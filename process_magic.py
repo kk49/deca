@@ -1,7 +1,7 @@
-import struct
 import os
 import numpy as np
 import sys
+from deca.file import ArchiveFile
 
 
 def file_stats(filename):
@@ -17,7 +17,7 @@ def file_stats(filename):
 if len(sys.argv) > 1:
     paths = [sys.argv[i] for i in range(1, len(sys.argv))]
 else:
-    paths = ['./test/out']
+    paths = ['./test/gz/out']
 
 line = '{}\t{}\t{}\t{}\th{}'.format('path', 'ftype', 'file_size', 'file_size_hex', 'magic_hex')
 print(line)
@@ -33,7 +33,7 @@ while len(paths) > 0:
             paths.append(ffn)
     else:
         file_size = os.stat(path).st_size
-        with open(path, 'rb') as f:
+        with ArchiveFile(open(path, 'rb')) as f:
             magic = f.read(32)
 
         # guess type

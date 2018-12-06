@@ -2,42 +2,24 @@ import os
 import sys
 import struct
 import re
+from deca.file import ArchiveFile
 
-in_file = sys.argv[1]
+# root_path = sys.argv[1]
+# in_file = sys.argv[2]
 
-out_path = './test/files/'
-fn_good = './test/files_good.txt'
-fn_bad = './test/files_bad.txt'
+root_path = '/home/krys/prj/deca/test/jc4/'
+in_file = 'test/jc4/out/test/game0/691DB0D0.sarc'
 
-hash_list_file = './hash_list.txt'
-hash_list_prefix = './out'
+out_path = root_path + 'files/'
+fn_good = root_path + 'files_good.txt'
+fn_bad = root_path + 'files_bad.txt'
+
+hash_list_file = root_path + 'hash_list.txt'
+hash_list_prefix = root_path + 'out'
 
 """
 krys@krysl001:~/prj/gz_hack/tab_arc/out$ find -type f > ../hash_list.txt
 """
-
-def dread(fp, l):
-    v = fp.read(l)
-    vs = v
-    v = struct.unpack('I', v)[0]
-    print('{1} {0:08x} {0}'.format(v, vs))
-    return v
-
-
-def dump_line(line, width, format=None):
-    if format is None or len(line) != width:
-        line = ['{:02x}'.format(v) for v in bytearray(line)]
-    else:
-        line = struct.unpack(format, line)
-    return '{}'.format(line)
-
-
-def dump_block(blk, width, format=None):
-    for i in range((len(blk) + width - 1) // width):
-        line = blk[(i*width):((i+1)*width)]
-        line = dump_line(line, width, format)
-        print(line)
-
 
 with open(hash_list_file, 'r') as f:
     hash_list = f.readlines()
@@ -51,7 +33,7 @@ for ele in hash_list:
     if mr is None:
         raise Exception('MISSING HASH {}'.format(ele))
     else:
-        hashv = int(mr[1],base=16)
+        hashv = int(mr[1], base=16)
         if hashv in hdict:
             raise Exception('HASH ALREADY FOUND {}'.format(ele))
         else:
@@ -60,11 +42,11 @@ for ele in hash_list:
 print('Processing sarc file {}'.format(in_file))
 with open(fn_good, 'a') as fng:
     with open(fn_bad, 'a') as fnb:
-        with open(in_file, 'rb') as f:
-            version = struct.unpack('I', f.read(4))[0]
+        with ArchiveFile(open(in_file, 'rb')) as f:
+            version = f.read_u32()
             magic = f.read(4)
-            ver2 = struct.unpack('I', f.read(4))[0]
-            dir_block_len = struct.unpack('I', f.read(4))[0]
+            ver2 = f.read_u32()
+            dir_block_len = f.read_u32()
 
             buf = f.read(dir_block_len)
             string_len = struct.unpack('I', buf[0:4])[0]
@@ -80,7 +62,7 @@ with open(fn_good, 'a') as fng:
             for i in range(len(strings)):
                 line = buf[(i*width):((i+1)*width)]
                 if len(line) == width:
-                    v = struct.unpack('IIIII',line)
+                    v = struct.unpack('IIIII', line)
                     v = [x for x in v]
 
                     offset = v[1]
@@ -118,11 +100,6 @@ with open(fn_good, 'a') as fng:
                                 else:
                                     print('File {} found in TAB/ARC, size do not match'.format(strings[i].decode("utf-8")))
                         fng.write('{}\n'.format([strings[i].decode("utf-8"), in_file] + v))
-
-
-
-
-
 
     # dump_block(buf,20)
     # dump_block(buf,20,'IIIII')

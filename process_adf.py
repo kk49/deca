@@ -1,13 +1,15 @@
 import sys
 import io
 import os
-from kkae.util import *
+from deca.file import ArchiveFile
+from deca.util import dump_block
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
 # TODO first pass find types?
 # TODO first pass find string hashes?
 # TODO ./files/effects/vehicles/wheels/rear_snow.effc good for basic types
+
 
 class StringHash:
     def __init__(self):
@@ -16,9 +18,9 @@ class StringHash:
         self.unknown = None
 
     def deserialize(self, f, nt):
-        self.value = dread_strz(f)
-        self.value_hash = dread(f, 'I', 4)
-        self.unknown = dread(f, 'I', 4)
+        self.value = f.read_strz()
+        self.value_hash = f.read_u32()
+        self.unknown = f.read_u32()
         print(self.value, self.value_hash, self.unknown)
 
 
@@ -32,12 +34,12 @@ class MemberDef:
         self.default_value = None
 
     def deserialize(self, f, nt):
-        self.name = nt[dread(f, 'q', 8)][1]
-        self.type_hash = dread(f, 'I', 4)
-        self.size = dread(f, 'I', 4)
-        self.offset = dread(f, 'I', 4)
-        self.default_type = dread(f, 'I', 4)
-        self.default_value = dread(f, 'Q', 8)
+        self.name = nt[f.read_u64()][1]
+        self.type_hash = f.read_u32()
+        self.size = f.read_u32()
+        self.offset = f.read_u32()
+        self.default_type = f.read_u32()
+        self.default_value = f.read_u64()
 
 
 class EnumDef:
@@ -46,8 +48,8 @@ class EnumDef:
         self.value = None
 
     def deserialize(self, f, nt):
-        self.name = nt[dread(f, 'q', 8)][1]
-        self.value = dread(f, 'I', 4)
+        self.name = nt[f.read_u64()][1]
+        self.value = f.read_u32()
 
         print(self.name, self.value)
 
@@ -80,49 +82,49 @@ class TypeDef:
         self.members = None
 
     def deserialize(self, f, nt):
-        self.metatype = dread(f, 'I', 4)
-        self.size = dread(f, 'I', 4)
-        self.alignment = dread(f, 'I', 4)
-        self.type_hash = dread(f, 'I', 4)
-        self.name = nt[dread(f, 'q', 8)][1]
-        self.flags = dread(f, 'I', 4)
-        self.element_type_hash = dread(f, 'I', 4)
-        self.element_length = dread(f, 'I', 4)
+        self.metatype = f.read_u32()
+        self.size = f.read_u32()
+        self.alignment = f.read_u32()
+        self.type_hash = f.read_u32()
+        self.name = nt[f.read_u64()][1]
+        self.flags = f.read_u32()
+        self.element_type_hash = f.read_u32()
+        self.element_length = f.read_u32()
 
         if self.metatype == 0:  # Primative
             pass
         elif self.metatype == 1:  # Structure
-            member_count = dread(f, 'I', 4)
+            member_count = f.read_u32()
             self.members = [MemberDef() for i in range(member_count)]
             for i in range(member_count):
                 self.members[i].deserialize(f, nt)
         elif self.metatype == 2:  # Pointer
-            count = dread(f, 'I', 4)
+            count = f.read_u32()
             if count != 0:
                 print(count)
                 raise Exception('Not Implemented')
         elif self.metatype == 3:  # Array
-            count = dread(f, 'I', 4)
+            count = f.read_u32()
             if count != 0:
                 print(count)
                 raise Exception('Not Implemented')
         elif self.metatype == 4:  # Inline Array
-            count = dread(f, 'I', 4)
+            count = f.read_u32()
             if count != 0:
                 print(count)
                 raise Exception('Not Implemented')
         elif self.metatype == 7:  # BitField
-            count = dread(f, 'I', 4)
+            count = f.read_u32()
             if count != 0:
                 print(count)
                 raise Exception('Not Implemented')
         elif self.metatype == 8:  # Enumeration
-            count = dread(f, 'I', 4)
+            count = f.read_u32()
             self.members = [EnumDef() for i in range(count)]
             for i in range(count):
                 self.members[i].deserialize(f, nt)
         elif self.metatype == 9:  # String Hash
-            count = dread(f, 'I', 4)
+            count = f.read_u32()
             if count != 0:
                 print(count)
                 raise Exception('Not Implemented')
@@ -154,51 +156,51 @@ class Instance:
 
     def deserialize(self, f, nt):
         print('FP Begin:', f.tell())
-        self.name_hash = dread(f, 'I', 4)
-        self.type_hash = dread(f, 'I', 4)
-        self.offset = dread(f, 'I', 4)
-        self.size = dread(f, 'I', 4)
-        self.name = nt[dread(f, 'Q', 8)][1]
+        self.name_hash = f.read_u32()
+        self.type_hash = f.read_u32()
+        self.offset = f.read_u32()
+        self.size = f.read_u32()
+        self.name = nt[f.read_u64()][1]
         # print('{:08x}'.format(self.name_hash), '{:08x}'.format(self.type_hash), self.offset, self.size, self.name)
         print('FP End', f.tell())
 
 
 if len(sys.argv) < 2:
-    in_file = './files/models/manmade/collectibles/gnomes/gnomes_01_garden_01.meshc'
+    in_file = './test/gz/files/models/manmade/collectibles/gnomes/gnomes_01_garden_01.meshc'
 else:
     in_file = sys.argv[1]
 
 file_sz = os.stat(in_file).st_size
 print('file size: {}'.format(file_sz))
 
-with open(in_file, 'rb') as f:
+with ArchiveFile(open(in_file, 'rb')) as f:
     header = f.read(0x40)
     dump_block(header, 0x10)
 
-    fh = io.BytesIO(header)
+    fh = ArchiveFile(io.BytesIO(header))
 
-    magic = dread(fh,'I',4)
-    version = dread(fh,'I',4)
+    magic = fh.read_u32()
+    version = fh.read_u32()
 
-    instance_count = dread(fh,'I',4)
-    instance_offset = dread(fh,'I',4)
+    instance_count = fh.read_u32()
+    instance_offset = fh.read_u32()
 
-    typedef_count = dread(fh,'I',4)
-    typedef_offset = dread(fh,'I',4)
+    typedef_count = fh.read_u32()
+    typedef_offset = fh.read_u32()
 
-    stringhash_count = dread(fh,'I',4)
-    stringhash_offset = dread(fh,'I',4)
+    stringhash_count = fh.read_u32()
+    stringhash_offset = fh.read_u32()
 
-    nametable_count = dread(fh,'I',4)
-    nametable_offset = dread(fh,'I',4)
+    nametable_count = fh.read_u32()
+    nametable_offset = fh.read_u32()
 
-    total_size = dread(fh,'I',4)
-    dread(fh,'I',4)
+    total_size = fh.read_u32()
+    fh.read_u32()
 
-    dread(fh,'I',4)
-    dread(fh,'I',4)
-    dread(fh,'I',4)
-    dread(fh,'I',4)
+    fh.read_u32()
+    fh.read_u32()
+    fh.read_u32()
+    fh.read_u32()
 
     #TODO COMMENT C-string
 
@@ -206,7 +208,7 @@ with open(in_file, 'rb') as f:
     name_table = [[None, None] for i in range(nametable_count)]
     f.seek(nametable_offset)
     for i in range(nametable_count):
-        name_table[i][0] = dread(f, 'B', 1)
+        name_table[i][0] = f.read_u8()
     for i in range(nametable_count):
         name_table[i][1] = f.read(name_table[i][0] + 1)[0:-1]
 

@@ -57,8 +57,14 @@ class ArchiveFile:
 
         return v
 
+    def read_u8(self, n=None):
+        return self.read_base('B', 1, n)
+
     def read_u16(self, n=None):
         return self.read_base('H', 2, n)
 
     def read_u32(self, n=None):
         return self.read_base('I', 4, n)
+
+    def read_u64(self, n=None):
+        return self.read_base('Q', 8, n)

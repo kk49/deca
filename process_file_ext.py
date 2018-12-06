@@ -1,10 +1,13 @@
-import struct
 import os
+import sys
 import numpy as np
+from deca.file import ArchiveFile
+
+paths = [sys.argv[1]]
 
 
 def file_stats(filename):
-    counts = np.zeros((256,),dtype=np.uint32)
+    counts = np.zeros((256,), dtype=np.uint32)
     with open(filename, 'rb') as f:
         buf = f.read(1024*1024)
         buf = bytearray(buf)
@@ -12,7 +15,6 @@ def file_stats(filename):
         counts = counts + cnt
     return counts
 
-paths = ['./test/gz/out']
 
 while len(paths) > 0:
     path = paths.pop(-1)
@@ -24,10 +26,10 @@ while len(paths) > 0:
             ffn = path + file
             paths.append(ffn)
     elif path[-3:].lower() == 'dat':
-        with open(path, 'rb') as f:
+        with ArchiveFile(open(path, 'rb')) as f:
             magic = f.read(8)
             f.seek(0)
-            magic16 = f.read(16)
+            magic_long = f.read(32)
         if False:
             None
         # elif b' fda' == magic[0:4].lower():
@@ -59,7 +61,7 @@ while len(paths) > 0:
         #     if all_sum == pri_sum:
         #         os.rename(path, path[0:-4] + '.xml')
         else:
-            magic_ba = bytearray(magic16)
+            magic_ba = bytearray(magic_long)
             magic_hex = ['{:02x}'.format(v) for v in magic_ba]
             magic_hex = ''.join(magic_hex)
             magic_str = magic_ba
@@ -68,5 +70,5 @@ while len(paths) > 0:
                     magic_str[i] = ord('.')
             magic_str = magic_str.decode('utf-8')
             file_size = os.stat(path).st_size
-            line = '{}\t{}\t0x{:x}\th{}\t{}'.format(path, file_size, file_size, magic_hex, magic_str)
+            line = '{}\t{}\t0x{:08x}\th{}\t{}'.format(path, file_size, file_size, magic_hex, magic_str)
             print(line)

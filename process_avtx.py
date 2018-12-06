@@ -1,14 +1,14 @@
 import os
 import io
 import sys
-import struct
 import matplotlib.pyplot as plt
 import numpy as np
 import PIL
 import datetime
 import time
-from deca.util import dread
 import deca.dxgi
+from deca.file import ArchiveFile
+
 
 # TODO when dumping, run through other mip levels, to check for too much or too little data
 # TODO add option to delete dst file on exception to clean up partially working loader
@@ -47,28 +47,28 @@ try:
         0x20000: [[71, 128 * 4, 128 * 4]],
     }
 
-    with open(in_file, 'rb') as f0:
+    with ArchiveFile(open(in_file, 'rb')) as f0:
         no_header = file_sz in file_data_layout_db
         if not no_header:
             file_sz = file_sz - 128
             header = f0.read(128)
-            fh = io.BytesIO(header)
+            fh = ArchiveFile(io.BytesIO(header))
 
             p = 0
-            magic = dread(fh, 'I', 4)
-            version = dread(fh, 'H', 2)
-            d = dread(fh, 'B', 1)
-            dim = dread(fh, 'B', 1)
-            pixel_format = dread(fh, 'I', 4)
-            nx0 = dread(fh, 'H', 2)
-            ny0 = dread(fh, 'H', 2)
-            depth = dread(fh, 'H', 2)
-            flags = dread(fh, 'H', 2)
-            full_mip_count = dread(fh, 'B', 1)
-            mip_count = dread(fh, 'B', 1)
-            d = dread(fh, 'H', 2)
+            magic = fh.read_u32()
+            version = fh.read_u16()
+            d = fh.read_u8()
+            dim = fh.read_u8()
+            pixel_format = fh.read_u32()
+            nx0 = fh.read_u16()
+            ny0 = fh.read_u16()
+            depth = fh.read_u16()
+            flags = fh.read_u16()
+            full_mip_count = fh.read_u8()
+            mip_count = fh.read_u8()
+            d = fh.read_u16()
             while fh.tell() < 128:
-                d = dread(fh, 'I', 4)
+                d = fh.read_u32()
 
             nx = nx0 >> (full_mip_count - mip_count)
             ny = ny0 >> (full_mip_count - mip_count)

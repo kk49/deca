@@ -21,7 +21,8 @@ class StringHash:
         self.value = f.read_strz()
         self.value_hash = f.read_u32()
         self.unknown = f.read_u32()
-        print(self.value, self.value_hash, self.unknown)
+
+        # print(self.value, self.value_hash, self.unknown)
 
 
 class MemberDef:
@@ -51,7 +52,7 @@ class EnumDef:
         self.name = nt[f.read_u64()][1]
         self.value = f.read_u32()
 
-        print(self.name, self.value)
+        # print(self.name, self.value)
 
 '''
         public enum TypeDefinitionType : uint
@@ -101,23 +102,19 @@ class TypeDef:
         elif self.metatype == 2:  # Pointer
             count = f.read_u32()
             if count != 0:
-                print(count)
-                raise Exception('Not Implemented')
+                raise Exception('Not Implemented: count == {}'.format(count))
         elif self.metatype == 3:  # Array
             count = f.read_u32()
             if count != 0:
-                print(count)
-                raise Exception('Not Implemented')
+                raise Exception('Not Implemented: count == {}'.format(count))
         elif self.metatype == 4:  # Inline Array
             count = f.read_u32()
             if count != 0:
-                print(count)
-                raise Exception('Not Implemented')
+                raise Exception('Not Implemented: count == {}'.format(count))
         elif self.metatype == 7:  # BitField
             count = f.read_u32()
             if count != 0:
-                print(count)
-                raise Exception('Not Implemented')
+                raise Exception('Not Implemented: count == {}'.format(count))
         elif self.metatype == 8:  # Enumeration
             count = f.read_u32()
             self.members = [EnumDef() for i in range(count)]
@@ -126,8 +123,7 @@ class TypeDef:
         elif self.metatype == 9:  # String Hash
             count = f.read_u32()
             if count != 0:
-                print(count)
-                raise Exception('Not Implemented')
+                raise Exception('Not Implemented: count == {}'.format(count))
         else:
             raise Exception('Unknown Typedef Type {}'.format(self.type))
 
@@ -155,14 +151,14 @@ class Instance:
         self.name = None
 
     def deserialize(self, f, nt):
-        print('FP Begin:', f.tell())
+        # print('FP Begin:', f.tell())
         self.name_hash = f.read_u32()
         self.type_hash = f.read_u32()
         self.offset = f.read_u32()
         self.size = f.read_u32()
         self.name = nt[f.read_u64()][1]
         # print('{:08x}'.format(self.name_hash), '{:08x}'.format(self.type_hash), self.offset, self.size, self.name)
-        print('FP End', f.tell())
+        # print('FP End', f.tell())
 
 
 if len(sys.argv) < 2:
@@ -171,15 +167,23 @@ else:
     in_file = sys.argv[1]
 
 file_sz = os.stat(in_file).st_size
-print('file size: {}'.format(file_sz))
 
 with ArchiveFile(open(in_file, 'rb')) as f:
     header = f.read(0x40)
-    dump_block(header, 0x10)
+    # dump_block(header, 0x10)
 
     fh = ArchiveFile(io.BytesIO(header))
 
-    magic = fh.read_u32()
+    if len(header) < 0x40:
+        exit(0)
+
+    magic = fh.read_strl(4)
+
+    if magic != b' FDA':
+        exit(0)
+
+    print('file\t{}\t{}'.format(in_file, file_sz))
+
     version = fh.read_u32()
 
     instance_count = fh.read_u32()
@@ -228,7 +232,7 @@ with ArchiveFile(open(in_file, 'rb')) as f:
         typedef_table[i].deserialize(f, name_table)
         typedef_map[typedef_table[i].type_hash] = typedef_table[i]
 
-    print(typedef_map)
+    # print(typedef_map)
 
     # instance
     instance_table = [Instance() for i in range(instance_count)]
@@ -238,18 +242,18 @@ with ArchiveFile(open(in_file, 'rb')) as f:
         instance_table[i].deserialize(f, name_table)
         instance_map[instance_table[i].name_hash] = instance_table[i]
 
-print('--------name_table')
+# print('--------name_table')
 for i in range(len(name_table)):
-    print(i, name_table[i][1])
+    print('name_table\t{}\t{}'.format(i, name_table[i][1]))
 
-print('--------string_hash')
+# print('--------string_hash')
 for v in stringhash_map.items():
-    print('{:08x}'.format(v[0]), v[1].value)
+    print('string_hash\t{:08x}\t{}'.format(v[0], v[1].value))
 
-print('--------typedefs')
+# print('--------typedefs')
 for v in typedef_map.items():
-    print('{:08x}'.format(v[0]), v[1].name)
+    print('typedefs\t{:08x}\t{}'.format(v[0], v[1].name))
 
-print('--------instances')
+# print('--------instances')
 for v in instance_map.items():
-    print('{:08x}'.format(v[0]), '{:08x}'.format(v[1].type_hash), v[1].name)
+    print('instances\t{:08x}\t{:08x}\t{}'.format(v[0], v[1].type_hash, v[1].name))

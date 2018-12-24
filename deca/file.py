@@ -57,6 +57,13 @@ class ArchiveFile:
 
         return v
 
+    def read_c8(self, n=None):
+        return self.read_base('c', 1, n)
+
+    def read_strl(self, n=None):
+        v = self.read_base('c', 1, n)
+        return b''.join(v)
+
     def read_u8(self, n=None):
         return self.read_base('B', 1, n)
 
@@ -68,3 +75,9 @@ class ArchiveFile:
 
     def read_u64(self, n=None):
         return self.read_base('Q', 8, n)
+
+    def read_f32(self, n=None):
+        return self.read_base('f', 4, n)
+
+    def read_f64(self, n=None):
+        return self.read_base('d', 8, n)

@@ -16,7 +16,7 @@ from deca.file import ArchiveFile
 
 
 if len(sys.argv) < 2:
-    in_file = './test/gz/files/models/characters/machines/skirmisher/textures/skirmisher_body_01_dif.ddsc'
+    in_file = './test/gz/files/models/characters/machines/scout/textures/scout_01_dif.ddsc'
 else:
     in_file = sys.argv[1]
 
@@ -45,6 +45,7 @@ try:
         0x80000: [[71, 256 * 4, 256 * 4]],
         0x40000: [[71, 256 * 4, 128 * 4]],
         0x20000: [[71, 128 * 4, 128 * 4]],
+        0x8000: [[71, 128 * 2, 128 * 2]],
     }
 
     with ArchiveFile(open(in_file, 'rb')) as f0:
@@ -93,6 +94,8 @@ try:
             pixel_format = fl[0]
             nx = fl[1]
             ny = fl[2]
+            if nx == 0 or ny == 0:
+                break
             nxm = max(4, nx)
             nym = max(4, ny)
             raw_size = deca.dxgi.raw_data_size(pixel_format, nx, ny)
@@ -113,10 +116,11 @@ try:
                 if no_header:
                     impath = image_dump + 'raw_images/{:08x}/'.format(file_sz)
                 else:
-                    impath = image_dump + '{:02d}/'.format(pixel_format) + fns[0] + '/'
+                    impath = image_dump + '{:02d}/'.format(pixel_format)
+                impath = impath + '/'.join(fns[3:]) + '/'
                 imfn = impath + ifn + '.{:04d}x{:04d}.png'.format(fl[1], fl[2])
                 # print(imfn)
-                os.makedirs(impath,exist_ok=True)
+                os.makedirs(impath, exist_ok=True)
                 if not os.path.isfile(imfn):
                     im.save(imfn)
             else:

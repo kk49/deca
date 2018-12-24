@@ -4,11 +4,11 @@ import struct
 import re
 from deca.file import ArchiveFile
 
-# root_path = sys.argv[1]
-# in_file = sys.argv[2]
+root_path = sys.argv[1]
+in_file = sys.argv[2]
 
-root_path = '/home/krys/prj/deca/test/jc4/'
-in_file = 'test/jc4/out/test/game0/691DB0D0.sarc'
+# root_path = '/home/krys/prj/deca/test/jc4/'
+# in_file = 'test/jc4/out/test/game0/691DB0D0.sarc'
 
 out_path = root_path + 'files/'
 fn_good = root_path + 'files_good.txt'

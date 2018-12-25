@@ -2,7 +2,7 @@ import numpy as np
 import struct
 import io
 from deca.file import ArchiveFile
-from deca.ff_vfs import *
+from deca.ff_types import *
 
 
 # guess type
@@ -66,7 +66,8 @@ def determine_file_type(f, file_size):
         ftype = FTYPE_NHAVTX
 
     # need to inspect file structure
-    if ftype is None:  # OBC files with (u32)4, (u32)cnt, f32 *
+
+    if ftype is None:  # OBC files with (u32)4, (u32)count , 80 * count bytes, something to do with areas on the map? object placement?
         fm = ArchiveFile(f)
         fm.seek(start_pos)
         ver = fm.read_u32()
@@ -74,7 +75,7 @@ def determine_file_type(f, file_size):
         if ver == 4 and cnt * 80 + 8 == file_size:
             ftype = FTYPE_OBC
 
-    if ftype is None:  # text file of some sort only text bytes, json, xml, ...
+    if ftype is None:  # text file only contains text bytes, json, xml, ...
         fm.seek(start_pos)
         counts = file_stats(fm, file_size)
         all_sum = np.sum(counts)

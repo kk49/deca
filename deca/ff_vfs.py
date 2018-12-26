@@ -1,11 +1,15 @@
 import os
 import datetime
+import pandas as pd
 from deca.util import *
 from deca.file import ArchiveFile
 from deca.ff_types import *
+from deca.ff_txt import load_json
+from deca.ff_adf import load_adf
 from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_determine import determine_file_type
+from deca.hash_jenkins import hash_little
 
 
 class VfsNode:
@@ -38,16 +42,24 @@ class VfsNode:
         return ' '.join(info)
 
 
+def game_file_to_sortable_string(v):
+    if v[0:4] == 'game':
+        return 'game{:08}'.format(int(v[4:]))
+    else:
+        return v
+
+
 class VfsStructure:
     def __init__(self, working_dir):
+        self.working_dir = working_dir
         self.uid = 0
         self.table_vfsnode = [None]
-        self.map_uid_vfsnode = {}
-        self.working_dir = working_dir
+        self.map_uid_to_vfsnode = {}  # TODO currently redundant, may always be
         self.map_hash_to_vpath = {}
         self.map_vpath_to_hash = {}
         self.hash_bad = {}
-        self.hashs = set()
+        self.hash_present = set()
+        self.hash_missing = set()
 
     def log_base(self, level, s):
         with open(self.working_dir + 'log.txt', 'a') as f:
@@ -66,7 +78,7 @@ class VfsStructure:
         self.uid = self.uid + 1
         node.uid = self.uid
         self.table_vfsnode.append(node)
-        self.map_uid_vfsnode[node.uid] = node
+        self.map_uid_to_vfsnode[node.uid] = node
         return node
 
     def file_obj_from(self, node: VfsNode, mode='rb'):
@@ -90,19 +102,51 @@ class VfsStructure:
         else:
             raise Exception('NOT IMPLEMENTED: DEFAULT')
 
+    def propose_vpaths(self, strings):
+        found = 0
+        with open(self.working_dir + 'found_vpaths.txt', 'a') as f:
+            for s in strings:
+                if isinstance(s, str):
+                    s = s.encode('ascii', 'ignore')
+                elif isinstance(s, bytes):
+                    pass
+                else:
+                    self.trace('BAD STRING {}'.format(s))
+                    continue
+                hid = hash_little(s)
+                if hid in self.hash_present:
+                    if hid in self.map_hash_to_vpath:
+                        if s != self.map_hash_to_vpath[hid]:
+                            self.trace('HASH CONFLICT STRINGS: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], s))
+                            self.hash_bad[hid] = (self.map_hash_to_vpath[hid], s)
+                    else:
+                        f.write('{:08X}\t{}\n'.format(hid, s))
+                        self.map_hash_to_vpath[hid] = s
+                        self.map_vpath_to_hash[s] = hid
+                        found = found + 1
+        return found
+
     def load_from_archives(self, archive_path, ver=3, debug=False):
+        find_all_tab_arcs = False
         self.log('find all tab/arc files')
         input_files = []
-        cats = os.listdir(archive_path)
+        if find_all_tab_arcs:
+            cats = os.listdir(archive_path)
+        else:
+            cats = ['initial', 'supplemental', 'optional']
         for cat in cats:
             fcat = archive_path + cat
             print(fcat)
             if os.path.isdir(fcat):
                 fcat = fcat + '/'
                 files = os.listdir(fcat)
+                ifns = []
                 for file in files:
                     if 'tab' == file[-3:]:
-                        input_files.append((cat, file[0:-4]))
+                        ifns.append(file[0:-4])
+                ifns.sort(key=game_file_to_sortable_string)
+                for ifn in ifns:
+                    input_files.append((cat, ifn))
 
         self.log('process all game tab / arc files')
         for ta_file in input_files:
@@ -215,43 +259,108 @@ class VfsStructure:
             node = self.table_vfsnode[idx]
             if node is not None and node.hashid is not None:
                 hid = node.hashid
-                self.hashs.add(hid)
+                self.hash_present.add(hid)
                 if node.v_path is not None:
                     if hid in self.map_hash_to_vpath:
                         if self.map_hash_to_vpath[hid] != node.v_path:
-                            self.trace('HASH CONFLICT: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.v_path))
+                            self.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.v_path))
                             self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.v_path)
                     else:
                         self.map_hash_to_vpath[hid] = node.v_path
                         self.map_vpath_to_hash[node.v_path] = hid
 
+        self.log('HASH FROM JSON: look for hashable strings in json files')
+        json_strings = set()
+        for idx in range(len(self.table_vfsnode)):
+            node = self.table_vfsnode[idx]
+            if node is not None and node.ftype == FTYPE_TXT:
+                with self.file_obj_from(node) as f:
+                    buffer = f.read(node.size_u)
+                json = load_json(buffer)
+                # Parse {"0":[]. "1":[]}
+                if isinstance(json, dict) and '0' in json and '1' in json:
+                    for k, v in json.items():
+                        for l in v:
+                            json_strings.add(l)
+        json_found = self.propose_vpaths(json_strings)
+        self.log('HASH FROM JSON: From {} found {} hashes'.format(len(json_strings), json_found))
+
+        self.log('HASH FROM ADF: look for hashable strings in ADF files')
+        adf_strings = set()
+        adf_done = set()
+        for idx in range(len(self.table_vfsnode)):
+            # if idx % 10000 == 0:
+            #     self.log('HASH FROM ADF: {} of {}'.format(idx, len(self.table_vfsnode)))
+            node = self.table_vfsnode[idx]
+            if node is not None and node.ftype == FTYPE_ADF and node.hashid not in adf_done:
+                adf_done.add(node.hashid)
+                with self.file_obj_from(node) as f:
+                    buffer = f.read(node.size_u)
+                adf = load_adf(buffer)
+                for sh in adf.table_stringhash:
+                    adf_strings.add(sh.value)
+        adf_found = self.propose_vpaths(adf_strings)
+        self.log('HASH FROM ADF: From {} found {} hashes. Total ADFs {}'.format(len(adf_strings), adf_found, len(adf_done)))
+
+        self.log('HASH FROM TEXTURE FILE NAMES: add possible strings for all ddsc -> atx?')
+        avtx_strings = set()
+        for idx in range(len(self.table_vfsnode)):
+            node = self.table_vfsnode[idx]
+            if node is not None and node.ftype == FTYPE_AVTX and node.v_path is not None:
+                file, ext = os.path.splitext(node.v_path)
+                for exti in range(16):
+                    avtx_strings.add(file + '.atx{}'.format(exti).encode('ascii'))
+        avtx_found = self.propose_vpaths(avtx_strings)
+        self.log('HASH FROM TEXTURE FILE NAMES: From {} found {} hashes'.format(len(avtx_strings), avtx_found))
+
+        self.log('HASH FROM EXE: look for hashable strings in EXE strings from IDA')
+        db = pd.read_csv('./resources/gz/all_strings.tsv', delimiter='\t')
+        db_str = db['String']
+        exe_found = self.propose_vpaths(db_str)
+        self.log('HASH FROM EXE: From {} found {} hashes'.format(len(db_str), exe_found))
+
+        self.log('HASH FROM CUSTOM: look for hashable strings in resources/gz/strings.txt')
+        db = pd.read_csv('./resources/gz/strings.txt', delimiter='\t')
+        db_str = db['String']
+        custom_found = self.propose_vpaths(db_str)
+        self.log('HASH FROM CUSTOM: From {} found {} hashes'.format(len(db_str), custom_found))
+
         self.log('fill in v_paths')
-        hash_missing = {}
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
             if node is not None and node.hashid is not None and node.v_path is None:
                 if node.hashid in self.map_hash_to_vpath:
                     node.v_path = self.map_hash_to_vpath[node.hashid]
+                elif node.ftype == FTYPE_AAF:
+                    pass  # AAF files are containers
+                elif node.ftype == FTYPE_SARC:
+                    pass  # SARC files are containers
                 else:
-                    hash_missing[node.hashid] = None
+                    self.hash_missing.add(node.hashid)
+
+        self.log('hash_missing: {}'.format(len(self.hash_missing)))
 
         self.log('dump files that need more info')
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node is not None and node.ftype is None:
-                with ArchiveFile(self.file_obj_from(node)) as f:
-                    if node.v_path is None:
-                        ofile = self.working_dir + '__TEST__/{:08X}.dat'.format(node.hashid)
-                    else:
-                        ofile = self.working_dir + '__TEST__/{}.{:08X}'.format(node.v_path.decode('utf-8'), node.hashid)
+            if node is not None:
+                dump = False
+                dump = dump or node.ftype is None
+                dump = dump or (node.v_path is not None and node.v_path.find(b'characters/machines/dreadnought') >= 0)
+                if dump and node.offset is not None:
+                    with ArchiveFile(self.file_obj_from(node)) as f:
+                        if node.v_path is None:
+                            ofile = self.working_dir + '__TEST__/{:08X}.dat'.format(node.hashid)
+                        else:
+                            ofile = self.working_dir + '__TEST__/{}.{:08X}'.format(node.v_path.decode('utf-8'), node.hashid)
 
-                    ofiledir = os.path.dirname(ofile)
-                    os.makedirs(ofiledir, exist_ok=True)
+                        ofiledir = os.path.dirname(ofile)
+                        os.makedirs(ofiledir, exist_ok=True)
 
-                    self.trace('Unknown Type: {}'.format(ofile))
-                    with ArchiveFile(open(ofile, 'wb')) as fo:
-                        buf = f.read(node.size_c)
-                        fo.write(buf)
+                        self.trace('Unknown Type: {}'.format(ofile))
+                        with ArchiveFile(open(ofile, 'wb')) as fo:
+                            buf = f.read(node.size_c)
+                            fo.write(buf)
 
 
 

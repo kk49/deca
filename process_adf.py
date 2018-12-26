@@ -3,6 +3,7 @@ import io
 import os
 from deca.file import ArchiveFile
 from deca.util import dump_block
+from deca.ff_adf import load_adf
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
@@ -168,92 +169,25 @@ else:
 
 file_sz = os.stat(in_file).st_size
 
+
 with ArchiveFile(open(in_file, 'rb')) as f:
-    header = f.read(0x40)
+    buffer = f.read(file_sz)
     # dump_block(header, 0x10)
 
-    fh = ArchiveFile(io.BytesIO(header))
-
-    if len(header) < 0x40:
-        exit(0)
-
-    magic = fh.read_strl(4)
-
-    if magic != b' FDA':
-        exit(0)
-
-    print('file\t{}\t{}'.format(in_file, file_sz))
-
-    version = fh.read_u32()
-
-    instance_count = fh.read_u32()
-    instance_offset = fh.read_u32()
-
-    typedef_count = fh.read_u32()
-    typedef_offset = fh.read_u32()
-
-    stringhash_count = fh.read_u32()
-    stringhash_offset = fh.read_u32()
-
-    nametable_count = fh.read_u32()
-    nametable_offset = fh.read_u32()
-
-    total_size = fh.read_u32()
-    fh.read_u32()
-
-    fh.read_u32()
-    fh.read_u32()
-    fh.read_u32()
-    fh.read_u32()
-
-    #TODO COMMENT C-string
-
-    # name table
-    name_table = [[None, None] for i in range(nametable_count)]
-    f.seek(nametable_offset)
-    for i in range(nametable_count):
-        name_table[i][0] = f.read_u8()
-    for i in range(nametable_count):
-        name_table[i][1] = f.read(name_table[i][0] + 1)[0:-1]
-
-    # string hash
-    stringhash_table = [StringHash() for i in range(stringhash_count)]
-    stringhash_map = {}
-    f.seek(stringhash_offset)
-    for i in range(stringhash_count):
-        stringhash_table[i].deserialize(f, name_table)
-        stringhash_map[stringhash_table[i].value_hash] = stringhash_table[i]
-
-    # typedef
-    typedef_table = [TypeDef() for i in range(typedef_count)]
-    typedef_map = {}
-    f.seek(typedef_offset)
-    for i in range(typedef_count):
-        typedef_table[i].deserialize(f, name_table)
-        typedef_map[typedef_table[i].type_hash] = typedef_table[i]
-
-    # print(typedef_map)
-
-    # instance
-    instance_table = [Instance() for i in range(instance_count)]
-    instance_map = {}
-    f.seek(instance_offset)
-    for i in range(instance_count):
-        instance_table[i].deserialize(f, name_table)
-        instance_map[instance_table[i].name_hash] = instance_table[i]
+obj = load_adf(buffer)
 
 # print('--------name_table')
-for i in range(len(name_table)):
-    print('name_table\t{}\t{}'.format(i, name_table[i][1]))
+for i in range(len(obj.table_name)):
+    print('name_table\t{}\t{}'.format(i, obj.table_name[i][1]))
 
 # print('--------string_hash')
-for v in stringhash_map.items():
+for v in obj.map_stringhash.items():
     print('string_hash\t{:08x}\t{}'.format(v[0], v[1].value))
 
 # print('--------typedefs')
-for v in typedef_map.items():
+for v in obj.map_typedef.items():
     print('typedefs\t{:08x}\t{}'.format(v[0], v[1].name))
 
 # print('--------instances')
-for v in instance_map.items():
+for v in obj.map_instance.items():
     print('instances\t{:08x}\t{:08x}\t{}'.format(v[0], v[1].type_hash, v[1].name))

@@ -3,10 +3,8 @@
   <component name="ChangeListManager">
     <list default="true" id="d9d1d6c7-0409-4b6e-8d7d-221114698d99" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/deca/ff_types.py" beforeDir="false" afterPath="$PROJECT_DIR$/deca/ff_types.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/deca/ff_vfs.py" beforeDir="false" afterPath="$PROJECT_DIR$/deca/ff_vfs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/deca/util.py" beforeDir="false" afterPath="$PROJECT_DIR$/deca/util.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/process_adf.py" beforeDir="false" afterPath="$PROJECT_DIR$/process_adf.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/process_obc.py" beforeDir="false" afterPath="$PROJECT_DIR$/process_obc.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/process_vfs.py" beforeDir="false" afterPath="$PROJECT_DIR$/process_vfs.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -20,8 +18,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/process_vfs.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-299">
-              <caret line="311" selection-start-line="311" selection-end-line="311" />
+            <state relative-caret-position="-60">
+              <caret line="309" column="21" selection-start-line="309" selection-start-column="21" selection-end-line="309" selection-end-column="21" />
               <folding>
                 <element signature="e#0#10#0" expanded="true" />
               </folding>
@@ -39,19 +37,31 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/deca/ff_types.py">
+        <entry file="file://$PROJECT_DIR$/deca/ff_determine.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="45">
-              <caret line="3" column="10" selection-start-line="3" selection-end-line="3" selection-end-column="10" />
+            <state relative-caret-position="49">
+              <caret line="22" selection-start-line="22" selection-end-line="22" />
+              <folding>
+                <element signature="e#0#18#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/deca/ff_types.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="135">
+              <caret line="9" column="24" selection-start-line="9" selection-start-column="17" selection-end-line="9" selection-end-column="24" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/deca/ff_vfs.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="136">
-              <caret line="292" column="31" selection-start-line="291" selection-start-column="31" selection-end-line="292" selection-end-column="31" />
+            <state relative-caret-position="120">
+              <caret line="348" column="52" selection-start-line="348" selection-start-column="52" selection-end-line="348" selection-end-column="52" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -68,7 +78,7 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/deca/ff_adf.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="281">
@@ -114,14 +124,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>raw_image_size</find>
-      <find>kkae</find>
-      <find>in_file</find>
-      <find>dread(f, 'q', 8)</find>
-      <find>dread(fh, 'H', 2)</find>
-      <find>.append(f.read_u16())</find>
-      <find>.append(f.read_u32())</find>
-      <find>d1</find>
       <find>d2</find>
       <find>prefix_out</find>
       <find>file_list</find>
@@ -143,6 +145,15 @@
       <find>node.hid</find>
       <find>load_adf</find>
       <find>hash_pre</find>
+      <find>dete</find>
+      <find>CACH</find>
+      <find>determine_file_type</find>
+      <find>determi</find>
+      <find>symlink</find>
+      <find>SARC</find>
+      <find>is_com</find>
+      <find>FROM AD</find>
+      <find>ftype</find>
     </findStrings>
     <replaceStrings>
       <replace>f.read_u64()</replace>
@@ -176,18 +187,18 @@
         <option value="$PROJECT_DIR$/process_filelist.py" />
         <option value="$PROJECT_DIR$/deca/ff_aaf.py" />
         <option value="$PROJECT_DIR$/process_avtx.py" />
-        <option value="$PROJECT_DIR$/deca/ff_types.py" />
-        <option value="$PROJECT_DIR$/deca/ff_determine.py" />
         <option value="$PROJECT_DIR$/process_obc.py" />
         <option value="$PROJECT_DIR$/deca/util.py" />
         <option value="$PROJECT_DIR$/deca/hash_jenkins.py" />
         <option value="$PROJECT_DIR$/deca/ff_txt.py" />
         <option value="$PROJECT_DIR$/process_adf.py" />
-        <option value="$PROJECT_DIR$/process_vfs.py" />
         <option value="$PROJECT_DIR$/deca/file.py" />
         <option value="$PROJECT_DIR$/deca/errors.py" />
-        <option value="$PROJECT_DIR$/deca/ff_vfs.py" />
         <option value="$PROJECT_DIR$/deca/ff_adf.py" />
+        <option value="$PROJECT_DIR$/deca/ff_determine.py" />
+        <option value="$PROJECT_DIR$/deca/ff_types.py" />
+        <option value="$PROJECT_DIR$/process_vfs.py" />
+        <option value="$PROJECT_DIR$/deca/ff_vfs.py" />
       </list>
     </option>
   </component>
@@ -392,7 +403,7 @@
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32922733" />
       <window_info anchor="bottom" id="Run" order="2" />
-      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.49815497" visible="true" weight="0.39977604" />
+      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.49815497" weight="0.39977604" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -452,16 +463,6 @@
           <url>file://$PROJECT_DIR$/process_avtx.py</url>
           <line>73</line>
           <option name="timeStamp" value="20" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/deca/ff_vfs.py</url>
-          <line>301</line>
-          <option name="timeStamp" value="56" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/deca/ff_vfs.py</url>
-          <line>312</line>
-          <option name="timeStamp" value="81" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
@@ -551,16 +552,6 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/deca/__init__.py">
       <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/deca/ff_determine.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="150">
-          <caret line="10" column="17" selection-start-line="10" selection-start-column="17" selection-end-line="10" selection-end-column="17" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/extract_base.sh">
       <provider selected="true" editor-type-id="text-editor">
@@ -732,10 +723,30 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/deca/ff_types.py">
+    <entry file="file://$PROJECT_DIR$/deca/ff_aaf.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="45">
-          <caret line="3" column="10" selection-start-line="3" selection-end-line="3" selection-end-column="10" />
+        <state relative-caret-position="30">
+          <caret line="2" selection-start-line="2" selection-end-line="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/deca/ff_adf.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="281">
+          <caret line="191" column="25" selection-start-line="191" selection-start-column="25" selection-end-line="191" selection-end-column="25" />
+          <folding>
+            <element signature="e#0#10#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/deca/ff_determine.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="49">
+          <caret line="22" selection-start-line="22" selection-end-line="22" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -746,13 +757,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/deca/ff_aaf.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="30">
-          <caret line="2" selection-start-line="2" selection-end-line="2" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/deca/file.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="244">
@@ -760,10 +764,17 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/deca/ff_types.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="135">
+          <caret line="9" column="24" selection-start-line="9" selection-start-column="17" selection-end-line="9" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/process_vfs.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-299">
-          <caret line="311" selection-start-line="311" selection-end-line="311" />
+        <state relative-caret-position="-60">
+          <caret line="309" column="21" selection-start-line="309" selection-start-column="21" selection-end-line="309" selection-end-column="21" />
           <folding>
             <element signature="e#0#10#0" expanded="true" />
           </folding>
@@ -772,20 +783,10 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/deca/ff_vfs.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="136">
-          <caret line="292" column="31" selection-start-line="291" selection-start-column="31" selection-end-line="292" selection-end-column="31" />
+        <state relative-caret-position="120">
+          <caret line="348" column="52" selection-start-line="348" selection-start-column="52" selection-end-line="348" selection-end-column="52" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/deca/ff_adf.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="281">
-          <caret line="191" column="25" selection-start-line="191" selection-start-column="25" selection-end-line="191" selection-end-column="25" />
-          <folding>
-            <element signature="e#0#10#0" expanded="true" />
           </folding>
         </state>
       </provider>

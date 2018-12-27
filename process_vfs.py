@@ -32,13 +32,13 @@ class VfsNodeTableModel(QAbstractTableModel):
         return len(self.vfs.table_vfsnode)
 
     def columnCount(self, parent=QModelIndex()):
-        return 6
+        return 7
 
     def headerData(self, section, orientation, role):
         if role != Qt.DisplayRole:
             return None
         if orientation == Qt.Horizontal:
-            return ("Index", "Type", "Hash", "Size_U", "Size_C", "Path")[section]
+            return ("Index", "PIDX", "Type", "Hash", "Size_U", "Size_C", "Path")[section]
         else:
             return None
 
@@ -54,17 +54,19 @@ class VfsNodeTableModel(QAbstractTableModel):
                 if column == 0:
                     return '{}'.format(node.uid)
                 elif column == 1:
-                    return '{}'.format(node.ftype)
+                    return '{}'.format(node.pid)
                 elif column == 2:
+                    return '{}'.format(node.file_type())
+                elif column == 3:
                     if node.hashid is None:
                         return ''
                     else:
                         return '{:08X}'.format(node.hashid)
-                elif column == 3:
-                    return '{}'.format(node.size_u)
                 elif column == 4:
-                    return '{}'.format(node.size_c)
+                    return '{}'.format(node.size_u)
                 elif column == 5:
+                    return '{}'.format(node.size_c)
+                elif column == 6:
                     if node.v_path is not None:
                         return 'V: {}'.format(node.v_path.decode('utf-8'))
                     elif node.p_path is not None:
@@ -237,7 +239,7 @@ class VfsDirModel(QAbstractItemModel):
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
-                    return '{}'.format(vnode.ftype)
+                    return '{}'.format(vnode.file_type())
                 elif column == 3:
                     if vnode.hashid is None:
                         return ''

@@ -1,6 +1,43 @@
 import struct
 
 
+class SubsetFile:
+    def __init__(self, f, size):
+        self.f = f
+        self.f0 = f
+        self.bpos = f.tell()
+        self.epos = self.bpos + size
+
+    def __enter__(self):
+        self.f = self.f0.__enter__()
+        return self
+
+    def __exit__(self, t, value, traceback):
+        self.f0.__exit__(t, value, traceback)
+
+    def seek(self, pos):
+        npos = self.bpos + pos
+        if npos > self.epos:
+            raise Exception('Seek Beyond End Of File')
+        return self.f.seek(npos)
+
+    def tell(self):
+        return self.f.tell() - self.bpos
+
+    def read(self, n):
+        bpos = self.f.tell()
+        epos = bpos + n
+        epos = min(epos, self.epos)
+        return self.f.read(epos - bpos)
+
+    def write(self, blk):
+        bpos = self.f.tell()
+        epos = bpos + len(blk)
+        if epos > self.epos:
+            raise Exception('Write Beyond End Of File')
+        return self.f.write(blk)
+
+
 class ArchiveFile:
     def __init__(self, f, debug=False, endian=None):
         self.f0 = f

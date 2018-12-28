@@ -10,8 +10,12 @@ from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex,
 from PySide2.QtGui import QColor, QPainter
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QTextEdit
+    QTabWidget, QTreeView, QTextEdit, QPushButton
 from PySide2.QtCharts import QtCharts
+from deca_gui_viewer_adf import DataViewerAdf
+from deca_gui_viewer_image import DataViewerImage
+from deca_gui_viewer_raw import DataViewerRaw
+from deca_gui_viewer_text import DataViewerText
 
 prefix_in = '/home/krys/prj/gz/archives_win64/'
 prefix_out = './test/gz/'
@@ -75,12 +79,12 @@ class VfsNodeTableModel(QAbstractTableModel):
                         return ''
         elif role == Qt.BackgroundRole:
             node = self.vfs.table_vfsnode[row]
-            if column == 1 and node is not None and node.ftype in {FTYPE_AVTX, FTYPE_SARC, FTYPE_AAF, FTYPE_TABARC}:
+            if column == 1 and node.is_valid() and node.ftype in {FTYPE_AVTX, FTYPE_SARC, FTYPE_AAF, FTYPE_TAB, FTYPE_ARC}:
                 return QColor(Qt.green)
             else:
                 return QColor(Qt.white)
         elif role == Qt.TextAlignmentRole:
-            if column == 5:
+            if column == 6:
                 return Qt.AlignLeft
             else:
                 return Qt.AlignRight
@@ -132,11 +136,11 @@ class VfsNodeTableWidget(QWidget):
 
 
 class VfsDirLeaf(object):
-    def __init__(self, name, vnode):
+    def __init__(self, name, vnodes):
         self.name = name
         self.parent = None
         self.row = 0
-        self.vnode = vnode
+        self.vnodes = vnodes
 
     def child_count(self):
         return 0
@@ -178,19 +182,22 @@ class VfsDirModel(QAbstractItemModel):
         self.root_node = None
         self.root_node = VfsDirBranch(b'/')
 
-        for vnode in self.vfs.table_vfsnode:
-            if vnode is not None and vnode.v_path is not None:
-                if vnode.v_path.find(b'\\') >= 0:
-                    path = vnode.v_path.split(b'\\')
+        keys = list(self.vfs.map_vpath_to_vfsnodes.keys())
+        keys.sort()
+        for v_path in keys:
+            vnodes = self.vfs.map_vpath_to_vfsnodes[v_path]
+            if len(vnodes) > 0 and v_path is not None:
+                if v_path.find(b'\\') >= 0:
+                    raise Exception('WEIRD PATH {}'.format(v_path))
                 else:
-                    path = vnode.v_path.split(b'/')
+                    path = v_path.split(b'/')
                 name = path[-1]
                 path = path[0:-1]
                 cnode = self.root_node
                 for p in path:
                     cnode = cnode.child_add(VfsDirBranch(p))
 
-                lnode = cnode.child_add(VfsDirLeaf(name, vnode))
+                cnode.child_add(VfsDirLeaf(name, vnodes))
 
         self.endResetModel()
 
@@ -235,7 +242,7 @@ class VfsDirModel(QAbstractItemModel):
             if column == 0:
                 return node.name.decode('utf-8')
             elif isinstance(node, VfsDirLeaf):
-                vnode = node.vnode
+                vnode = node.vnodes[0]
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
@@ -287,55 +294,7 @@ class VfsDirWidget(QWidget):
         if index.isValid():
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_selected is not None:
-                self.vnode_selected(tnode.vnode)
-
-
-class DataViewer(QWidget):
-    def __init__(self):
-        QWidget.__init__(self)
-
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
-        pass
-
-
-class DataViewerText(DataViewer):
-    def __init__(self):
-        DataViewer.__init__(self)
-
-        self.text_box = QTextEdit()
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.text_box.setSizePolicy(size)
-
-        self.main_layout = QVBoxLayout()
-        self.main_layout.addWidget(self.text_box)
-        self.setLayout(self.main_layout)
-
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
-        with ArchiveFile(vfs.file_obj_from(vnode)) as f:
-            buf = f.read(vnode.size_u)
-            self.text_box.setText(buf.decode('utf-8'))
-
-
-class DataViewerAdf(DataViewer):
-    def __init__(self):
-        DataViewer.__init__(self)
-
-        self.text_box = QTextEdit()
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.text_box.setSizePolicy(size)
-
-        self.main_layout = QVBoxLayout()
-        self.main_layout.addWidget(self.text_box)
-        self.setLayout(self.main_layout)
-
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
-        with ArchiveFile(vfs.file_obj_from(vnode)) as f:
-            buffer = f.read(vnode.size_u)
-        obj = load_adf(buffer)
-        sbuf = ''
-        if obj is not None:
-            sbuf = obj.dump_to_string()
-        self.text_box.setText(sbuf)
+                self.vnode_selected(tnode.vnodes[0])
 
 
 class DataViewWidget(QWidget):
@@ -343,9 +302,9 @@ class DataViewWidget(QWidget):
         QWidget.__init__(self)
         self.vfs = vfs
 
-        self.tab_raw = DataViewer()
+        self.tab_raw = DataViewerRaw()
         self.tab_text = DataViewerText()
-        self.tab_image = DataViewer()
+        self.tab_image = DataViewerImage()
         self.tab_adf = DataViewerAdf()
 
         self.tab_widget = QTabWidget()
@@ -373,7 +332,7 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_text_index, True)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
-        elif vnode.ftype == FTYPE_AVTX:
+        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX}:
             self.tab_image.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
@@ -483,7 +442,7 @@ if __name__ == "__main__":
 
     widget = Widget(vfs_global)
 
-    window = MainWindow(widget, 'hash_missing: {}'.format(len(vfs_global.hash_missing)))
+    window = MainWindow(widget, 'hash_map_missing: {}'.format(len(vfs_global.hash_map_missing)))
 
     window.show()
 

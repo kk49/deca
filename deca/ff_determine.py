@@ -2,6 +2,7 @@ import numpy as np
 import struct
 import io
 from deca.file import ArchiveFile
+from deca.ff_aaf import load_aaf_header
 from deca.ff_types import *
 
 
@@ -31,17 +32,21 @@ def file_stats(f, file_size):
     return counts
 
 
-def determine_file_type(f, file_size):
+def determine_file_type_and_size(f, file_size):
     start_pos = f.tell()
     magic = f.read(32)
 
     ftype = None
+    fsize = file_size
     if b' FDA' == magic[0:4]:
         ftype = FTYPE_ADF
     elif b'AVTX' == magic[0:4]:
         ftype = FTYPE_AVTX
     elif b'AAF' == magic[0:3].upper():
         ftype = FTYPE_AAF
+        f.seek(start_pos)
+        aafh = load_aaf_header(f)
+        fsize = aafh.size_u
     elif b'SARC' == magic[4:8]:
         ftype = FTYPE_SARC
     elif b'DDS ' == magic[0:4]:
@@ -62,8 +67,9 @@ def determine_file_type(f, file_size):
         ftype = 'TAG0'
     elif b'FSB5' == magic[16:20]:
         ftype = 'lFSB5'
-    elif file_size in raw_image_size:
-        ftype = FTYPE_NHAVTX
+    # ATX file format was a guess by size
+    # elif file_size in raw_image_size:
+    #     ftype = FTYPE_ATX
 
     # need to inspect file structure
 
@@ -83,4 +89,4 @@ def determine_file_type(f, file_size):
         if all_sum == pri_sum:
             ftype = FTYPE_TXT
 
-    return ftype
+    return ftype, fsize

@@ -1,4 +1,27 @@
 import zlib
+from deca.file import ArchiveFile
+
+
+class AafHeader:
+    def __init__(self):
+        self.magic = None
+        self.version = None
+        self.aic = None
+        self.size_u = None
+        self.section_max_size_u = None
+        self.section_count = None
+
+
+def load_aaf_header(fin):
+    with ArchiveFile(fin) as f:
+        aafh = AafHeader()
+        aafh.magic = f.read(4)
+        aafh.version = f.read_u32()
+        aafh.aic = f.read(8+16+4)
+        aafh.size_u = f.read_u32()  # uncompressed length, whole file
+        aafh.section_size = f.read_u32()  # uncompress length, max any section?
+        aafh.section_count = f.read_u32()  # section count? Normally 1 (2-5 found), number of 32MiB blocks?
+    return aafh
 
 
 def extract_aaf(src, dst):

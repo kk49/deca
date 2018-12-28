@@ -2,13 +2,13 @@ import os
 import datetime
 import pandas as pd
 from deca.util import *
-from deca.file import ArchiveFile
+from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_txt import load_json
 from deca.ff_adf import load_adf
 from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
-from deca.ff_determine import determine_file_type
+from deca.ff_determine import determine_file_type_and_size
 from deca.hash_jenkins import hash_little
 
 
@@ -33,6 +33,9 @@ class VfsNode:
             return self.ftype + '.z'
         else:
             return self.ftype
+
+    def is_valid(self):
+        return self.uid is not None and self.uid != 0
 
     def __str__(self):
         info = []
@@ -60,13 +63,15 @@ class VfsStructure:
     def __init__(self, working_dir):
         self.working_dir = working_dir
         self.uid = 0
-        self.table_vfsnode = [None]
+        self.table_vfsnode = [VfsNode()]
         self.map_uid_to_vfsnode = {}  # TODO currently redundant, may always be
         self.map_hash_to_vpath = {}
         self.map_vpath_to_hash = {}
+        self.map_vpath_to_vfsnodes = {}
         self.hash_bad = {}
         self.hash_present = set()
-        self.hash_missing = set()
+        self.hash_map_present = set()
+        self.hash_map_missing = set()
 
     def log_base(self, level, s):
         with open(self.working_dir + 'log.txt', 'a') as f:
@@ -90,8 +95,10 @@ class VfsStructure:
         return node
 
     def file_obj_from(self, node: VfsNode, mode='rb'):
-        if node.ftype == FTYPE_TABARC:
+        if node.ftype == FTYPE_ARC:
             return open(node.p_path, mode)
+        elif node.ftype == FTYPE_TAB:
+            return self.file_obj_from(self.table_vfsnode[node.pid])
         elif node.is_compressed:
             cache_dir = self.working_dir + '__CACHE__/'
             os.makedirs(cache_dir, exist_ok=True)
@@ -106,6 +113,7 @@ class VfsStructure:
             pnode = self.table_vfsnode[node.pid]
             pf = self.file_obj_from(pnode, mode)
             pf.seek(node.offset)
+            pf = SubsetFile(pf, node.size_u)
             return pf
         else:
             raise Exception('NOT IMPLEMENTED: DEFAULT')
@@ -117,12 +125,12 @@ class VfsStructure:
                 node.ftype = 'symlink'
             else:
                 with self.file_obj_from(node) as f:
-                    node.ftype = determine_file_type(f, node.size_c)
+                    node.ftype, node.size_u = determine_file_type_and_size(f, node.size_c)
 
         if node.ftype is FTYPE_AAF:
             node.is_compressed = True
             with self.file_obj_from(node) as f:
-                node.ftype = determine_file_type(f, node.size_u)
+                node.ftype, node.size_u = determine_file_type_and_size(f, node.size_u)
 
     def propose_vpaths(self, strings):
         found = 0
@@ -173,86 +181,95 @@ class VfsStructure:
         self.log('process all game tab / arc files')
         for ta_file in input_files:
             inpath = archive_path + ta_file[0] + '/' + ta_file[1]
-
-            file_tab = inpath + '.tab'
             file_arc = inpath + '.arc'
+            self.node_add(VfsNode(ftype=FTYPE_ARC, p_path=file_arc))
 
-            with ArchiveFile(open(file_tab, 'rb'), debug=debug) as f:
-                if 3 == ver:
-                    tab_file = TabFileV3()
-                elif 4 == ver:
-                    tab_file = TabFileV4()
+        any_change = True
+        n_nodes = 0
+        phase_id = 0
+        while any_change:
+            phase_id = phase_id + 1
+            self.log('Expand Archives Phase {}: Begin'.format(phase_id))
 
-                tab_file.deserialize(f)
+            any_change = False
+            idx = n_nodes  # start after last processed node
+            n_nodes = len(self.table_vfsnode)  # only process this level of nodes
+            while idx < n_nodes:
+                # if idx % 10000 == 0:
+                #     self.log('Processing {} of {}'.format(idx, len(self.table_vfsnode)))
+                node = self.table_vfsnode[idx]
+                if node.is_valid() and not node.processed:
+                    if node.ftype == FTYPE_ARC:
+                        node.processed = True
+                        any_change = True
+                        tab_path = os.path.splitext(node.p_path)
+                        tab_path = tab_path[0] + '.tab'
+                        self.node_add(VfsNode(ftype=FTYPE_TAB, p_path=tab_path, pid=node.uid, level=node.level))
+                    elif node.ftype == FTYPE_TAB:
+                        node.processed = True
+                        any_change = True
+                        with ArchiveFile(open(node.p_path, 'rb'), debug=debug) as f:
+                            if 3 == ver:
+                                tab_file = TabFileV3()
+                            elif 4 == ver:
+                                tab_file = TabFileV4()
 
-                arc_node = self.node_add(VfsNode(ftype=FTYPE_TABARC, p_path=file_arc))
+                            tab_file.deserialize(f)
 
-                for i in range(len(tab_file.file_table)):
-                    te = tab_file.file_table[i]
-                    node = self.node_add(VfsNode(
-                        hashid=te.hashname,
-                        pid=arc_node.uid,
-                        level=arc_node.level + 1,
-                        index=i,
-                        offset=te.offset,
-                        size_c=te.size_c,
-                        size_u=te.size_u))
+                            for i in range(len(tab_file.file_table)):
+                                te = tab_file.file_table[i]
+                                self.node_add(VfsNode(
+                                    hashid=te.hashname,
+                                    pid=node.uid,
+                                    level=node.level + 1,
+                                    index=i,
+                                    offset=te.offset,
+                                    size_c=te.size_c,
+                                    size_u=te.size_u))
+                    elif node.ftype == FTYPE_SARC:
+                        node.processed = True
+                        any_change = True
+                        with ArchiveFile(self.file_obj_from(node)) as f:
+                            version = f.read_u32()
+                            magic = f.read(4)
+                            ver2 = f.read_u32()
+                            dir_block_len = f.read_u32()
 
-                arc_node.processed = True
+                            buf = f.read(dir_block_len)
+                            string_len = struct.unpack('I', buf[0:4])[0]
+                            strings = buf[4:(4 + string_len)]
+                            strings0 = strings
+                            strings = strings.split(b'\00')
+                            if strings[-1] == '':
+                                strings = strings[:-1]
 
-        self.log('Expand Archives')
-        idx = 0
-        while idx < len(self.table_vfsnode):
-            # if idx % 10000 == 0:
-            #     self.log('Processing {} of {}'.format(idx, len(self.table_vfsnode)))
-            node = self.table_vfsnode[idx]
-            if node is not None and not node.processed:
-                if node.ftype == FTYPE_SARC:
-                    with ArchiveFile(self.file_obj_from(node)) as f:
-                        version = f.read_u32()
-                        magic = f.read(4)
-                        ver2 = f.read_u32()
-                        dir_block_len = f.read_u32()
+                            buf = buf[(4 + string_len):]
 
-                        buf = f.read(dir_block_len)
-                        string_len = struct.unpack('I', buf[0:4])[0]
-                        strings = buf[4:(4 + string_len)]
-                        strings0 = strings
-                        strings = strings.split(b'\00')
-                        if strings[-1] == '':
-                            strings = strings[:-1]
+                            fdir = []
+                            width = 20
+                            for i in range(len(strings)):
+                                line = buf[(i * width):((i + 1) * width)]
+                                if len(line) == width:
+                                    v = struct.unpack('IIIII', line)
+                                    v = [x for x in v]
+                                    string_offset = v[1]
+                                    offset = v[1]
+                                    length = v[2]
+                                    hashv = v[3]
+                                    if offset == 0:
+                                        offset = None  # sarc files with zero offset are not in file, but reference hash value
+                                    self.node_add(VfsNode(
+                                        hashid=hashv, pid=node.uid, level=node.level + 1, index=i,
+                                        offset=offset, size_c=length, size_u=length, v_path=strings[i]))
 
-                        buf = buf[(4 + string_len):]
-
-                        fdir = []
-                        width = 20
-                        for i in range(len(strings)):
-                            line = buf[(i * width):((i + 1) * width)]
-                            if len(line) == width:
-                                v = struct.unpack('IIIII', line)
-                                v = [x for x in v]
-
-                                string_offset = v[1]
-                                offset = v[1]
-                                length = v[2]
-                                hashv = v[3]
-
-                                if offset == 0:
-                                    offset = None  # sarc files with zero offset are not in file, but reference hash value
-
-                                cnode = self.node_add(VfsNode(
-                                    hashid=hashv, pid=node.uid, level=node.level + 1, index=i,
-                                    offset=offset, size_c=length, size_u=length, v_path=strings[i]))
-
-                                # print('str_off:{} offset:{} length:{} hash:{:08X} ?:{}'.format(*v), strings[i])
-
-                    node.processed = True
-            idx = idx + 1
+                                    # print('str_off:{} offset:{} length:{} hash:{:08X} ?:{}'.format(*v), strings[i])
+                idx = idx + 1
+            self.log('Expand Archives Phase {}: End'.format(phase_id))
 
         self.log('HASH FROM ARC/TAB/SARC')
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node is not None and node.hashid is not None:
+            if node.is_valid() and node.hashid is not None:
                 hid = node.hashid
                 self.hash_present.add(hid)
                 if node.v_path is not None:
@@ -272,7 +289,7 @@ class VfsStructure:
             # if idx % 10000 == 0:
             #     self.log('HASH FROM ADF: {} of {}'.format(idx, len(self.table_vfsnode)))
             node = self.table_vfsnode[idx]
-            if node is not None and node.ftype == FTYPE_ADF and node.hashid not in adf_done:
+            if node.is_valid() and node.ftype == FTYPE_ADF and node.hashid not in adf_done:
                 adf_done.add(node.hashid)
                 with self.file_obj_from(node) as f:
                     buffer = f.read(node.size_u)
@@ -289,7 +306,7 @@ class VfsStructure:
         json_strings = set()
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node is not None and node.ftype == FTYPE_TXT:
+            if node.is_valid() and node.ftype == FTYPE_TXT:
                 with self.file_obj_from(node) as f:
                     buffer = f.read(node.size_u)
                 json = load_json(buffer)
@@ -305,7 +322,7 @@ class VfsStructure:
         avtx_strings = set()
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node is not None and node.ftype == FTYPE_AVTX and node.v_path is not None:
+            if node.is_valid() and node.ftype == FTYPE_AVTX and node.v_path is not None:
                 file, ext = os.path.splitext(node.v_path)
                 for exti in range(16):
                     avtx_strings.add(file + '.atx{}'.format(exti).encode('ascii'))
@@ -324,28 +341,42 @@ class VfsStructure:
         # custom_found = self.propose_vpaths(db_str)
         # self.log('HASH FROM CUSTOM: From {} found {} hash mappings'.format(len(db_str), custom_found))
 
-        self.log('fill in v_paths')
+        self.log('fill in v_paths, mark extention identified files as ftype')
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node is not None and node.hashid is not None and node.v_path is None:
+            if node.is_valid() and node.hashid is not None and node.v_path is None:
                 if node.hashid in self.map_hash_to_vpath:
                     node.v_path = self.map_hash_to_vpath[node.hashid]
-                elif node.ftype == FTYPE_AAF:
-                    pass  # AAF files are containers
-                elif node.ftype == FTYPE_SARC:
-                    pass  # SARC files are containers
-                else:
-                    self.hash_missing.add(node.hashid)
 
-        self.log('hash_missing: {}'.format(len(self.hash_missing)))
+            if node.is_valid() and node.hashid is not None:
+                if node.ftype not in {FTYPE_ARC, FTYPE_TAB, FTYPE_SARC}:  # TODO ignoring all sarcs, maybe overkill
+                    if node.hashid in self.map_hash_to_vpath:
+                        self.hash_map_present.add(node.hashid)
+                    else:
+                        self.hash_map_missing.add(node.hashid)
+
+            if node.is_valid() and node.v_path is not None:
+                if os.path.splitext(node.v_path)[1][0:4] == b'.atx':
+                    if node.ftype is not None:
+                        raise Exception('ATX marked as non ATX: {}'.format(node.v_path))
+                    node.ftype = FTYPE_ATX
+
+                lst = self.map_vpath_to_vfsnodes.get(node.v_path, [])
+                if len(lst) > 0 and lst[0].offset is None:  # Do not let symlink be first is list # TODO Sort by accessibility
+                    lst = [node] + lst
+                else:
+                    lst.append(node)
+                self.map_vpath_to_vfsnodes[node.v_path] = lst
+
+        self.log('hashes: {}, mappings missing: {}, mappings present {}'.format(len(self.hash_present), len(self.hash_map_missing), len(self.hash_map_present)))
 
         self.log('Extracting files of unknown type')
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node is not None:
+            if node.is_valid():
                 dump = False
                 dump = dump or node.ftype is None
-                # dump = dump or (node.v_path is not None and node.v_path.find(b'characters/machines/dreadnought') >= 0)
+                # dump = dump and (node.v_path is None or os.path.splitext(node.v_path)[1][0:4] != '.atx')  # do not mark atx files as unknown
                 if dump and node.offset is not None:
                     with ArchiveFile(self.file_obj_from(node)) as f:
                         if node.v_path is None:

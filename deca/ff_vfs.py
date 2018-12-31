@@ -329,6 +329,23 @@ class VfsStructure:
         avtx_found = self.propose_vpaths(avtx_strings)
         self.log('HASH FROM TEXTURE FILE NAMES: From {} found {} hash mappings'.format(len(avtx_strings), avtx_found))
 
+        self.log('HASH FROM MDIC FILE NAMES: add possible strings for all {fl,nl}.mdic -> {nl,fl}.mdic')
+        mdic_strings = set()
+        for idx in range(len(self.table_vfsnode)):
+            node = self.table_vfsnode[idx]
+            if node.is_valid() and node.ftype == FTYPE_ADF and node.v_path is not None:
+                file, ext = os.path.splitext(node.v_path)
+                if ext == b'.mdic':
+                    file2, ext2 = os.path.splitext(file)
+                    if ext2 == b'.nl':
+                        mdic_strings.add(file2 + b'.fl.mdic')
+                    elif ext2 == b'.fl':
+                        mdic_strings.add(file2 + b'.nl.mdic')
+
+
+        mdic_found = self.propose_vpaths(mdic_strings)
+        self.log('HASH FROM MDIC FILE NAMES: From {} found {} hash mappings'.format(len(mdic_strings), mdic_found))
+
         self.log('HASH FROM EXE: look for hashable strings in EXE strings from IDA')
         db = pd.read_csv('./resources/gz/all_strings.tsv', delimiter='\t')
         db_str = db['String']
@@ -377,18 +394,22 @@ class VfsStructure:
                 dump = False
                 dump = dump or node.ftype is None
                 # dump = dump and (node.v_path is None or os.path.splitext(node.v_path)[1][0:4] != '.atx')  # do not mark atx files as unknown
+                dump = dump or (node.v_path is not None and node.v_path.find(b'archipelago_iboholmen_church') >= 0)
+                dump = dump or (node.v_path is not None and node.v_path.find(b'machines/dreadnought') >= 0)
                 if dump and node.offset is not None:
                     with ArchiveFile(self.file_obj_from(node)) as f:
                         if node.v_path is None:
                             ofile = self.working_dir + '__TEST__/{:08X}.dat'.format(node.hashid)
                         else:
-                            ofile = self.working_dir + '__TEST__/{}.{:08X}'.format(node.v_path.decode('utf-8'), node.hashid)
+                            # ofile = self.working_dir + '__TEST__/{}.{:08X}'.format(node.v_path.decode('utf-8'), node.hashid)
+                            ofile = self.working_dir + '__TEST__/{}'.format(node.v_path.decode('utf-8'))
 
                         ofiledir = os.path.dirname(ofile)
                         os.makedirs(ofiledir, exist_ok=True)
 
                         self.trace('Unknown Type: {}'.format(ofile))
-                        with ArchiveFile(open(ofile, 'wb')) as fo:
+                        with ArchiveFile(open(ofile, 'wb'
+                                                     '')) as fo:
                             buf = f.read(node.size_c)
                             fo.write(buf)
 

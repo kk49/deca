@@ -1,0 +1,4 @@
+textures/font/arial_18.ddsc
+textures/font/terminal_9.ddsc
+textures/font/terminal_9_dif.ddsc
+

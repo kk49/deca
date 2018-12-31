@@ -1,9 +1,10 @@
 import os
+from PySide2 import QtCore, QtGui, QtWidgets
+from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QComboBox
+from deca.ff_types import *
 from deca_gui_viewer import *
 from deca.ff_avtx import Ddsc
 from deca.file import ArchiveFile
-from PySide2 import QtCore, QtGui, QtWidgets
-from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QComboBox
 
 # Initial version from
 # https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview/35514531#35514531
@@ -131,7 +132,7 @@ class DataViewerImage(DataViewer):
         self.select_dropdown.addItem('A')
         self.select_dropdown.addItem('B')
         self.select_dropdown.addItem('C')
-        size = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.select_dropdown.setSizePolicy(size)
 
         self.image_display = PhotoViewer(self)
@@ -145,9 +146,15 @@ class DataViewerImage(DataViewer):
 
     def select_dropdown_current_index_changed(self, v):
         if self.ddsc is not None and 0 <= v < len(self.ddsc.mips):
-            mip = self.ddsc.mips[v][3]
-            if mip is not None:
-                qimg = QtGui.QImage(mip.data, mip.shape[1], mip.shape[0], QtGui.QImage.Format_RGBA8888)
+            npimp = self.ddsc.mips[v].data
+            if npimp is not None:
+                if npimp.shape[2] == 3:
+                    frmt = QtGui.QImage.Format_RGB888
+                elif npimp.shape[2] == 4:
+                    frmt = QtGui.QImage.Format_RGBA8888
+                else:
+                    raise Exception('Unhandled byte counts for image')
+                qimg = QtGui.QImage(npimp.data, npimp.shape[1], npimp.shape[0], npimp.shape[1] * npimp.shape[2], frmt)
                 pixmap = QtGui.QPixmap.fromImage(qimg)
                 self.image_display.setPhoto(pixmap)
 
@@ -155,34 +162,50 @@ class DataViewerImage(DataViewer):
         self.ddsc = None
         self.select_dropdown.clear()
 
-        if vnode.v_path is None:
+        if vnode.ftype == FTYPE_BMP:
             f_ddsc = vfs.file_obj_from(vnode)
             ddsc = Ddsc()
-            ddsc.load_ddsc(f_ddsc)
-
+            ddsc.load_bmp(f_ddsc)
             self.ddsc = ddsc
-            for mip in self.ddsc.mips:
-                self.select_dropdown.addItem('{}x{} ({})'.format(mip[0], mip[1], mip[2]))
-        else:
-            filename = os.path.splitext(vnode.v_path)
-            filename_ddsc = filename[0] + b'.ddsc'
-
-            if filename_ddsc in vfs.map_vpath_to_vfsnodes:
-                f_ddsc = vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_ddsc][0])
-                f_atxs = []
-                for i in range(1, 16):
-                    filename_atx = filename[0] + '.atx{}'.format(i).encode('ascii')
-                    if filename_atx in vfs.map_vpath_to_vfsnodes:
-                        f_atxs.append(vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_atx][0]))
-                    else:
-                        break
-
+        elif vnode.ftype == FTYPE_DDS:
+            f_ddsc = vfs.file_obj_from(vnode)
+            ddsc = Ddsc()
+            ddsc.load_dds(f_ddsc)
+            self.ddsc = ddsc
+        elif vnode.ftype == FTYPE_AVTX or FTYPE_ATX:
+            if vnode.v_path is None:
+                f_ddsc = vfs.file_obj_from(vnode)
                 ddsc = Ddsc()
                 ddsc.load_ddsc(f_ddsc)
-                for atx in f_atxs:
-                    ddsc.load_atx(atx)
-
                 self.ddsc = ddsc
+            else:
+                filename = os.path.splitext(vnode.v_path)
+                filename_ddsc = filename[0] + b'.ddsc'
 
-                for mip in self.ddsc.mips:
-                    self.select_dropdown.addItem('{}x{} ({})'.format(mip[0], mip[1], mip[2]))
+                if filename_ddsc in vfs.map_vpath_to_vfsnodes:
+                    f_ddsc = vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_ddsc][0])
+                    f_atxs = []
+                    for i in range(1, 16):
+                        filename_atx = filename[0] + '.atx{}'.format(i).encode('ascii')
+                        if filename_atx in vfs.map_vpath_to_vfsnodes:
+                            f_atxs.append(vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_atx][0]))
+                        else:
+                            break
+                    ddsc = Ddsc()
+                    ddsc.load_ddsc(f_ddsc)
+                    for atx in f_atxs:
+                        ddsc.load_atx(atx)
+                    self.ddsc = ddsc
+
+        if self.ddsc is not None and self.ddsc.mips is not None:
+            first_valid = None
+            for i in range(len(self.ddsc.mips)):
+                mip = self.ddsc.mips[i]
+                if first_valid is None and mip.data is not None:
+                    first_valid = i
+                depth_info = ''
+                if mip.depth_idx is not None and mip.depth_cnt is not None:
+                    depth_info = 'd:{}/{} '.format(mip.depth_idx, mip.depth_cnt)
+                self.select_dropdown.addItem('{}x{} {}({})'.format(mip.size_y, mip.size_x, depth_info, mip.itype))
+
+            self.select_dropdown.setCurrentIndex(first_valid)

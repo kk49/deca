@@ -3,12 +3,33 @@ import deca.dxgi
 import io
 import time
 import numpy as np
+from PIL import Image
+
+
+class DecaImage:
+    def __init__(self, sx=None, sy=None, depth_cnt=None, depth_idx=None, pixel_format=None, itype=None, data=None):
+        self.size_x = sx
+        self.size_y = sy
+        self.depth_cnt = depth_cnt
+        self.depth_idx = depth_idx
+        self.pixel_format = pixel_format
+        self.itype = itype
+        self.data = data
 
 
 class Ddsc:
     def __init__(self):
         self.mips = None
-        self.mips_params = None
+
+    def load_bmp(self, f):
+        im = Image.open(f)
+        im.convert('RGBA')
+        self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='bmp', data=np.array(im))]
+
+    def load_dds(self, f):
+        im = Image.open(f)
+        im.convert('RGBA')
+        self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='dds', data=np.array(im))]
 
     def load_ddsc(self, f):
         header = f.read(128)
@@ -31,19 +52,19 @@ class Ddsc:
 
         nx = nx0
         ny = ny0
-        self.mips_params = []
         self.mips = []
         for i in range(full_mip_count):
-            self.mips_params.append([pixel_format, nx, ny])
-            self.mips.append([max(4, ny), max(4, nx), 'missing', None])
+            for j in range(depth):
+                self.mips.append(DecaImage(sx=nx, sy=ny, depth_cnt=depth, depth_idx=j, pixel_format=pixel_format, itype='missing'))
+
             nx = nx // 2
             ny = ny // 2
 
-        for midx in range(full_mip_count - mip_count, full_mip_count):
-            fl = self.mips_params[midx]
-            pixel_format = fl[0]
-            nx = fl[1]
-            ny = fl[2]
+        for midx in range((full_mip_count - mip_count) * depth, full_mip_count * depth):
+            mip = self.mips[midx]
+            pixel_format = mip.pixel_format
+            nx = mip.size_x
+            ny = mip.size_y
             if nx == 0 or ny == 0:
                 break
             nxm = max(4, nx)
@@ -54,27 +75,31 @@ class Ddsc:
             if len(raw_data) < raw_size:
                 raise Exception('Ddsc::load_ddsc: Not Enough Data')
             inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
-            print('Process Data: {}'.format(fl))
+            print('Process Data: {}'.format(mip))
             t0 = time.time()
             deca.dxgi.process_image(inp, raw_data, nx, ny, pixel_format)
+            # inp = inp[0:ny, 0:nx, :]  # TODO Qt cannot display 2x2 for some reason
+            if ny < nym or nx < nxm:
+                inp[ny:, :, :] = 0
+                inp[:, nx:, :] = 0
             t1 = time.time()
             print('Execute time: {} s'.format(t1 - t0))
-
-            self.mips[midx] = [nym, nxm, 'ddsc', inp]
+            mip.itype = 'ddsc'
+            mip.data = inp
 
     def load_atx(self, f):
         first_loaded = 0
         while first_loaded < len(self.mips):
-            if self.mips[first_loaded][3] is None:
+            if self.mips[first_loaded].data is None:
                 first_loaded = first_loaded + 1
             else:
                 break
 
         for midx in range(first_loaded - 1, -1, -1):
-            fl = self.mips_params[midx]
-            pixel_format = fl[0]
-            nx = fl[1]
-            ny = fl[2]
+            mip = self.mips[midx]
+            pixel_format = mip.pixel_format
+            nx = mip.size_x
+            ny = mip.size_y
             if nx == 0 or ny == 0:
                 break
             nxm = max(4, nx)
@@ -88,13 +113,14 @@ class Ddsc:
             if raw_data_size < raw_size:
                 raise Exception('Ddsc::load_atx: Not Enough Data')
             inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
-            print('Process Data: {}'.format(fl))
+            print('Process Data: {}'.format(mip))
             t0 = time.time()
             deca.dxgi.process_image(inp, raw_data, nx, ny, pixel_format)
             t1 = time.time()
             print('Execute time: {} s'.format(t1 - t0))
 
-            self.mips[midx] = [nym, nxm, 'atx', inp]
+            mip.itype = 'atx'
+            mip.data = inp
 
 
 # if dump:

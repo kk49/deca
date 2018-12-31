@@ -221,10 +221,12 @@ def process_image_74(image, f, nx, ny):
             color0, color1 = struct.unpack('HH', buf[0:4])
             bs = struct.unpack('BBBB', buf[4:8])
 
-            color0_full = np.array([((color0 >> 11) & 0x1F) << 3, ((color0 >> 5) & 0x3F) << 2, ((color0 >> 0) & 0x1F) << 3, 0xFF],
-                                   dtype=np.uint8)
-            color1_full = np.array([((color1 >> 11) & 0x1F) << 3, ((color1 >> 5) & 0x3F) << 2, ((color1 >> 0) & 0x1F) << 3, 0xFF],
-                                   dtype=np.uint8)
+            color0_full = np.array(
+                [((color0 >> 11) & 0x1F) << 3, ((color0 >> 5) & 0x3F) << 2, ((color0 >> 0) & 0x1F) << 3, 0xFF],
+                dtype=np.uint8)
+            color1_full = np.array(
+                [((color1 >> 11) & 0x1F) << 3, ((color1 >> 5) & 0x3F) << 2, ((color1 >> 0) & 0x1F) << 3, 0xFF],
+                dtype=np.uint8)
 
             colors = np.zeros((4, 4), dtype=np.uint8)
             if color0 > color1:
@@ -288,10 +290,12 @@ def process_image_77(image, f, nx, ny):
             color0, color1 = struct.unpack('HH', buf[0:4])
             bs = struct.unpack('BBBB', buf[4:8])
 
-            color0_full = np.array([((color0 >> 11) & 0x1F) << 3, ((color0 >> 5) & 0x3F) << 2, ((color0 >> 0) & 0x1F) << 3, 0xFF],
-                                   dtype=np.uint8)
-            color1_full = np.array([((color1 >> 11) & 0x1F) << 3, ((color1 >> 5) & 0x3F) << 2, ((color1 >> 0) & 0x1F) << 3, 0xFF],
-                                   dtype=np.uint8)
+            color0_full = np.array(
+                [((color0 >> 11) & 0x1F) << 3, ((color0 >> 5) & 0x3F) << 2, ((color0 >> 0) & 0x1F) << 3, 0xFF],
+                dtype=np.uint8)
+            color1_full = np.array(
+                [((color1 >> 11) & 0x1F) << 3, ((color1 >> 5) & 0x3F) << 2, ((color1 >> 0) & 0x1F) << 3, 0xFF],
+                dtype=np.uint8)
 
             colors = np.zeros((4, 4), dtype=np.uint8)
             if color0 > color1:

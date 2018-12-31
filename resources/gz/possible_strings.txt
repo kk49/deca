@@ -1,6 +1,22 @@
 environment/weather/%s
-audio_layers.worldaudioinfo_xml
+audio_layers.worldaudioinfo_xmlaudio_layers.worldaudioinfo_xml
 %s/patch_%02d_%02d_%02d.streampatch
+%s/horizon_%s%d.ddsc
+%s/zone_%d/%s_%d_%d.ddsc
+%s/terrainsystem.terrainsystemc
+%s/audio_layers.worldaudioinfo_xmlc
+terrain/%s/occluder
+terrain/%s/%s.world
+%s/terrainsystem.terrainsystemc
+terrain/%s/patches
+%s/vegetation.vegetationinfo
+ai/tiles/%d_%d.navmeshc
+%s/zone_%d/vegetation_%d.bl
+settings/hp_settings/reserve_%d.bin
+
+
+
+
 
 for i in range(100): 
   for j in range(100):
@@ -14,7 +30,6 @@ for i in range(100):
       s = 'terrain/gz/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(i,j,k)
       if deca.hash_jenkins.hash_little(s) in vfs_global.hash_present:
         print(s)
-
 for i in range(100): 
   for j in range(100):
     for k in range(100): 
@@ -28,3 +43,5 @@ for i in range(100):
       s = 'terrain/jc3/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(i,j,k)
       if deca.hash_jenkins.hash_little(s) in vfs_global.hash_present:
         print(s)
+
+

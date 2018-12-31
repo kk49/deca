@@ -1,2 +1,4 @@
 test/
+work/
+venv36/
 *.pyc

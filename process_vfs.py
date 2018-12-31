@@ -3,22 +3,20 @@ import os
 import argparse
 import pickle
 from deca.ff_vfs import VfsStructure, VfsNode
-from deca.ff_adf import load_adf
 from deca.ff_types import *
-from deca.file import ArchiveFile
-from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot
-from PySide2.QtGui import QColor, QPainter
+import PySide2
+from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel
+from PySide2.QtGui import QColor
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
     QTabWidget, QTreeView, QTextEdit, QPushButton
-from PySide2.QtCharts import QtCharts
 from deca_gui_viewer_adf import DataViewerAdf
 from deca_gui_viewer_image import DataViewerImage
 from deca_gui_viewer_raw import DataViewerRaw
 from deca_gui_viewer_text import DataViewerText
 
 prefix_in = '/home/krys/prj/gz/archives_win64/'
-prefix_out = './test/gz/'
+working_dir = './work/gz/'
 ver = 3
 debug = False
 
@@ -28,12 +26,60 @@ vfs_global = None
 # ********************
 # IDX, TYPE, HASH, USIZE, CSIZE, VPATH
 class VfsNodeTableModel(QAbstractTableModel):
-    def __init__(self, vfs=None):
+    def __init__(self, vfs=None, show_mapped=True):
         QAbstractTableModel.__init__(self)
         self.vfs = vfs
+        self.show_mapped = show_mapped
+        self.table = self.vfs.table_vfsnode
+
+        if not show_mapped:
+            self.table = [v for v in self.table if v.v_path is None and v.p_path is None and v.ftype not in {FTYPE_SARC, FTYPE_TAB, FTYPE_ARC}]
+
+        self.remap = None
+        self.remap_uid = None
+        self.remap_pid = None
+        self.remap_type = None
+        self.remap_hash = None
+        self.column_ids = ["Index", "PIDX", "Type", "Hash", "Size_U", "Size_C", "Path"]
+
+    def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
+        # if self.remap_uid is None:
+        #     rm = list(range(len(self.vfs.table_vfsnode)))
+        #     self.remap_uid = rm
+        #
+        # if column == 0:  # IDX
+        #     self.remap = self.remap_uid
+        # elif column == 1:  # PIDX
+        #     if self.remap_pid is None:
+        #         rm = list(range(len(self.vfs.table_vfsnode)))
+        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].pid)
+        #         self.remap_pid = rm
+        #     self.remap = self.remap_pid
+        # elif column == 2:  # Type
+        #     if self.remap_type is None:
+        #         rm = list(range(len(self.vfs.table_vfsnode)))
+        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].file_type())
+        #         self.remap_type = rm
+        #     self.remap = self.remap_type
+        # elif column == 3:  # Hash
+        #     if self.remap_hash is None:
+        #         rm = list(range(len(self.vfs.table_vfsnode)))
+        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].hashid)
+        #         self.remap_hash = rm
+        #     self.remap = self.remap_hash
+        # else:
+        #     self.remap = self.remap_uid
+        #     print('Unhandled Sort {}'.format(self.column_ids[column]))
+        #
+        # if self.remap is not None:
+        #     if order == Qt.AscendingOrder:
+        #         pass
+        #     else:
+        #         self.remap = self.remap[::-1]
+        pass
 
     def rowCount(self, parent=QModelIndex()):
-        return len(self.vfs.table_vfsnode)
+        return len(self.table)
 
     def columnCount(self, parent=QModelIndex()):
         return 7
@@ -42,7 +88,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         if role != Qt.DisplayRole:
             return None
         if orientation == Qt.Horizontal:
-            return ("Index", "PIDX", "Type", "Hash", "Size_U", "Size_C", "Path")[section]
+            return self.column_ids[section]
         else:
             return None
 
@@ -50,8 +96,11 @@ class VfsNodeTableModel(QAbstractTableModel):
         column = index.column()
         row = index.row()
 
+        if self.remap is not None:
+            row = self.remap[row]
+
         if role == Qt.DisplayRole:
-            node = self.vfs.table_vfsnode[row]
+            node = self.table[row]
             if node is None:
                 return 'NA'
             else:
@@ -78,7 +127,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                     else:
                         return ''
         elif role == Qt.BackgroundRole:
-            node = self.vfs.table_vfsnode[row]
+            node = self.table[row]
             if column == 1 and node.is_valid() and node.ftype in {FTYPE_AVTX, FTYPE_SARC, FTYPE_AAF, FTYPE_TAB, FTYPE_ARC}:
                 return QColor(Qt.green)
             else:
@@ -93,13 +142,13 @@ class VfsNodeTableModel(QAbstractTableModel):
 
 
 class VfsNodeTableWidget(QWidget):
-    def __init__(self, vfs):
+    def __init__(self, vfs, show_mapped):
         QWidget.__init__(self)
 
         self.vnode_selected = None
 
         # Getting the Model
-        self.model = VfsNodeTableModel(vfs)
+        self.model = VfsNodeTableModel(vfs, show_mapped=show_mapped)
 
         # Creating a QTableView
         self.table_view = QTableView()
@@ -107,7 +156,7 @@ class VfsNodeTableWidget(QWidget):
         font = self.table_view.font()
         font.setPointSize(8)
         self.table_view.setFont(font)
-        # self.table_view.setSortingEnabled(True)
+        self.table_view.setSortingEnabled(True)
         self.table_view.setModel(self.model)
 
         # QTableView Headers
@@ -132,7 +181,7 @@ class VfsNodeTableWidget(QWidget):
     def double_clicked(self, index):
         if index.isValid():
             if self.vnode_selected is not None:
-                self.vnode_selected(self.model.vfs.table_vfsnode[index.row()])
+                self.vnode_selected(self.model.table[index.row()])
 
 
 class VfsDirLeaf(object):
@@ -332,20 +381,24 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_text_index, True)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
-        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX}:
+            self.tab_widget.setCurrentIndex(self.tab_text_index)
+        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_DDS, FTYPE_BMP}:
             self.tab_image.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setCurrentIndex(self.tab_image_index)
         elif vnode.ftype == FTYPE_ADF:
             self.tab_adf.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, True)
+            self.tab_widget.setCurrentIndex(self.tab_adf_indexa)
         else:
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setCurrentIndex(self.tab_raw_index)
 
 
 class Widget(QWidget):
@@ -354,8 +407,12 @@ class Widget(QWidget):
         self.vfs = vfs
 
         # Create VFS Node table
-        self.vfs_node_widget = VfsNodeTableWidget(self.vfs)
+        self.vfs_node_widget = VfsNodeTableWidget(self.vfs, show_mapped=True)
         self.vfs_node_widget.vnode_selected = self.vnode_selected
+
+        # Create VFS Node table
+        self.vfs_node_widget_non_mapped = VfsNodeTableWidget(self.vfs, show_mapped=False)
+        self.vfs_node_widget_non_mapped.vnode_selected = self.vnode_selected
 
         # Create VFS dir table
         self.vfs_dir_widget = VfsDirWidget(self.vfs)
@@ -363,6 +420,7 @@ class Widget(QWidget):
 
         self.nav_widget = QTabWidget()
         self.nav_widget.addTab(self.vfs_dir_widget, 'Directory')
+        self.nav_widget.addTab(self.vfs_node_widget_non_mapped, 'Non-Mapped List')
         self.nav_widget.addTab(self.vfs_node_widget, 'Raw List')
 
         # Creating Data View
@@ -427,12 +485,12 @@ if __name__ == "__main__":
     # options.add_argument("-f", "--file", type=str, required=True)
     # args = options.parse_args()
 
-    cache_file = prefix_out + 'vfs_cache.pickle'
+    cache_file = working_dir + 'vfs_cache.pickle'
     if os.path.isfile(cache_file):
         with open(cache_file, 'rb') as f:
             vfs_global = pickle.load(f)
     else:
-        vfs_global = VfsStructure(prefix_out)
+        vfs_global = VfsStructure(working_dir)
         vfs_global.load_from_archives(prefix_in, debug=debug)
         with open(cache_file, 'wb') as f:
             pickle.dump(vfs_global, f, protocol=pickle.HIGHEST_PROTOCOL)

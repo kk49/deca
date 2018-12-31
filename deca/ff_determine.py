@@ -60,9 +60,9 @@ def determine_file_type_and_size(f, file_size):
     elif b'OggS' == magic[0:4]:
         ftype = 'OGG'
     elif b'BM6' == magic[0:3]:
-        ftype = 'BM6'
+        ftype = FTYPE_BMP
     elif b'BM8' == magic[0:3]:
-        ftype = 'BM8'
+        ftype = FTYPE_BMP
     elif b'TAG0' == magic[4:8]:
         ftype = 'TAG0'
     elif b'FSB5' == magic[16:20]:

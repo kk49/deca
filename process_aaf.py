@@ -21,7 +21,7 @@ with ArchiveFile(open(in_file, 'rb')) as f:
             section_length_with_header = f.read_u32()  # padded length + 16
             magic_ewam = f.read(4)                         # 'EWAM'
             buf = f.read(section_compressed_length)
-            obuf = zlib.decompress(buf,-15)
+            obuf = zlib.decompress(buf, -15)
             fo.write(obuf)
             f.seek(section_length_with_header + section_start)
             # print(section_compressed_length, section_uncompressed_length, section_length_with_header, magic_ewam)

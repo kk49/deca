@@ -14,6 +14,7 @@ from deca_gui_viewer_adf import DataViewerAdf
 from deca_gui_viewer_image import DataViewerImage
 from deca_gui_viewer_raw import DataViewerRaw
 from deca_gui_viewer_text import DataViewerText
+from deca_gui_viewer_sarc import DataViewerSarc
 
 prefix_in = '/home/krys/prj/gz/archives_win64/'
 working_dir = './work/gz/'
@@ -33,7 +34,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.table = self.vfs.table_vfsnode
 
         if not show_mapped:
-            self.table = [v for v in self.table if v.v_path is None and v.p_path is None and v.ftype not in {FTYPE_SARC, FTYPE_TAB, FTYPE_ARC}]
+            self.table = [v for v in self.table if v.v_path is None and v.p_path is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
 
         self.remap = None
         self.remap_uid = None
@@ -237,7 +238,8 @@ class VfsDirModel(QAbstractItemModel):
             vnodes = self.vfs.map_vpath_to_vfsnodes[v_path]
             if len(vnodes) > 0 and v_path is not None:
                 if v_path.find(b'\\') >= 0:
-                    raise Exception('WEIRD PATH {}'.format(v_path))
+                    print('WINDOWS PATH {}'.format(v_path))
+                    path = v_path.split(b'\\')
                 else:
                     path = v_path.split(b'/')
                 name = path[-1]
@@ -353,12 +355,14 @@ class DataViewWidget(QWidget):
 
         self.tab_raw = DataViewerRaw()
         self.tab_text = DataViewerText()
+        self.tab_sarc = DataViewerSarc()
         self.tab_image = DataViewerImage()
         self.tab_adf = DataViewerAdf()
 
         self.tab_widget = QTabWidget()
         self.tab_raw_index = self.tab_widget.addTab(self.tab_raw, 'Raw/Hex')
         self.tab_text_index = self.tab_widget.addTab(self.tab_text, 'Text')
+        self.tab_sarc_index = self.tab_widget.addTab(self.tab_sarc, 'SARC')
         self.tab_image_index = self.tab_widget.addTab(self.tab_image, 'Image')
         self.tab_adf_index = self.tab_widget.addTab(self.tab_adf, 'ADF')
 
@@ -379,23 +383,34 @@ class DataViewWidget(QWidget):
         if vnode.ftype == FTYPE_TXT:
             self.tab_text.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, True)
+            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
             self.tab_widget.setCurrentIndex(self.tab_text_index)
+        elif vnode.ftype == FTYPE_SARC:
+            self.tab_sarc.vnode_process(self.vfs, vnode)
+            self.tab_widget.setTabEnabled(self.tab_text_index, False)
+            self.tab_widget.setTabEnabled(self.tab_sarc_index, True)
+            self.tab_widget.setTabEnabled(self.tab_image_index, False)
+            self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setCurrentIndex(self.tab_sarc_index)
         elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_DDS, FTYPE_BMP}:
             self.tab_image.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
+            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
             self.tab_widget.setCurrentIndex(self.tab_image_index)
         elif vnode.ftype == FTYPE_ADF:
             self.tab_adf.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
+            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, True)
-            self.tab_widget.setCurrentIndex(self.tab_adf_indexa)
+            self.tab_widget.setCurrentIndex(self.tab_adf_index)
         else:
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
+            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
             self.tab_widget.setCurrentIndex(self.tab_raw_index)
@@ -405,45 +420,76 @@ class Widget(QWidget):
     def __init__(self, vfs):
         QWidget.__init__(self)
         self.vfs = vfs
+        self.current_vnode = None
 
         # Create VFS Node table
         self.vfs_node_widget = VfsNodeTableWidget(self.vfs, show_mapped=True)
         self.vfs_node_widget.vnode_selected = self.vnode_selected
+        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        # size.setHorizontalStretch(1)
+        # self.vfs_node_widget.setSizePolicy(size)
 
         # Create VFS Node table
         self.vfs_node_widget_non_mapped = VfsNodeTableWidget(self.vfs, show_mapped=False)
         self.vfs_node_widget_non_mapped.vnode_selected = self.vnode_selected
+        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        # size.setHorizontalStretch(1)
+        # self.vfs_node_widget_non_mapped.setSizePolicy(size)
 
         # Create VFS dir table
         self.vfs_dir_widget = VfsDirWidget(self.vfs)
         self.vfs_dir_widget.vnode_selected = self.vnode_selected
+        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        # size.setHorizontalStretch(1)
+        # self.vfs_dir_widget.setSizePolicy(size)
 
         self.nav_widget = QTabWidget()
         self.nav_widget.addTab(self.vfs_dir_widget, 'Directory')
         self.nav_widget.addTab(self.vfs_node_widget_non_mapped, 'Non-Mapped List')
         self.nav_widget.addTab(self.vfs_node_widget, 'Raw List')
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        size.setHorizontalStretch(1)
+        size.setVerticalStretch(1)
+        self.nav_widget.setSizePolicy(size)
+        # self.nav_widget.updateGeometry()
+
+        self.bt_extract = QPushButton()
+        self.bt_extract.setEnabled(False)
+        self.bt_extract.setText('EXTRACT')
+        self.bt_extract.clicked.connect(self.bt_extract_clicked)
+        size = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        # size.setHorizontalStretch(0)
+        # size.setVerticalStretch(0)
+        # self.bt_extract.setSizePolicy(size)
+
+        self.nav_layout = QVBoxLayout()
+        self.nav_layout.addWidget(self.nav_widget)
+        self.nav_layout.addWidget(self.bt_extract)
 
         # Creating Data View
         self.data_view = DataViewWidget(self.vfs)
-
-        # Left layout
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        size.setHorizontalStretch(1)
-        self.nav_widget.setSizePolicy(size)
-
-        # Right Layout
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        size.setHorizontalStretch(1)
+        # size.setHorizontalStretch(1)
         self.data_view.setSizePolicy(size)
+        # self.data_view.updateGeometry()
 
         # QWidget Layout
         self.main_layout = QHBoxLayout()
-        self.main_layout.addWidget(self.nav_widget)
+        self.main_layout.addLayout(self.nav_layout)
         self.main_layout.addWidget(self.data_view)
         self.setLayout(self.main_layout)
+        self.updateGeometry()
 
     def vnode_selected(self, vnode: VfsNode):
+        self.current_vnode = vnode
         self.data_view.vnode_selected(vnode)
+        if self.current_vnode is not None:
+            self.bt_extract.setText('EXTRACT: {}'.format(vnode.v_path))
+            self.bt_extract.setEnabled(True)
+
+    def bt_extract_clicked(self, checked):
+        if self.current_vnode is not None:
+            self.vfs.extract_node(self.current_vnode)
 
 
 # ********************

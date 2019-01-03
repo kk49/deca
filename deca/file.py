@@ -101,14 +101,26 @@ class ArchiveFile:
         v = self.read_base('c', 1, n)
         return b''.join(v)
 
+    def read_s8(self, n=None):
+        return self.read_base('b', 1, n)
+
     def read_u8(self, n=None):
         return self.read_base('B', 1, n)
+
+    def read_s16(self, n=None):
+        return self.read_base('h', 2, n)
 
     def read_u16(self, n=None):
         return self.read_base('H', 2, n)
 
+    def read_s32(self, n=None):
+        return self.read_base('i', 4, n)
+
     def read_u32(self, n=None):
         return self.read_base('I', 4, n)
+
+    def read_s64(self, n=None):
+        return self.read_base('q', 8, n)
 
     def read_u64(self, n=None):
         return self.read_base('Q', 8, n)

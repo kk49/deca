@@ -2,8 +2,9 @@ import sys
 import io
 import os
 from deca.errors import *
-from deca.file import ArchiveFile
+from deca.file import ArchiveFile, SubsetFile
 from deca.util import dump_block
+from pprint import pformat
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
@@ -38,6 +39,7 @@ class MemberDef:
         self.type_hash = None
         self.size = None
         self.offset = None
+        self.bit_offset = None
         self.default_type = None
         self.default_value = None
 
@@ -45,7 +47,9 @@ class MemberDef:
         self.name = nt[f.read_u64()][1]
         self.type_hash = f.read_u32()
         self.size = f.read_u32()
-        self.offset = f.read_u32()
+        offset = f.read_u32()
+        self.bit_offset = (offset >> 24) & 0xff
+        self.offset = offset & 0x00ffffff
         self.default_type = f.read_u32()
         self.default_value = f.read_u64()
 
@@ -256,30 +260,70 @@ def dump_type(type_id, type_map, offset=0):
     return sbuf
 
 
-def read_instance(f, type_id, map_typdef, map_stringhash, table_name):
-    if type_id == 0x580D0A62:
+typedef_s8 = 0x580D0A62
+typedef_u8 = 0x0ca2821d
+typedef_s16 = 0xD13FCF93
+typedef_u16 = 0x86d152bd
+typedef_s32 = 0x192fe633
+typedef_u32 = 0x075e4e4f
+typedef_s64 = 0xAF41354F
+typedef_u64 = 0xA139E01F
+typedef_f32 = 0x7515a207
+typedef_f64 = 0xC609F663
+
+prim_types = {
+    typedef_s8,
+    typedef_u8,
+    typedef_s16,
+    typedef_u16,
+    typedef_s32,
+    typedef_u32,
+    typedef_s64,
+    typedef_u64,
+    typedef_f32,
+    typedef_f64,
+}
+
+
+def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset=None):
+    if type_id == typedef_s8:
         v = f.read_s8()
-    elif type_id == 0x0ca2821d:
+    elif type_id == typedef_u8:
         v = f.read_u8()
-    elif type_id == 0xD13FCF93:
+    elif type_id == typedef_s16:
         v = f.read_s16()
-    elif type_id == 0x86d152bd:
+    elif type_id == typedef_u16:
         v = f.read_u16()
-    elif type_id == 0x192fe633:
+    elif type_id == typedef_s32:
         v = f.read_s32()
-    elif type_id == 0x075e4e4f:
+    elif type_id == typedef_u32:
         v = f.read_u32()
-    elif type_id == 0xAF41354F:
+    elif type_id == typedef_s64:
         v = f.read_s64()
-    elif type_id == 0xA139E01F:
+    elif type_id == typedef_u64:
         v = f.read_u64()
-    elif type_id == 0x7515a207:
+    elif type_id == typedef_f32:
         v = f.read_f32()
-    elif type_id == 0xC609F663:
+    elif type_id == typedef_f64:
         v = f.read_f64()
     elif type_id == 0x8955583e:
         v = f.read_u64()
-        v = table_name[v]
+        opos = f.tell()
+        offset = v & 0xffffffff
+        f.seek(offset)
+        # TODO Size may be needed for byte codes?
+        # size = (v >> 32) & 0xffffffff
+        # v = f.read_c8(size)
+        # v = b''.join(v)
+        v = f.read_strz()
+
+        f.seek(opos)
+    elif type_id == 0xdefe88ed:
+        v0 = f.read_u32(4)
+        opos = f.tell()
+        f.seek(v0[0])
+        v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name)
+        f.seek(opos)
     else:
         if type_id not in map_typdef:
             raise AdfTypeMissing(type_id)
@@ -289,30 +333,101 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name):
             raise AdfTypeMissing(type_id)
         elif type_def.metatype == 1:  # Structure
             v = {}
+            p0 = f.tell()
             for m in type_def.members:
-                v[m.name.decode('utf-8')] = read_instance(f, m.type_hash, map_typdef, map_stringhash, table_name)
+                f.seek(p0 + m.offset)
+                nm = m.name.decode('utf-8')
+                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, table_name, bit_offset=m.bit_offset)
+                v[nm] = vt
+                # print(nm, vt)
+            p1 = f.tell()
+            f.seek(p0 + type_def.size)
+            # print(p0, p1, p1-p0, type_def.size)
         elif type_def.metatype == 2:  # Pointer
             raise AdfTypeMissing(type_id)
         elif type_def.metatype == 3:  # Array
-            pos = f.tell()
-            buf = f.read(128)
-            f.seek(pos)
-            l = f.read_u32()
-            v = [None] * l
-            for i in range(l):
-                v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name)
-            # raise AdfTypeMissing(type_id)
+            v0 = f.read_u32(4)
+            opos = f.tell()
+
+            offset = v0[0]
+            flags = v0[1]
+            length = v0[2]
+            unknown = v0[3]
+            align = None
+            # aligning based on element size info
+            # if type_def.element_type_hash not in prim_types:
+            #     align = 4
+            f.seek(offset)
+
+            if type_def.element_type_hash == typedef_u8:
+                v = list(f.read_u8(length))
+            elif type_def.element_type_hash == typedef_s8:
+                v = list(f.read_s8(length))
+            elif type_def.element_type_hash == typedef_u16:
+                v = list(f.read_u16(length))
+            elif type_def.element_type_hash == typedef_s16:
+                v = list(f.read_s16(length))
+            elif type_def.element_type_hash == typedef_u32:
+                v = list(f.read_u32(length))
+            elif type_def.element_type_hash == typedef_s32:
+                v = list(f.read_s32(length))
+            elif type_def.element_type_hash == typedef_u64:
+                v = list(f.read_u64(length))
+            elif type_def.element_type_hash == typedef_s64:
+                v = list(f.read_s64(length))
+            elif type_def.element_type_hash == typedef_f32:
+                v = list(f.read_f32(length))
+            elif type_def.element_type_hash == typedef_f64:
+                v = list(f.read_f64(length))
+            else:
+                if length > 1000:
+                    print('OPTIMIZE {:08x}'.format(type_def.element_type_hash))
+                v = [None] * length
+                for i in range(length):
+                    p0 = f.tell()
+                    if align is not None:
+                        nudge = (align - p0 % align) % align
+                        f.seek(p0 + nudge)  # v0[0] offset ele 0, v0[1] stride?
+                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name)
+                    p1 = f.tell()
+                    # print(p0, p1, p1-p0)
+            f.seek(opos)
         elif type_def.metatype == 4:  # Inline Array
             v = [None] * type_def.element_length
             for i in range(type_def.element_length):
                 v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name)
         elif type_def.metatype == 7:  # BitField
-            raise AdfTypeMissing(type_id)
+            if type_def.size == 1:
+                v = f.read_u8()
+            elif type_def.size == 2:
+                v = f.read_u16()
+            elif type_def.size == 4:
+                v = f.read_u32()
+            elif type_def.size == 8:
+                v = f.read_u64()
+            else:
+                raise Exception('Unknown bitfield size')
+
+            if bit_offset is None:
+                raise Exception('Missing bit offset')
+            v = (v >> bit_offset) & 1
         elif type_def.metatype == 8:  # Enumeration
-            raise AdfTypeMissing(type_id)
+            if type_def.size != 4:
+                raise Exception('Unknown enum size')
+            v = f.read_u32()
+            if v < len(type_def.members):
+                vs = type_def.members[v].name
+            else:
+                vs = None
+            v = [v, vs]
         elif type_def.metatype == 9:  # String Hash
             v = f.read_u32()
-            v = map_stringhash[v].value
+            if v in map_stringhash:
+                v = map_stringhash[v].value
+            elif v == 0xDEADBEEF:
+                v = b''
+            else:
+                v = (v, 'MISSING_STRINGHASH')
         else:
             raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
 
@@ -373,8 +488,14 @@ class Adf:
             sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
 
         sbuf = sbuf + '\n--------instances\n'
-        for v in self.map_instance.items():
-            sbuf = sbuf + 'instances\t{:08x}\t{:08x}\t{}\t{}\t{}\t{:08x}-{:08x}\n'.format(v[0], v[1].type_hash, v[1].name.decode('utf-8'), v[1].offset, v[1].size, v[1].offset, v[1].offset + v[1].size)
+        for info, v in zip(self.table_instance, self.table_instance_values):
+            sbuf = sbuf + 'instances\t{:08x}\t{:08x}\t{}\t{}\t{}\t{:08x}-{:08x}\n'.format(
+                info.name_hash,
+                info.type_hash,
+                info.name.decode('utf-8'),
+                info.offset, info.size, info.offset, info.offset + info.size)
+
+            sbuf = sbuf + pformat(v, width=1024) + '\n'
 
         return sbuf
 
@@ -449,11 +570,17 @@ class Adf:
             self.table_instance[i].deserialize(fp, self.table_name)
             self.map_instance[self.table_instance[i].name_hash] = self.table_instance[i]
 
-        # self.table_instance_values = []
-        # for ins in self.table_instance:
-        #     fp.seek(ins.offset)
-        #     v = read_instance(fp, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name)
-        #     self.table_instance_values.append(v)
+        self.table_instance_values = [None] * len(self.table_instance)
+        # try:
+        for i in range(len(self.table_instance)):
+            ins = self.table_instance[i]
+            fp.seek(ins.offset)
+            buf = fp.read(ins.size)
+            with ArchiveFile(io.BytesIO(buf)) as f:
+                v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name)
+                self.table_instance_values[i] = v
+        # except Exception as exp:
+        #     print(exp)
 
 
 def load_adf(buffer):

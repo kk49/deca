@@ -7,7 +7,9 @@ from deca.ff_adf import load_adf
 
 
 if len(sys.argv) < 2:
+    in_file = '/home/krys/prj/deca/work/gz/exported/models/manmade/props/interior/civilian_01_answering_machine.hrmeshc'
     in_file = '/home/krys/prj/deca/work/gz/exported/models/manmade/props/interior/civilian_01_answering_machine.modelc'
+    in_file = '/home/krys/prj/deca/work/gz/exported/graphs/check_region_difficulty.graphc'
 else:
     in_file = sys.argv[1]
 

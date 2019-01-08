@@ -105,7 +105,7 @@ class Ddsc:
             nxm = max(4, nx)
             nym = max(4, ny)
             raw_size = deca.dxgi.raw_data_size(pixel_format, nx, ny)
-            print('Loading Data: {}'.format(raw_size))
+            # print('Loading Data: {}'.format(raw_size))
             raw_data = f.read(raw_size)
             raw_data_size = len(raw_data)
             if raw_data_size == 0:
@@ -113,11 +113,11 @@ class Ddsc:
             if raw_data_size < raw_size:
                 raise Exception('Ddsc::load_atx: Not Enough Data')
             inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
-            print('Process Data: {}'.format(mip))
+            # print('Process Data: {}'.format(mip))
             t0 = time.time()
             deca.dxgi.process_image(inp, raw_data, nx, ny, pixel_format)
             t1 = time.time()
-            print('Execute time: {} s'.format(t1 - t0))
+            # print('Execute time: {} s'.format(t1 - t0))
 
             mip.itype = 'atx'
             mip.data = inp

@@ -28,24 +28,30 @@ NT_names = [
 
 class RtpcProperty:
     def __init__(self):
-        self.data_position = None
+        self.pos = None
         self.name_hash = None
-        self.data = None
+        self.data_pos = None
         self.data_raw = None
+        self.data = None
         self.type = None
-        self.extra = None
 
     def __repr__(self):
-        return '0x{:08x} @{}(0x{:08x}) {} = 0x{:08x} {}'.format(
-            self.name_hash, self.data_position, self.data_position, NT_names[self.type], self.data_raw, self.data)
+        return '@0x{:08x}({}) 0x{:08x} 0x{:08x} {}({}) = @0x{:08x}({}) {} '.format(
+            self.pos, self.pos,, 
+            self.name_hash,
+            self.data_raw, 
+            NT_names[self.type],
+            self.type, 
+            self.data_pos, self.data_pos,
+            self.data)
         # return '0x{:08x}: {} = {}'.format(self.name_hash, NT_names[self.type], self.data,)
 
     def deserialize(self, f):
+        self.pos = f.tell()
         self.name_hash = f.read_u32()
-        self.data_position = f.tell()
+        self.data_pos = f.tell()
         self.data_raw = f.read_u32()
         self.type = f.read_u8()
-        # self.extra = f.read_u8(3)
 
         self.data = self.data_raw
 
@@ -58,36 +64,43 @@ class RtpcProperty:
             self.data = struct.unpack('f', raw_buf)[0]
         elif self.type == NT_str:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = f.read_strz()
             f.seek(opos)
         elif self.type == NT_vec2:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(2))
             f.seek(opos)
         elif self.type == NT_vec3:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(3))
             f.seek(opos)
         elif self.type == NT_vec4:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(4))
             f.seek(opos)
         elif self.type == NT_mat3x3:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(9))
             f.seek(opos)
         elif self.type == NT_mat4x4:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(16))
             f.seek(opos)
         elif self.type == NT_array_u32:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             n = f.read_u32()
             self.data = []
@@ -96,6 +109,7 @@ class RtpcProperty:
             f.seek(opos)
         elif self.type == NT_array_f32:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             n = f.read_u32()
             self.data = []
@@ -104,6 +118,7 @@ class RtpcProperty:
             f.seek(opos)
         elif self.type == NT_array_u8:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             n = f.read_u32()
             self.data = []
@@ -112,11 +127,13 @@ class RtpcProperty:
             f.seek(opos)
         elif self.type == NT_objid:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = f.read_u8(8)
             f.seek(opos)
         elif self.type == NT_event:
             opos = f.tell()
+            self.data_pos = self.data_raw
             f.seek(self.data_raw)
             n = f.read_u32()
             self.data = []

@@ -2,6 +2,7 @@ from deca_gui_viewer import *
 from deca.file import ArchiveFile
 from deca.ff_rtpc import Rtpc
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
+from PySide2.QtGui import QFont
 
 
 class DataViewerRtpc(DataViewer):
@@ -9,6 +10,9 @@ class DataViewerRtpc(DataViewer):
         DataViewer.__init__(self)
 
         self.text_box = QTextEdit()
+        font = QFont("Courier", 8)
+        self.text_box.setFont(font)
+        self.text_box.setStyleSheet("fontName='Courier'")
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.text_box.setSizePolicy(size)
 

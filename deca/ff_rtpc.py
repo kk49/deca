@@ -20,10 +20,22 @@ NT_objid = 13
 NT_event = 14
 
 NT_names = [
-    'none', 'u32', 'f32', 'str',
-    'vec2', 'vec3', 'vec4', 'mat3x3',
-    'mat4x4', 'array_u32', 'array_f32', 'array_u8',
-    'd12', 'objid', 'event']
+    'none',
+    'u32',
+    'f32',
+    'str',
+    'vec2',
+    'vec3',
+    'vec4',
+    'mat3x3',
+    'mat4x4',
+    'A[u32]',
+    'A[f32]',
+    'A[u8]',
+    'd12',
+    'objid',
+    'event',
+]
 
 
 class RtpcProperty:
@@ -36,12 +48,12 @@ class RtpcProperty:
         self.type = None
 
     def __repr__(self):
-        return '@0x{:08x}({}) 0x{:08x} 0x{:08x} {}({}) = @0x{:08x}({}) {} '.format(
-            self.pos, self.pos,, 
+        return '@0x{:08x}({: 8d}) 0x{:08x} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
+            self.pos, self.pos,
             self.name_hash,
             self.data_raw, 
+            self.type,
             NT_names[self.type],
-            self.type, 
             self.data_pos, self.data_pos,
             self.data)
         # return '0x{:08x}: {} = {}'.format(self.name_hash, NT_names[self.type], self.data,)

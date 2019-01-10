@@ -14,9 +14,10 @@ Written in Python, tested only on Linux, because this is an experiment in buildi
   * 99% SARC
   * 99% AVTX/DDSC/ATX (image data)
   * 99% AAF
-  * 95% ADF - (missing MDIC, and Game)
+  * 95% ADF
     * Missing GameDataCollection (0x178842fe)
     * Missing MDIC (0xb5b062f1)
+    * Missing code for types that do not seem to exist in GZB
   * 10% OBC - found a correlation in file size, guess at record size/count
   * 00% RTPC
   * 00% TAG0

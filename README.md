@@ -8,8 +8,8 @@ mainly to explore Generation Zero BETA files until it's released.
 Written in Python, tested only on Linux, because this is an experiment in building a library / toolset
 
 ## Status
-* Extracting all files from Generation Zero archives
-* Parsing files from GenZ archives 
+* Extracting all files from GenZ Beta archives
+* Parsing files from GenZ Beta archives 
   * 99% ARC/TAB
   * 99% SARC
   * 99% AVTX/DDSC/ATX (image data)

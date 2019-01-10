@@ -1,4 +1,5 @@
 import os
+import io
 import datetime
 import pandas as pd
 from deca.util import *
@@ -6,6 +7,7 @@ from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_txt import load_json
 from deca.ff_adf import load_adf, AdfTypeMissing
+from deca.ff_rtpc import Rtpc, NT_str
 from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc
@@ -330,13 +332,53 @@ class VfsStructure:
                         if len(fns) > 0 and not found_any:
                             self.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.hashid, fns[0]))
 
-
                 except AdfTypeMissing as ae:
                     missing_types[ae.hashid] = missing_types.get(ae.hashid,[]) + [node.hashid]
                     print('Missing Type {:08x} in {:08X} {} {}'.format(ae.hashid, node.hashid, node.v_path, node.p_path))
 
         adf_found = self.propose_vpaths(adf_strings)
         self.log('HASH FROM ADF: From {} found {} hash mappings. Total ADFs {}'.format(len(adf_strings), adf_found, len(adf_done)))
+
+        self.log('HASH FROM RTPC: look for hashable strings in RTPC files')
+        rtpc_strings = set()
+        rtpc_done = set()
+        for idx in range(len(self.table_vfsnode)):
+            # if idx % 10000 == 0:
+            #     self.log('HASH FROM ADF: {} of {}'.format(idx, len(self.table_vfsnode)))
+            node = self.table_vfsnode[idx]
+            if node.is_valid() and node.ftype == FTYPE_RTPC and node.hashid not in rtpc_done:
+                rtpc_done.add(node.hashid)
+                # try:
+                with self.file_obj_from(node) as f:
+                    buf = f.read(node.size_u)
+
+                # with open('dump.dat', 'wb') as fo:
+                #     fo.write(buf)
+
+                rtpc = Rtpc()
+                with io.BytesIO(buf) as f:
+                    rtpc.deserialize(f)
+
+                rnodelist = [rtpc.root_node]
+
+                while len(rnodelist) > 0:
+                    rnode = rnodelist.pop(0)
+
+                    for c in rnode.child_table:
+                        rnodelist.append(c)
+
+                    for p in rnode.prop_table:
+                        if p.type == NT_str:
+                            s = p.data
+                            rtpc_strings.add(s)
+                            fn, ext = os.path.splitext(s)
+                            if ext == b'.tga':
+                                rtpc_strings.add(fn + b'.ddsc')
+                # except:
+                #     self.log('RTPC FAIL: {:08X} {} {}'.format(node.hashid, node.v_path, node.p_path))
+
+        rtpc_found = self.propose_vpaths(rtpc_strings)
+        self.log('HASH FROM RTPC: From {} found {} hash mappings. Total RTPCs {}'.format(len(rtpc_strings), rtpc_found, len(rtpc_done)))
 
         self.log('HASH FROM JSON: look for hashable strings in json files')
         json_strings = set()

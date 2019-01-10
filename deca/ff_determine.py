@@ -52,7 +52,7 @@ def determine_file_type_and_size(f, file_size):
     elif b'DDS ' == magic[0:4]:
         ftype = FTYPE_DDS
     elif b'RTPC' == magic[0:4]:
-        ftype = 'RTPC'
+        ftype = FTYPE_RTPC
     elif b'CFX' == magic[0:3]:
         ftype = 'CFX'
     elif b'RIFF' == magic[0:4]:

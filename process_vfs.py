@@ -11,6 +11,7 @@ from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
     QTabWidget, QTreeView, QTextEdit, QPushButton
 from deca_gui_viewer_adf import DataViewerAdf
+from deca_gui_viewer_rtpc import DataViewerRtpc
 from deca_gui_viewer_image import DataViewerImage
 from deca_gui_viewer_raw import DataViewerRaw
 from deca_gui_viewer_text import DataViewerText
@@ -359,6 +360,7 @@ class DataViewWidget(QWidget):
         self.tab_sarc = DataViewerSarc()
         self.tab_image = DataViewerImage()
         self.tab_adf = DataViewerAdf()
+        self.tab_rtpc = DataViewerRtpc()
 
         self.tab_widget = QTabWidget()
         self.tab_raw_index = self.tab_widget.addTab(self.tab_raw, 'Raw/Hex')
@@ -366,6 +368,7 @@ class DataViewWidget(QWidget):
         self.tab_sarc_index = self.tab_widget.addTab(self.tab_sarc, 'SARC')
         self.tab_image_index = self.tab_widget.addTab(self.tab_image, 'Image')
         self.tab_adf_index = self.tab_widget.addTab(self.tab_adf, 'ADF')
+        self.tab_rtpc_index = self.tab_widget.addTab(self.tab_rtpc, 'RTPC')
 
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         size.setVerticalStretch(1)
@@ -387,6 +390,7 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_text_index)
         elif vnode.ftype == FTYPE_SARC:
             self.tab_sarc.vnode_process(self.vfs, vnode)
@@ -394,6 +398,7 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_sarc_index, True)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_sarc_index)
         elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_DDS, FTYPE_BMP}:
             self.tab_image.vnode_process(self.vfs, vnode)
@@ -401,6 +406,7 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_image_index)
         elif vnode.ftype == FTYPE_ADF:
             self.tab_adf.vnode_process(self.vfs, vnode)
@@ -408,12 +414,22 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, True)
+            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_adf_index)
+        elif vnode.ftype == FTYPE_RTPC:
+            self.tab_rtpc.vnode_process(self.vfs, vnode)
+            self.tab_widget.setTabEnabled(self.tab_text_index, False)
+            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
+            self.tab_widget.setTabEnabled(self.tab_image_index, False)
+            self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setTabEnabled(self.tab_rtpc_index, True)
+            self.tab_widget.setCurrentIndex(self.tab_rtpc_index)
         else:
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
             self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_raw_index)
 
 

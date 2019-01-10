@@ -1,6 +1,7 @@
+*.pyc
+__PYCACHE__/
 test/
 tools/
 work/
 venv36/
 .idea/
-*.pyc

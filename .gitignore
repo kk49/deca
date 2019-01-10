@@ -2,4 +2,5 @@ test/
 tools/
 work/
 venv36/
+.idea/
 *.pyc

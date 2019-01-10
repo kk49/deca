@@ -5,7 +5,7 @@ from deca.util import *
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_txt import load_json
-from deca.ff_adf import load_adf
+from deca.ff_adf import load_adf, AdfTypeMissing
 from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc
@@ -269,6 +269,7 @@ class VfsStructure:
         self.log('HASH FROM ARC/TAB/SARC: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
 
         self.log('HASH FROM ADF: look for hashable strings in ADF files')
+        missing_types = {}
         adf_strings = set()
         adf_done = set()
         for idx in range(len(self.table_vfsnode)):
@@ -279,24 +280,60 @@ class VfsStructure:
                 adf_done.add(node.hashid)
                 with self.file_obj_from(node) as f:
                     buffer = f.read(node.size_u)
-                adf = load_adf(buffer)
-                for sh in adf.table_stringhash:
-                    adf_strings.add(sh.value)
-                    remove_prefix = b'intermediate/'
-                    if sh.value.find(remove_prefix) == 0:
-                        adf_strings.add(sh.value[len(remove_prefix):])
+                try:
+                    adf = load_adf(buffer)
+                    for sh in adf.table_stringhash:
+                        adf_strings.add(sh.value)
+                        remove_prefix = b'intermediate/'
+                        if sh.value.find(remove_prefix) == 0:
+                            adf_strings.add(sh.value[len(remove_prefix):])
 
-                for sh in adf.table_name:
-                    s = sh[1]
-                    st = self.map_name_usage.get(s, set())
-                    st.add(node)
-                    self.map_name_usage[s] = st
+                    for sh in adf.found_strings:
+                        adf_strings.add(sh)
+                        remove_prefix = b'intermediate/'
+                        if sh.find(remove_prefix) == 0:
+                            adf_strings.add(sh[len(remove_prefix):])
 
-                for sh in adf.table_stringhash:
-                    s = sh.value
-                    st = self.map_shash_usage.get(s, set())
-                    st.add(node)
-                    self.map_shash_usage[s] = st
+                    for sh in adf.table_name:
+                        s = sh[1]
+                        st = self.map_name_usage.get(s, set())
+                        st.add(node)
+                        self.map_name_usage[s] = st
+
+                    for sh in adf.table_stringhash:
+                        s = sh.value
+                        st = self.map_shash_usage.get(s, set())
+                        st.add(node)
+                        self.map_shash_usage[s] = st
+
+                    if len(adf.table_instance_values) > 0 and adf.table_instance_values[0] is not None and isinstance(adf.table_instance_values[0], dict):
+                        obj0 = adf.table_instance_values[0]
+
+                        fns = []
+                        # self name patch files
+                        if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
+                            fn = 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
+                            fns.append(fn)
+
+                        if adf.table_instance[0].name == b'environ':
+                            fn = 'environment/weather/{}.environc'.format(obj0['Name'].decode('utf-8'))
+                            fns.append(fn)
+                            fn = 'environment/{}.environc'.format(obj0['Name'].decode('utf-8'))
+                            fns.append(fn)
+
+                        found_any = False
+                        for fn in fns:
+                            if node.hashid == hash_little(fn):
+                                adf_strings.add(fn)
+                                found_any = True
+
+                        if len(fns) > 0 and not found_any:
+                            self.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.hashid, fns[0]))
+
+
+                except AdfTypeMissing as ae:
+                    missing_types[ae.hashid] = missing_types.get(ae.hashid,[]) + [node.hashid]
+                    print('Missing Type {:08x} in {:08X} {} {}'.format(ae.hashid, node.hashid, node.v_path, node.p_path))
 
         adf_found = self.propose_vpaths(adf_strings)
         self.log('HASH FROM ADF: From {} found {} hash mappings. Total ADFs {}'.format(len(adf_strings), adf_found, len(adf_done)))
@@ -375,12 +412,15 @@ class VfsStructure:
         avtx_found = self.propose_vpaths(avtx_strings)
         self.log('HASH FROM DDSC FILE NAMES: From {} found {} hash mappings'.format(len(avtx_strings), avtx_found))
 
-        self.log('HASH FROM PAIR FILE NAMES: add possible strings for all [(epe,ee),(blo,bl)]')
+        self.log('HASH FROM PAIR FILE NAMES: add possible strings for all [(epe,ee),(blo,bl), (meshc, hrmeshc, hrmeshc)]')
         pair_exts = {
             '.epe': ['.ee'],
             '.ee': ['.epe'],
             '.blo': ['.bl'],
             '.bl': ['.blo'],
+            '.meshc': ['.hrmeshc', '.modelc', '.model_deps'],
+            '.modelc': ['.hrmeshc', '.meshc', '.model_deps'],
+            '.hrmeshc': ['.meshc', '.modelc', '.model_deps'],
         }
         pair_strings = set()
         for k, v in self.map_vpath_to_hash.items():
@@ -389,6 +429,22 @@ class VfsStructure:
                 pair_strings.add(file + e2)
         pair_found = self.propose_vpaths(pair_strings)
         self.log('HASH FROM PAIR FILE NAMES: From {} found {} hash mappings'.format(len(pair_strings), pair_found))
+
+        self.log('HASH FROM GUESSING FILE NAMES: based on map naming scheme')
+        guess_strings = set()
+        guess_strings.add('textures/ui/map_reserve_0/world_map.ddsc')
+        guess_strings.add('textures/ui/map_reserve_1/world_map.ddsc')
+        guess_strings.add('settings/hp_settings/reserve_1.bin')
+        guess_strings.add('settings/hp_settings/reserve_1.bl')
+        for res_i in [0, 1]:
+            for zoom_i in [1, 2, 3]:
+                for index in range(500):
+                    guess_strings.add('textures/ui/map_reserve_{}/zoom{}/{}.ddsc'.format(res_i, zoom_i, index))
+        for i in range(64):
+            guess_strings.add('terrain/hp/horizonmap/horizon_{}.ddsc'.format(i))
+
+        guess_found = self.propose_vpaths(guess_strings)
+        self.log('HASH FROM PAIR FILE NAMES: From {} found {} hash mappings'.format(len(guess_strings), guess_found))
 
         self.log('fill in v_paths, mark extensions identified files as ftype')
         for idx in range(len(self.table_vfsnode)):
@@ -418,6 +474,11 @@ class VfsStructure:
                 self.map_vpath_to_vfsnodes[node.v_path] = lst
 
         self.log('hashes: {}, mappings missing: {}, mappings present {}'.format(len(self.hash_present), len(self.hash_map_missing), len(self.hash_map_present)))
+
+        for k, vs in missing_types.items():
+            for v in vs:
+                vp = self.map_hash_to_vpath.get(v, b'')
+                self.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp.decode('utf-8')))
 
     def extract_node(self, node):
         if node.is_valid():

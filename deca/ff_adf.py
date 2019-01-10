@@ -239,7 +239,7 @@ def dump_type(type_id, type_map, offset=0):
         pass
     elif type_def.metatype == 1:  # Structure
         for m in type_def.members:
-            sbuf = sbuf + '{}{} o:{}({:08x}) s:{} t:{:08x} dt:{:08x} dv:{:016x}\n'.format(' ' * (offset + 2), m.name.decode('utf-8'), m.offset, m.offset, m.size, m.type_hash, m.default_type, m.default_value)
+            sbuf = sbuf + '{}{} o:{}({:08x})[{}] s:{} t:{:08x} dt:{:08x} dv:{:016x}\n'.format(' ' * (offset + 2), m.name.decode('utf-8'), m.offset, m.offset, m.bit_offset, m.size, m.type_hash, m.default_type, m.default_value)
             sbuf = sbuf + dump_type(m.type_hash, type_map, offset + 4)
     elif type_def.metatype == 2:  # Pointer
         pass
@@ -285,7 +285,7 @@ prim_types = {
 }
 
 
-def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset=None):
+def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset=None, found_strings=None):
     if type_id == typedef_s8:
         v = f.read_s8()
     elif type_id == typedef_u8:
@@ -317,13 +317,30 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
         # v = b''.join(v)
         v = f.read_strz()
 
+        if found_strings is not None:
+            found_strings.add(v)
+
         f.seek(opos)
-    elif type_id == 0xdefe88ed:
+    # TODO: optional type? this seems to be missing in some cases, i.e. the case of meshc files for CharacterMesh1UVMesh
+    elif type_id == 0xdefe88ed:  # Optional value
         v0 = f.read_u32(4)
-        opos = f.tell()
-        f.seek(v0[0])
-        v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name)
-        f.seek(opos)
+        if v0[0] == 0 or v0[2] == 0:
+            v = None
+        else:
+            opos = f.tell()
+            f.seek(v0[0])
+            v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, found_strings=found_strings)
+            f.seek(opos)
+    elif type_id == 0x178842fe:
+        v = ('GameDataCollection', 'NOT_HANDLED_0x178842fe')
+    elif type_id == 0xb5b062f1:
+        v = []
+        while True:
+            t = f.read_u8()
+            if t is None:
+                break
+            v.append(t)
+        # v = ['{:02x}'.format(v[i]) for i in range(len(v))]
     else:
         if type_id not in map_typdef:
             raise AdfTypeMissing(type_id)
@@ -337,14 +354,17 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
             for m in type_def.members:
                 f.seek(p0 + m.offset)
                 nm = m.name.decode('utf-8')
-                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, table_name, bit_offset=m.bit_offset)
+                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, table_name, bit_offset=m.bit_offset, found_strings=found_strings)
                 v[nm] = vt
                 # print(nm, vt)
             p1 = f.tell()
             f.seek(p0 + type_def.size)
             # print(p0, p1, p1-p0, type_def.size)
         elif type_def.metatype == 2:  # Pointer
-            raise AdfTypeMissing(type_id)
+            v0 = f.read_u64()
+            v = (v0, 'NOTE: {}: {:016x} to {:08x}'.format(type_def.name, v0, type_def.element_type_hash))
+            # TODO sure how this is used yet, but it's used by effects so lower priority
+            # raise AdfTypeMissing(type_id)
         elif type_def.metatype == 3:  # Array
             v0 = f.read_u32(4)
             opos = f.tell()
@@ -380,22 +400,22 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
             elif type_def.element_type_hash == typedef_f64:
                 v = list(f.read_f64(length))
             else:
-                if length > 1000:
-                    print('OPTIMIZE {:08x}'.format(type_def.element_type_hash))
+                # if length > 1000:
+                #     print('OPTIMIZE {:08x}'.format(type_def.element_type_hash))
                 v = [None] * length
                 for i in range(length):
                     p0 = f.tell()
                     if align is not None:
                         nudge = (align - p0 % align) % align
                         f.seek(p0 + nudge)  # v0[0] offset ele 0, v0[1] stride?
-                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name)
+                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, found_strings=found_strings)
                     p1 = f.tell()
                     # print(p0, p1, p1-p0)
             f.seek(opos)
         elif type_def.metatype == 4:  # Inline Array
             v = [None] * type_def.element_length
             for i in range(type_def.element_length):
-                v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name)
+                v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, found_strings=found_strings)
         elif type_def.metatype == 7:  # BitField
             if type_def.size == 1:
                 v = f.read_u8()
@@ -455,7 +475,9 @@ class Adf:
         self.map_typedef = {}
         self.table_instance = []
         self.map_instance = {}
-        self.table_instance_value = []
+
+        self.found_strings = set()
+        self.table_instance_values = []
 
     def dump_to_string(self):
         sbuf = ''
@@ -570,17 +592,20 @@ class Adf:
             self.table_instance[i].deserialize(fp, self.table_name)
             self.map_instance[self.table_instance[i].name_hash] = self.table_instance[i]
 
+        self.found_strings = set()
         self.table_instance_values = [None] * len(self.table_instance)
-        # try:
         for i in range(len(self.table_instance)):
             ins = self.table_instance[i]
             fp.seek(ins.offset)
+            # try:
             buf = fp.read(ins.size)
             with ArchiveFile(io.BytesIO(buf)) as f:
-                v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name)
+                v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name, found_strings=self.found_strings)
                 self.table_instance_values[i] = v
-        # except Exception as exp:
-        #     print(exp)
+            # except AdfTypeMissing as ae:
+            #     print('Missing HASHID {:08x}'.format(ae.hashid))
+            # except Exception as exp:
+            #     print(exp)
 
 
 def load_adf(buffer):

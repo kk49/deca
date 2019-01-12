@@ -2,12 +2,13 @@ import os
 import io
 import datetime
 import pandas as pd
-from deca.util import *
+
+import deca.ff_rtpc
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_txt import load_json
 from deca.ff_adf import load_adf, AdfTypeMissing
-from deca.ff_rtpc import Rtpc, NT_str
+from deca.ff_rtpc import Rtpc
 from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc
@@ -368,7 +369,7 @@ class VfsStructure:
                         rnodelist.append(c)
 
                     for p in rnode.prop_table:
-                        if p.type == NT_str:
+                        if p.type == deca.ff_rtpc.PropType.type_str.value:
                             s = p.data
                             rtpc_strings.add(s)
                             fn, ext = os.path.splitext(s)

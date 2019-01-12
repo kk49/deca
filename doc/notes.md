@@ -6,5 +6,10 @@
 2019-01-08 04:22:31.475566: hashes: 44146, mappings missing: 5102, mappings present 39044
 2019-01-10 00:01:07.749605: hashes: 44146, mappings missing: 5102, mappings present 39044
 
+# Events
+## CEventTrigger
+* debug_unlock_all_safehouses
 
+
+demo region 0x00005614901B415A
 

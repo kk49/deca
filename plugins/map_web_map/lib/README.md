@@ -1,0 +1,1 @@
+Leaflet (https://github.com/Leaflet/Leaflet) is distributed under it's license

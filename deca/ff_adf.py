@@ -497,17 +497,20 @@ class Adf:
         sbuf = sbuf + self.comment.decode('utf-8')
 
         sbuf = sbuf + '\n\n--------name_table\n'
-        for i in range(len(self.table_name)):
-            sbuf = sbuf + 'name_table\t{}\t{}\n'.format(i, self.table_name[i][1].decode('utf-8'))
+        sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        # for i in range(len(self.table_name)):
+        #     sbuf = sbuf + 'name_table\t{}\t{}\n'.format(i, self.table_name[i][1].decode('utf-8'))
 
         sbuf = sbuf + '\n--------string_hash\n'
-        for v in self.map_stringhash.items():
-            sbuf = sbuf + 'string_hash\t{:08x}\t{}\n'.format(v[0], v[1].value)
+        sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        # for v in self.map_stringhash.items():
+        #     sbuf = sbuf + 'string_hash\t{:08x}\t{}\n'.format(v[0], v[1].value)
 
         sbuf = sbuf + '\n--------typedefs\n'
-        for v in self.map_typedef.items():
-            sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
-            sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
+        sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        # for v in self.map_typedef.items():
+        #     sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
+        #     sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
 
         sbuf = sbuf + '\n--------instances\n'
         for info, v in zip(self.table_instance, self.table_instance_values):

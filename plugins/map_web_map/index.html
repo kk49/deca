@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='utf-8' />
+    <title>deca Map</title>
+    <link rel="stylesheet" href="./lib/leaflet/leaflet.css" />
+    <script src="./lib/leaflet/leaflet.js"></script>
+    <script src="./regions.js"></script>
+
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <style>
+        body { margin:0; padding:0; }
+        #mapid { position:absolute; top:0; bottom:0; width:100%; }
+        #xmapid { height: 800px; }
+    </style>
+</head>
+
+<body>
+
+<div id="mapid"></div>
+
+<script>
+    var crs = L.CRS.Simple
+
+    var map = L.map('mapid', {crs: crs}).setView([-128, 128], 2);
+
+    var tile_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'GenZero BETA data extracted by deca',
+        minNativeZoom: 0,
+        maxNativeZoom: 6,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'itile',
+        })
+
+    tile_layer.addTo(map);
+
+    function onEachFeature(feature, layer) {
+        if (feature.properties && feature.properties.uid) {
+            layer.bindPopup(feature.properties.uid);
+        }
+    }
+
+    var def_style = {
+        "color": "#ff0000",
+        "weight": 2,
+        "opacity": 0.5,
+        fillColor: "#ffffff",
+        fillOpacity: 0.1,
+    };
+    var region_layer = L.geoJSON(regions_json, {style: def_style, onEachFeature: onEachFeature})
+
+    region_layer.addTo(map);
+
+    var baseMaps = {
+        "Map": tile_layer,
+    };
+
+    var overlayMaps = {
+        "Regions": region_layer
+    };
+
+    L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+</script>
+
+</body>
+
+</html>

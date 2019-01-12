@@ -1,25 +1,29 @@
 from deca.file import ArchiveFile
 import struct
+from enum import IntEnum
 
 # Node Types
 
-NT_none = 0
-NT_u32 = 1
-NT_f32 = 2
-NT_str = 3
-NT_vec2 = 4
-NT_vec3 = 5
-NT_vec4 = 6
-NT_mat3x3 = 7  # DEPRECIATED?
-NT_mat4x4 = 8
-NT_array_u32 = 9
-NT_array_f32 = 10
-NT_array_u8 = 11
-NT_depreciated_12 = 12
-NT_objid = 13
-NT_event = 14
 
-NT_names = [
+class PropType(IntEnum):
+    type_none = 0
+    type_u32 = 1
+    type_f32 = 2
+    type_str = 3
+    type_vec2 = 4
+    type_vec3 = 5
+    type_vec4 = 6
+    type_mat3x3 = 7  # DEPRECIATED?
+    type_mat4x4 = 8
+    type_array_u32 = 9
+    type_array_f32 = 10
+    type_array_u8 = 11
+    type_depreciated_12 = 12
+    type_objid = 13
+    type_event = 14
+
+
+PropType_names = [
     'none',
     'u32',
     'f32',
@@ -38,6 +42,15 @@ NT_names = [
 ]
 
 
+class PropName(IntEnum):
+    CLASS_NAME = 0x1473b179
+    CLASS_NAME_HASH = 0xd04059e6
+    CREGION_BORDER = 0x1c1d51a9
+    CLASS_COMMENT = 0xd31ab684
+    INSTANCE_UID = 0xcfff8405
+    ROTPOS_TRANSFORM = 0x6ca6d4b9
+
+
 class RtpcProperty:
     def __init__(self):
         self.pos = None
@@ -48,15 +61,21 @@ class RtpcProperty:
         self.type = None
 
     def __repr__(self):
+        data = self.data
+        if self.type == PropType.type_objid.value:
+            data = 'id:0x{:016X}'.format(data)
+        elif self.type == PropType.type_event.value:
+            data = ['ev:0x{:016X}'.format(d) for d in data]
+
         return '@0x{:08x}({: 8d}) 0x{:08x} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
             self.pos, self.pos,
             self.name_hash,
             self.data_raw, 
             self.type,
-            NT_names[self.type],
+            PropType_names[self.type],
             self.data_pos, self.data_pos,
-            self.data)
-        # return '0x{:08x}: {} = {}'.format(self.name_hash, NT_names[self.type], self.data,)
+            data)
+        # return '0x{:08x}: {} = {}'.format(self.name_hash, PropType.type_names[self.type], self.data,)
 
     def deserialize(self, f):
         self.pos = f.tell()
@@ -68,49 +87,49 @@ class RtpcProperty:
         self.data = self.data_raw
 
         raw_buf = struct.pack('I', self.data_raw)
-        if self.type == NT_none:
+        if self.type == PropType.type_none:
             pass
-        elif self.type == NT_u32:
+        elif self.type == PropType.type_u32:
             self.data = struct.unpack('I', raw_buf)[0]
-        elif self.type == NT_f32:
+        elif self.type == PropType.type_f32:
             self.data = struct.unpack('f', raw_buf)[0]
-        elif self.type == NT_str:
+        elif self.type == PropType.type_str:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = f.read_strz()
             f.seek(opos)
-        elif self.type == NT_vec2:
+        elif self.type == PropType.type_vec2:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(2))
             f.seek(opos)
-        elif self.type == NT_vec3:
+        elif self.type == PropType.type_vec3:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(3))
             f.seek(opos)
-        elif self.type == NT_vec4:
+        elif self.type == PropType.type_vec4:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(4))
             f.seek(opos)
-        elif self.type == NT_mat3x3:
+        elif self.type == PropType.type_mat3x3:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(9))
             f.seek(opos)
-        elif self.type == NT_mat4x4:
+        elif self.type == PropType.type_mat4x4:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(16))
             f.seek(opos)
-        elif self.type == NT_array_u32:
+        elif self.type == PropType.type_array_u32:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
@@ -119,7 +138,7 @@ class RtpcProperty:
             if n > 0:
                 self.data = list(f.read_u32(n))
             f.seek(opos)
-        elif self.type == NT_array_f32:
+        elif self.type == PropType.type_array_f32:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
@@ -128,7 +147,7 @@ class RtpcProperty:
             if n > 0:
                 self.data = list(f.read_f32(n))
             f.seek(opos)
-        elif self.type == NT_array_u8:
+        elif self.type == PropType.type_array_u8:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
@@ -137,20 +156,20 @@ class RtpcProperty:
             if n > 0:
                 self.data = list(f.read_u8(n))
             f.seek(opos)
-        elif self.type == NT_objid:
+        elif self.type == PropType.type_objid:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
-            self.data = f.read_u8(8)
+            self.data = f.read_u64()
             f.seek(opos)
-        elif self.type == NT_event:
+        elif self.type == PropType.type_event:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             n = f.read_u32()
             self.data = []
             for i in range(n):
-                self.data.append(f.read_u32(2))
+                self.data.append(f.read_u64())
             f.seek(opos)
         else:
             raise Exception('NOT HANDLED {}'.format(self.type))
@@ -163,7 +182,9 @@ class RtpcNode:
         self.prop_count = None
         self.child_count = None
         self.prop_table = []
+        self.prop_map = {}
         self.child_table = []
+        self.child_map = {}
 
     def __repr__(self):
         return '{:08x} pc:{} cc:{} @ {} {:08x}'.format(
@@ -199,6 +220,7 @@ class RtpcNode:
             prop = RtpcProperty()
             prop.deserialize(f)
             self.prop_table[i] = prop
+            self.prop_map[prop.name_hash] = prop
 
         #  children 4-byte aligned
         np = f.tell()
@@ -210,6 +232,7 @@ class RtpcNode:
             child = RtpcNode()
             child.deserialize(f)
             self.child_table[i] = child
+            self.child_map[child.name_hash] = child
 
         f.seek(oldp)
 

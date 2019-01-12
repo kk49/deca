@@ -543,32 +543,6 @@ class MainWindow(QMainWindow):
         sys.exit()
 
 
-# def export_map():
-#     ai = []
-#     for i in range(16):
-#         ai.append([None] * 16)
-#     for i in range(256):
-#         x = i % 16
-#         y = i // 16
-#         fn = 'textures/ui/map_reserve_0/zoom3/{}.ddsc'.format(i)
-#         fn = fn.encode('ascii')
-#         vnode = vfs_global.map_vpath_to_vfsnodes[fn][0]
-#         img = Ddsc()
-#         with vfs_global.file_obj_from(vnode) as f:
-#             img.load_ddsc(f)
-#         ai[y][x] = img.mips[0].data
-#
-#     import numpy as np
-#     from PIL import Image
-#     for i in range(16):
-#         ai[i] = np.hstack(ai[i])
-#     ai = np.vstack(ai)
-#     img = Image.fromarray(ai)
-#     img.save(working_dir + '/z0.png')
-#
-#     return img
-
-
 if __name__ == "__main__":
     # options = argparse.ArgumentParser()
     # options.add_argument("-f", "--file", type=str, required=True)

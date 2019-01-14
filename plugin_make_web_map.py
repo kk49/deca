@@ -216,9 +216,10 @@ def plugin_make_web_map(vfs, wdir):
         tileset_make(img, wdir + 'map/z0/{}'.format(tileo[1]))
 
     # load translation
-    vnode = vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
-    with vfs.file_obj_from(vnode, 'rb') as f:
-        tr = process_translation_adf(f, vnode.size_u)
+    tr = {}
+    # vnode = vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
+    # with vfs.file_obj_from(vnode, 'rb') as f:
+    #     tr = process_translation_adf(f, vnode.size_u)
 
     # extract geometric features
     dst_x0 = 128

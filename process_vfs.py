@@ -18,7 +18,7 @@ from deca_gui_viewer_text import DataViewerText
 from deca_gui_viewer_sarc import DataViewerSarc
 from deca.ff_avtx import Ddsc
 
-prefix_in = '/home/krys/prj/gz/archives_win64/'
+prefix_in = '/home/krys/prj/as_games/gz/archives_win64/'
 working_dir = './work/gz/'
 ver = 3
 debug = False

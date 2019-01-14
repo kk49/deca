@@ -359,6 +359,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 entry = gdf.read_u32(8)
                 dir_list.append(entry)
 
+            # TODO put in assumption for values we dont' expect to change
             dir_contents = []
             for e1 in dir_list:
                 gdf.seek(e1[0])

@@ -74,11 +74,11 @@ def tileset_make(img, tile_path, tile_size=256, interpolate_to=16*1204):
 
 
 def plugin_make_web_map(vfs, wdir):
-    build_image_tiles = False
-    build_global_blo = True
+    force_image_tiles = False
 
     # BUILD topo map
-    if build_image_tiles:
+    topo_dst_path = wdir + 'map/z0/tile_t'
+    if not os.path.isdir(topo_dst_path) or force_image_tiles:  # this is slow so only do it once
         # extract full res image
         ai = []
         for i in range(16):
@@ -99,7 +99,7 @@ def plugin_make_web_map(vfs, wdir):
         ai = np.vstack(ai)
         img = Image.fromarray(ai)
 
-        tileset_make(img, wdir + 'map/z0/tile_t')
+        tileset_make(img, topo_dst_path)
 
     # BUILD height map
     # extract full res image
@@ -220,234 +220,232 @@ def plugin_make_web_map(vfs, wdir):
     with vfs.file_obj_from(vnode, 'rb') as f:
         tr = process_translation_adf(f, vnode.size_u)
 
-    # extract regions
-    if build_global_blo:
+    # extract geometric features
+    dst_x0 = 128
+    dst_y0 = -128
 
-        dst_x0 = 128
-        dst_y0 = -128
+    src_to_dst_x_scale = 128 / (16*1024)  # 180.0/(16*1024)
+    src_to_dst_y_scale = -128 / (16*1024)  # -90.0/(16*1024)
 
-        src_to_dst_x_scale = 128 / (16*1024)  # 180.0/(16*1024)
-        src_to_dst_y_scale = -128 / (16*1024)  # -90.0/(16*1024)
+    regions = []
+    global_collectables = []
+    pois = []
 
-        regions = []
-        global_collectables = []
-        pois = []
+    vnode = vfs.map_vpath_to_vfsnodes[b'global/global.blo'][0]
+    with vfs.file_obj_from(vnode, 'rb') as f:
+        rtpc = Rtpc()
+        rtpc.deserialize(f)
+    chs = [rtpc.root_node]
+    while len(chs) > 0:
+        ch: RtpcNode = chs.pop(0)
 
-        vnode = vfs.map_vpath_to_vfsnodes[b'global/global.blo'][0]
-        with vfs.file_obj_from(vnode, 'rb') as f:
-            rtpc = Rtpc()
-            rtpc.deserialize(f)
-        chs = [rtpc.root_node]
-        while len(chs) > 0:
-            ch: RtpcNode = chs.pop(0)
+        for c in ch.child_table:
+            chs.append(c)
 
-            for c in ch.child_table:
-                chs.append(c)
+        # if k_class_name in ch.prop_map and ch.prop_map[k_class_name].data == b'CRegion':
+        if PropName.CLASS_NAME in ch.prop_map:
+            obj_type = ch.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
+            obj_id = ch.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
+            comment = ch.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
+            if obj_type == 'CRegion':
+                rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
+                border = ch.prop_map[PropName.CREGION_BORDER].data
+                if len(border) % 4 != 0:
+                    raise Exception('Unexpected')
 
-            # if k_class_name in ch.prop_map and ch.prop_map[k_class_name].data == b'CRegion':
-            if PropName.CLASS_NAME in ch.prop_map:
-                obj_type = ch.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
-                obj_id = ch.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
-                comment = ch.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
-                if obj_type == 'CRegion':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
-                    border = ch.prop_map[PropName.CREGION_BORDER].data
-                    if len(border) % 4 != 0:
-                        raise Exception('Unexpected')
+                if rotpos_trans is not None:
+                    src_x0 = rotpos_trans[12]
+                    src_y0 = rotpos_trans[14]
+                else:
+                    print('USING DEFAULT OFFSETS')
+                    src_x0 = -7016.08642578125
+                    src_y0 = -1591.216064453125
 
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = -7016.08642578125
-                        src_y0 = -1591.216064453125
+                coords = []
+                for i in range(len(border) // 4):
+                    x = (border[4*i + 0] + src_x0) * src_to_dst_x_scale + dst_x0
+                    y = (border[4*i + 2] + src_y0) * src_to_dst_y_scale + dst_y0
+                    coords.append([x, y])
 
-                    coords = []
-                    for i in range(len(border) // 4):
-                        x = (border[4*i + 0] + src_x0) * src_to_dst_x_scale + dst_x0
-                        y = (border[4*i + 2] + src_y0) * src_to_dst_y_scale + dst_y0
-                        coords.append([x, y])
+                obj = {
+                    'type': 'Feature',
+                    'properties': {
+                        'type': obj_type,
+                        'uid': obj_id,
+                        'uid_str': '0x{:012X}'.format(obj_id),
+                        'comment': comment,
+                    },
+                    'geometry': {
+                        'type': 'Polygon',
+                        'coordinates': [coords]
+                    },
+                }
+                regions.append(obj)
 
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                        },
-                        'geometry': {
-                            'type': 'Polygon',
-                            'coordinates': [coords]
-                        },
-                    }
-                    regions.append(obj)
+            elif obj_type == 'CCollectable':
+                rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
 
-                elif obj_type == 'CCollectable':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
+                if rotpos_trans is not None:
+                    src_x0 = rotpos_trans[12]
+                    src_y0 = rotpos_trans[14]
+                else:
+                    print('USING DEFAULT OFFSETS')
+                    src_x0 = 0
+                    src_y0 = 0
 
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = 0
-                        src_y0 = 0
+                x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
+                y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
+                coords = [x, y]
 
-                    x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
-                    y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
-                    coords = [x, y]
+                obj = {
+                    'type': 'Feature',
+                    'properties': {
+                        'type': obj_type,
+                        'uid': obj_id,
+                        'uid_str': '0x{:012X}'.format(obj_id),
+                        'comment': comment,
+                    },
+                    'geometry': {
+                        'type': 'Point',
+                        'coordinates': coords
+                    },
+                }
+                global_collectables.append(obj)
 
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                        },
-                        'geometry': {
-                            'type': 'Point',
-                            'coordinates': coords
-                        },
-                    }
-                    global_collectables.append(obj)
+            elif obj_type == 'CPOI':
+                rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
+                cpoi_name = ch.prop_map.get(PropName.CPOI_NAME, RtpcProperty()).data.decode('utf-8')
+                cpoi_desc = ch.prop_map.get(PropName.CPOI_DESC, RtpcProperty()).data.decode('utf-8')
+                cpoi_name_tr = tr.get(cpoi_name, cpoi_name)
+                cpoi_desc_tr = tr.get(cpoi_desc, cpoi_desc)
 
-                elif obj_type == 'CPOI':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
-                    cpoi_name = ch.prop_map.get(PropName.CPOI_NAME, RtpcProperty()).data.decode('utf-8')
-                    cpoi_desc = ch.prop_map.get(PropName.CPOI_DESC, RtpcProperty()).data.decode('utf-8')
-                    cpoi_name_tr = tr.get(cpoi_name, cpoi_name)
-                    cpoi_desc_tr = tr.get(cpoi_desc, cpoi_desc)
+                if rotpos_trans is not None:
+                    src_x0 = rotpos_trans[12]
+                    src_y0 = rotpos_trans[14]
+                else:
+                    print('USING DEFAULT OFFSETS')
+                    src_x0 = 0
+                    src_y0 = 0
 
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = 0
-                        src_y0 = 0
+                x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
+                y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
+                coords = [x, y]
 
-                    x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
-                    y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
-                    coords = [x, y]
+                obj = {
+                    'type': 'Feature',
+                    'properties': {
+                        'type': obj_type,
+                        'uid': obj_id,
+                        'uid_str': '0x{:012X}'.format(obj_id),
+                        'comment': comment,
+                        'poi_name': cpoi_name,
+                        'poi_desc': cpoi_desc,
+                        'poi_name_tr': cpoi_name_tr,
+                        'poi_desc_tr': cpoi_desc_tr,
+                    },
+                    'geometry': {
+                        'type': 'Point',
+                        'coordinates': coords
+                    },
+                }
+                pois.append(obj)
 
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                            'poi_name': cpoi_name,
-                            'poi_desc': cpoi_desc,
-                            'poi_name_tr': cpoi_name_tr,
-                            'poi_desc_tr': cpoi_desc_tr,
-                        },
-                        'geometry': {
-                            'type': 'Point',
-                            'coordinates': coords
-                        },
-                    }
-                    pois.append(obj)
+    # LOAD from 'global/bookmarks_gen.blo
+    bookmarks = []
+    vnode = vfs.map_vpath_to_vfsnodes[b'global/bookmarks_gen.blo'][0]
+    with vfs.file_obj_from(vnode, 'rb') as f:
+        rtpc = Rtpc()
+        rtpc.deserialize(f)
+    chs = [rtpc.root_node]
+    while len(chs) > 0:
+        ch: RtpcNode = chs.pop(0)
 
-        # LOAD from 'global/bookmarks_gen.blo
-        bookmarks = []
-        vnode = vfs.map_vpath_to_vfsnodes[b'global/bookmarks_gen.blo'][0]
-        with vfs.file_obj_from(vnode, 'rb') as f:
-            rtpc = Rtpc()
-            rtpc.deserialize(f)
-        chs = [rtpc.root_node]
-        while len(chs) > 0:
-            ch: RtpcNode = chs.pop(0)
+        for c in ch.child_table:
+            chs.append(c)
 
-            for c in ch.child_table:
-                chs.append(c)
+        # if k_class_name in ch.prop_map and ch.prop_map[k_class_name].data == b'CRegion':
+        if PropName.CLASS_NAME in ch.prop_map:
+            obj_type = ch.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
+            obj_id = ch.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
+            comment = ch.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
+            bookmark_name = ch.prop_map.get(PropName.BOOKMARK_NAME, RtpcProperty()).data.decode('utf-8')
+            if obj_type == 'CBookMark':
+                rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
 
-            # if k_class_name in ch.prop_map and ch.prop_map[k_class_name].data == b'CRegion':
-            if PropName.CLASS_NAME in ch.prop_map:
-                obj_type = ch.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
-                obj_id = ch.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
-                comment = ch.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
-                bookmark_name = ch.prop_map.get(PropName.BOOKMARK_NAME, RtpcProperty()).data.decode('utf-8')
-                if obj_type == 'CBookMark':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
+                if rotpos_trans is not None:
+                    src_x0 = rotpos_trans[12]
+                    src_y0 = rotpos_trans[14]
+                else:
+                    print('USING DEFAULT OFFSETS')
+                    src_x0 = 0
+                    src_y0 = 0
 
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = 0
-                        src_y0 = 0
+                x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
+                y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
+                coords = [x, y]
 
-                    x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
-                    y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
-                    coords = [x, y]
+                obj = {
+                    'type': 'Feature',
+                    'properties': {
+                        'type': obj_type,
+                        'uid': obj_id,
+                        'uid_str': '0x{:012X}'.format(obj_id),
+                        'comment': comment,
+                        'bookmark_name': bookmark_name,
+                    },
+                    'geometry': {
+                        'type': 'Point',
+                        'coordinates': coords
+                    },
+                }
+                bookmarks.append(obj)
 
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                            'bookmark_name': bookmark_name,
-                        },
-                        'geometry': {
-                            'type': 'Point',
-                            'coordinates': coords
-                        },
-                    }
-                    bookmarks.append(obj)
+    # LOAD from global/collection.collectionc
+    vnode = vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
+    with vfs.file_obj_from(vnode, 'rb') as f:
+        buffer = f.read(vnode.size_u)
+        adf = load_adf(buffer)
 
-        # LOAD from global/collection.collectionc
-        vnode = vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
-        with vfs.file_obj_from(vnode, 'rb') as f:
-            buffer = f.read(vnode.size_u)
-            adf = load_adf(buffer)
+    collectables = []
+    for v in adf.table_instance_values[0]['Collectibles']:
+        obj_id = v['ID']
+        cid = v['Name'].decode('utf-8')
+        name = cid + '_name'
+        name = tr.get(name, name)
+        desc = cid + '_desc'
+        desc = tr.get(desc, desc)
+        position = v['Position']
+        x = (position[0]) * src_to_dst_x_scale + dst_x0
+        y = (position[2]) * src_to_dst_y_scale + dst_y0
+        coords = [x, y]
 
-        collectables = []
-        for v in adf.table_instance_values[0]['Collectibles']:
-            obj_id = v['ID']
-            cid = v['Name'].decode('utf-8')
-            name = cid + '_name'
-            name = tr.get(name, name)
-            desc = cid + '_desc'
-            desc = tr.get(desc, desc)
-            position = v['Position']
-            x = (position[0]) * src_to_dst_x_scale + dst_x0
-            y = (position[2]) * src_to_dst_y_scale + dst_y0
-            coords = [x, y]
+        obj = {
+            'type': 'Feature',
+            'properties': {
+                'type': 'collection.collectionc',
+                'uid': obj_id,
+                'uid_str': '0x{:012X}'.format(obj_id),
+                'collectable_id': cid,
+                'collectable_name': name,
+                'collectable_desc': desc,
+            },
+            'geometry': {
+                'type': 'Point',
+                'coordinates': coords
+            },
+        }
+        collectables.append(obj)
 
-            obj = {
-                'type': 'Feature',
-                'properties': {
-                    'type': 'collection.collectionc',
-                    'uid': obj_id,
-                    'uid_str': '0x{:012X}'.format(obj_id),
-                    'collectable_id': cid,
-                    'collectable_name': name,
-                    'collectable_desc': desc,
-                },
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': coords
-                },
-            }
-            collectables.append(obj)
+    dpath = wdir + 'map/z0'
+    os.makedirs(dpath, exist_ok=True)
+    fpath = dpath + '/data.js'
 
-        dpath = wdir + 'map/z0'
-        os.makedirs(dpath, exist_ok=True)
-        fpath = dpath + '/data.js'
-
-        with open(fpath, 'w') as f:
-            f.write('var region_data = {};\n'.format(json.dumps(regions, indent=4)))
-            f.write('var global_collectable_data = {};\n'.format(json.dumps(global_collectables, indent=4)))
-            f.write('var poi_data = {};\n'.format(json.dumps(pois, indent=4)))
-            f.write('var bookmark_data = {};\n'.format(json.dumps(bookmarks, indent=4)))
-            f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
+    with open(fpath, 'w') as f:
+        f.write('var region_data = {};\n'.format(json.dumps(regions, indent=4)))
+        f.write('var global_collectable_data = {};\n'.format(json.dumps(global_collectables, indent=4)))
+        f.write('var poi_data = {};\n'.format(json.dumps(pois, indent=4)))
+        f.write('var bookmark_data = {};\n'.format(json.dumps(bookmarks, indent=4)))
+        f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
 
 
 def main():

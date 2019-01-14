@@ -6,7 +6,7 @@
     <title>deca Map</title>
     <link rel="stylesheet" href="./lib/leaflet/leaflet.css" />
     <script src="./lib/leaflet/leaflet.js"></script>
-    <script src="./regions.js"></script>
+    <script src="./data.js"></script>
 
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <style>
@@ -23,27 +23,164 @@
 <script>
     var crs = L.CRS.Simple
 
-    var map = L.map('mapid', {crs: crs}).setView([-128, 128], 2);
+    var map = L.map('mapid', {crs: crs}).setView([-128, 128], 3);
 
-    var tile_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
-        attribution: 'GenZero BETA data extracted by deca',
+    var topo_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'topo map',
         minNativeZoom: 0,
         maxNativeZoom: 6,
         minZoom: 0,
         maxZoom: 10,
         bounds:[[-256,0], [0, 256]],
         noWrap: true,
-        id: 'itile',
+        id: 'tile_t',
+        })
+    // attribution, maxNativeZoom, id, Layer Text, layer type (0 - base, 1 - overlay), opacity
+    // 'topo map', 6, './tile_t/{z}/{x}/{y}.png', 'Topo', 0, 1.0
+
+    topo_layer.addTo(map);
+
+    var water_nv_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'water NV waveworks',
+        minNativeZoom: 0,
+        maxNativeZoom: 2,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'tile_wn',
+        opacity: 1.0,
         })
 
-    tile_layer.addTo(map);
+    water_nv_layer.addTo(map);
+
+    var water_ge_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'water gerstner',
+        minNativeZoom: 0,
+        maxNativeZoom: 2,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'tile_wg',
+        opacity: 1.0,
+        })
+
+    water_ge_layer.addTo(map);
+
+    var height_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'height',
+        minNativeZoom: 0,
+        maxNativeZoom: 1,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'tile_h',
+        opacity: 1.0,
+        })
+
+    height_layer.addTo(map);
+
+    var water_nvm_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'water NV Mask',
+        minNativeZoom: 0,
+        maxNativeZoom: 1,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'tile_wnm',
+        opacity: 1.0,
+        })
+
+    water_nvm_layer.addTo(map);
+
+    var tile_spawn_skirmisher_a_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'water NV Mask',
+        minNativeZoom: 0,
+        maxNativeZoom: 1,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'tile_spawn_skirmisher_a',
+        opacity: 0.5,
+        })
+
+    tile_spawn_skirmisher_a_layer.addTo(map);
+
+    var tile_spawn_skirmisher_b_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'water NV Mask',
+        minNativeZoom: 0,
+        maxNativeZoom: 1,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'tile_spawn_skirmisher_b',
+        opacity: 0.5,
+        })
+
+    tile_spawn_skirmisher_b_layer.addTo(map);
+
+    var tile_spawn_skirmisher_c_layer = L.tileLayer('./{id}/{z}/{x}/{y}.png', {
+        attribution: 'water NV Mask',
+        minNativeZoom: 0,
+        maxNativeZoom: 1,
+        minZoom: 0,
+        maxZoom: 10,
+        bounds:[[-256,0], [0, 256]],
+        noWrap: true,
+        id: 'tile_spawn_skirmisher_c',
+        opacity: 0.5,
+        })
+
+    tile_spawn_skirmisher_c_layer.addTo(map);
 
     function onEachFeature(feature, layer) {
-        if (feature.properties && feature.properties.uid) {
-            layer.bindPopup(feature.properties.uid);
+        var s = ""
+        if (feature.properties)
+        {
+            if (feature.properties && feature.properties.type) {
+                s = s + feature.properties.type;
+            }
+            if (feature.properties && feature.properties.uid_str) {
+                s = s + "<br>id: " + feature.properties.uid_str;
+            }
+            if (feature.properties && feature.properties.poi_name_tr) {
+                s = s + "<br>name_tr: " + feature.properties.poi_name_tr;
+            }
+            if (feature.properties && feature.properties.poi_desc_tr) {
+                s = s + "<br>desc_tr: " + feature.properties.poi_desc_tr;
+            }
+            if (feature.properties && feature.properties.poi_name) {
+                s = s + "<br>name: " + feature.properties.poi_name;
+            }
+            if (feature.properties && feature.properties.poi_desc) {
+                s = s + "<br>desc: " + feature.properties.poi_desc;
+            }
+            if (feature.properties && feature.properties.bookmark_name) {
+                s = s + "<br>name: " + feature.properties.bookmark_name;
+            }
+            if (feature.properties && feature.properties.collectable_name) {
+                s = s + "<br>name: " + feature.properties.collectable_name;
+            }
+            if (feature.properties && feature.properties.collectable_desc) {
+                s = s + "<br>desc: " + feature.properties.collectable_desc;
+            }
+            if (feature.properties && feature.properties.collectable_id) {
+                s = s + "<br>id: " + feature.properties.collectable_id;
+            }
+            if (feature.properties && feature.properties.comment) {
+                s = s + "<br>cmt: " + feature.properties.comment;
+            }
+
+            layer.bindPopup(s)
         }
     }
 
+    //region display
     var def_style = {
         "color": "#ff0000",
         "weight": 2,
@@ -51,20 +188,84 @@
         fillColor: "#ffffff",
         fillOpacity: 0.1,
     };
-    var region_layer = L.geoJSON(regions_json, {style: def_style, onEachFeature: onEachFeature})
-
+    var region_layer = L.geoJSON(region_data, {style: def_style, onEachFeature: onEachFeature})
     region_layer.addTo(map);
 
+    //collectable display
+    var markerOptions = {
+        radius: 8,
+        color: "#00FF00",
+        weight: 1,
+        opacity: 1,
+        fill: true,
+        fillColor: "#00FF00",
+        fillOpacity: 0.5
+    };
+    var onPointToLayer = function (feature, latlng) {
+        return L.circleMarker(latlng, markerOptions);
+    }
+    var global_collectable_layer = L.geoJSON(global_collectable_data, {pointToLayer: onPointToLayer, onEachFeature: onEachFeature})
+    global_collectable_layer.addTo(map);
+
+    //POI display
+    var poi_layer = L.geoJSON(poi_data, {onEachFeature: onEachFeature})
+    poi_layer.addTo(map);
+
+    //Bookmark display
+    var markerOptions = {
+        radius: 8,
+        color: "#0000FF",
+        weight: 1,
+        opacity: 1,
+        fill: true,
+        fillColor: "#0000FF",
+        fillOpacity: 0.5
+    };
+    var onPointToLayer = function (feature, latlng) {
+        return L.circleMarker(latlng, markerOptions);
+    }
+    var bookmark_layer = L.geoJSON(bookmark_data, {pointToLayer: onPointToLayer, onEachFeature: onEachFeature})
+    bookmark_layer.addTo(map);
+
+    var markerOptions = {
+        radius: 8,
+        color: "#800000",
+        weight: 1,
+        opacity: 1,
+        fill: true,
+        fillColor: "#800000",
+        fillOpacity: 0.5
+    };
+    var onPointToLayer = function (feature, latlng) {
+        return L.circleMarker(latlng, markerOptions);
+    }
+    var collectable_layer = L.geoJSON(collectable_data, {pointToLayer: onPointToLayer, onEachFeature: onEachFeature})
+    collectable_layer.addTo(map);
+
+    // layer control
     var baseMaps = {
-        "Map": tile_layer,
+        "Water NVWaveworks": water_nv_layer,
+        "Water Gerstner": water_ge_layer,
+        "Height": height_layer,
+        "Topo": topo_layer,
     };
 
-    var overlayMaps = {
-        "Regions": region_layer
-    };
+    var overlayMaps = {}
+    overlayMaps["Water NV Mask"] = water_nvm_layer
+    overlayMaps["spawn_skirmisher_a"] = tile_spawn_skirmisher_a_layer
+    overlayMaps["spawn_skirmisher_b"] = tile_spawn_skirmisher_b_layer
+    overlayMaps["spawn_skirmisher_c"] = tile_spawn_skirmisher_c_layer
+    overlayMaps["Regions"] = region_layer
+    overlayMaps["Global Collectables"] = global_collectable_layer
+    overlayMaps["POIs"] = poi_layer
+    overlayMaps["Bookmarks"] = bookmark_layer
+    overlayMaps["Collectables"] = collectable_layer
 
-    L.control.layers(baseMaps, overlayMaps).addTo(map);
-
+    L.control.layers(
+        baseMaps,
+        overlayMaps,
+        {collapsed: false}
+    ).addTo(map);
 </script>
 
 </body>

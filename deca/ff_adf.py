@@ -5,6 +5,7 @@ from deca.errors import *
 from deca.file import ArchiveFile, SubsetFile
 from deca.util import dump_block
 from pprint import pformat
+from deca.hash_jenkins import hash_little
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
@@ -17,6 +18,18 @@ class AdfTypeMissing(Exception):
     def __init__(self, hashid, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
         self.hashid = hashid
+
+
+class GdcArchiveEntry:
+    def __init__(self, index, offset, size, vpath_hash, vpath):
+        self.index = index
+        self.offset = offset
+        self.size = size
+        self.vpath_hash = vpath_hash
+        self.vpath = vpath
+
+    def __repr__(self):
+        return 'i:{} o:{} s:{} h:{:08X} n:{}'.format(self.index, self.offset, self.size, self.vpath_hash, self.vpath.decode('utf-8'))
 
 
 class StringHash:
@@ -285,7 +298,7 @@ prim_types = {
 }
 
 
-def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset=None, found_strings=None):
+def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset, bit_offset=None, found_strings=None):
     if type_id == typedef_s8:
         v = f.read_s8()
     elif type_id == typedef_u8:
@@ -329,17 +342,52 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
         else:
             opos = f.tell()
             f.seek(v0[0])
-            v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, found_strings=found_strings)
+            v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
             f.seek(opos)
-    elif type_id == 0x178842fe:
-        v = ('GameDataCollection', 'NOT_HANDLED_0x178842fe')
-    elif type_id == 0xb5b062f1:
+    elif type_id == 0x178842fe:  # gdc/global.gdcc
         v = []
         while True:
             t = f.read_u8()
             if t is None:
                 break
             v.append(t)
+        v = bytearray(v)
+        with ArchiveFile(io.BytesIO(v)) as gdf:
+            count = gdf.read_u32(8)
+            dir_list = []
+            for i in range(count[2]):
+                entry = gdf.read_u32(8)
+                dir_list.append(entry)
+
+            dir_contents = []
+            for e1 in dir_list:
+                gdf.seek(e1[0])
+                e2 = gdf.read_u32(4)
+                # gdf.seek(e2[0])
+                # fd = gdf.read(e2[2])
+                gdf.seek(e1[0] + 16)
+                fd = gdf.read(e1[4] - e1[0] - 16)
+                gdf.seek(e1[4])
+                e3 = gdf.read_strz()
+
+                dir_contents.append([e1, e2, e3, fd])
+
+        v = []
+        for i in range(len(dir_contents)):
+            entry = dir_contents[i]
+            vpath = entry[2]
+            vpath_hash = hash_little(vpath)
+            v.append(GdcArchiveEntry(
+                i, entry[0][0] + 16 + abs_offset, entry[0][4] - entry[0][0] - 16, vpath_hash, vpath))
+
+    elif type_id == 0xb5b062f1:  # MDIC
+        v = []
+        while True:
+            t = f.read_u8()
+            if t is None:
+                break
+            v.append(t)
+        v = bytearray(v)
         # v = ['{:02x}'.format(v[i]) for i in range(len(v))]
     else:
         if type_id not in map_typdef:
@@ -354,7 +402,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
             for m in type_def.members:
                 f.seek(p0 + m.offset)
                 nm = m.name.decode('utf-8')
-                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, table_name, bit_offset=m.bit_offset, found_strings=found_strings)
+                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, table_name, abs_offset, bit_offset=m.bit_offset, found_strings=found_strings)
                 v[nm] = vt
                 # print(nm, vt)
             p1 = f.tell()
@@ -380,9 +428,11 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
             f.seek(offset)
 
             if type_def.element_type_hash == typedef_u8:
-                v = list(f.read_u8(length))
+                # v = list(f.read_u8(length))
+                v = f.read(length)
             elif type_def.element_type_hash == typedef_s8:
-                v = list(f.read_s8(length))
+                # v = list(f.read_s8(length))
+                v = f.read(length)
             elif type_def.element_type_hash == typedef_u16:
                 v = list(f.read_u16(length))
             elif type_def.element_type_hash == typedef_s16:
@@ -408,14 +458,14 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
                     if align is not None:
                         nudge = (align - p0 % align) % align
                         f.seek(p0 + nudge)  # v0[0] offset ele 0, v0[1] stride?
-                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, found_strings=found_strings)
+                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
                     p1 = f.tell()
                     # print(p0, p1, p1-p0)
             f.seek(opos)
         elif type_def.metatype == 4:  # Inline Array
             v = [None] * type_def.element_length
             for i in range(type_def.element_length):
-                v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, found_strings=found_strings)
+                v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
         elif type_def.metatype == 7:  # BitField
             if type_def.size == 1:
                 v = f.read_u8()
@@ -441,13 +491,26 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, bit_offset
                 vs = None
             v = [v, vs]
         elif type_def.metatype == 9:  # String Hash
-            v = f.read_u32()
-            if v in map_stringhash:
-                v = map_stringhash[v].value
-            elif v == 0xDEADBEEF:
-                v = b''
+            if type_def.size == 4:
+                v = f.read_u32()
+                if v in map_stringhash:
+                    v = map_stringhash[v].value
+                elif v == 0xDEADBEEF:
+                    v = b''
+                else:
+                    v = (v, 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v))
+            elif type_def.size == 6:
+                v0 = f.read_u32()
+                v1 = f.read_u16()
+                v = v1 << 32 | v0
+                v = (v, 'OBJID {} 0x{:016x}'.format(type_def.size, v))
+            elif type_def.size == 8:
+                v = f.read_u64()
+                v = (v, 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v))
             else:
-                v = (v, 'MISSING_STRINGHASH')
+                v = f.read(type_def.size)
+                v = (v, 'NOT EXPECTED {}'.format(type_def.size))
+
         else:
             raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
 
@@ -496,22 +559,22 @@ class Adf:
         sbuf = sbuf + '\n--------comment\n'
         sbuf = sbuf + self.comment.decode('utf-8')
 
-        sbuf = sbuf + '\n\n--------name_table\n'
-        sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        # sbuf = sbuf + '\n\n--------name_table\n'
+        # # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
         # for i in range(len(self.table_name)):
         #     sbuf = sbuf + 'name_table\t{}\t{}\n'.format(i, self.table_name[i][1].decode('utf-8'))
-
-        sbuf = sbuf + '\n--------string_hash\n'
-        sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        #
+        # sbuf = sbuf + '\n--------string_hash\n'
+        # # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
         # for v in self.map_stringhash.items():
         #     sbuf = sbuf + 'string_hash\t{:08x}\t{}\n'.format(v[0], v[1].value)
-
-        sbuf = sbuf + '\n--------typedefs\n'
-        sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        #
+        # sbuf = sbuf + '\n--------typedefs\n'
+        # # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
         # for v in self.map_typedef.items():
         #     sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
         #     sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
-
+        #
         sbuf = sbuf + '\n--------instances\n'
         for info, v in zip(self.table_instance, self.table_instance_values):
             sbuf = sbuf + 'instances\t{:08x}\t{:08x}\t{}\t{}\t{}\t{:08x}-{:08x}\n'.format(
@@ -603,7 +666,7 @@ class Adf:
             # try:
             buf = fp.read(ins.size)
             with ArchiveFile(io.BytesIO(buf)) as f:
-                v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name, found_strings=self.found_strings)
+                v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name, ins.offset, found_strings=self.found_strings)
                 self.table_instance_values[i] = v
             # except AdfTypeMissing as ae:
             #     print('Missing HASHID {:08x}'.format(ae.hashid))

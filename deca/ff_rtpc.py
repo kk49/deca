@@ -49,6 +49,9 @@ class PropName(IntEnum):
     CLASS_COMMENT = 0xd31ab684
     INSTANCE_UID = 0xcfff8405
     ROTPOS_TRANSFORM = 0x6ca6d4b9
+    CPOI_NAME = 0x6f24d4e5
+    CPOI_DESC = 0xe6b6b3f9
+    BOOKMARK_NAME = 0x2314c9ea
 
 
 class RtpcProperty:
@@ -63,9 +66,9 @@ class RtpcProperty:
     def __repr__(self):
         data = self.data
         if self.type == PropType.type_objid.value:
-            data = 'id:0x{:016X}'.format(data)
+            data = 'id:0x{:012X}'.format(data)
         elif self.type == PropType.type_event.value:
-            data = ['ev:0x{:016X}'.format(d) for d in data]
+            data = ['ev:0x{:012X}'.format(d) for d in data]
 
         return '@0x{:08x}({: 8d}) 0x{:08x} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
             self.pos, self.pos,

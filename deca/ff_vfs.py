@@ -7,7 +7,7 @@ import deca.ff_rtpc
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_txt import load_json
-from deca.ff_adf import load_adf, AdfTypeMissing
+from deca.ff_adf import load_adf, AdfTypeMissing, GdcArchiveEntry
 from deca.ff_rtpc import Rtpc
 from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
@@ -251,6 +251,18 @@ class VfsStructure:
                             self.node_add(VfsNode(
                                 hashid=se.shash, pid=node.uid, level=node.level + 1, index=se.index,
                                 offset=offset, size_c=se.length, size_u=se.length, v_path=se.v_path))
+                    elif node.hashid == deca.hash_jenkins.hash_little(b'gdc/global.gdcc'):  # special case starting point for runtime
+                        node.processed = True
+                        any_change = True
+                        with self.file_obj_from(node) as f:
+                            buffer = f.read(node.size_u)
+                        adf = load_adf(buffer)
+                        for entry in adf.table_instance_values[0]:
+                            if isinstance(entry, GdcArchiveEntry):
+                                # self.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.vpath))
+                                self.node_add(VfsNode(
+                                    hashid=entry.vpath_hash, pid=node.uid, level=node.level + 1, index=entry.index,
+                                    offset=entry.offset, size_c=entry.size, size_u=entry.size, v_path=entry.vpath))
 
                 idx = idx + 1
             self.log('Expand Archives Phase {}: End'.format(phase_id))

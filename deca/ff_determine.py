@@ -64,7 +64,7 @@ def determine_file_type_and_size(f, file_size):
     elif b'BM8' == magic[0:3]:
         ftype = FTYPE_BMP
     elif b'TAG0' == magic[4:8]:
-        ftype = 'TAG0'
+        ftype = FTYPE_TAG0
     elif b'FSB5' == magic[16:20]:
         ftype = 'lFSB5'
     # ATX file format was a guess by size

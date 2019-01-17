@@ -575,7 +575,7 @@ class Adf:
         # for v in self.map_typedef.items():
         #     sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
         #     sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
-        #
+
         sbuf = sbuf + '\n--------instances\n'
         for info, v in zip(self.table_instance, self.table_instance_values):
             sbuf = sbuf + 'instances\t{:08x}\t{:08x}\t{}\t{}\t{}\t{:08x}-{:08x}\n'.format(

@@ -6,6 +6,9 @@
 2019-01-08 04:22:31.475566: hashes: 44146, mappings missing: 5102, mappings present 39044
 2019-01-10 00:01:07.749605: hashes: 44146, mappings missing: 5102, mappings present 39044
 2019-01-13 00:23:04.195511: hashes: 44240, mappings missing: 5060, mappings present 39180
+2019-01-14 18:40:08.257962: hashes: 44240, mappings missing: 5024, mappings present 39216
+2019-01-14 23:08:42.320006: hashes: 44240, mappings missing: 4863, mappings present 39377
+2019-01-15 00:46:31.593074: hashes: 44240, mappings missing: 4625, mappings present 39615
 
 # Events
 ## CEventTrigger

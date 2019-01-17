@@ -36,7 +36,7 @@ def process_translation_adf(f, sz):
     return tr
 
 
-def tileset_make(img, tile_path, tile_size=256, interpolate_to=16*1204):
+def tileset_make(img, tile_path, tile_size=256, max_zoom=-1):
     # save full image, mainly for debugging
     os.makedirs(tile_path, exist_ok=True)
     img.save(tile_path + '/full.png')
@@ -55,7 +55,6 @@ def tileset_make(img, tile_path, tile_size=256, interpolate_to=16*1204):
     zimgs[-1] = img
     for z in range(zooms):
         zlevel = zooms - 1 - z
-        width = max_width >> z
         zpath = tile_path + '/{}'.format(zlevel)
         print('Generate Zoom: {}'.format(zpath))
 
@@ -72,13 +71,25 @@ def tileset_make(img, tile_path, tile_size=256, interpolate_to=16*1204):
                     zimgs[zlevel].crop((x * tile_size, y * tile_size, (x + 1) * tile_size, (y + 1) * tile_size)).save(
                         fpath)
 
+    for zlevel in range(zooms, max_zoom+1):
+        width = tile_size >> (zlevel - (zooms-1))
+        zpath = tile_path + '/{}'.format(zlevel)
+        print('Generate Zoom: {}'.format(zpath))
+        if not os.path.isdir(zpath):
+            for x in range(0, 2 ** zlevel):
+                dpath = zpath + '/{}'.format(x)
+                os.makedirs(dpath, exist_ok=True)
+                for y in range(0, 2 ** zlevel):
+                    fpath = dpath + '/{}.png'.format(y)
+                    zimgs[(zooms-1)].crop((x * width, y * width, (x + 1) * width, (y + 1) * width)).resize((tile_size, tile_size), Image.NEAREST).save(fpath)
+
 
 def plugin_make_web_map(vfs, wdir):
-    force_image_tiles = False
+    force_topo_tiles = False
 
     # BUILD topo map
     topo_dst_path = wdir + 'map/z0/tile_t'
-    if not os.path.isdir(topo_dst_path) or force_image_tiles:  # this is slow so only do it once
+    if not os.path.isdir(topo_dst_path) or force_topo_tiles:  # this is slow so only do it once
         # extract full res image
         ai = []
         for i in range(16):

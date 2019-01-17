@@ -5,6 +5,7 @@
     <meta charset='utf-8' />
     <title>deca Map</title>
     <link rel="stylesheet" href="./lib/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="./lib/crisp_image.css" />
     <script src="./lib/leaflet/leaflet.js"></script>
     <script src="./data.js"></script>
 
@@ -81,6 +82,52 @@
         }
     }
 
+/*
+    var tapeIcon = L.icon({
+        iconUrl: './lib/icons8/icons8-cassette-filled-50-red.png',
+        // shadowUrl: './lib/icons8/icons8-cassette-50.png',
+
+        iconSize:     [25, 25], // size of the icon
+        // shadowSize:   [25, 25], // size of the shadow
+        iconAnchor:   [25, 25], // point of the icon which will correspond to marker's location
+        // shadowAnchor: [25, 25],  // the same for the shadow
+        popupAnchor:  [-3, -76] // point from which the popup should open relative to the iconAnchor
+    });
+
+    var horseIcon = L.icon({
+        iconUrl: './lib/icons8/icons8-horse-filled-50.png',
+        // shadowUrl: './lib/icons8/icons8-horse-50.png',
+
+        iconSize:     [25, 25], // size of the icon
+        // shadowSize:   [25, 25], // size of the shadow
+        iconAnchor:   [25, 25], // point of the icon which will correspond to marker's location
+        // shadowAnchor: [25, 25],  // the same for the shadow
+        popupAnchor:  [-3, -76] // point from which the popup should open relative to the iconAnchor
+    });
+
+    var gnomeIcon = L.icon({
+        iconUrl: './lib/icons8/icons8-dwarf-filled-50.png',
+        // shadowUrl: './lib/icons8/icons8-dwarf-50.png',
+
+        iconSize:     [25, 25], // size of the icon
+        // shadowSize:   [25, 25], // size of the shadow
+        iconAnchor:   [25, 25], // point of the icon which will correspond to marker's location
+        // shadowAnchor: [25, 25],  // the same for the shadow
+        popupAnchor:  [-3, -76] // point from which the popup should open relative to the iconAnchor
+    });
+
+    var blueprintIcon = L.icon({
+        iconUrl: './lib/icons8/icons8-documents-filled-50.png',
+        // shadowUrl: './lib/icons8/icons8-documents-50.png',
+
+        iconSize:     [25, 25], // size of the icon
+        // shadowSize:   [25, 25], // size of the shadow
+        iconAnchor:   [0, 25], // point of the icon which will correspond to marker's location
+        // shadowAnchor: [0, 25],  // the same for the shadow
+        popupAnchor:  [-3, -76] // point from which the popup should open relative to the iconAnchor
+    });
+*/
+
     function onPointToLayer(feature, latlng) {
         if (feature.properties && feature.properties.type) {
             var ft = feature.properties.type
@@ -111,6 +158,20 @@
                 );
             }
             if (ft == 'collection.collectionc') {
+                /*
+                if(feature.properties.collectable_id.includes('mixtape')) {
+                    return L.marker(latlng, {icon: tapeIcon});
+                }
+                if(feature.properties.collectable_id.includes('dala')) {
+                    return L.marker(latlng, {icon: horseIcon});
+                }
+                if(feature.properties.collectable_id.includes('gnome')) {
+                    return L.marker(latlng, {icon: gnomeIcon});
+                }
+                if(feature.properties.collectable_id.includes('blueprint')) {
+                    return L.marker(latlng, {icon: blueprintIcon});
+                }
+                */
                 return L.circleMarker(latlng,
                     {
                         radius: 8,
@@ -175,6 +236,7 @@
                 noWrap: true,
                 id: tl[4],
                 opacity: tl[7],
+                className: 'crisp-image',
                 })
 
             if(tl[2] == 0) {

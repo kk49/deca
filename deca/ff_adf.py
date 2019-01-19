@@ -356,7 +356,23 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             count = gdf.read_u32(8)
             dir_list = []
             for i in range(count[2]):
-                entry = gdf.read_u32(8)
+                d00_offset = gdf.read_u32()
+                d04_unk = gdf.read_u32()
+                d08_unk = gdf.read_u8()
+                d09_unk = gdf.read_u8()
+                d10_unk = gdf.read_u8()
+                d11_unk = gdf.read_u8()
+                d12_unk = gdf.read_u32()
+                d16_data_len = gdf.read_u32()
+                d20_unk = gdf.read_u32()
+                d24_unk = gdf.read_u32()
+                d28_unk = gdf.read_u32()
+                assert(d04_unk == 16)
+                assert(d12_unk == 0)
+                assert(d20_unk == 16)
+                assert(d24_unk == 0)
+                assert(d28_unk == 0)
+                entry = [d00_offset, d16_data_len, d04_unk, d08_unk, d09_unk, d10_unk, d11_unk, d12_unk, d20_unk, d24_unk, d28_unk]
                 dir_list.append(entry)
 
             # TODO put in assumption for values we dont' expect to change
@@ -367,8 +383,8 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 # gdf.seek(e2[0])
                 # fd = gdf.read(e2[2])
                 gdf.seek(e1[0] + 16)
-                fd = gdf.read(e1[4] - e1[0] - 16)
-                gdf.seek(e1[4])
+                fd = gdf.read(e1[1] - e1[0] - 16)
+                gdf.seek(e1[1])
                 e3 = gdf.read_strz()
 
                 dir_contents.append([e1, e2, e3, fd])
@@ -379,7 +395,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             vpath = entry[2]
             vpath_hash = hash_little(vpath)
             v.append(GdcArchiveEntry(
-                i, entry[0][0] + 16 + abs_offset, entry[0][4] - entry[0][0] - 16, vpath_hash, vpath))
+                i, entry[0][0] + 16 + abs_offset, entry[0][1] - entry[0][0] - 16, vpath_hash, vpath))
 
     elif type_id == 0xb5b062f1:  # MDIC
         v = []

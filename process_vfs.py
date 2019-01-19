@@ -103,7 +103,7 @@ class VfsNodeTableModel(QAbstractTableModel):
             row = self.remap[row]
 
         if role == Qt.DisplayRole:
-            node = self.table[row]
+            node : VfsNode = self.table[row]
             if node is None:
                 return 'NA'
             else:
@@ -129,12 +129,14 @@ class VfsNodeTableModel(QAbstractTableModel):
                         return 'P: {}'.format(node.p_path)
                     else:
                         return ''
+
         elif role == Qt.BackgroundRole:
             node = self.table[row]
             if column == 1 and node.is_valid() and node.ftype in {FTYPE_AVTX, FTYPE_SARC, FTYPE_AAF, FTYPE_TAB, FTYPE_ARC}:
                 return QColor(Qt.green)
-            else:
-                return QColor(Qt.white)
+            elif column == 6 and node.is_valid() and node.used_at_runtime:
+                return QColor(Qt.green)
+
         elif role == Qt.TextAlignmentRole:
             if column == 6:
                 return Qt.AlignLeft
@@ -278,11 +280,11 @@ class VfsDirModel(QAbstractItemModel):
         return node.child_count()
 
     def columnCount(self, parent):
-        return 6
+        return 7
 
     def headerData(self, section, orientation, role):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ("Path", "Index", "Type", "Hash", "Size_U", "Size_C")[section]
+            return ("Path", "Index", "Type", "Hash", "Size_U", "Size_C", "Used")[section]
         else:
             return None
 
@@ -295,7 +297,7 @@ class VfsDirModel(QAbstractItemModel):
             if column == 0:
                 return node.name.decode('utf-8')
             elif isinstance(node, VfsDirLeaf):
-                vnode = node.vnodes[0]
+                vnode : VfsNode = node.vnodes[0]
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
@@ -309,6 +311,13 @@ class VfsDirModel(QAbstractItemModel):
                     return '{}'.format(vnode.size_u)
                 elif column == 5:
                     return '{}'.format(vnode.size_c)
+                elif column == 6:
+                    return '{}'.format(vnode.used_at_runtime)
+        elif role == Qt.BackgroundColorRole:
+            if isinstance(node, VfsDirLeaf):
+                vnode : VfsNode = node.vnodes[0]
+                if column == 6 and vnode.used_at_runtime:
+                    return QColor(Qt.green)
         return None
 
 

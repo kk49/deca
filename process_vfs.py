@@ -2,6 +2,7 @@ import sys
 import os
 import argparse
 import pickle
+from deca.errors import DecaFileExists
 from deca.ff_vfs import VfsStructure, VfsNode
 from deca.ff_types import *
 from deca.builder import Builder
@@ -475,7 +476,7 @@ class Widget(QWidget):
     def __init__(self, vfs):
         QWidget.__init__(self)
         self.vfs = vfs
-        self.build = Builder()
+        self.builder = Builder()
         self.current_vnode = None
         self.current_vpath = None
 
@@ -572,15 +573,23 @@ class Widget(QWidget):
 
     def bt_extract_clicked(self, checked):
         if self.current_vpath is not None:
-            self.vfs.extract_nodes(self.current_vpath, 'extracted/', False)
+            try:
+                self.vfs.extract_nodes(self.current_vpath, working_dir + 'extracted/', False)
+            except DecaFileExists as exce:
+                Qt.Dialog('Extacted Canceled: File Exists: {}'.format(exce.args))
 
     def bt_prep_mod_clicked(self, checked):
         if self.current_vpath is not None:
-            self.vfs.extract_nodes(self.current_vpath, 'mod/', True)
+            try:
+                self.vfs.extract_nodes(self.current_vpath, working_dir + 'mod/', True)
+            except DecaFileExists as exce:
+                Qt.Dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 
     def bt_mod_build_clicked(self, checked):
-        if self.current_vpath is not None:
-            self.builder.build_dir(self.vfs, 'mod/', 'build/')
+        try:
+            self.builder.build_dir(self.vfs, working_dir + 'mod/', working_dir + 'build/')
+        except DecaFileExists as exce:
+            Qt.Dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 
 
 # ********************

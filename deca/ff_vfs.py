@@ -8,6 +8,7 @@ import multiprocessing
 import re
 
 import deca.ff_rtpc
+from deca.errors import DecaFileExists
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_txt import load_json
@@ -872,9 +873,9 @@ class VfsStructure:
             if node.offset is not None:
                 with ArchiveFile(self.file_obj_from(node)) as f:
                     if node.v_path is None:
-                        ofile = self.working_dir + extract_dir + '{:08X}.dat'.format(node.hashid)
+                        ofile = extract_dir + '{:08X}.dat'.format(node.hashid)
                     else:
-                        ofile = self.working_dir + extract_dir + '{}'.format(node.v_path.decode('utf-8'))
+                        ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
 
                     self.log('Exporting {}'.format(ofile))
 
@@ -882,6 +883,9 @@ class VfsStructure:
                     os.makedirs(ofiledir, exist_ok=True)
 
                     buf = f.read(node.size_c)
+
+                    if os.path.isfile(ofile):
+                        raise DecaFileExists(ofile)
 
                     with ArchiveFile(open(ofile, 'wb')) as fo:
                         fo.write(buf)

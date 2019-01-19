@@ -789,6 +789,10 @@ class VfsStructure:
                 fn = '{}{:x}.ddsc'.format(prefix, i)
                 guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
 
+        for i in range(255):
+            fn = 'textures/ui/load/{}.ddsc'.format(i)
+            guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
+
         for k, v in guess_strings.items():
             fn = k
             fn = fn.encode('ascii')

@@ -44,3 +44,6 @@ This filled in some holes for the ADF parsing
 #### Various Microsoft(tm) websites
 
 Got most of the info for parsing the custom image formats came from the source documentation for DirectX
+
+#### CFX Decompiler
+https://github.com/jindrapetrik/jpexs-decompiler

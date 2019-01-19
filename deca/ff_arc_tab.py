@@ -23,7 +23,7 @@ class TabFileV3(TabFileBase):
         self.unk += [f.read_u16()]
         self.unk += [f.read_u32()]
 
-        # print(magic, unk00, unk01, unk02)
+        # print(self.magic, self.unk)
 
         self.file_table = []
         self.file_hash_map = {}

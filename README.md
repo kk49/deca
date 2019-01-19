@@ -24,7 +24,7 @@ Written in Python, tested only on Linux, code is a mess, because this is an expe
 |OBC| 10% | 0% |  found a correlation in file size, guess at record size/count |
 |TAG0| 0% | 0% |  |
 |btc| 0% | 0% |  |
-|CFX| 0% | 0% |  |
+|CFX| 0% | 0% | Autodesk Scaleform https://github.com/jindrapetrik/jpexs-decompiler |
 |RIFF| 0% | 0% |  |
 |lFSB5| 0% | 0% |  |
 |...| 0% | 0% |  Missed some add to table|

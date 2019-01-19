@@ -5,6 +5,7 @@ import pandas as pd
 from hashlib import sha1
 from pprint import pprint
 import multiprocessing
+import re
 
 import deca.ff_rtpc
 from deca.file import ArchiveFile, SubsetFile
@@ -866,23 +867,39 @@ class VfsStructure:
 
         self.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
 
-    def extract_node(self, node):
+    def extract_node(self, node: VfsNode, extract_dir: str, do_sha1sum):
         if node.is_valid():
             if node.offset is not None:
                 with ArchiveFile(self.file_obj_from(node)) as f:
                     if node.v_path is None:
-                        ofile = self.working_dir + 'exported/{:08X}.dat'.format(node.hashid)
+                        ofile = self.working_dir + extract_dir + '{:08X}.dat'.format(node.hashid)
                     else:
-                        ofile = self.working_dir + 'exported/{}'.format(node.v_path.decode('utf-8'))
+                        ofile = self.working_dir + extract_dir + '{}'.format(node.v_path.decode('utf-8'))
+
+                    self.log('Exporting {}'.format(ofile))
 
                     ofiledir = os.path.dirname(ofile)
                     os.makedirs(ofiledir, exist_ok=True)
 
-                    self.trace('Unknown Type: {}'.format(ofile))
+                    buf = f.read(node.size_c)
+
                     with ArchiveFile(open(ofile, 'wb')) as fo:
-                        buf = f.read(node.size_c)
                         fo.write(buf)
 
+                    if do_sha1sum:
+                        # path, file = os.path.split(ofile)
+                        # sfile = os.path.join(path, '.' + file)
+                        sfile = ofile + '.deca_sha1sum'
+                        hsha = sha1(buf).hexdigest()
+                        self.log('SHA1SUM {} {}'.format(hsha, sfile))
+                        with open(sfile, 'w') as fo:
+                            fo.write(hsha)
+
+    def extract_nodes(self, vpath: str, extract_dir: str, do_sha1sum):
+        vpath_re = re.compile(vpath)
+        for k, v in self.map_vpath_to_vfsnodes.items():
+            if vpath_re.match(k):
+                self.extract_node(v[0], extract_dir, do_sha1sum)
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .

@@ -4,6 +4,7 @@ import argparse
 import pickle
 from deca.ff_vfs import VfsStructure, VfsNode
 from deca.ff_types import *
+from deca.builder import Builder
 import PySide2
 from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel
 from PySide2.QtGui import QColor
@@ -150,7 +151,8 @@ class VfsNodeTableWidget(QWidget):
     def __init__(self, vfs, show_mapped):
         QWidget.__init__(self)
 
-        self.vnode_selected = None
+        self.vnode_1click_selected = None
+        self.vnode_2click_selected = None
 
         # Getting the Model
         self.model = VfsNodeTableModel(vfs, show_mapped=show_mapped)
@@ -185,8 +187,8 @@ class VfsNodeTableWidget(QWidget):
 
     def double_clicked(self, index):
         if index.isValid():
-            if self.vnode_selected is not None:
-                self.vnode_selected(self.model.table[index.row()])
+            if self.vnode_2click_selected is not None:
+                self.vnode_2click_selected(self.model.table[index.row()])
 
 
 class VfsDirLeaf(object):
@@ -195,6 +197,12 @@ class VfsDirLeaf(object):
         self.parent = None
         self.row = 0
         self.vnodes = vnodes
+
+    def v_path(self):
+        pn = b''
+        if self.parent is not None:
+            pn = self.parent.v_path(True)
+        return pn + self.name
 
     def child_count(self):
         return 0
@@ -207,6 +215,15 @@ class VfsDirBranch(object):
         self.row = 0
         self.children = []
         self.child_name_map = {}
+
+    def v_path(self, child_called=False):
+        s = b''
+        if self.parent is not None:
+            s = self.parent.v_path(True)
+            s = s + self.name + b'/'
+        if not child_called:
+            s = s + b'.*'
+        return s
 
     def child_count(self):
         return len(self.children)
@@ -325,7 +342,8 @@ class VfsDirWidget(QWidget):
     def __init__(self, vfs):
         QWidget.__init__(self)
 
-        self.vnode_selected = None
+        self.vnode_1click_selected = None
+        self.vnode_2click_selected = None
 
         # Getting the Model
         self.model = VfsDirModel(vfs)
@@ -333,6 +351,8 @@ class VfsDirWidget(QWidget):
         # Creating a QTableView
         self.view = QTreeView()
         self.view.doubleClicked.connect(self.double_clicked)
+        self.view.clicked.connect(self.clicked)
+
         font = self.view.font()
         font.setPointSize(8)
         self.view.setFont(font)
@@ -352,11 +372,17 @@ class VfsDirWidget(QWidget):
         self.main_layout.addWidget(self.view)
         self.setLayout(self.main_layout)
 
+    def clicked(self, index):
+        if index.isValid():
+            tnode = index.internalPointer()
+            if (isinstance(tnode, VfsDirLeaf) or isinstance(tnode, VfsDirBranch)) and self.vnode_1click_selected is not None:
+                self.vnode_1click_selected(tnode.v_path())
+
     def double_clicked(self, index):
         if index.isValid():
             tnode = index.internalPointer()
-            if isinstance(tnode, VfsDirLeaf) and self.vnode_selected is not None:
-                self.vnode_selected(tnode.vnodes[0])
+            if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
+                self.vnode_2click_selected(tnode.vnodes[0])
 
 
 class DataViewWidget(QWidget):
@@ -387,8 +413,11 @@ class DataViewWidget(QWidget):
         self.main_layout.addWidget(self.tab_widget)
         self.setLayout(self.main_layout)
 
-    def vnode_selected(self, vnode: VfsNode):
-        print('DataViewWidget:vnode_selected: {}'.format(vnode))
+    def vnode_1click_selected(self, v_path: str):
+        print('DataViewWidget:vnode_1click_selected: {}'.format(v_path))
+
+    def vnode_2click_selected(self, vnode: VfsNode):
+        print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))
 
         self.tab_widget.setTabEnabled(self.tab_raw_index, True)
         self.tab_raw.vnode_process(self.vfs, vnode)
@@ -446,25 +475,30 @@ class Widget(QWidget):
     def __init__(self, vfs):
         QWidget.__init__(self)
         self.vfs = vfs
+        self.build = Builder()
         self.current_vnode = None
+        self.current_vpath = None
 
         # Create VFS Node table
         self.vfs_node_widget = VfsNodeTableWidget(self.vfs, show_mapped=True)
-        self.vfs_node_widget.vnode_selected = self.vnode_selected
+        self.vfs_node_widget.vnode_1click_selected = self.vnode_1click_selected
+        self.vfs_node_widget.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # size.setHorizontalStretch(1)
         # self.vfs_node_widget.setSizePolicy(size)
 
         # Create VFS Node table
         self.vfs_node_widget_non_mapped = VfsNodeTableWidget(self.vfs, show_mapped=False)
-        self.vfs_node_widget_non_mapped.vnode_selected = self.vnode_selected
+        self.vfs_node_widget_non_mapped.vnode_1click_selected = self.vnode_1click_selected
+        self.vfs_node_widget_non_mapped.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # size.setHorizontalStretch(1)
         # self.vfs_node_widget_non_mapped.setSizePolicy(size)
 
         # Create VFS dir table
         self.vfs_dir_widget = VfsDirWidget(self.vfs)
-        self.vfs_dir_widget.vnode_selected = self.vnode_selected
+        self.vfs_dir_widget.vnode_1click_selected = self.vnode_1click_selected
+        self.vfs_dir_widget.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # size.setHorizontalStretch(1)
         # self.vfs_dir_widget.setSizePolicy(size)
@@ -488,9 +522,23 @@ class Widget(QWidget):
         # size.setVerticalStretch(0)
         # self.bt_extract.setSizePolicy(size)
 
+        self.bt_prep_mod = QPushButton()
+        self.bt_prep_mod.setEnabled(False)
+        self.bt_prep_mod.setText('PREP MOD')
+        self.bt_prep_mod.clicked.connect(self.bt_prep_mod_clicked)
+        size = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
+        self.bt_mod_build = QPushButton()
+        # self.bt_mod_build.setEnabled(False)
+        self.bt_mod_build.setText('BUILD MOD')
+        self.bt_mod_build.clicked.connect(self.bt_mod_build_clicked)
+        size = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
         self.nav_layout = QVBoxLayout()
         self.nav_layout.addWidget(self.nav_widget)
         self.nav_layout.addWidget(self.bt_extract)
+        self.nav_layout.addWidget(self.bt_prep_mod)
+        self.nav_layout.addWidget(self.bt_mod_build)
 
         # Creating Data View
         self.data_view = DataViewWidget(self.vfs)
@@ -506,16 +554,33 @@ class Widget(QWidget):
         self.setLayout(self.main_layout)
         self.updateGeometry()
 
-    def vnode_selected(self, vnode: VfsNode):
-        self.current_vnode = vnode
-        self.data_view.vnode_selected(vnode)
-        if self.current_vnode is not None:
-            self.bt_extract.setText('EXTRACT: {}'.format(vnode.v_path))
+    def vnode_1click_selected(self, v_path: str):
+        self.current_vpath = v_path
+        self.data_view.vnode_1click_selected(v_path)
+        if self.current_vpath is not None:
+            self.bt_extract.setText('EXTRACT: {}'.format(self.current_vpath))
             self.bt_extract.setEnabled(True)
+            self.bt_prep_mod.setText('PREP MOD: {}'.format(self.current_vpath))
+            self.bt_prep_mod.setEnabled(True)
+
+    def vnode_2click_selected(self, vnode: VfsNode):
+        self.current_vnode = vnode
+        self.data_view.vnode_2click_selected(vnode)
+        # if self.current_vnode is not None:
+        #     self.bt_extract.setText('EXTRACT: {}'.format(vnode.v_path))
+        #     self.bt_extract.setEnabled(True)
 
     def bt_extract_clicked(self, checked):
-        if self.current_vnode is not None:
-            self.vfs.extract_node(self.current_vnode)
+        if self.current_vpath is not None:
+            self.vfs.extract_nodes(self.current_vpath, 'extracted/', False)
+
+    def bt_prep_mod_clicked(self, checked):
+        if self.current_vpath is not None:
+            self.vfs.extract_nodes(self.current_vpath, 'mod/', True)
+
+    def bt_mod_build_clicked(self, checked):
+        if self.current_vpath is not None:
+            self.builder.build_dir(self.vfs, 'mod/', 'build/')
 
 
 # ********************

@@ -410,9 +410,10 @@ class VfsStructure:
                             else:
                                 self.log('vpath:skip {} {:08X} {} {} {}'.format(vp.vpath, vp.vphash, len(vp.src), vp.possible_ftypes, vnode.ftype))
 
-                        if vnode.v_path == vp.vpath and vp.used_at_runtime and not vnode.used_at_runtime:
-                            # print('rnt', vp.vpath)
-                            vnode.used_at_runtime = True
+                        if vnode.v_path == vp.vpath:
+                            if vp.used_at_runtime and not vnode.used_at_runtime:
+                                # print('rnt', vp.vpath)
+                                vnode.used_at_runtime = True
             else:
                 self.log('vpath:miss {} {:08X} {} {}'.format(vp.vpath, vp.vphash, len(vp.src), vp.possible_ftypes))
 
@@ -439,6 +440,12 @@ class VfsStructure:
                         else:
                             vl = [vnode] + vl
                         self.map_vpath_to_vfsnodes[vpath] = vl
+
+                        # tag atx file type since they have no header info
+                        if vnode.ftype is None:
+                            file, ext = os.path.splitext(vnode.v_path)
+                            if ext[0:4] == b'.atx':
+                                vnode.ftype = FTYPE_ATX
 
         with open(self.working_dir + 'found_vpaths.txt', 'a') as f:
             for vp in found_vpaths:

@@ -14,14 +14,14 @@ Written in Python, tested only on Linux, code is a mess, because this is an expe
 |AAF| 99% | 99% | double check code to see if something is not understood |
 |SARC| 99% | 99% | double check code to see if something is not understood |
 |AVTX/ATX/DDSC| 99% | 99% | double check code to see if something is not understood |
-|ADF| 95% | 10% | Missing GameDataCollection (0x178842fe) |
+|ADF| 95% | 10% | Handling GameDataCollection (0x178842fe) |
 | |  |  | Missing MDIC (0xb5b062f1) |
 | |  |  | Missing code for types that do not seem to exist in GZB |
 | |  |  | stringlookup not fully grokked |
 | |  |  | models, hrmesh, mesh, not fully grokked |
 |RTPC| 99% | 0% | parsed but not grokked |
 |OGG| 99% | 0% | Ogg file, can be extracted |
-|OBC| 10% | 0% |  found a correlation in file size, guess at record size/count |
+|OBC| 10% | 0% | found a correlation in file size, guess at record size/count |
 |TAG0| 0% | 0% |  |
 |btc| 0% | 0% |  |
 |CFX| 0% | 0% | Autodesk Scaleform https://github.com/jindrapetrik/jpexs-decompiler |

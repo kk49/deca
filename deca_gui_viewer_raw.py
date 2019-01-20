@@ -1,13 +1,17 @@
 from deca_gui_viewer import *
 from deca.file import ArchiveFile
 from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QTextEdit
-
+from PySide2.QtGui import QFont
 
 class DataViewerRaw(DataViewer):
     def __init__(self):
         DataViewer.__init__(self)
 
         self.text_box = QTextEdit()
+        font = QFont("Courier", 8)
+        self.text_box.setFont(font)
+        self.text_box.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.text_box.setSizePolicy(size)
 

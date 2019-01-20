@@ -1,13 +1,78 @@
 from deca.ff_vfs import VfsStructure, VfsNode
 from deca.ff_types import *
+from deca.ff_sarc import FileSarc, EntrySarc
+from deca.errors import *
+from deca.file import ArchiveFile
 import os
 import shutil
-from pprint import pprint
+from pprint import pprint, pformat
+from copy import deepcopy
 
 
 class Builder:
     def __init__(self):
         pass
+
+    def build_node(self, dst_path: str, vnode: VfsNode, vfs: VfsStructure, src_map):
+        if vnode.ftype == FTYPE_SARC:
+            print('BUILD SARC {}'.format(vnode.v_path))
+
+            # parse existing file
+            sarc_old = FileSarc()
+            f = vfs.file_obj_from(vnode)
+            sarc_old.deserialize(f)
+
+            sarc_new = deepcopy(sarc_old)
+
+            data_write_pos = sarc_old.dir_block_len + 16  # 16 is the basic header length 4,b'SARC', 3, dir_block_len
+            src_files = [None] * len(sarc_old.entries)
+            for i in range(len(sarc_old.entries)):
+                entry_old: EntrySarc = sarc_old.entries[i]
+                entry_new: EntrySarc = sarc_new.entries[i]
+                vpath = entry_old.v_path
+                if entry_old.v_path in src_map:
+                    src_files[i] = src_map[vpath]
+                    sz = os.stat(src_files[i]).st_size
+                else:
+                    sz = entry_old.length
+
+                entry_new.offset = data_write_pos
+                entry_new.length = sz
+                data_write_pos = data_write_pos + sz
+                align = 4
+                data_write_pos = (data_write_pos + align - 1) // align * align
+
+            # extract existing file
+
+            fn_dst = os.path.join(dst_path, vnode.v_path.decode('utf-8'))
+
+            # fn = vfs.extract_node(vnode, dst_path, do_sha1sum=False, allow_overwrite=True)
+
+            # modify extracted existing file by overwriting offset to file entry to zero, telling the engine that it is
+            # a symbolic link, and should be loaded elsewhere, preferably directly
+            with ArchiveFile(open(fn_dst, 'wb')) as fso:
+                with ArchiveFile(vfs.file_obj_from(vnode, 'rb')) as fsi:
+                    buf = fsi.read(sarc_old.dir_block_len + 16)
+                    fso.write(buf)
+
+                    for i in range(len(sarc_old.entries)):
+                        entry_old: EntrySarc = sarc_old.entries[i]
+                        entry_new: EntrySarc = sarc_new.entries[i]
+                        if src_files[i] is None:
+                            print('  COPYING {} from old file to new file'.format(entry_old.v_path))
+                            fsi.seek(entry_old.offset)
+                            buf = fsi.read(entry_old.length)
+                        else:
+                            print('  INSERTING {} src file to new file'.format(entry_old.v_path))
+                            with open(src_files[i].decode('utf-8'), 'rb') as f:
+                                buf = f.read(entry_new.length)
+
+                        fso.seek(entry_new.offset)
+                        fso.write(buf)
+
+            return fn_dst.encode('ascii')
+        else:
+            raise EDecaBuildError('Cannot build {} : {}'.format(vnode.ftype, vnode.v_path))
 
     def build_dir(self, vfs: VfsStructure, src_path: str, dst_path: str):
         # find all changed src files
@@ -56,8 +121,12 @@ class Builder:
                 if pid is not None:
                     pnode = vfs.table_vfsnode[pid]
                     if pnode.ftype != FTYPE_ARC and pnode.ftype != FTYPE_TAB:
-                        depends[pnode.v_path] = depends.get(pnode.v_path, set()).union({vnode.v_path})
-                        pack_list.append([pnode.v_path, dst_path.encode('ascii') + pnode.v_path])
+                        if pnode.v_path is None:
+                            raise EDecaBuildError('MISSING VPATH FOR uid:{} hash:{:08X}, when packing {}'.format(
+                                pnode.uid, pnode.hashid, vnode.v_path))
+                        else:
+                            depends[pnode.v_path] = depends.get(pnode.v_path, set()).union({vnode.v_path})
+                            pack_list.append([pnode.v_path, dst_path.encode('ascii') + pnode.v_path])
 
         # pprint(depends, width=128)
 
@@ -76,8 +145,8 @@ class Builder:
                             all_src_ready = False
                             break
                     if all_src_ready:
-                        dst = os.path.join(dst_path, dep.decode('utf-8')).encode('ascii')
-                        print('BUILD {}'.format(dep))
+                        vnodes = vfs.map_vpath_to_vfsnodes[dep]
+                        dst = self.build_node(dst_path, vnodes[0], vfs, vpaths_completed)
                         any_changes = True
                         vpaths_completed[dep] = dst
                     else:
@@ -86,10 +155,11 @@ class Builder:
         if len(vpaths_todo):
             print('BUILD FAILED: Not Completed:')
             pprint(vpaths_todo)
+            raise EDecaBuildError('BUILD FAILED\n' + pformat(vpaths_todo))
         else:
-            print('BUILD SUCCESS: vpaths changed')
+            print('BUILD SUCCESS:')
             for k, v in vpaths_completed.items():
-                print(k,v)
+                print(v.decode('utf-8'))
 
     def build_src(self, vfs: VfsStructure, src_file: str, dst_path: str):
         # TODO Eventually process a simple script to update files based on relative addressing to handle other mods and

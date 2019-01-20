@@ -3,23 +3,28 @@ from deca.file import ArchiveFile
 
 class EntrySarc:
     def __init__(self, index=None, v_path=None):
+        self.META_entry_offset = None
         self.index = index
         self.v_path = v_path
         self.string_offset = None
         self.offset = None
         self.length = None
         self.shash = None
-        self.u32_4 = None
+        self.unk_file_type_hash = None
 
     def deserialize(self, f):
+        self.META_entry_offset = f.tell()
         self.string_offset = f.read_u32()
         self.offset = f.read_u32()
         self.length = f.read_u32()
         self.shash = f.read_u32()
-        self.u32_4 = f.read_u32()
+        self.unk_file_type_hash = f.read_u32()
+
+    def __repr__(self):
+        return 'o:{:9d} s:{:9d} h:{:08X} ft:{:08x} vp:{}'.format(self.offset, self.length, self.shash, self.unk_file_type_hash, self.v_path.decode('utf-8'))
 
     def dump_str(self):
-        return 'o:{} s:{} h:{:08X} vp:{}'.format(self.offset, self.length, self.shash, self.v_path.decode('utf-8'))
+        return 'o:{:9d} s:{:9d} h:{:08X} ft:{:08x} vp:{}'.format(self.offset, self.length, self.shash, self.unk_file_type_hash, self.v_path.decode('utf-8'))
 
 
 class FileSarc:
@@ -35,8 +40,11 @@ class FileSarc:
     def deserialize(self, fin):
         with ArchiveFile(fin) as f:
             self.version = f.read_u32()
+            assert(self.version == 4)
             self.magic = f.read(4)
+            assert(self.magic == b'SARC')
             self.ver2 = f.read_u32()
+            assert(self.ver2 == 3)
             self.dir_block_len = f.read_u32()
 
             string_len = f.read_u32()

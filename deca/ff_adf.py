@@ -21,15 +21,17 @@ class AdfTypeMissing(Exception):
 
 
 class GdcArchiveEntry:
-    def __init__(self, index, offset, size, vpath_hash, vpath):
+    def __init__(self, index, offset, size, vpath_hash, filetype_hash, vpath):
         self.index = index
         self.offset = offset
         self.size = size
         self.vpath_hash = vpath_hash
+        self.filetype_hash = filetype_hash
         self.vpath = vpath
 
     def __repr__(self):
-        return 'i:{} o:{} s:{} h:{:08X} n:{}'.format(self.index, self.offset, self.size, self.vpath_hash, self.vpath.decode('utf-8'))
+        return 'i:{:4d} o:{:9d} s:{:9d} h:{:08X} ft:{:08x} vp:{}'.format(
+            self.index, self.offset, self.size, self.vpath_hash, self.filetype_hash, self.vpath.decode('utf-8'))
 
 
 class StringHash:
@@ -354,14 +356,19 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         v = bytearray(v)
         with ArchiveFile(io.BytesIO(v)) as gdf:
             count = gdf.read_u32(8)
+            assert(count[0] == 32)
+            assert(count[1] == 16)
+            assert(count[2] == count[6])
+            assert(count[3] == 0)
+            # assert(count[4] == filesize +- k)
+            assert(count[5] == 16)
+            assert(count[6] == count[2])
+            assert(count[7] == 0)
             dir_list = []
             for i in range(count[2]):
                 d00_offset = gdf.read_u32()
                 d04_unk = gdf.read_u32()
-                d08_unk = gdf.read_u8()
-                d09_unk = gdf.read_u8()
-                d10_unk = gdf.read_u8()
-                d11_unk = gdf.read_u8()
+                d08_filetype_hash = gdf.read_u32()
                 d12_unk = gdf.read_u32()
                 d16_data_len = gdf.read_u32()
                 d20_unk = gdf.read_u32()
@@ -372,13 +379,14 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 assert(d20_unk == 16)
                 assert(d24_unk == 0)
                 assert(d28_unk == 0)
-                entry = [d00_offset, d16_data_len, d04_unk, d08_unk, d09_unk, d10_unk, d11_unk, d12_unk, d20_unk, d24_unk, d28_unk]
+                entry = [d00_offset, d16_data_len, d08_filetype_hash, d04_unk, d12_unk, d20_unk, d24_unk, d28_unk]
                 dir_list.append(entry)
 
-            # TODO put in assumption for values we dont' expect to change
             dir_contents = []
             for e1 in dir_list:
                 gdf.seek(e1[0])
+                # TODO something weird is going on with this second header, sometimes it makes sense, sometimes it may
+                # have floats? or indicate that is should be 24 byte long?
                 e2 = gdf.read_u32(4)
                 # gdf.seek(e2[0])
                 # fd = gdf.read(e2[2])
@@ -395,7 +403,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             vpath = entry[2]
             vpath_hash = hash_little(vpath)
             v.append(GdcArchiveEntry(
-                i, entry[0][0] + 16 + abs_offset, entry[0][1] - entry[0][0] - 16, vpath_hash, vpath))
+                i, entry[0][0] + 16 + abs_offset, entry[0][1] - entry[0][0] - 16, vpath_hash, entry[0][2], vpath))
 
     elif type_id == 0xb5b062f1:  # MDIC
         v = []

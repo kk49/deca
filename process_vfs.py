@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 import pickle
-from deca.errors import DecaFileExists
+from deca.errors import *
 from deca.ff_vfs import VfsStructure, VfsNode
 from deca.ff_types import *
 from deca.builder import Builder
@@ -11,7 +11,8 @@ from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex,
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QTextEdit, QPushButton
+    QTabWidget, QTreeView, QTextEdit, QPushButton, QMessageBox
+from PySide2.QtWebEngineWidgets import QWebEngineView
 from deca_gui_viewer_adf import DataViewerAdf
 from deca_gui_viewer_rtpc import DataViewerRtpc
 from deca_gui_viewer_image import DataViewerImage
@@ -105,7 +106,7 @@ class VfsNodeTableModel(QAbstractTableModel):
             row = self.remap[row]
 
         if role == Qt.DisplayRole:
-            node : VfsNode = self.table[row]
+            node: VfsNode = self.table[row]
             if node is None:
                 return 'NA'
             else:
@@ -504,10 +505,16 @@ class Widget(QWidget):
         # size.setHorizontalStretch(1)
         # self.vfs_dir_widget.setSizePolicy(size)
 
+        # # Create map widget
+        # self.web_map_widget = QWebEngineView(self)
+        # self.web_map_widget.setUrl(working_dir + 'map/z0/index.html')
+        # self.web_map_widget.show()
+
         self.nav_widget = QTabWidget()
         self.nav_widget.addTab(self.vfs_dir_widget, 'Directory')
         self.nav_widget.addTab(self.vfs_node_widget_non_mapped, 'Non-Mapped List')
         self.nav_widget.addTab(self.vfs_node_widget, 'Raw List')
+        # self.nav_widget.addTab(self.web_map_widget, 'Map')
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         size.setHorizontalStretch(1)
         size.setVerticalStretch(1)
@@ -555,6 +562,28 @@ class Widget(QWidget):
         self.setLayout(self.main_layout)
         self.updateGeometry()
 
+    def error_dialog(self, s):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+
+        msg.setWindowTitle("DECA: ERROR")
+        msg.setText(s)
+        # msg.setInformativeText("This is additional information")
+        # msg.setDetailedText("The details are as follows:")
+        msg.setStandardButtons(QMessageBox.Ok)
+        retval = msg.exec_()
+
+    def dialog_good(self, s):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+
+        msg.setWindowTitle("DECA")
+        msg.setText(s)
+        # msg.setInformativeText("This is additional information")
+        # msg.setDetailedText("The details are as follows:")
+        msg.setStandardButtons(QMessageBox.Ok)
+        retval = msg.exec_()
+
     def vnode_1click_selected(self, v_path: str):
         self.current_vpath = v_path
         self.data_view.vnode_1click_selected(v_path)
@@ -576,20 +605,23 @@ class Widget(QWidget):
             try:
                 self.vfs.extract_nodes(self.current_vpath, working_dir + 'extracted/', False)
             except DecaFileExists as exce:
-                Qt.Dialog('Extacted Canceled: File Exists: {}'.format(exce.args))
+                self.error_dialog('Extacted Canceled: File Exists: {}'.format(exce.args))
 
     def bt_prep_mod_clicked(self, checked):
         if self.current_vpath is not None:
             try:
                 self.vfs.extract_nodes(self.current_vpath, working_dir + 'mod/', True)
             except DecaFileExists as exce:
-                Qt.Dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
+                self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 
     def bt_mod_build_clicked(self, checked):
         try:
             self.builder.build_dir(self.vfs, working_dir + 'mod/', working_dir + 'build/')
+            self.dialog_good('BUILD SUCCESS')
         except DecaFileExists as exce:
-            Qt.Dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
+            self.error_dialog('Build Failed: File Exists: {}'.format(exce.args))
+        except EDecaBuildError as exce:
+            self.error_dialog('Build Failed: {}'.format(exce.args))
 
 
 # ********************
@@ -635,11 +667,13 @@ if __name__ == "__main__":
     if os.path.isfile(cache_file):
         with open(cache_file, 'rb') as f:
             vfs_global = pickle.load(f)
+        vfs_global.dump_status()
     else:
         vfs_global = VfsStructure(working_dir)
         vfs_global.load_from_archives(prefix_in, debug=debug)
         with open(cache_file, 'wb') as f:
             pickle.dump(vfs_global, f, protocol=pickle.HIGHEST_PROTOCOL)
+
 
     # Qt Application
     app = QApplication(sys.argv)

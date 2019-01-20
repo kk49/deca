@@ -375,6 +375,9 @@ class VfsStructure:
 
         self.process_vpaths()
 
+        self.dump_status()
+
+    def dump_status(self):
         self.log('hashes: {}, mappings missing: {}, mappings present {}, mapping conflict {}'.format(
             len(self.hash_present),
             len(self.hash_map_missing),
@@ -385,6 +388,10 @@ class VfsStructure:
             for v in vs:
                 vp = self.map_hash_to_vpath.get(v, b'')
                 self.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp.decode('utf-8')))
+
+        for vid in self.hash_map_conflict:
+            for vp in self.map_hash_to_vpath[vid]:
+                self.log('CONFLICT: {:08X} {}'.format(vid, vp))
 
     def process_vpaths(self):
         self.log('process_vpaths: Input count {}'.format(len(self.possible_vpath_map.nodes)))
@@ -868,7 +875,7 @@ class VfsStructure:
 
         self.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
 
-    def extract_node(self, node: VfsNode, extract_dir: str, do_sha1sum):
+    def extract_node(self, node: VfsNode, extract_dir: str, do_sha1sum, allow_overwrite):
         if node.is_valid():
             if node.offset is not None:
                 with ArchiveFile(self.file_obj_from(node)) as f:
@@ -882,28 +889,33 @@ class VfsStructure:
                     ofiledir = os.path.dirname(ofile)
                     os.makedirs(ofiledir, exist_ok=True)
 
-                    buf = f.read(node.size_c)
+                    buf = f.read(node.size_u)
 
-                    if os.path.isfile(ofile):
+                    if not allow_overwrite and os.path.isfile(ofile):
                         raise DecaFileExists(ofile)
 
                     with ArchiveFile(open(ofile, 'wb')) as fo:
                         fo.write(buf)
 
-                    if do_sha1sum:
-                        # path, file = os.path.split(ofile)
-                        # sfile = os.path.join(path, '.' + file)
-                        sfile = ofile + '.deca_sha1sum'
-                        hsha = sha1(buf).hexdigest()
-                        self.log('SHA1SUM {} {}'.format(hsha, sfile))
-                        with open(sfile, 'w') as fo:
-                            fo.write(hsha)
+                    # TODO
+                    # if do_sha1sum:
+                    #     # path, file = os.path.split(ofile)
+                    #     # sfile = os.path.join(path, '.' + file)
+                    #     sfile = ofile + '.deca_sha1sum'
+                    #     hsha = sha1(buf).hexdigest()
+                    #     self.log('SHA1SUM {} {}'.format(hsha, sfile))
+                    #     with open(sfile, 'w') as fo:
+                    #         fo.write(hsha)
+                return ofile
 
-    def extract_nodes(self, vpath: str, extract_dir: str, do_sha1sum):
+        return None
+
+
+    def extract_nodes(self, vpath: str, extract_dir: str, do_sha1sum, allow_overwrite=False):
         vpath_re = re.compile(vpath)
         for k, v in self.map_vpath_to_vfsnodes.items():
             if vpath_re.match(k):
-                self.extract_node(v[0], extract_dir, do_sha1sum)
+                self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .

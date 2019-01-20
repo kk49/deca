@@ -11,7 +11,7 @@ if len(sys.argv) < 2:
     in_file = '/home/krys/prj/deca/work/gz/exported/models/manmade/props/interior/civilian_01_answering_machine.modelc'
     in_file = '/home/krys/prj/deca/work/gz/exported/graphs/check_region_difficulty.graphc'
     in_file = '/home/krys/prj/deca/work/gz/exported/graphs/check_region_difficulty.graphc'
-    in_file = '/home/krys/prj/deca/work/gz/exported/gdc/global.gdcc'
+    in_file = '/home/krys/prj/deca/work/gz/extracted/gdc/global.gdcc'
 else:
     in_file = sys.argv[1]
 

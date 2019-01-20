@@ -130,3 +130,54 @@ class ArchiveFile:
 
     def read_f64(self, n=None):
         return self.read_base('d', 8, n)
+
+    def write_base(self, fmt, elen, v):
+        if isinstance(v, list) or isinstance(v, tuple):
+            buf = struct.pack(fmt * len(v), *v)
+            self.f.write(buf)
+        else:
+            buf = struct.pack(fmt, v)
+            self.f.write(buf)
+
+        if self.debug:
+            vs = ['{:02x}'.format(t) for t in buf]
+            vs = ''.join(vs)
+            print('{} {}'.format(vs, v))
+
+        return None
+
+    def write_c8(self, v):
+        return self.write_base('c', 1, v)
+
+    def write_strl(self, v):
+        return self.write_base('c', 1, v)
+
+    def write_s8(self, v):
+        return self.write_base('b', 1, v)
+
+    def write_u8(self, v):
+        return self.write_base('B', 1, v)
+
+    def write_s16(self, v):
+        return self.write_base('h', 2, v)
+
+    def write_u16(self, v):
+        return self.write_base('H', 2, v)
+
+    def write_s32(self, v):
+        return self.write_base('i', 4, v)
+
+    def write_u32(self, v):
+        return self.write_base('I', 4, v)
+
+    def write_s64(self, v):
+        return self.write_base('q', 8, v)
+
+    def write_u64(self, v):
+        return self.write_base('Q', 8, v)
+
+    def write_f32(self, v):
+        return self.write_base('f', 4, v)
+
+    def write_f64(self, v):
+        return self.write_base('d', 8, v)

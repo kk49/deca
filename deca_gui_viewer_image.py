@@ -172,25 +172,29 @@ class DataViewerImage(DataViewer):
             ddsc = Ddsc()
             ddsc.load_dds(f_ddsc)
             self.ddsc = ddsc
-        elif vnode.ftype == FTYPE_AVTX or FTYPE_ATX:
-            if vnode.v_path is None:
+        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+            if vnode.vpath is None:
                 f_ddsc = vfs.file_obj_from(vnode)
                 ddsc = Ddsc()
                 ddsc.load_ddsc(f_ddsc)
                 self.ddsc = ddsc
             else:
-                filename = os.path.splitext(vnode.v_path)
-                filename_ddsc = filename[0] + b'.ddsc'
+                filename = os.path.splitext(vnode.vpath)
+                if len(filename[1]) == 0 and vnode.ftype == FTYPE_AVTX:
+                    filename_ddsc = vnode.vpath
+                else:
+                    filename_ddsc = filename[0] + b'.ddsc'
 
                 if filename_ddsc in vfs.map_vpath_to_vfsnodes:
+                    extras = [b'.hmddsc']
+                    for i in range(1, 16):
+                        extras.append('.atx{}'.format(i).encode('ascii'))
                     f_ddsc = vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_ddsc][0])
                     f_atxs = []
-                    for i in range(1, 16):
-                        filename_atx = filename[0] + '.atx{}'.format(i).encode('ascii')
+                    for extra in extras:
+                        filename_atx = filename[0] + extra
                         if filename_atx in vfs.map_vpath_to_vfsnodes:
                             f_atxs.append(vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_atx][0]))
-                        else:
-                            break
                     ddsc = Ddsc()
                     ddsc.load_ddsc(f_ddsc)
                     for atx in f_atxs:

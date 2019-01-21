@@ -97,6 +97,16 @@ class ArchiveFile:
     def read_c8(self, n=None):
         return self.read_base('c', 1, n)
 
+    def read_strl_u32(self, n=None):
+        if n is None:
+            sz = self.read_u32()
+            return self.read_strl(sz)
+        else:
+            sl = []
+            for i in range(n):
+                sl.append(self.read_strl_u32())
+            return sl
+
     def read_strl(self, n=None):
         v = self.read_base('c', 1, n)
         return b''.join(v)

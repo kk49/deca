@@ -1,11 +1,9 @@
 import os
 import io
-import datetime
 import pandas as pd
-from hashlib import sha1
-from pprint import pprint
 import multiprocessing
 import re
+import pickle
 
 import deca.ff_rtpc
 from deca.errors import DecaFileExists
@@ -19,12 +17,13 @@ from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc
 from deca.ff_determine import determine_file_type_and_size
 from deca.hash_jenkins import hash_little
+from deca.util import Logger
 
 
 class VfsPathNode:
     def __init__(self, vpath):
         self.vpath = vpath
-        self.vphash = None
+        self.vhash = None
         self.vfsnodes = []
         self.src = []  # [[SARC, vfsnode], [RTPC, vfsnode], [ADF, vfsnode], [GUESS], ]
         self.used_at_runtime = False
@@ -33,22 +32,18 @@ class VfsPathNode:
 
 class VfsPathMap:
     def __init__(self, logger):
-        self.nodes = {}
         self.logger = logger
-
-    def log(self, s):
-        if self.logger is not None:
-            self.logger.log(s)
+        self.nodes = {}
 
     def merge(self, other):
         for k, v in other.nodes.items():
             v2 = self.nodes.get(k, VfsPathNode(k))
 
-            if v2.vphash is None:
-                v2.vphash = v.vphash
-            elif v.vphash is not None:
-                if v.vphash != v2.vphash:
-                    raise Exception('merge: {}: hash mismatch {} != {}'.format(k, v.vphash, v2.vphash))
+            if v2.vhash is None:
+                v2.vhash = v.vhash
+            elif v.vhash is not None:
+                if v.vhash != v2.vhash:
+                    raise Exception('merge: {}: hash mismatch {} != {}'.format(k, v.vhash, v2.vhash))
 
             v2.vfsnodes = v2.vfsnodes + v.vfsnodes
             v2.src = v2.src + v.src
@@ -74,7 +69,7 @@ class VfsPathMap:
         elif isinstance(vpath, bytes):
             pass
         else:
-            self.log('propose: BAD STRING {}'.format(vpath))
+            self.logger.log('propose: BAD STRING {}'.format(vpath))
             return None
 
         vpath = vpath.replace(b'\\\\', b'/').replace(b'\\', b'/')
@@ -83,7 +78,7 @@ class VfsPathMap:
             iv = self.nodes[vpath]
         else:
             iv = VfsPathNode(vpath)
-            iv.vphash = hash_little(vpath)
+            iv.vhash = hash_little(vpath)
 
         iv.used_at_runtime = iv.used_at_runtime or used_at_runtime
 
@@ -110,23 +105,23 @@ class VfsPathMap:
 class VfsNode:
     def __init__(
             self, uid=None, ftype=None, compressed=False,
-            hashid=None, p_path=None, v_path=None, pid=None, level=0, index=None, offset=None,
-            size_c=None, size_u=None, processed=False, used_at_runtime=False, content_hash=None):
+            vhash=None, pvpath=None, vpath=None, pid=None, level=0, index=None, offset=None,
+            size_c=None, size_u=None, processed=False, used_at_runtime_depth=None):
         self.uid = uid
         self.ftype = ftype
         self.is_compressed = compressed
-        self.hashid = hashid
-        self.p_path = p_path
-        self.v_path = v_path
+        self.vpath = vpath
+        self.vhash = vhash
+        self.pvpath = pvpath
         self.pid = pid
         self.level = level
         self.index = index  # index in parent
         self.offset = offset  # offset in parent
         self.size_c = size_c  # compressed size in client
         self.size_u = size_u  # extracted size
+        self.children = set()
+        self.used_at_runtime_depth = used_at_runtime_depth
         self.processed = processed
-        self.used_at_runtime = used_at_runtime
-        self.content_hash = content_hash
 
     def file_type(self):
         if self.is_compressed:
@@ -137,16 +132,22 @@ class VfsNode:
     def is_valid(self):
         return self.uid is not None and self.uid != 0
 
+    def used_depth_set(self, v):
+        if self.used_at_runtime_depth is None or self.used_at_runtime_depth > v:
+            self.used_at_runtime_depth = v
+            for ch in self.children:
+                ch.used_depth_set(v+1)
+
     def __str__(self):
         info = []
         if self.ftype is not None:
             info.append('ft:{}'.format(self.file_type()))
-        if self.hashid is not None:
-            info.append('h:{:08X}'.format(self.hashid))
-        if self.v_path is not None:
-            info.append('v:{}'.format(self.v_path))
-        if self.p_path is not None:
-            info.append('p:{}'.format(self.p_path))
+        if self.vhash is not None:
+            info.append('h:{:08X}'.format(self.vhash))
+        if self.vpath is not None:
+            info.append('v:{}'.format(self.vpath))
+        if self.pvpath is not None:
+            info.append('p:{}'.format(self.pvpath))
         if len(info) == 0:
             info.append('child({},{})'.format(self.pid, self.index))
         return ' '.join(info)
@@ -160,8 +161,16 @@ def game_file_to_sortable_string(v):
 
 
 class VfsStructure:
-    def __init__(self, working_dir):
+    def __init__(self, game_id, working_dir, logger):
+        self.game_id = game_id
+        self.game_dir = None
+
+        self.worlds = ['', 'worlds/base/']
+        for widx in range(8):
+            self.worlds.append('worlds/world{}/'.format(widx))
+
         self.working_dir = working_dir
+        self.logger = logger
 
         # basic node tracking
         self.uid = 0
@@ -174,11 +183,11 @@ class VfsStructure:
 
         # track info from ADFs
         self.map_name_usage = {}
-        self.map_shash_usage = {}
+        self.map_vhash_usage = {}
         self.adf_missing_types = {}
 
         # track possible vpaths
-        self.possible_vpath_map = VfsPathMap(self)
+        self.possible_vpath_map = VfsPathMap(self.logger)
 
         # results from connecting vpaths to vfsnodes
         self.hash_map_present = set()
@@ -187,28 +196,18 @@ class VfsStructure:
         self.map_hash_to_vpath = {}
         self.map_vpath_to_vfsnodes = {}
 
-    def log_base(self, level, s):
-        with open(self.working_dir + 'log.txt', 'a') as f:
-            msg = '{}: {}'.format(datetime.datetime.now(), s)
-            f.write(msg + '\n')
-            if level <= 0:
-                print(msg)
-
-    def log(self, s):
-        self.log_base(0, s)
-
-    def trace(self, s):
-        self.log_base(1, s)
+    def logger_set(self, logger):
+        self.logger = logger
 
     def file_obj_from(self, node: VfsNode, mode='rb'):
         if node.ftype == FTYPE_ARC:
-            return open(node.p_path, mode)
+            return open(node.pvpath, mode)
         elif node.ftype == FTYPE_TAB:
             return self.file_obj_from(self.table_vfsnode[node.pid])
         elif node.is_compressed:
             cache_dir = self.working_dir + '__CACHE__/'
             os.makedirs(cache_dir, exist_ok=True)
-            file_name = cache_dir + '{:08X}.dat'.format(node.hashid)
+            file_name = cache_dir + '{:08X}.dat'.format(node.vhash)
             if not os.path.isfile(file_name):
                 pnode = self.table_vfsnode[node.pid]
                 with ArchiveFile(self.file_obj_from(pnode, mode)) as pf:
@@ -247,30 +246,31 @@ class VfsStructure:
         self.determine_ftype(node)
 
         if node.is_valid():
-            if node.hashid is not None:
-                self.hash_present.add(node.hashid)
-                vl = self.map_hash_to_vnodes.get(node.hashid, [])
+            if node.vhash is not None:
+                self.hash_present.add(node.vhash)
+                vl = self.map_hash_to_vnodes.get(node.vhash, [])
                 if node.offset is None:
                     vl.append(node)  # put symlinks at end
                 else:
                     vl = [node] + vl  # put real files up front
-                self.map_hash_to_vnodes[node.hashid] = vl
+                self.map_hash_to_vnodes[node.vhash] = vl
+
+            if node.pid is not None:
+                pnode = self.table_vfsnode[node.pid]
+                pnode.children.add(node)
+                if pnode.used_at_runtime_depth is not None and \
+                   (node.used_at_runtime_depth is None or node.used_at_runtime_depth > (1+pnode.used_at_runtime_depth)):
+                    node.used_depth_set(pnode.used_at_runtime_depth + 1)
 
         return node
 
-    def load_from_archives(self, archive_path, ver=3, debug=False):
-        find_all_tab_arcs = False
-        self.log('find all tab/arc files')
+    def load_from_archives(self, game_dir, archive_paths, ver=3, debug=False):
+        self.game_dir = game_dir
+        self.logger.log('find all tab/arc files')
         input_files = []
-        if find_all_tab_arcs:
-            cats = os.listdir(archive_path)
-        else:
-            cats = ['initial', 'supplemental', 'optional']
-        for cat in cats:
-            fcat = archive_path + cat
+        for fcat in archive_paths:
             print(fcat)
             if os.path.isdir(fcat):
-                fcat = fcat + '/'
                 files = os.listdir(fcat)
                 ifns = []
                 for file in files:
@@ -278,41 +278,41 @@ class VfsStructure:
                         ifns.append(file[0:-4])
                 ifns.sort(key=game_file_to_sortable_string)
                 for ifn in ifns:
-                    input_files.append((cat, ifn))
+                    input_files.append(os.path.join(fcat, ifn))
 
-        self.log('process all game tab / arc files')
+        self.logger.log('process all game tab / arc files')
         for ta_file in input_files:
-            inpath = archive_path + ta_file[0] + '/' + ta_file[1]
+            inpath = os.path.join(ta_file)
             file_arc = inpath + '.arc'
-            self.node_add(VfsNode(ftype=FTYPE_ARC, p_path=file_arc))
+            self.node_add(VfsNode(ftype=FTYPE_ARC, pvpath=file_arc))
 
         any_change = True
         n_nodes = 0
         phase_id = 0
         while any_change:
             phase_id = phase_id + 1
-            self.log('Expand Archives Phase {}: Begin'.format(phase_id))
+            self.logger.log('Expand Archives Phase {}: Begin'.format(phase_id))
 
             any_change = False
             idx = n_nodes  # start after last processed node
             n_nodes = len(self.table_vfsnode)  # only process this level of nodes
             while idx < n_nodes:
                 # if idx % 10000 == 0:
-                #     self.log('Processing {} of {}'.format(idx, len(self.table_vfsnode)))
+                #     self.logger.log('Processing {} of {}'.format(idx, len(self.table_vfsnode)))
                 node = self.table_vfsnode[idx]
                 if node.is_valid() and not node.processed:
                     if node.ftype == FTYPE_ARC:
                         # here we add the tab file as a child of the ARC, a trick to make it work with our data model
                         node.processed = True
                         any_change = True
-                        tab_path = os.path.splitext(node.p_path)
+                        tab_path = os.path.splitext(node.pvpath)
                         tab_path = tab_path[0] + '.tab'
-                        cnode = VfsNode(ftype=FTYPE_TAB, p_path=tab_path, pid=node.uid, level=node.level)
+                        cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid, level=node.level)
                         self.node_add(cnode)
                     elif node.ftype == FTYPE_TAB:
                         node.processed = True
                         any_change = True
-                        with ArchiveFile(open(node.p_path, 'rb'), debug=debug) as f:
+                        with ArchiveFile(open(node.pvpath, 'rb'), debug=debug) as f:
                             if 3 == ver:
                                 tab_file = TabFileV3()
                             elif 4 == ver:
@@ -325,7 +325,7 @@ class VfsStructure:
                             for i in range(len(tab_file.file_table)):
                                 te = tab_file.file_table[i]
                                 cnode = VfsNode(
-                                    hashid=te.hashname, pid=node.uid, level=node.level + 1, index=i,
+                                    vhash=te.hashname, pid=node.uid, level=node.level + 1, index=i,
                                     offset=te.offset, size_c=te.size_c, size_u=te.size_u)
                                 self.node_add(cnode)
 
@@ -340,13 +340,13 @@ class VfsStructure:
                             if offset == 0:
                                 offset = None  # sarc files with zero offset are not in file, but reference hash value
                             cnode = VfsNode(
-                                hashid=se.shash, pid=node.uid, level=node.level + 1, index=se.index,
-                                offset=offset, size_c=se.length, size_u=se.length, v_path=se.v_path)
+                                vhash=se.vhash, pid=node.uid, level=node.level + 1, index=se.index,
+                                offset=offset, size_c=se.length, size_u=se.length, vpath=se.vpath)
 
                             self.node_add(cnode)
-                            self.possible_vpath_map.propose(cnode.v_path, [FTYPE_SARC, node], vnode=cnode)
+                            self.possible_vpath_map.propose(cnode.vpath, [FTYPE_SARC, node], vnode=cnode)
 
-                    elif node.hashid == deca.hash_jenkins.hash_little(b'gdc/global.gdcc'):  # special case starting point for runtime
+                    elif node.vhash == deca.hash_jenkins.hash_little(b'gdc/global.gdcc'):  # special case starting point for runtime
                         node.processed = True
                         any_change = True
                         with self.file_obj_from(node) as f:
@@ -354,15 +354,15 @@ class VfsStructure:
                         adf = load_adf(buffer)
                         for entry in adf.table_instance_values[0]:
                             if isinstance(entry, GdcArchiveEntry):
-                                # self.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.vpath))
+                                # self.logger.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.vpath))
                                 cnode = VfsNode(
-                                    hashid=entry.vpath_hash, pid=node.uid, level=node.level + 1, index=entry.index,
-                                    offset=entry.offset, size_c=entry.size, size_u=entry.size, v_path=entry.vpath)
+                                    vhash=entry.vpath_hash, pid=node.uid, level=node.level + 1, index=entry.index,
+                                    offset=entry.offset, size_c=entry.size, size_u=entry.size, vpath=entry.vpath)
                                 self.node_add(cnode)
-                                self.possible_vpath_map.propose(cnode.v_path, [FTYPE_ADF, node], vnode=cnode)
+                                self.possible_vpath_map.propose(cnode.vpath, [FTYPE_ADF, node], vnode=cnode)
 
                 idx = idx + 1
-            self.log('Expand Archives Phase {}: End'.format(phase_id))
+            self.logger.log('Expand Archives Phase {}: End'.format(phase_id))
 
         self.find_vpath_adf(self.possible_vpath_map)
         self.find_vpath_rtpc(self.possible_vpath_map)
@@ -378,7 +378,7 @@ class VfsStructure:
         self.dump_status()
 
     def dump_status(self):
-        self.log('hashes: {}, mappings missing: {}, mappings present {}, mapping conflict {}'.format(
+        self.logger.log('hashes: {}, mappings missing: {}, mappings present {}, mapping conflict {}'.format(
             len(self.hash_present),
             len(self.hash_map_missing),
             len(self.hash_map_present),
@@ -387,14 +387,14 @@ class VfsStructure:
         for k, vs in self.adf_missing_types.items():
             for v in vs:
                 vp = self.map_hash_to_vpath.get(v, b'')
-                self.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp.decode('utf-8')))
+                self.logger.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp.decode('utf-8')))
 
         for vid in self.hash_map_conflict:
             for vp in self.map_hash_to_vpath[vid]:
-                self.log('CONFLICT: {:08X} {}'.format(vid, vp))
+                self.logger.log('CONFLICT: {:08X} {}'.format(vid, vp))
 
     def process_vpaths(self):
-        self.log('process_vpaths: Input count {}'.format(len(self.possible_vpath_map.nodes)))
+        self.logger.log('process_vpaths: Input count {}'.format(len(self.possible_vpath_map.nodes)))
 
         self.hash_map_present = set()
         self.hash_map_missing = set()
@@ -405,37 +405,37 @@ class VfsStructure:
         found_vpaths = set()
         for vp in self.possible_vpath_map.nodes.values():
             vp: VfsPathNode = vp
-            vpid = vp.vphash
+            vpid = vp.vhash
             if vpid in self.map_hash_to_vnodes:
                 vnodes = self.map_hash_to_vnodes[vpid]
                 for vnode in vnodes:
                     vnode: VfsNode = vnode
                     if vnode.is_valid():
-                        if vnode.v_path is None:
+                        if vnode.vpath is None:
                             if len(vp.possible_ftypes) == 0 or vnode.ftype in vp.possible_ftypes:
-                                self.log('vpath:add  {} {:08X} {} {} {}'.format(vp.vpath, vp.vphash, len(vp.src), vp.possible_ftypes, vnode.ftype))
-                                vnode.v_path = vp.vpath
+                                self.logger.trace('vpath:add  {} {:08X} {} {} {}'.format(vp.vpath, vp.vhash, len(vp.src), vp.possible_ftypes, vnode.ftype))
+                                vnode.vpath = vp.vpath
                                 found_vpaths.add(vp.vpath)
                             else:
-                                self.log('vpath:skip {} {:08X} {} {} {}'.format(vp.vpath, vp.vphash, len(vp.src), vp.possible_ftypes, vnode.ftype))
+                                self.logger.log('vpath:skip {} {:08X} {} {} {}'.format(vp.vpath, vp.vhash, len(vp.src), vp.possible_ftypes, vnode.ftype))
 
-                        if vnode.v_path == vp.vpath:
-                            if vp.used_at_runtime and not vnode.used_at_runtime:
+                        if vnode.vpath == vp.vpath:
+                            if vp.used_at_runtime and (vnode.used_at_runtime_depth is None or vnode.used_at_runtime_depth > 0):
                                 # print('rnt', vp.vpath)
-                                vnode.used_at_runtime = True
+                                vnode.used_depth_set(0)
             else:
-                self.log('vpath:miss {} {:08X} {} {}'.format(vp.vpath, vp.vphash, len(vp.src), vp.possible_ftypes))
+                self.logger.trace('vpath:miss {} {:08X} {} {}'.format(vp.vpath, vp.vhash, len(vp.src), vp.possible_ftypes))
 
         for vnode in self.table_vfsnode:
             vnode: VfsNode = vnode
             if vnode.is_valid():
-                if vnode.hashid is not None:
-                    vid = vnode.hashid
-                    if vnode.v_path is None:
+                if vnode.vhash is not None:
+                    vid = vnode.vhash
+                    if vnode.vpath is None:
                         self.hash_map_missing.add(vid)
                     else:
                         self.hash_map_present.add(vid)
-                        vpath = vnode.v_path
+                        vpath = vnode.vpath
                         if vid in self.map_hash_to_vpath:
                             self.map_hash_to_vpath[vid].add(vpath)
                             if len(self.map_hash_to_vpath[vid]) > 1:
@@ -452,20 +452,24 @@ class VfsStructure:
 
                         # tag atx file type since they have no header info
                         if vnode.ftype is None:
-                            file, ext = os.path.splitext(vnode.v_path)
+                            file, ext = os.path.splitext(vnode.vpath)
                             if ext[0:4] == b'.atx':
                                 vnode.ftype = FTYPE_ATX
+                            elif ext == b'.hmddsc':
+                                vnode.ftype = FTYPE_HMDDSC
 
+        found_vpaths = list(found_vpaths)
+        found_vpaths.sort()
         with open(self.working_dir + 'found_vpaths.txt', 'a') as f:
             for vp in found_vpaths:
-                f.write('{}\n'.format(vp))
+                f.write('{}\n'.format(vp.decode('utf-8')))
 
-    #         for s in ss:
+        #         for s in ss:
         #             hid = hash_little(s)
         #             if hid in self.hash_present:
         #                 if hid in self.map_hash_to_vpath:
         #                     if s != self.map_hash_to_vpath[hid]:
-        #                         self.trace('HASH CONFLICT STRINGS: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], s))
+        #                         self.logger.trace('HASH CONFLICT STRINGS: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], s))
         #                         self.hash_bad[hid] = (self.map_hash_to_vpath[hid], s)
         #                 else:
         #                     if dump_found_paths:
@@ -474,57 +478,57 @@ class VfsStructure:
         #                     self.map_vpath_to_hash[s] = hid
         #                     found = found + 1
         #
-        # self.log('fill in v_paths, mark extensions identified files as ftype')
+        # self.logger.log('fill in v_paths, mark extensions identified files as ftype')
         #
-        # self.log('PROCESS BASELINE VNODE INFORMATION')
+        # self.logger.log('PROCESS BASELINE VNODE INFORMATION')
         # for idx in range(len(self.table_vfsnode)):
         #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.hashid is not None:
-        #         hid = node.hashid
-        #         if node.v_path is not None:
+        #     if node.is_valid() and node.vhash is not None:
+        #         hid = node.vhash
+        #         if node.vpath is not None:
         #             if hid in self.map_hash_to_vpath:
-        #                 if self.map_hash_to_vpath[hid] != node.v_path:
-        #                     self.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.v_path))
-        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.v_path)
+        #                 if self.map_hash_to_vpath[hid] != node.vpath:
+        #                     self.logger.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.vpath))
+        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.vpath)
         #             else:
-        #                 self.map_hash_to_vpath[hid] = node.v_path
-        #                 self.map_vpath_to_hash[node.v_path] = hid
-        # self.log('PROCESS BASELINE VNODE INFORMATION: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
+        #                 self.map_hash_to_vpath[hid] = node.vpath
+        #                 self.map_vpath_to_hash[node.vpath] = hid
+        # self.logger.log('PROCESS BASELINE VNODE INFORMATION: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
         #
         # for idx in range(len(self.table_vfsnode)):
         #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.hashid is not None and node.v_path is None:
-        #         if node.hashid in self.map_hash_to_vpath:
-        #             node.v_path = self.map_hash_to_vpath[node.hashid]
+        #     if node.is_valid() and node.vhash is not None and node.vpath is None:
+        #         if node.vhash in self.map_hash_to_vpath:
+        #             node.vpath = self.map_hash_to_vpath[node.vhash]
         #
-        #     if node.is_valid() and node.hashid is not None:
+        #     if node.is_valid() and node.vhash is not None:
         #         if node.ftype not in {FTYPE_ARC, FTYPE_TAB}:
-        #             if node.hashid in self.map_hash_to_vpath:
-        #                 self.hash_map_present.add(node.hashid)
+        #             if node.vhash in self.map_hash_to_vpath:
+        #                 self.hash_map_present.add(node.vhash)
         #             else:
-        #                 self.hash_map_missing.add(node.hashid)
+        #                 self.hash_map_missing.add(node.vhash)
         #
-        #     if node.is_valid() and node.v_path is not None:
-        #         if os.path.splitext(node.v_path)[1][0:4] == b'.atx':
+        #     if node.is_valid() and node.vpath is not None:
+        #         if os.path.splitext(node.vpath)[1][0:4] == b'.atx':
         #             if node.ftype is not None:
-        #                 raise Exception('ATX marked as non ATX: {}'.format(node.v_path))
+        #                 raise Exception('ATX marked as non ATX: {}'.format(node.vpath))
         #             node.ftype = FTYPE_ATX
         #
-        #         lst = self.map_vpath_to_vfsnodes.get(node.v_path, [])
+        #         lst = self.map_vpath_to_vfsnodes.get(node.vpath, [])
         #         if len(lst) > 0 and lst[0].offset is None:  # Do not let symlink be first is list # TODO Sort by accessibility
         #             lst = [node] + lst
         #         else:
         #             lst.append(node)
-        #         self.map_vpath_to_vfsnodes[node.v_path] = lst
+        #         self.map_vpath_to_vfsnodes[node.vpath] = lst
 
     def find_vpath_adf(self, vpath_map):
-        self.log('PROCESS ADFs: find strings, propose terrain patches')
+        self.logger.log('PROCESS ADFs: find strings, propose terrain patches')
         indexes = []
         adf_done = set()
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_ADF and node.hashid not in adf_done:
-                adf_done.add(node.hashid)
+            if node.is_valid() and node.ftype == FTYPE_ADF and node.vhash not in adf_done:
+                adf_done.add(node.vhash)
                 indexes.append(idx)
 
         nprocs = max(1, multiprocessing.cpu_count() // 2)  # assuming hyperthreading exists and slows down processing
@@ -535,16 +539,16 @@ class VfsStructure:
 
         procs = []
         for idxs in indexes2:
-            self.log('Create Process: ({},{},{}'.format(min(idxs), max(idxs), idxs[:8]))
+            self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
             p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs,))
-            self.log('Process: {}: Start'.format(p))
+            self.logger.log('Process: {}: Start'.format(p))
             p.start()
             procs.append(p)
 
         scount = 0
         for i in range(len(procs)):
-            self.log('Waiting {} of {}'.format(i+1, len(procs)))
-            vpath_map_work, adf_missing_types, map_name_usage, map_shash_usage = q.get()
+            self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
+            vpath_map_work, adf_missing_types, map_name_usage, map_vhash_usage = q.get()
             scount += len(vpath_map_work.nodes)
 
             vpath_map.merge(vpath_map_work)
@@ -555,23 +559,23 @@ class VfsStructure:
             for k, v in map_name_usage.items():
                 self.map_name_usage[k] = self.map_name_usage.get(k, set()).union(v)
 
-            for k, v in map_shash_usage.items():
-                self.map_shash_usage[k] = self.map_shash_usage.get(k, set()).union(v)
+            for k, v in map_vhash_usage.items():
+                self.map_vhash_usage[k] = self.map_vhash_usage.get(k, set()).union(v)
 
-            self.log('Process Done {} of {}'.format(i + 1, len(procs)))
+            self.logger.log('Process Done {} of {}'.format(i + 1, len(procs)))
 
         for p in procs:
-            self.log('Process: {}: Joining'.format(p))
+            self.logger.log('Process: {}: Joining'.format(p))
             p.join()
-            self.log('Process: {}: Joined'.format(p))
+            self.logger.log('Process: {}: Joined'.format(p))
 
-        self.log('PROCESS ADFs: Total ADFs: {}, Total Strings: {}'.format(len(adf_done), scount))
+        self.logger.log('PROCESS ADFs: Total ADFs: {}, Total Strings: {}'.format(len(adf_done), scount))
 
     def find_vpath_adf_core(self, q, indexs):
-        vpath_map = VfsPathMap(self)
+        vpath_map = VfsPathMap(self.logger)
         adf_missing_types = {}
         map_name_usage = {}
-        map_shash_usage = {}
+        map_vhash_usage = {}
 
         for idx in indexs:
             node = self.table_vfsnode[idx]
@@ -600,9 +604,9 @@ class VfsStructure:
 
                     for sh in adf.table_stringhash:
                         s = sh.value
-                        st = map_shash_usage.get(s, set())
+                        st = map_vhash_usage.get(s, set())
                         st.add(node)
-                        map_shash_usage[s] = st
+                        map_vhash_usage[s] = st
 
                     if len(adf.table_instance_values) > 0 and adf.table_instance_values[0] is not None and isinstance(
                             adf.table_instance_values[0], dict):
@@ -611,10 +615,12 @@ class VfsStructure:
                         fns = []
                         # self name patch files
                         if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
-                            fn = 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
-                                obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
-                            fns.append(fn)
+                            for world in self.worlds:
+                                fn = world + 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+                                    obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
+                                fns.append(fn)
 
+                        # self name environc files
                         if adf.table_instance[0].name == b'environ':
                             fn = 'environment/weather/{}.environc'.format(obj0['Name'].decode('utf-8'))
                             fns.append(fn)
@@ -623,28 +629,28 @@ class VfsStructure:
 
                         found_any = False
                         for fn in fns:
-                            if node.hashid == hash_little(fn):
+                            if node.vhash == hash_little(fn):
                                 vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=FTYPE_ADF)
                                 found_any = True
 
                         if len(fns) > 0 and not found_any:
-                            self.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.hashid, fns[0]))
+                            self.logger.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.vhash, fns[0]))
 
                 except AdfTypeMissing as ae:
-                    adf_missing_types[ae.hashid] = adf_missing_types.get(ae.hashid, []) + [node.hashid]
+                    adf_missing_types[ae.vhash] = adf_missing_types.get(ae.vhash, []) + [node.vhash]
                     print('Missing Type {:08x} in {:08X} {} {}'.format(
-                        ae.hashid, node.hashid, node.v_path, node.p_path))
+                        ae.vhash, node.vhash, node.vpath, node.pvpath))
 
-        q.put([vpath_map, adf_missing_types, map_name_usage, map_shash_usage])
+        q.put([vpath_map, adf_missing_types, map_name_usage, map_vhash_usage])
 
     def find_vpath_rtpc(self, vpath_map):
-        self.log('PROCESS RTPCs: look for hashable strings in RTPC files')
+        self.logger.log('PROCESS RTPCs: look for hashable strings in RTPC files')
         indexes = []
         rtpc_done = set()
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_RTPC and node.hashid not in rtpc_done:
-                rtpc_done.add(node.hashid)
+            if node.is_valid() and node.ftype == FTYPE_RTPC and node.vhash not in rtpc_done:
+                rtpc_done.add(node.vhash)
                 indexes.append(idx)
 
         nprocs = max(1, multiprocessing.cpu_count() // 2)  # assuming hyperthreading exists and slows down processing
@@ -655,29 +661,29 @@ class VfsStructure:
 
         procs = []
         for idxs in indexes2:
-            self.log('Create Process: ({},{},{}'.format(min(idxs), max(idxs), idxs[:8]))
+            self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
             p = multiprocessing.Process(target=self.find_vpath_rtpc_core, args=(q, idxs,))
-            self.log('Process: {}: Start'.format(p))
+            self.logger.log('Process: {}: Start'.format(p))
             p.start()
             procs.append(p)
 
         scount = 0
         for i in range(len(procs)):
-            self.log('Waiting {} of {}'.format(i+1, len(procs)))
+            self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
             vpath_map_work = q.get()
             scount += len(vpath_map_work.nodes)
             vpath_map.merge(vpath_map_work)
-            self.log('Process Done {} of {}'.format(i+1, len(procs)))
+            self.logger.log('Process Done {} of {}'.format(i+1, len(procs)))
 
         for p in procs:
-            self.log('Process: {}: Joining'.format(p))
+            self.logger.log('Process: {}: Joining'.format(p))
             p.join()
-            self.log('Process: {}: Joined'.format(p))
+            self.logger.log('Process: {}: Joined'.format(p))
 
-        self.log('PROCESS RTPCs: Total RTPCs: {}, Total Strings: {}'.format(len(rtpc_done), scount))
+        self.logger.log('PROCESS RTPCs: Total RTPCs: {}, Total Strings: {}'.format(len(rtpc_done), scount))
 
     def find_vpath_rtpc_core(self, q, indexs):
-        vpath_map = VfsPathMap(self)
+        vpath_map = VfsPathMap(self.logger)
         for idx in indexs:
             node = self.table_vfsnode[idx]
             if node.is_valid() and node.ftype == FTYPE_RTPC:
@@ -710,75 +716,80 @@ class VfsStructure:
         q.put(vpath_map)
 
     def find_vpath_json(self, vpath_map):
-        self.log('PROCESS JSONs: look for hashable strings in json files')
+        self.logger.log('PROCESS JSONs: look for hashable strings in json files')
         json_done = set()
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_TXT and node.hashid not in json_done:
+            if node.is_valid() and node.ftype == FTYPE_TXT and node.vhash not in json_done:
                 with self.file_obj_from(node) as f:
                     buffer = f.read(node.size_u)
 
                 json = load_json(buffer)
                 if json is not None:
-                    json_done.add(node.hashid)
+                    json_done.add(node.vhash)
 
                 # Parse {"0":[]. "1":[]}
                 if isinstance(json, dict) and '0' in json and '1' in json:
                     for k, v in json.items():
                         for l in v:
                             vpath_map.propose(l, [FTYPE_TXT, node])
-        self.log('PROCESS JSONs: Total JSON files {}'.format(len(json_done)))
+        self.logger.log('PROCESS JSONs: Total JSON files {}'.format(len(json_done)))
 
     def find_vpath_exe(self, vpath_map):
-        self.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/gz/all_strings.tsv')
-        db = pd.read_csv('./resources/gz/all_strings.tsv', delimiter='\t')
-        db_str = db['String']
-        db_str = set(db_str)
-        for s in db_str:
-            vpath_map.propose(s, ['EXE', None])
-        self.log('STRINGS FROM EXE: Found {} strings'.format(len(db_str)))
+        fn = './resources/{}/all_strings.tsv'.format(self.game_id)
+        if os.path.isfile(fn):
+            self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/gz/all_strings.tsv')
+            db = pd.read_csv(fn, delimiter='\t')
+            db_str = db['String']
+            db_str = set(db_str)
+            for s in db_str:
+                vpath_map.propose(s, ['EXE', None])
+            self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(db_str)))
 
     def find_vpath_procmon(self, vpath_map):
-        self.log('STRINGS FROM PROCMON: look for hashable strings in resources/gz/strings_procmon.txt')
-        with open('./resources/gz/strings_procmon.txt') as f:
-            custom_strings = f.readlines()
-            custom_strings = set(custom_strings)
-            for s in custom_strings:
-                vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
-        self.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
+        fn = './resources/{}/strings_procmon.txt'.format(self.game_id)
+        if os.path.isfile(fn):
+            self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/gz/strings_procmon.txt')
+            with open(fn) as f:
+                custom_strings = f.readlines()
+                custom_strings = set(custom_strings)
+                for s in custom_strings:
+                    vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
+            self.logger.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_custom(self, vpath_map):
-        self.log('STRINGS FROM CUSTOM: look for hashable strings in resources/gz/strings.txt')
-        with open('./resources/gz/strings.txt') as f:
-            custom_strings = f.readlines()
-            custom_strings = set(custom_strings)
-            for s in custom_strings:
-                vpath_map.propose(s.strip(), ['CUSTOM', None])
-        self.log('STRINGS FROM CUSTOM: Total {} strings'.format(len(custom_strings)))
+        fn = './resources/{}/strings.txt'.format(self.game_id)
+        if os.path.isfile(fn):
+            self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/gz/strings.txt')
+            with open(fn) as f:
+                custom_strings = f.readlines()
+                custom_strings = set(custom_strings)
+                for s in custom_strings:
+                    vpath_map.propose(s.strip(), ['CUSTOM', None])
+            self.logger.log('STRINGS FROM CUSTOM: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_guess(self, vpath_map):
-        self.log('STRINGS BY GUESSING: ...')
+        self.logger.log('STRINGS BY GUESSING: ...')
         guess_strings = {}
-        guess_strings['textures/ui/map_reserve_0/world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
-        guess_strings['textures/ui/map_reserve_1/world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
-        guess_strings['settings/hp_settings/reserve_0.bin'] = FTYPE_RTPC
-        guess_strings['settings/hp_settings/reserve_0.bl'] = FTYPE_SARC
-        guess_strings['settings/hp_settings/reserve_1.bin'] = FTYPE_RTPC
-        guess_strings['settings/hp_settings/reserve_1.bl'] = FTYPE_SARC
-        for res_i in [0, 1]:
+        guess_strings['textures/ui/world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
+        for res_i in range(8):
+            guess_strings['settings/hp_settings/reserve_{}.bin'.format(res_i)] = FTYPE_RTPC
+            guess_strings['settings/hp_settings/reserve_{}.bl'.format(res_i)] = FTYPE_SARC
+            guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
             for zoom_i in [1, 2, 3]:
                 for index in range(500):
                     fn = 'textures/ui/map_reserve_{}/zoom{}/{}.ddsc'.format(res_i, zoom_i, index)
                     guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
 
-        for i in range(64):
-            fn = 'terrain/hp/horizonmap/horizon_{}.ddsc'.format(i)
-            guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
+        for world in self.worlds:
+            for i in range(64):
+                fn = world + 'terrain/hp/horizonmap/horizon_{}.ddsc'.format(i)
+                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
 
-        for i in range(64):
-            for j in range(64):
-                fn = 'ai/tiles/{:02d}_{:02d}.navmeshc'.format(i, j)
-                guess_strings[fn] = FTYPE_TAG0
+            for i in range(64):
+                for j in range(64):
+                    fn = world + 'ai/tiles/{:02d}_{:02d}.navmeshc'.format(i, j)
+                    guess_strings[fn] = [FTYPE_TAG0, FTYPE_H2014]
 
         prefixs = [
             'ui/character_creation_i',
@@ -814,10 +825,10 @@ class VfsStructure:
             fn = fn.encode('ascii')
             vpath_map.propose(fn, ['GUESS', None], possible_ftypes=v)
 
-        self.log('STRINGS BY GUESSING: Total {} guesses'.format(len(guess_strings)))
+        self.logger.log('STRINGS BY GUESSING: Total {} guesses'.format(len(guess_strings)))
 
     def find_vpath_by_assoc(self, vpath_map):
-        self.log('STRINGS BY FILE NAME ASSOCIATION: epe/ee, blo/bl/nl/fl/nl.mdic/fl.mdic, mesh*/model*, avtx/atx?]')
+        self.logger.log('STRINGS BY FILE NAME ASSOCIATION: epe/ee, blo/bl/nl/fl/nl.mdic/fl.mdic, mesh*/model*, avtx/atx?]')
         pair_exts = [
             {
                 '.ee': FTYPE_SARC,
@@ -842,6 +853,7 @@ class VfsStructure:
             },
             {
                 '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
+                '.hmddsc': None,
                 '.atx0': None,
                 '.atx1': None,
                 '.atx2': None,
@@ -873,18 +885,18 @@ class VfsStructure:
             if fh in self.hash_present:
                 vpath_map.propose(fn, ['ASSOC', None], possible_ftypes=v)
 
-        self.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
+        self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
 
     def extract_node(self, node: VfsNode, extract_dir: str, do_sha1sum, allow_overwrite):
         if node.is_valid():
             if node.offset is not None:
                 with ArchiveFile(self.file_obj_from(node)) as f:
-                    if node.v_path is None:
-                        ofile = extract_dir + '{:08X}.dat'.format(node.hashid)
+                    if node.vpath is None:
+                        ofile = extract_dir + '{:08X}.dat'.format(node.vhash)
                     else:
-                        ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
+                        ofile = extract_dir + '{}'.format(node.vpath.decode('utf-8'))
 
-                    self.log('Exporting {}'.format(ofile))
+                    self.logger.log('Exporting {}'.format(ofile))
 
                     ofiledir = os.path.dirname(ofile)
                     os.makedirs(ofiledir, exist_ok=True)
@@ -903,19 +915,36 @@ class VfsStructure:
                     #     # sfile = os.path.join(path, '.' + file)
                     #     sfile = ofile + '.deca_sha1sum'
                     #     hsha = sha1(buf).hexdigest()
-                    #     self.log('SHA1SUM {} {}'.format(hsha, sfile))
+                    #     self.logger.log('SHA1SUM {} {}'.format(hsha, sfile))
                     #     with open(sfile, 'w') as fo:
                     #         fo.write(hsha)
                 return ofile
 
         return None
 
-
     def extract_nodes(self, vpath: str, extract_dir: str, do_sha1sum, allow_overwrite=False):
         vpath_re = re.compile(vpath)
         for k, v in self.map_vpath_to_vfsnodes.items():
             if vpath_re.match(k):
                 self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
+
+
+def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, debug=False):
+    os.makedirs(working_dir, exist_ok=True)
+    logger = Logger(working_dir)
+    cache_file = working_dir + 'vfs_cache.pickle'
+    if os.path.isfile(cache_file):
+        with open(cache_file, 'rb') as f:
+            vfs = pickle.load(f)
+        vfs.logger_set(logger)
+        vfs.dump_status()
+    else:
+        vfs = VfsStructure(game_id, working_dir, logger)
+        vfs.load_from_archives(game_dir, archive_paths, debug=debug)
+        with open(cache_file, 'wb') as f:
+            pickle.dump(vfs, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return vfs
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .
@@ -935,15 +964,15 @@ VfsTable
 
 uid : u64
 ftype : u32
-hashid : u32
-p_path : str
-v_path : str
+vhash : u32
+pvpath : str
+vpath : str
 pid : u64
 index : u64  # index in parent
 offset : u64 # offset in parent
 size_c : u64 # compressed size in client
 size_u : u64 # extracted size
 
-VfsHashToNameMap
+VfshashToNameMap
 VfsNameToHashMap
 '''

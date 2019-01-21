@@ -5,5 +5,7 @@ tools/
 work/
 venv36/
 .idea/
-resources/gz/scratch/
-resources/gz/procmon_csv/
+resources/gzb/scratch/
+resources/gzb/procmon_csv/
+resources/hp/scratch/
+resources/hp/procmon_csv/

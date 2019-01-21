@@ -67,6 +67,10 @@ class Builder:
                             with open(src_files[i].decode('utf-8'), 'rb') as f:
                                 buf = f.read(entry_new.length)
 
+                        fso.seek(entry_new.META_entry_offset_ptr)
+                        fso.write_u32(entry_new.offset)
+                        fso.seek(entry_new.META_entry_size_ptr)
+                        fso.write_u32(entry_new.length)
                         fso.seek(entry_new.offset)
                         fso.write(buf)
 

@@ -25,9 +25,9 @@ class GdcArchiveEntry:
         self.index = index
         self.offset = offset
         self.size = size
+        self.vpath = vpath
         self.vpath_hash = vpath_hash
         self.filetype_hash = filetype_hash
-        self.vpath = vpath
 
     def __repr__(self):
         return 'i:{:4d} o:{:9d} s:{:9d} h:{:08X} ft:{:08x} vp:{}'.format(

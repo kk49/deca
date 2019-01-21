@@ -1,4 +1,24 @@
 import struct
+import datetime
+
+
+class Logger:
+    def __init__(self, working_dir):
+        self.working_dir = working_dir
+
+    def log_base(self, level, s):
+        if self.working_dir is not None:
+            with open(self.working_dir + 'log.txt', 'a') as f:
+                msg = '{}: {}'.format(datetime.datetime.now(), s)
+                f.write(msg + '\n')
+                if level <= 0:
+                    print(msg)
+
+    def log(self, s):
+        self.log_base(0, s)
+
+    def trace(self, s):
+        self.log_base(1, s)
 
 
 def dump_line(line, width, format='hex'):
@@ -16,6 +36,7 @@ def dump_block(blk, width, format='hex'):
         line = blk[(i*width):((i+1)*width)]
         line = dump_line(line, width, format)
         print(line)
+
 
 '''
 JENKINS HASH code from 

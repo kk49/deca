@@ -1,11 +1,10 @@
-from deca.ff_vfs import VfsStructure
+from deca.ff_vfs import vfs_structure_prep
 from deca.ff_avtx import Ddsc
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.ff_adf import load_adf
 from deca.file import ArchiveFile
 from PIL import Image
 import numpy as np
-import pickle
 import os
 import json
 import io
@@ -413,7 +412,14 @@ def plugin_make_web_map(vfs, wdir):
                 bookmarks.append(obj)
 
     # LOAD from global/collection.collectionc
-    vnode = vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
+    vnodes = vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc']
+    for i in range(len(vnodes)):
+        vnode = vnodes[i]
+        with vfs.file_obj_from(vnode, 'rb') as f:
+            buffer = f.read(vnode.size_u)
+            with open('d{}.dat'.format(i), 'wb') as fo:
+                fo.write(buffer)
+    vnode = vnodes[1]
     with vfs.file_obj_from(vnode, 'rb') as f:
         buffer = f.read(vnode.size_u)
         adf = load_adf(buffer)
@@ -461,20 +467,14 @@ def plugin_make_web_map(vfs, wdir):
 
 
 def main():
-    prefix_in = '/home/krys/prj/gz/archives_win64/'
-    working_dir = './work/gz/'
-    ver = 3
-    debug = False
+    game_dir = '/home/krys/prj/as_games/GenerationZero_BETA/'
+    game_id = 'gzb'
+    working_dir = './work/gzb/'
+    archive_paths = []
+    for cat in ['initial', 'supplemental', 'optional']:
+        archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
 
-    cache_file = working_dir + 'vfs_cache.pickle'
-    if os.path.isfile(cache_file):
-        with open(cache_file, 'rb') as f:
-            vfs = pickle.load(f)
-    else:
-        vfs = VfsStructure(working_dir)
-        vfs.load_from_archives(prefix_in, debug=debug)
-        with open(cache_file, 'wb') as f:
-            pickle.dump(vfs, f, protocol=pickle.HIGHEST_PROTOCOL)
+    vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)
 
     plugin_make_web_map(vfs, working_dir)
 

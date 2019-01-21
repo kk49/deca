@@ -1,17 +1,15 @@
 import sys
-import io
 import os
 from deca.file import ArchiveFile
-from deca.util import dump_block
 from deca.ff_adf import load_adf
 
 
 if len(sys.argv) < 2:
-    in_file = '/home/krys/prj/deca/work/gz/exported/models/manmade/props/interior/civilian_01_answering_machine.hrmeshc'
-    in_file = '/home/krys/prj/deca/work/gz/exported/models/manmade/props/interior/civilian_01_answering_machine.modelc'
-    in_file = '/home/krys/prj/deca/work/gz/exported/graphs/check_region_difficulty.graphc'
-    in_file = '/home/krys/prj/deca/work/gz/exported/graphs/check_region_difficulty.graphc'
-    in_file = '/home/krys/prj/deca/work/gz/extracted/gdc/global.gdcc'
+    in_file = '/home/krys/prj/deca/work/gzb/extracted/models/manmade/props/interior/civilian_01_answering_machine.hrmeshc'
+    in_file = '/home/krys/prj/deca/work/gzb/extracted/models/manmade/props/interior/civilian_01_answering_machine.modelc'
+    in_file = '/home/krys/prj/deca/work/gzb/extracted/graphs/check_region_difficulty.graphc'
+    in_file = '/home/krys/prj/deca/work/gzb/extracted/graphs/check_region_difficulty.graphc'
+    in_file = '/home/krys/prj/deca/work/gzb/extracted/gdc/global.gdcc'
 else:
     in_file = sys.argv[1]
 

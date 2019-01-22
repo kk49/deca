@@ -1,6 +1,7 @@
 from deca_gui_viewer import *
+from deca.ff_types import FTYPE_ADF_BARE, FTYPE_ADF
 from deca.file import ArchiveFile
-from deca.ff_adf import load_adf
+from deca.ff_adf import load_adf, load_adf_bare
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
@@ -23,10 +24,15 @@ class DataViewerAdf(DataViewer):
     def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
         with ArchiveFile(vfs.file_obj_from(vnode)) as f:
             buffer = f.read(vnode.size_u)
-        obj = load_adf(buffer)
+
         sbuf = ''
-        if obj is not None:
-            sbuf = obj.dump_to_string()
+        if vnode.ftype == FTYPE_ADF_BARE:
+            obj = load_adf_bare(buffer, vnode.adf_type)
+            sbuf = 'ADF_BARE: TODO!!!!!!!!!!! {:08x}'.format(vnode.adf_type)
+        else:
+            obj = load_adf(buffer)
+            if obj is not None:
+                sbuf = obj.dump_to_string()
         self.text_box.setText(sbuf)
 
 

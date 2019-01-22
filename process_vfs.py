@@ -42,7 +42,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.remap_pid = None
         self.remap_type = None
         self.remap_hash = None
-        self.column_ids = ["Index", "PIDX", "Type", "Hash", "Size_U", "Size_C", "Path"]
+        self.column_ids = ["Index", "PIDX", "Type", "Hash", "SARC_Type", "ADF_type", "Size_U", "Size_C", "Path"]
 
     def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
         # if self.remap_uid is None:
@@ -84,7 +84,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         return len(self.table)
 
     def columnCount(self, parent=QModelIndex()):
-        return 7
+        return 9
 
     def headerData(self, section, orientation, role):
         if role != Qt.DisplayRole:
@@ -118,10 +118,20 @@ class VfsNodeTableModel(QAbstractTableModel):
                     else:
                         return '{:08X}'.format(node.vhash)
                 elif column == 4:
-                    return '{}'.format(node.size_u)
+                    if node.sarc_type is None:
+                        return ''
+                    else:
+                        return '{:08X}'.format(node.sarc_type)
                 elif column == 5:
-                    return '{}'.format(node.size_c)
+                    if node.adf_type is None:
+                        return ''
+                    else:
+                        return '{:08X}'.format(node.adf_type)
                 elif column == 6:
+                    return '{}'.format(node.size_u)
+                elif column == 7:
+                    return '{}'.format(node.size_c)
+                elif column == 8:
                     if node.vpath is not None:
                         return 'V: {}'.format(node.vpath.decode('utf-8'))
                     elif node.pvpath is not None:
@@ -132,11 +142,15 @@ class VfsNodeTableModel(QAbstractTableModel):
         elif role == Qt.BackgroundRole:
             node = self.table[row]
             if node.is_valid():
-                if column == 6 and node.used_at_runtime_depth is not None:
-                    return used_color_calc(node.used_at_runtime_depth)
+                if column == 8:
+                    if node.used_at_runtime_depth is not None:
+                        return used_color_calc(node.used_at_runtime_depth)
+                elif column == 5:
+                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.external_adf_types:
+                        return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:
-            if column == 6:
+            if column == 8:
                 return Qt.AlignLeft
             else:
                 return Qt.AlignRight
@@ -294,11 +308,11 @@ class VfsDirModel(QAbstractItemModel):
         return node.child_count()
 
     def columnCount(self, parent):
-        return 7
+        return 9
 
     def headerData(self, section, orientation, role):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ("Path", "Index", "Type", "Hash", "Size_U", "Size_C", "Used_Depth")[section]
+            return ("Path", "Index", "Type", "Hash", "SARC_Type", "ADF_Type", "Size_U", "Size_C", "Used_Depth")[section]
         else:
             return None
 
@@ -322,16 +336,30 @@ class VfsDirModel(QAbstractItemModel):
                     else:
                         return '{:08X}'.format(vnode.vhash)
                 elif column == 4:
-                    return '{}'.format(vnode.size_u)
+                    if vnode.sarc_type is None:
+                        return ''
+                    else:
+                        return '{:08x}'.format(vnode.sarc_type)
                 elif column == 5:
-                    return '{}'.format(vnode.size_c)
+                    if vnode.adf_type is None:
+                        return ''
+                    else:
+                        return '{:08x}'.format(vnode.adf_type)
                 elif column == 6:
+                    return '{}'.format(vnode.size_u)
+                elif column == 7:
+                    return '{}'.format(vnode.size_c)
+                elif column == 8:
                     return '{}'.format(vnode.used_at_runtime_depth)
         elif role == Qt.BackgroundColorRole:
             if isinstance(node, VfsDirLeaf):
                 vnode : VfsNode = node.vnodes[0]
-                if column == 6 and vnode.used_at_runtime_depth is not None:
-                    return used_color_calc(vnode.used_at_runtime_depth)
+                if column == 8:
+                    if vnode.used_at_runtime_depth is not None:
+                        return used_color_calc(vnode.used_at_runtime_depth)
+                elif column == 5:
+                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.external_adf_types:
+                        return QColor(Qt.red)
         return None
 
 
@@ -443,7 +471,7 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
             self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_image_index)
-        elif vnode.ftype == FTYPE_ADF:
+        elif vnode.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
             self.tab_adf.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
             self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
@@ -671,22 +699,56 @@ def main():
     # options.add_argument("-f", "--file", type=str, required=True)
     # args = options.parse_args()
 
-    vfs_global = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)
+    vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)
 
     # Qt Application
     app = QApplication(sys.argv)
 
-    widget = MainWidget(vfs_global)
+    widget = MainWidget(vfs)
 
-    window = MainWindow(vfs_global, widget, 'hash_map_missing: {}'.format(len(vfs_global.hash_map_missing)))
+    window = MainWindow(vfs, widget, 'hash_map_missing: {}'.format(len(vfs.hash_map_missing)))
 
     window.show()
 
-    sys.exit(app.exec_())
+    app.exec_()
+
+    return vfs
 
 
 if __name__ == "__main__":
-    main()
+    vfs = main()
 
-
-
+    # needed = {
+    #     0x0b73315d,
+    #     0x536cdf14,
+    #     0x5618735f,
+    #     0x5b222c55,
+    #     0x5db297db,
+    #     0x6e9b42c0,
+    #     0x7c962fa6,
+    #     0x82d0bea7,
+    #     0x904f4b40,
+    #     0x90a5413e,
+    #     0x9ebbfbef,
+    #     0xa28fbf46,
+    #     0xba23d341,
+    #     0xbc425335,
+    #     0xc402ec5d,
+    #     0xc60e6202,
+    #     0xd0f19cd8,
+    #     0xeb42f07d,
+    #     0xfb2226c6,
+    # }
+    #
+    # os.makedirs('./resource/adf/', exist_ok=True)
+    # for adft in needed:
+    #     uids = vfs.map_adftype_usage.get(adft, set())
+    #     for uid in uids:
+    #         vnode = vfs.table_vfsnode[uid]
+    #         with vfs.file_obj_from(vnode) as fi:
+    #             buf = fi.read(vnode.size_u)
+    #         fn = './resources/adf/{:08X}.full.adf'.format(adft)
+    #         if not os.path.isfile(fn):
+    #             with open(fn, 'wb') as fo:
+    #                 fo.write(buf)
+    #         break

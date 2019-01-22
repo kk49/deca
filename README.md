@@ -13,8 +13,8 @@ Written in Python, tested only on Linux, code is a mess, because this is an expe
 |TAB/ARC| 99% | 99% | double check code to see if something is not understood |
 |AAF| 99% | 99% | double check code to see if something is not understood |
 |SARC| 99% | 99% | double check code to see if something is not understood |
-|AVTX/ATX/DDSC| 99% | 99% | double check code to see if something is not understood |
-|ADF| 95% | 10% | Handling GameDataCollection (0x178842fe) |
+|AVTX, ATX, DDSC, HMDDSC| 99% | 99% | double check code to see if something is not understood |
+|ADF| 90% | 10% | Partial Handling of GameDataCollection (0x178842fe) |
 | |  |  | Missing MDIC (0xb5b062f1) |
 | |  |  | Missing code for types that do not seem to exist in GZB |
 | |  |  | stringlookup not fully grokked |

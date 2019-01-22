@@ -8,6 +8,7 @@ FTYPE_AVTX = 'avtx'
 FTYPE_ATX = 'atx'
 FTYPE_HMDDSC = 'hmddsc'
 FTYPE_ADF = 'adf'
+FTYPE_ADF_BARE = 'adfb'  # these are the adf files inside of the gdcc adf, type information is in the entry
 FTYPE_TXT = 'txt'
 FTYPE_OBC = 'obc'
 FTYPE_RTPC = 'rtpc'

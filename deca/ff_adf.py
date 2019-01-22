@@ -21,17 +21,30 @@ class AdfTypeMissing(Exception):
 
 
 class GdcArchiveEntry:
-    def __init__(self, index, offset, size, vpath_hash, filetype_hash, vpath):
+    def __init__(self, index, offset, size, vpath_hash, filetype_hash, adf_type_hash, vpath):
         self.index = index
         self.offset = offset
         self.size = size
         self.vpath = vpath
         self.vpath_hash = vpath_hash
         self.filetype_hash = filetype_hash
+        self.adf_type_hash = adf_type_hash
 
     def __repr__(self):
-        return 'i:{:4d} o:{:9d} s:{:9d} h:{:08X} ft:{:08x} vp:{}'.format(
-            self.index, self.offset, self.size, self.vpath_hash, self.filetype_hash, self.vpath.decode('utf-8'))
+        str_vhash = ''
+        if self.vpath_hash is not None:
+            str_vhash = ' h:{:08X}'.format(self.vpath_hash)
+
+        str_fthash = ''
+        if self.filetype_hash is not None:
+            str_fthash = ' ft:{:08x}'.format(self.filetype_hash)
+
+        str_adfhash = ''
+        if self.adf_type_hash is not None:
+            str_adfhash = ' adf:{:08x}'.format(self.adf_type_hash)
+
+        return 'i:{:4d} o:{:9d} s:{:9d}{}{}{} vp:{}'.format(
+            self.index, self.offset, self.size, str_vhash, str_fthash, str_adfhash, self.vpath.decode('utf-8'))
 
 
 class StringHash:
@@ -383,27 +396,43 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 dir_list.append(entry)
 
             dir_contents = []
+            idx = 0
             for e1 in dir_list:
-                gdf.seek(e1[0])
                 # TODO something weird is going on with this second header, sometimes it makes sense, sometimes it may
                 # have floats? or indicate that is should be 24 byte long?
-                e2 = gdf.read_u32(4)
-                # gdf.seek(e2[0])
-                # fd = gdf.read(e2[2])
-                gdf.seek(e1[0] + 16)
-                fd = gdf.read(e1[1] - e1[0] - 16)
-                gdf.seek(e1[1])
-                e3 = gdf.read_strz()
+                string_offset = e1[1]
+                ftype_hash = e1[2]
 
-                dir_contents.append([e1, e2, e3, fd])
+                gdf.seek(string_offset)
+                vpath = gdf.read_strz()
+                vhash = hash_little(vpath)
 
-        v = []
-        for i in range(len(dir_contents)):
-            entry = dir_contents[i]
-            vpath = entry[2]
-            vpath_hash = hash_little(vpath)
-            v.append(GdcArchiveEntry(
-                i, entry[0][0] + 16 + abs_offset, entry[0][1] - entry[0][0] - 16, vpath_hash, entry[0][2], vpath))
+                gdf.seek(e1[0])
+
+                if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
+                    header2 = gdf.read_u32(4)
+                    actual_offset = header2[0]
+                    actual_size = header2[2]
+                    adf_type_hash = None
+                else:  #TODO current guess it that it is a bare ADF instance
+                    header2 = gdf.read_u32(8)
+                    actual_offset = e1[0]
+                    actual_size = string_offset - actual_offset
+                    adf_type_hash = ftype_hash
+
+                gdf.seek(actual_offset)
+                buf = gdf.read(actual_size)
+                entry = GdcArchiveEntry(
+                    index=idx,
+                    offset=actual_offset + abs_offset,
+                    size=actual_size,
+                    vpath_hash=vhash,
+                    filetype_hash=ftype_hash,
+                    adf_type_hash=adf_type_hash,
+                    vpath=vpath)
+                dir_contents.append(entry)
+                idx += 1
+            v = dir_contents
 
     elif type_id == 0xb5b062f1:  # MDIC
         v = []
@@ -555,6 +584,8 @@ class Adf:
         self.nametable_offset = None
         self.total_size = None
 
+        self.unknown = None
+
         self.comment = ''
         self.table_name = []
         self.table_stringhash = []
@@ -580,25 +611,27 @@ class Adf:
         sbuf = sbuf + '{}: {}\n'.format('nametable_count', self.nametable_count)
         sbuf = sbuf + '{}: {}\n'.format('nametable_offset', self.nametable_offset)
         sbuf = sbuf + '{}: {}\n'.format('total_size', self.total_size)
+        for i in range(len(self.unknown)):
+            sbuf = sbuf + 'Unknown[{0}]: {1} 0x{1:08x}\n'.format(i, self.unknown[i])
 
         sbuf = sbuf + '\n--------comment\n'
         sbuf = sbuf + self.comment.decode('utf-8')
 
-        # sbuf = sbuf + '\n\n--------name_table\n'
-        # # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
-        # for i in range(len(self.table_name)):
-        #     sbuf = sbuf + 'name_table\t{}\t{}\n'.format(i, self.table_name[i][1].decode('utf-8'))
-        #
-        # sbuf = sbuf + '\n--------string_hash\n'
-        # # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
-        # for v in self.map_stringhash.items():
-        #     sbuf = sbuf + 'string_hash\t{:08x}\t{}\n'.format(v[0], v[1].value)
-        #
-        # sbuf = sbuf + '\n--------typedefs\n'
-        # # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
-        # for v in self.map_typedef.items():
-        #     sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
-        #     sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
+        sbuf = sbuf + '\n\n--------name_table\n'
+        # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        for i in range(len(self.table_name)):
+            sbuf = sbuf + 'name_table\t{}\t{}\n'.format(i, self.table_name[i][1].decode('utf-8'))
+
+        sbuf = sbuf + '\n--------string_hash\n'
+        # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        for v in self.map_stringhash.items():
+            sbuf = sbuf + 'string_hash\t{:08x}\t{}\n'.format(v[0], v[1].value)
+
+        sbuf = sbuf + '\n--------typedefs\n'
+        # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
+        for v in self.map_typedef.items():
+            sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
+            sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
 
         sbuf = sbuf + '\n--------instances\n'
         for info, v in zip(self.table_instance, self.table_instance_values):
@@ -640,12 +673,8 @@ class Adf:
         self.nametable_offset = fh.read_u32()
 
         self.total_size = fh.read_u32()
-        fh.read_u32()
 
-        fh.read_u32()
-        fh.read_u32()
-        fh.read_u32()
-        fh.read_u32()
+        self.unknown = fh.read_u32(5)
 
         self.comment = fp.read_strz()
 
@@ -707,3 +736,7 @@ def load_adf(buffer):
             return obj
         except DecaErrorParse:
             return None
+
+
+def load_adf_bare(buffer, adf_type):
+    return None

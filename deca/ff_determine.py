@@ -66,7 +66,7 @@ def determine_file_type_and_size(f, file_size):
     elif b'TAG0' == magic[4:8]:
         ftype = FTYPE_TAG0
     elif b'FSB5' == magic[16:20]:
-        ftype = 'lFSB5'
+        ftype = FTYPE_LFSB5
     elif b'\x57\xE0\xE0\x57\x10\xC0\xC0\x10' == magic[0:8]:
         ftype = FTYPE_H2014
     elif b'MDI\x00' == magic[0:4]:

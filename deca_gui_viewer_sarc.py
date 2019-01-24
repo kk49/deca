@@ -8,6 +8,7 @@ class DataViewerSarc(DataViewer):
         DataViewer.__init__(self)
 
         self.text_box = QTextEdit()
+        self.text_box.setReadOnly(True)
         font = QFont("Courier", 8)
         self.text_box.setFont(font)
         self.text_box.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)

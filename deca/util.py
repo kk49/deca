@@ -7,12 +7,14 @@ class Logger:
         self.working_dir = working_dir
 
     def log_base(self, level, s):
+        msg = '{}: {}'.format(datetime.datetime.now(), s)
         if self.working_dir is not None:
             with open(self.working_dir + 'log.txt', 'a') as f:
-                msg = '{}: {}'.format(datetime.datetime.now(), s)
                 f.write(msg + '\n')
                 if level <= 0:
                     print(msg)
+
+        return msg
 
     def log(self, s):
         self.log_base(0, s)

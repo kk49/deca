@@ -3,11 +3,13 @@ from deca.file import ArchiveFile
 from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
+
 class DataViewerRaw(DataViewer):
     def __init__(self):
         DataViewer.__init__(self)
 
         self.text_box = QTextEdit()
+        self.text_box.setReadOnly(True)
         font = QFont("Courier", 8)
         self.text_box.setFont(font)
         self.text_box.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)

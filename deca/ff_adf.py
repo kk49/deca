@@ -360,6 +360,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
             f.seek(opos)
     elif type_id == 0x178842fe:  # gdc/global.gdcc
+        # TODO this should probably be it's own file type and the adf should be considered a wrapper
         v = []
         while True:
             t = f.read_u8()
@@ -383,7 +384,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 d04_unk = gdf.read_u32()
                 d08_filetype_hash = gdf.read_u32()
                 d12_unk = gdf.read_u32()
-                d16_data_len = gdf.read_u32()
+                d16_vpath_offset = gdf.read_u32()
                 d20_unk = gdf.read_u32()
                 d24_unk = gdf.read_u32()
                 d28_unk = gdf.read_u32()
@@ -392,7 +393,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 assert(d20_unk == 16)
                 assert(d24_unk == 0)
                 assert(d28_unk == 0)
-                entry = [d00_offset, d16_data_len, d08_filetype_hash, d04_unk, d12_unk, d20_unk, d24_unk, d28_unk]
+                entry = [d00_offset, d16_vpath_offset, d08_filetype_hash, d04_unk, d12_unk, d20_unk, d24_unk, d28_unk]
                 dir_list.append(entry)
 
             dir_contents = []
@@ -410,6 +411,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 gdf.seek(e1[0])
 
                 if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
+                    # TODO this follows the data structure for an array of some type, 0xD74CC4CB is probably it's hash
                     header2 = gdf.read_u32(4)
                     actual_offset = header2[0]
                     actual_size = header2[2]
@@ -435,6 +437,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             v = dir_contents
 
     elif type_id == 0xb5b062f1:  # MDIC
+        # TODO this should probably be it's own file type and the adf should be considered a wrapper
         v = []
         while True:
             t = f.read_u8()

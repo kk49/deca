@@ -3,16 +3,16 @@ import os
 import argparse
 import pickle
 from deca.errors import *
-from deca.ff_vfs import vfs_structure_prep, VfsStructure, VfsNode
+from deca.ff_vfs import vfs_structure_prep, vfs_structure_open, VfsStructure, VfsNode
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger
 import PySide2
 from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel
-from PySide2.QtGui import QColor
+from PySide2.QtGui import QColor, QFont
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QTextEdit, QPushButton, QMessageBox
+    QTabWidget, QTreeView, QTextEdit, QPushButton, QMessageBox, QFileDialog
 from PySide2.QtWebEngineWidgets import QWebEngineView
 from deca_gui_viewer_adf import DataViewerAdf
 from deca_gui_viewer_rtpc import DataViewerRtpc
@@ -28,14 +28,11 @@ def used_color_calc(level):
 
 
 class VfsNodeTableModel(QAbstractTableModel):
-    def __init__(self, vfs, show_mapped=True):
+    def __init__(self, show_mapped=True):
         QAbstractTableModel.__init__(self)
-        self.vfs = vfs
+        self.vfs = None
         self.show_mapped = show_mapped
-        self.table = self.vfs.table_vfsnode
-
-        if not show_mapped:
-            self.table = [v for v in self.table if v.vpath is None and v.pvpath is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
+        self.table = None
 
         self.remap = None
         self.remap_uid = None
@@ -43,6 +40,14 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.remap_type = None
         self.remap_hash = None
         self.column_ids = ["Index", "PIDX", "Type", "Hash", "SARC_Type", "ADF_type", "Size_U", "Size_C", "Path"]
+
+    def vfs_set(self, vfs):
+        self.beginResetModel()
+        self.vfs = vfs
+        self.table = self.vfs.table_vfsnode
+        if not self.show_mapped:
+            self.table = [v for v in self.table if v.vpath is None and v.pvpath is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
+        self.endResetModel()
 
     def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
         # if self.remap_uid is None:
@@ -81,7 +86,10 @@ class VfsNodeTableModel(QAbstractTableModel):
         pass
 
     def rowCount(self, parent=QModelIndex()):
-        return len(self.table)
+        if self.table is None:
+            return 0
+        else:
+            return len(self.table)
 
     def columnCount(self, parent=QModelIndex()):
         return 9
@@ -146,7 +154,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                     if node.used_at_runtime_depth is not None:
                         return used_color_calc(node.used_at_runtime_depth)
                 elif column == 5:
-                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.external_adf_types:
+                    if node.adf_type is not None and node.adf_type not in self.vfs.external_adf_types:
                         return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:
@@ -159,14 +167,14 @@ class VfsNodeTableModel(QAbstractTableModel):
 
 
 class VfsNodeTableWidget(QWidget):
-    def __init__(self, vfs, show_mapped):
+    def __init__(self, show_mapped):
         QWidget.__init__(self)
 
         self.vnode_1click_selected = None
         self.vnode_2click_selected = None
 
         # Getting the Model
-        self.model = VfsNodeTableModel(vfs, show_mapped=show_mapped)
+        self.model = VfsNodeTableModel(show_mapped=show_mapped)
 
         # Creating a QTableView
         self.table_view = QTableView()
@@ -195,6 +203,9 @@ class VfsNodeTableWidget(QWidget):
 
         # Set the layout to the QWidget
         self.setLayout(self.main_layout)
+
+    def vfs_set(self, vfs):
+        self.model.vfs_set(vfs)
 
     def double_clicked(self, index):
         if index.isValid():
@@ -251,16 +262,16 @@ class VfsDirBranch(object):
 
 
 class VfsDirModel(QAbstractItemModel):
-    def __init__(self, vfs=None):
+    def __init__(self):
         QAbstractItemModel.__init__(self)
-        self.vfs = vfs
+        self.vfs = None
         self.root_node = None
         self.n_rows = 0
         self.n_cols = 0
-        self.items_build()
 
-    def items_build(self):
+    def vfs_set(self, vfs):
         self.beginResetModel()
+        self.vfs = vfs
         self.root_node = None
         self.root_node = VfsDirBranch(b'/')
 
@@ -289,7 +300,7 @@ class VfsDirModel(QAbstractItemModel):
             return QModelIndex()
 
         node = index.internalPointer()
-        if node.parent is None:
+        if node is None or node.parent is None:
             return QModelIndex()
         else:
             return self.createIndex(node.parent.row, 0, node.parent)
@@ -304,7 +315,11 @@ class VfsDirModel(QAbstractItemModel):
     def rowCount(self, parent):
         if not parent.isValid():
             return 1
+
         node = parent.internalPointer()
+        if node is None:
+            return 0
+
         return node.child_count()
 
     def columnCount(self, parent):
@@ -320,6 +335,8 @@ class VfsDirModel(QAbstractItemModel):
         if not index.isValid():
             return None
         node = index.internalPointer()
+        if node is None:
+            return None
         column = index.column()
         if role == Qt.DisplayRole:
             if column == 0:
@@ -364,14 +381,14 @@ class VfsDirModel(QAbstractItemModel):
 
 
 class VfsDirWidget(QWidget):
-    def __init__(self, vfs):
+    def __init__(self):
         QWidget.__init__(self)
 
         self.vnode_1click_selected = None
         self.vnode_2click_selected = None
 
         # Getting the Model
-        self.model = VfsDirModel(vfs)
+        self.model = VfsDirModel()
 
         # Creating a QTableView
         self.view = QTreeView()
@@ -397,6 +414,9 @@ class VfsDirWidget(QWidget):
         self.main_layout.addWidget(self.view)
         self.setLayout(self.main_layout)
 
+    def vfs_set(self, vfs):
+        self.model.vfs_set(vfs)
+
     def clicked(self, index):
         if index.isValid():
             tnode = index.internalPointer()
@@ -411,9 +431,9 @@ class VfsDirWidget(QWidget):
 
 
 class DataViewWidget(QWidget):
-    def __init__(self, vfs):
+    def __init__(self):
         QWidget.__init__(self)
-        self.vfs = vfs
+        self.vfs = None
 
         self.tab_raw = DataViewerRaw()
         self.tab_text = DataViewerText()
@@ -437,6 +457,9 @@ class DataViewWidget(QWidget):
         self.main_layout = QVBoxLayout()
         self.main_layout.addWidget(self.tab_widget)
         self.setLayout(self.main_layout)
+
+    def vfs_set(self, vfs):
+        self.vfs = vfs
 
     def vnode_1click_selected(self, vpath: str):
         print('DataViewWidget:vnode_1click_selected: {}'.format(vpath))
@@ -463,7 +486,7 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_adf_index, False)
             self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_sarc_index)
-        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_DDS, FTYPE_BMP}:
+        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC, FTYPE_DDS, FTYPE_BMP}:
             self.tab_image.vnode_process(self.vfs, vnode)
             self.tab_widget.setTabEnabled(self.tab_text_index, False)
             self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
@@ -497,15 +520,23 @@ class DataViewWidget(QWidget):
 
 
 class MainWidget(QWidget):
-    def __init__(self, vfs):
+    def __init__(self):
         QWidget.__init__(self)
-        self.vfs = vfs
+        self.vfs = None
         self.builder = Builder()
         self.current_vnode = None
         self.current_vpath = None
 
+        self.log_widget = QTextEdit()
+        self.log_widget.setReadOnly(True)
+        font = QFont("Courier", 8)
+        self.log_widget.setFont(font)
+        self.log_widget.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.log_widget.setSizePolicy(size)
+
         # Create VFS Node table
-        self.vfs_node_widget = VfsNodeTableWidget(self.vfs, show_mapped=True)
+        self.vfs_node_widget = VfsNodeTableWidget(show_mapped=True)
         self.vfs_node_widget.vnode_1click_selected = self.vnode_1click_selected
         self.vfs_node_widget.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -513,7 +544,7 @@ class MainWidget(QWidget):
         # self.vfs_node_widget.setSizePolicy(size)
 
         # Create VFS Node table
-        self.vfs_node_widget_non_mapped = VfsNodeTableWidget(self.vfs, show_mapped=False)
+        self.vfs_node_widget_non_mapped = VfsNodeTableWidget(show_mapped=False)
         self.vfs_node_widget_non_mapped.vnode_1click_selected = self.vnode_1click_selected
         self.vfs_node_widget_non_mapped.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -521,7 +552,7 @@ class MainWidget(QWidget):
         # self.vfs_node_widget_non_mapped.setSizePolicy(size)
 
         # Create VFS dir table
-        self.vfs_dir_widget = VfsDirWidget(self.vfs)
+        self.vfs_dir_widget = VfsDirWidget()
         self.vfs_dir_widget.vnode_1click_selected = self.vnode_1click_selected
         self.vfs_dir_widget.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -534,6 +565,7 @@ class MainWidget(QWidget):
         # self.web_map_widget.show()
 
         self.nav_widget = QTabWidget()
+        self.nav_widget.addTab(self.log_widget, 'Log')
         self.nav_widget.addTab(self.vfs_dir_widget, 'Directory')
         self.nav_widget.addTab(self.vfs_node_widget_non_mapped, 'Non-Mapped List')
         self.nav_widget.addTab(self.vfs_node_widget, 'Raw List')
@@ -572,7 +604,7 @@ class MainWidget(QWidget):
         self.nav_layout.addWidget(self.bt_mod_build)
 
         # Creating Data View
-        self.data_view = DataViewWidget(self.vfs)
+        self.data_view = DataViewWidget()
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # size.setHorizontalStretch(1)
         self.data_view.setSizePolicy(size)
@@ -584,6 +616,13 @@ class MainWidget(QWidget):
         self.main_layout.addWidget(self.data_view)
         self.setLayout(self.main_layout)
         self.updateGeometry()
+
+    def vfs_set(self, vfs):
+        self.vfs = vfs
+        self.vfs_node_widget.vfs_set(self.vfs)
+        self.vfs_node_widget_non_mapped.vfs_set(self.vfs)
+        self.vfs_dir_widget.vfs_set(self.vfs)
+        self.data_view.vfs_set(self.vfs)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -649,70 +688,136 @@ class MainWidget(QWidget):
 
 # ********************
 class MainWindow(QMainWindow):
-    def __init__(self, vfs: VfsStructure, widget, msg):
+    def __init__(self):
         QMainWindow.__init__(self)
-        self.vfs = vfs
-
-        self.setWindowTitle("deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_dir))
+        self.vfs = None
 
         # Menu
         self.menu = self.menuBar()
         self.file_menu = self.menu.addMenu("File")
 
-        # Exit QAction
-        exit_action = QAction("Exit", self)
-        exit_action.setShortcut("Ctrl+Q")
-        exit_action.triggered.connect(self.exit_app)
+        self.project_new_action = QAction("&New Project...")
+        self.project_new_action.triggered.connect(self.project_new)
 
-        self.file_menu.addAction(exit_action)
+        self.project_open_action = QAction("&Open Project...")
+        self.project_open_action.triggered.connect(self.project_open)
+
+        self.exit_action = QAction("E&xit", self)
+        self.exit_action.setShortcut("Ctrl+Q")
+        self.exit_action.triggered.connect(self.exit_app)
+
+        self.file_menu.addAction(self.project_new_action)
+        self.file_menu.addAction(self.project_open_action)
+        self.file_menu.addAction(self.exit_action)
 
         # Status Bar
         self.status = self.statusBar()
-        self.status.showMessage("Data loaded and plotted: {}".format(msg))
 
         # # Window dimensions
         # geometry = app.desktop().availv_pableGeometry(self)
         # self.setFixedSize(geometry.width() * 0.8, geometry.height() * 0.7)
 
-        self.setCentralWidget(widget)
+        self.main_widget = MainWidget()
+
+        class WidgetLogger(Logger):
+            def __init__(self, wdir, log_widget):
+                Logger.__init__(self, wdir)
+                self.log_widget = log_widget
+
+            def log_base(self, level, s):
+                msg = Logger.log_base(self, level, s)
+                if level <= 0:
+                    self.log_widget.append(msg)
+                    self.log_widget.repaint()
+
+        self.logger = WidgetLogger('./', self.main_widget.log_widget)
+
+        self.setCentralWidget(self.main_widget)
+
+    def vfs_set(self, vfs):
+        self.vfs = vfs
+        self.setWindowTitle(
+            "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_dir))
+        self.status.showMessage(
+            "Data loaded and plotted: {}".format('hash_map_missing: {}'.format(len(vfs.hash_map_missing))))
+        self.main_widget.vfs_set(vfs)
+
+    @Slot()
+    def project_new(self, checked):
+        filename = QFileDialog.getOpenFileName(self, 'Create Project ...', './', 'Game EXE (*.exe *.EXE)')
+
+        if filename is not None and len(filename[0]) > 0:
+            exe_name = filename[0]
+            game_dir, exe_name = os.path.split(exe_name)
+            game_dir = os.path.join(game_dir,'')
+
+            if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
+                game_id = 'gzb'
+                working_dir = './work/gzb/'
+                archive_paths = []
+                for cat in ['initial', 'supplemental', 'optional']:
+                    archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
+
+                vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
+                self.vfs_set(vfs)
+
+            elif exe_name.find('theHunterCotW') >= 0:
+                game_id = 'hp'
+                working_dir = './work/hp/'
+                archive_paths = []
+                archive_paths.append(os.path.join(game_dir, 'archives_win64'))
+
+                vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
+                self.vfs_set(vfs)
+
+            elif exe_name.find('JustCause3') >= 0:
+                game_id = 'jc3'
+                working_dir = './work/jc3/'
+                archive_paths = []
+                archive_paths.append(os.path.join(game_dir, 'patch_win64'))
+                archive_paths.append(os.path.join(game_dir, 'archives_win64'))
+                archive_paths.append(os.path.join(game_dir, 'dlc_win64'))
+
+                vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
+                self.vfs_set(vfs)
+
+            else:
+                self.logger.log('Unknown Game {}'.format(filename))
+        else:
+            self.logger.log('Cannot Create {}'.format(filename))
+
+    @Slot()
+    def project_open(self, checked):
+        filename = QFileDialog.getOpenFileName(self, 'Open Project ...', './work', 'Project File (project.json)')
+        if filename is not None and len(filename[0]) > 0:
+            project_file = filename[0]
+            # working_dir = './work/gzb/project.json'
+            # working_dir = './work/hp/project.json'
+            vfs = vfs_structure_open(project_file)  # , logger=self.logger)
+            self.vfs_set(vfs)
+        else:
+            self.logger.log('Cannot Open {}'.format(filename))
 
     @Slot()
     def exit_app(self, checked):
-        sys.exit()
+        self.close()
 
 
 def main():
-    game_dir = '/home/krys/prj/as_games/GenerationZero_BETA/'
-    game_id = 'gzb'
-    working_dir = './work/gzb/'
-    archive_paths = []
-    for cat in ['initial', 'supplemental', 'optional']:
-        archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
-
-    # game_dir = '/home/krys/prj/as_games/theHunterCotW/'
-    # game_id = 'hp'
-    # working_dir = './work/hp/'
-    # archive_paths = []
-    # archive_paths.append(os.path.join(game_dir, 'archives_win64'))
-
     # options = argparse.ArgumentParser()
     # options.add_argument("-f", "--file", type=str, required=True)
     # args = options.parse_args()
 
-    vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)
-
     # Qt Application
     app = QApplication(sys.argv)
 
-    widget = MainWidget(vfs)
-
-    window = MainWindow(vfs, widget, 'hash_map_missing: {}'.format(len(vfs.hash_map_missing)))
+    window = MainWindow()
 
     window.show()
 
     app.exec_()
 
-    return vfs
+    return window.vfs
 
 
 if __name__ == "__main__":

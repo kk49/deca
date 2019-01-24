@@ -4,6 +4,7 @@ import pandas as pd
 import multiprocessing
 import re
 import pickle
+import json
 
 import deca.ff_rtpc
 from deca.errors import DecaFileExists
@@ -638,6 +639,9 @@ class VfsStructure:
                                 fn = world + 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
                                     obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
                                 fns.append(fn)
+                            fn = 'terrain/jc3/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+                                obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
+                            fns.append(fn)
 
                         # self name environc files
                         if adf.table_instance[0].name == b'environ':
@@ -864,9 +868,9 @@ class VfsStructure:
                 '.nl': FTYPE_SARC,
                 '.fl': FTYPE_SARC,
                 '.blo': FTYPE_RTPC,
-                '.nl.mdic': FTYPE_ADF,
-                '.fl.mdic': FTYPE_ADF,
-                '.pfs': FTYPE_TAG0,
+                '.nl.mdic': [FTYPE_ADF, FTYPE_MDI],
+                '.fl.mdic': [FTYPE_ADF, FTYPE_MDI],
+                '.pfs': [FTYPE_TAG0, FTYPE_PFX],
                 '.obc': FTYPE_OBC,
             },
             {
@@ -874,7 +878,7 @@ class VfsStructure:
                 '.hrmeshc': FTYPE_ADF,
                 '.modelc': FTYPE_ADF,
                 '.model_deps': FTYPE_TXT,
-                '.pfxc': FTYPE_TAG0,
+                '.pfxc': [FTYPE_TAG0, FTYPE_PFX],
             },
             {
                 '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
@@ -954,20 +958,36 @@ class VfsStructure:
                 self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
 
 
-def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, debug=False):
+def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, logger=None, debug=False):
     os.makedirs(working_dir, exist_ok=True)
-    logger = Logger(working_dir)
+
+    if logger is None:
+        logger = Logger(working_dir)
+
     cache_file = working_dir + 'vfs_cache.pickle'
     if os.path.isfile(cache_file):
+        logger.log('LOADING: {} : {}'.format(game_dir, working_dir))
         with open(cache_file, 'rb') as f:
             vfs = pickle.load(f)
         vfs.logger_set(logger)
         vfs.dump_status()
+        logger.log('LOADING: COMPLETE')
     else:
+        logger.log('CREATING: {} {}'.format(game_dir, working_dir))
+        settings = {
+            'game_dir': game_dir,
+            'game_id': game_id,
+            'archive_paths': archive_paths,
+        }
+
+        with open(os.path.join(working_dir, 'project.json'), 'w') as f:
+            json.dump(settings, f, indent=2)
+
         vfs = VfsStructure(game_id, working_dir, logger)
         vfs.load_from_archives(game_dir, archive_paths, debug=debug)
         with open(cache_file, 'wb') as f:
             pickle.dump(vfs, f, protocol=pickle.HIGHEST_PROTOCOL)
+        logger.log('CREATING: COMPLETE')
 
     # find external adf types
     vfs.external_adf_types = {}
@@ -984,6 +1004,18 @@ def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, debug=Fals
                 pass
 
     return vfs
+
+
+def vfs_structure_open(project_file, logger=None, debug=False):
+    working_dir = os.path.join(os.path.split(project_file)[0],'')
+    with open(project_file) as f:
+        settings = json.load(f)
+    game_dir = settings['game_dir']
+    game_id = settings['game_id']
+    archive_paths = settings['archive_paths']
+
+    return vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, logger=logger, debug=debug)
+
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .

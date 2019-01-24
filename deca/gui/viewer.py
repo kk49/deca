@@ -1,4 +1,4 @@
-from deca.ff_vfs import VfsNode, VfsStructure
+from ..ff_vfs import VfsNode, VfsStructure
 from PySide2.QtWidgets import QWidget
 
 

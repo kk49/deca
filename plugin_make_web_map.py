@@ -1,4 +1,4 @@
-from deca.ff_vfs import vfs_structure_prep
+from deca.ff_vfs import vfs_structure_open
 from deca.ff_avtx import Ddsc
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.ff_adf import load_adf
@@ -467,16 +467,8 @@ def plugin_make_web_map(vfs, wdir):
 
 
 def main():
-    game_dir = '/home/krys/prj/as_games/GenerationZero_BETA/'
-    game_id = 'gzb'
-    working_dir = './work/gzb/'
-    archive_paths = []
-    for cat in ['initial', 'supplemental', 'optional']:
-        archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
-
-    vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)
-
-    plugin_make_web_map(vfs, working_dir)
+    vfs = vfs_structure_open('./work/gzb/project.json')
+    plugin_make_web_map(vfs, vfs.working_dir)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,12 @@ from deca.ff_vfs import vfs_structure_prep, vfs_structure_open, VfsStructure, Vf
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger
+from deca.gui.viewer_adf import DataViewerAdf
+from deca.gui.viewer_rtpc import DataViewerRtpc
+from deca.gui.viewer_image import DataViewerImage
+from deca.gui.viewer_raw import DataViewerRaw
+from deca.gui.viewer_text import DataViewerText
+from deca.gui.viewer_sarc import DataViewerSarc
 import PySide2
 from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel
 from PySide2.QtGui import QColor, QFont
@@ -14,13 +20,6 @@ from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
     QTabWidget, QTreeView, QTextEdit, QPushButton, QMessageBox, QFileDialog
 from PySide2.QtWebEngineWidgets import QWebEngineView
-from deca_gui_viewer_adf import DataViewerAdf
-from deca_gui_viewer_rtpc import DataViewerRtpc
-from deca_gui_viewer_image import DataViewerImage
-from deca_gui_viewer_raw import DataViewerRaw
-from deca_gui_viewer_text import DataViewerText
-from deca_gui_viewer_sarc import DataViewerSarc
-from deca.ff_avtx import Ddsc
 
 
 def used_color_calc(level):

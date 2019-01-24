@@ -1,6 +1,7 @@
 from deca.ff_vfs import vfs_structure_prep
 import os
 
+
 def main():
     game_dir = '/home/krys/prj/as_games/GenerationZero_BETA/'
     game_id = 'gzb'

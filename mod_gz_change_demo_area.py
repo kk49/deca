@@ -18,7 +18,7 @@ from deca.hash_jenkins import hash_little
 #
 # exit(0)
 
-fn = '/home/krys/prj/deca/work/gz/mod/global/global.blo'
+fn = '/home/krys/prj/deca/work/gzb/mod/global/global.blo'
 with ArchiveFile(open(fn, 'r+b')) as f:
     f.seek(0x00021020)
     mat4 = list(f.read_f32(16))

@@ -1,11 +1,10 @@
-from deca_gui_viewer import *
-from deca.file import ArchiveFile
-from deca.ff_rtpc import Rtpc
-from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
+from .viewer import *
+from ..file import ArchiveFile
+from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
 
-class DataViewerRtpc(DataViewer):
+class DataViewerText(DataViewer):
     def __init__(self):
         DataViewer.__init__(self)
 
@@ -22,10 +21,6 @@ class DataViewerRtpc(DataViewer):
         self.setLayout(self.main_layout)
 
     def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
-        rtpc = Rtpc()
-        with vfs.file_obj_from(vnode) as f:
-            rtpc.deserialize(f)
-        sbuf = rtpc.dump_to_string()
-        self.text_box.setText(sbuf)
-
-
+        with ArchiveFile(vfs.file_obj_from(vnode)) as f:
+            buf = f.read(vnode.size_u)
+            self.text_box.setText(buf.decode('utf-8'))

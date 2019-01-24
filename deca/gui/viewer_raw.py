@@ -1,9 +1,9 @@
-from deca_gui_viewer import *
-from deca.ff_sarc import FileSarc
-from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
+from .viewer import *
+from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
-class DataViewerSarc(DataViewer):
+
+class DataViewerRaw(DataViewer):
     def __init__(self):
         DataViewer.__init__(self)
 
@@ -12,6 +12,7 @@ class DataViewerSarc(DataViewer):
         font = QFont("Courier", 8)
         self.text_box.setFont(font)
         self.text_box.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.text_box.setSizePolicy(size)
 
@@ -19,10 +20,7 @@ class DataViewerSarc(DataViewer):
         self.main_layout.addWidget(self.text_box)
         self.setLayout(self.main_layout)
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
-        sarc_file = FileSarc()
-        sarc_file.deserialize(vfs.file_obj_from(vnode))
-        sbuf = sarc_file.dump_str()
-        self.text_box.setText(sbuf)
-
-
+    # def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+    #     with ArchiveFile(vfs.file_obj_from(vnode)) as f:
+    #         buf = f.read(vnode.size_u)
+    #         self.text_box.setText(buf.decode('utf-8'))

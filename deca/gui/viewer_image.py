@@ -1,9 +1,9 @@
+from .viewer import *
+from ..ff_avtx import Ddsc
 import os
 from PySide2 import QtCore, QtGui, QtWidgets
 from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QComboBox
 from deca.ff_types import *
-from deca_gui_viewer import *
-from deca.ff_avtx import Ddsc
 from deca.file import ArchiveFile
 
 # Initial version from

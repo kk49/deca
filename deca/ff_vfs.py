@@ -1,6 +1,5 @@
 import os
 import io
-import pandas as pd
 import multiprocessing
 import re
 import pickle
@@ -768,12 +767,14 @@ class VfsStructure:
         fn = './resources/{}/all_strings.tsv'.format(self.game_id)
         if os.path.isfile(fn):
             self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/gz/all_strings.tsv')
-            db = pd.read_csv(fn, delimiter='\t')
-            db_str = db['String']
-            db_str = set(db_str)
-            for s in db_str:
+            with open(fn, 'r') as f:
+                exe_strings = f.readlines()
+            exe_strings = [line.split('\t') for line in exe_strings]
+            exe_strings = [line[3].strip() for line in exe_strings if len(line) >= 4]
+            exe_strings = list(set(exe_strings))
+            for s in exe_strings:
                 vpath_map.propose(s, ['EXE', None])
-            self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(db_str)))
+            self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
 
     def find_vpath_procmon(self, vpath_map):
         fn = './resources/{}/strings_procmon.txt'.format(self.game_id)
@@ -988,6 +989,8 @@ def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, logger=Non
         with open(cache_file, 'wb') as f:
             pickle.dump(vfs, f, protocol=pickle.HIGHEST_PROTOCOL)
         logger.log('CREATING: COMPLETE')
+
+    vfs.working_dir = working_dir
 
     # find external adf types
     vfs.external_adf_types = {}

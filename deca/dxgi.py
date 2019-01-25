@@ -3,6 +3,8 @@ import struct
 import io
 import os
 import ctypes
+# import time
+# from deca.process_image_python import process_image_cython
 
 process_image_func = None
 c_process_image_lib = None
@@ -102,29 +104,6 @@ c_process_image_func = None
     DXGI_FORMAT_B8G8R8X8_UNORM = 88,
     DXGI_FORMAT_FORCE_UINT = 0xffffffffUL,
 '''
-
-
-def raw_data_size(pixel_format, nx, ny):
-    format_db = {
-        10: [True, 8],
-        26: [True, 4],
-        28: [True, 4],
-        87: [True, 4],
-        71: [False, 8],
-        74: [False, 16],
-        77: [False, 16],
-        80: [False, 8],
-        83: [False, 16],
-
-    }
-
-    fi = format_db[pixel_format]
-
-    if fi[0]:
-        return fi[1] * nx * ny
-    else:
-        return fi[1] * ((nx + 3) // 4) * ((ny + 3) // 4)
-
 
 def process_image_10(image, f, nx, ny):
     for yi in range(ny):
@@ -450,6 +429,28 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         raise Exception('Unknown DCC format {}'.format(pixel_format))
 
 
+def raw_data_size(pixel_format, nx, ny):
+    format_db = {
+        10: [True, 8],
+        26: [True, 4],
+        28: [True, 4],
+        87: [True, 4],
+        71: [False, 8],
+        74: [False, 16],
+        77: [False, 16],
+        80: [False, 8],
+        83: [False, 16],
+
+    }
+
+    fi = format_db[pixel_format]
+
+    if fi[0]:
+        return fi[1] * nx * ny
+    else:
+        return fi[1] * ((nx + 3) // 4) * ((ny + 3) // 4)
+
+
 def process_image_c(image, raw, nx, ny, pixel_format):
     global c_process_image_func
     ret = c_process_image_func(
@@ -500,5 +501,20 @@ def process_image(*args, **kwargs):
             process_image_func = process_image_c
         else:
             process_image_func = process_image_python
+
     process_image_func(*args, **kwargs)
 
+    # t0 = time.time()
+    # process_image_func(*args, **kwargs)
+    # t1 = time.time()
+    # print('Runtime {}'.format(t1-t0))
+
+    # t0 = time.time()
+    # process_image_python(*args, **kwargs)
+    # t1 = time.time()
+    # print('Runtime {}'.format(t1-t0))
+    #
+    # t0 = time.time()
+    # process_image_cython(*args, **kwargs)
+    # t1 = time.time()
+    # print('Runtime {}'.format(t1-t0))

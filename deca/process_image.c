@@ -1,5 +1,13 @@
+// gcc -fPIC -shared -O3 process_image.c -o process_image.so
+
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef WIN32
+#define DLLEXPORT   __declspec( dllexport )
+#else
+#define DLLEXPORT
 #endif
 
 typedef unsigned char u8;
@@ -7,6 +15,7 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
+DLLEXPORT
 int process_image(
     u8 * dst_image_buf,
     u32 dst_image_sz,
@@ -17,7 +26,6 @@ int process_image(
     u32 pixel_format
     )
 {
-
     switch(pixel_format)
     {
 

@@ -22,11 +22,11 @@
 <div id="mapid"></div>
 
 <script>
-    var crs = L.CRS.Simple
+    var crs = L.CRS.Simple;
     var map = L.map('mapid', {crs: crs}).setView([-128, 128], 3);
 
     function onEachFeature(feature, layer) {
-        var s = ""
+        var s = "";
         if (feature.properties)
         {
             if (feature.properties && feature.properties.type) {
@@ -69,7 +69,7 @@
 
     function onStyle(feature) {
         if (feature.properties && feature.properties.type) {
-            var ft = feature.properties.type
+            var ft = feature.properties.type;
             if(ft == 'CRegion') {
                 return {
                     "color": "#ff0000",

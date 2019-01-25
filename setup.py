@@ -1,13 +1,14 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='deca',
     version='0.1dev',
     description='Tools for ...',
-    packages=['deca', ],
-    # url='http://github.com/storborg/funniest',
+    # packages=['deca', 'deca.cmds', 'deca.gui', ],
+    packages=find_packages(),
+    url='http://github.com/kk49/deca',
+    license='MIT',
     # author='Flying Circus',
     # author_email='flyingcircus@example.com',
-    # license='MIT',
     # zip_safe=False),
 )

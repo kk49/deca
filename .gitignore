@@ -1,5 +1,7 @@
 *.pyc
+deca_gui.pex
 __PYCACHE__/
+deca.egg-info/
 test/
 tools/
 work/

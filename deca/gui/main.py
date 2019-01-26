@@ -743,16 +743,21 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def project_new(self, checked):
-        filename = QFileDialog.getOpenFileName(self, 'Create Project ...', './', 'Game EXE (*.exe *.EXE)')
+        if os.name == 'nt':
+            game_loc = 'C:/Program Files(x86)/Steam/steamapps/common/'
+        else:
+            game_loc = '../'
+
+        filename = QFileDialog.getOpenFileName(self, 'Create Project ...', game_loc, 'Game EXE (*.exe *.EXE)')
 
         if filename is not None and len(filename[0]) > 0:
             exe_name = filename[0]
             game_dir, exe_name = os.path.split(exe_name)
-            game_dir = os.path.join(game_dir,'')
+            game_dir = os.path.join(game_dir, '')
 
             if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
                 game_id = 'gzb'
-                working_dir = './work/gzb/'
+                working_dir = '../work/gzb/'
                 archive_paths = []
                 for cat in ['initial', 'supplemental', 'optional']:
                     archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
@@ -762,7 +767,7 @@ class MainWindow(QMainWindow):
 
             elif exe_name.find('theHunterCotW') >= 0:
                 game_id = 'hp'
-                working_dir = './work/hp/'
+                working_dir = '../work/hp/'
                 archive_paths = []
                 archive_paths.append(os.path.join(game_dir, 'archives_win64'))
 
@@ -771,7 +776,7 @@ class MainWindow(QMainWindow):
 
             elif exe_name.find('JustCause3') >= 0:
                 game_id = 'jc3'
-                working_dir = './work/jc3/'
+                working_dir = '../work/jc3/'
                 archive_paths = []
                 archive_paths.append(os.path.join(game_dir, 'patch_win64'))
                 archive_paths.append(os.path.join(game_dir, 'archives_win64'))
@@ -787,7 +792,7 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def project_open(self, checked):
-        filename = QFileDialog.getOpenFileName(self, 'Open Project ...', './work', 'Project File (project.json)')
+        filename = QFileDialog.getOpenFileName(self, 'Open Project ...', '../work', 'Project File (project.json)')
         if filename is not None and len(filename[0]) > 0:
             project_file = filename[0]
             # working_dir = './work/gzb/project.json'

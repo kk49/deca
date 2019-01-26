@@ -19,7 +19,7 @@ from PySide2.QtGui import QColor, QFont
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
     QTabWidget, QTreeView, QTextEdit, QPushButton, QMessageBox, QFileDialog
-from PySide2.QtWebEngineWidgets import QWebEngineView
+# from PySide2.QtWebEngineWidgets import QWebEngineView
 
 
 def used_color_calc(level):

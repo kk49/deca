@@ -757,15 +757,16 @@ class MainWindow(QMainWindow):
 
             if False:
                 pass
-            elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-                game_id = 'gzb'
-                working_dir = '../work/gzb/'
-                archive_paths = []
-                for cat in ['initial', 'supplemental', 'optional']:
-                    archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
 
-                vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
-                self.vfs_set(vfs)
+            # elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
+            #     game_id = 'gzb'
+            #     working_dir = '../work/gzb/'
+            #     archive_paths = []
+            #     for cat in ['initial', 'supplemental', 'optional']:
+            #         archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
+            #
+            #     vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
+            #     self.vfs_set(vfs)
 
             elif exe_name.find('theHunterCotW') >= 0:
                 game_id = 'hp'

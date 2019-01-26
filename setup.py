@@ -8,6 +8,7 @@ setup(
     packages=find_packages(),
     url='http://github.com/kk49/deca',
     license='MIT',
+    data_files=[('./', ['./deca/process_image.so'])],
     # author='Flying Circus',
     # author_email='flyingcircus@example.com',
     # zip_safe=False),

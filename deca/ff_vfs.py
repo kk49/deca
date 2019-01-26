@@ -766,7 +766,7 @@ class VfsStructure:
     def find_vpath_exe(self, vpath_map):
         fn = './resources/{}/all_strings.tsv'.format(self.game_id)
         if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/gz/all_strings.tsv')
+            self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/{}/all_strings.tsv'.format(self.game_id))
             with open(fn, 'r') as f:
                 exe_strings = f.readlines()
             exe_strings = [line.split('\t') for line in exe_strings]
@@ -779,7 +779,7 @@ class VfsStructure:
     def find_vpath_procmon(self, vpath_map):
         fn = './resources/{}/strings_procmon.txt'.format(self.game_id)
         if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/gz/strings_procmon.txt')
+            self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/{}/strings_procmon.txt'.format(self.game_id))
             with open(fn) as f:
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)
@@ -790,7 +790,7 @@ class VfsStructure:
     def find_vpath_custom(self, vpath_map):
         fn = './resources/{}/strings.txt'.format(self.game_id)
         if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/gz/strings.txt')
+            self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/{}/strings.txt'.format(self.game_id))
             with open(fn) as f:
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)

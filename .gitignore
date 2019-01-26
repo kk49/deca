@@ -7,8 +7,14 @@ tools/
 work/
 venv36/
 .idea/
+dist/
+build/
 resources/gzb/scratch/
 resources/gzb/procmon_csv/
 resources/hp/scratch/
 resources/hp/procmon_csv/
 resources/adf/
+process_image.so
+process_image.dll
+deca/process_image_python.c*
+deca/process_image_python.html

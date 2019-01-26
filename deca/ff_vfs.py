@@ -554,7 +554,7 @@ class VfsStructure:
         procs = []
         for idxs in indexes2:
             self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-            p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs,))
+            p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(self, q, idxs,))
             self.logger.log('Process: {}: Start'.format(p))
             p.start()
             procs.append(p)
@@ -588,6 +588,7 @@ class VfsStructure:
 
         self.logger.log('PROCESS ADFs: Total ADFs: {}, Total Strings: {}'.format(len(adf_done), scount))
 
+    @staticmethod
     def find_vpath_adf_core(self, q, indexs):
         vpath_map = VfsPathMap(self.logger)
         adf_missing_types = {}
@@ -690,7 +691,7 @@ class VfsStructure:
         procs = []
         for idxs in indexes2:
             self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-            p = multiprocessing.Process(target=self.find_vpath_rtpc_core, args=(q, idxs,))
+            p = multiprocessing.Process(target=self.find_vpath_rtpc_core, args=(self, q, idxs,))
             self.logger.log('Process: {}: Start'.format(p))
             p.start()
             procs.append(p)
@@ -710,6 +711,7 @@ class VfsStructure:
 
         self.logger.log('PROCESS RTPCs: Total RTPCs: {}, Total Strings: {}'.format(len(rtpc_done), scount))
 
+    @staticmethod
     def find_vpath_rtpc_core(self, q, indexs):
         vpath_map = VfsPathMap(self.logger)
         for idx in indexs:
@@ -742,6 +744,7 @@ class VfsStructure:
                             if ext == b'.tga':
                                 vpath_map.propose(fn + b'.ddsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
         q.put(vpath_map)
+
 
     def find_vpath_json(self, vpath_map):
         self.logger.log('PROCESS JSONs: look for hashable strings in json files')

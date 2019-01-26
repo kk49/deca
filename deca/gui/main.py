@@ -755,7 +755,9 @@ class MainWindow(QMainWindow):
             game_dir, exe_name = os.path.split(exe_name)
             game_dir = os.path.join(game_dir, '')
 
-            if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
+            if False:
+                pass
+            elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
                 game_id = 'gzb'
                 working_dir = '../work/gzb/'
                 archive_paths = []

@@ -3,6 +3,7 @@ import struct
 import io
 import os
 import ctypes
+import sys
 # import time
 # from deca.process_image_python import process_image_cython
 
@@ -476,10 +477,18 @@ def process_image(*args, **kwargs):
 
     if process_image_func is None:
         c_process_image_lib = None
+        exe_path, exe_name = os.path.split(sys.argv[0])
+        if len(exe_path) == 0:
+            exe_path = '.'
         if os.path.isfile('process_image.dll'):
+            # "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+            # "cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll"
             c_process_image_lib = ctypes.WinDLL('process_image.dll')
+        elif os.path.isfile(os.path.join(exe_path, 'process_image.so')):
+            # gcc -fPIC -shared -O3 deca/process_image.c -o process_image.so
+            c_process_image_lib = ctypes.CDLL(os.path.join(exe_path, 'process_image.so'))
         elif os.path.isfile('process_image.so'):
-            # gcc -fPIC -shared -O3 process_image.c -o process_image.so
+            # gcc -fPIC -shared -O3 deca/process_image.c -o process_image.so
             c_process_image_lib = ctypes.CDLL('process_image.so')
 
         if c_process_image_lib is not None:

@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#ifdef WIN32
+#ifdef _WINDLL
 #define DLLEXPORT   __declspec( dllexport )
 #else
 #define DLLEXPORT

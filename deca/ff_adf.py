@@ -168,7 +168,6 @@ class TypeDef:
         else:
             raise Exception('Unknown Typedef Type {}'.format(self.metatype))
 
-
     # def read(self, type_systems, f):
     #     if self.metatype == 0:  # Primative
     #         pass

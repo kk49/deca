@@ -7,6 +7,7 @@ from deca.ff_vfs import vfs_structure_prep, vfs_structure_open, VfsStructure, Vf
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger
+from deca.game_info import GameInfoGZB, GameInfoTHCOTW, GameInfoJC3
 from deca.gui.viewer_adf import DataViewerAdf
 from deca.gui.viewer_rtpc import DataViewerRtpc
 from deca.gui.viewer_image import DataViewerImage
@@ -19,6 +20,8 @@ from PySide2.QtGui import QColor, QFont
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
     QTabWidget, QTreeView, QTextEdit, QPushButton, QMessageBox, QFileDialog
+
+
 # from PySide2.QtWebEngineWidgets import QWebEngineView
 
 
@@ -45,7 +48,8 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.vfs = vfs
         self.table = self.vfs.table_vfsnode
         if not self.show_mapped:
-            self.table = [v for v in self.table if v.vpath is None and v.pvpath is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
+            self.table = [v for v in self.table if
+                          v.vpath is None and v.pvpath is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
         self.endResetModel()
 
     def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
@@ -181,7 +185,7 @@ class VfsNodeTableWidget(QWidget):
         font = self.table_view.font()
         font.setPointSize(8)
         self.table_view.setFont(font)
-        self.table_view.setSortingEnabled(True)
+        # self.table_view.setSortingEnabled(True)
         self.table_view.setModel(self.model)
 
         # QTableView Headers
@@ -341,7 +345,7 @@ class VfsDirModel(QAbstractItemModel):
             if column == 0:
                 return node.name.decode('utf-8')
             elif isinstance(node, VfsDirLeaf):
-                vnode : VfsNode = node.vnodes[0]
+                vnode: VfsNode = node.vnodes[0]
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
@@ -369,7 +373,7 @@ class VfsDirModel(QAbstractItemModel):
                     return '{}'.format(vnode.used_at_runtime_depth)
         elif role == Qt.BackgroundColorRole:
             if isinstance(node, VfsDirLeaf):
-                vnode : VfsNode = node.vnodes[0]
+                vnode: VfsNode = node.vnodes[0]
                 if column == 8:
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
@@ -419,7 +423,8 @@ class VfsDirWidget(QWidget):
     def clicked(self, index):
         if index.isValid():
             tnode = index.internalPointer()
-            if (isinstance(tnode, VfsDirLeaf) or isinstance(tnode, VfsDirBranch)) and self.vnode_1click_selected is not None:
+            if (isinstance(tnode, VfsDirLeaf) or isinstance(tnode,
+                                                            VfsDirBranch)) and self.vnode_1click_selected is not None:
                 self.vnode_1click_selected(tnode.vpath())
 
     def double_clicked(self, index):
@@ -736,7 +741,7 @@ class MainWindow(QMainWindow):
     def vfs_set(self, vfs):
         self.vfs = vfs
         self.setWindowTitle(
-            "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_dir))
+            "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_info.game_dir))
         self.status.showMessage(
             "Data loaded and plotted: {}".format('hash_map_missing: {}'.format(len(vfs.hash_map_missing))))
         self.main_widget.vfs_set(vfs)
@@ -755,40 +760,23 @@ class MainWindow(QMainWindow):
             game_dir, exe_name = os.path.split(exe_name)
             game_dir = os.path.join(game_dir, '')
 
+            game_info = None
             if False:
                 pass
             elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-                game_id = 'gzb'
-                working_dir = '../work/gzb/'
-                archive_paths = []
-                for cat in ['initial', 'supplemental', 'optional']:
-                    archive_paths.append(os.path.join(game_dir, 'archives_win64', cat))
-
-                vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
-                self.vfs_set(vfs)
-
+                game_info = GameInfoGZB(game_dir)
             elif exe_name.find('theHunterCotW') >= 0:
-                game_id = 'hp'
-                working_dir = '../work/hp/'
-                archive_paths = []
-                archive_paths.append(os.path.join(game_dir, 'archives_win64'))
-
-                vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
-                self.vfs_set(vfs)
-
+                game_info = GameInfoTHCOTW(game_dir)
             elif exe_name.find('JustCause3') >= 0:
-                game_id = 'jc3'
-                working_dir = '../work/jc3/'
-                archive_paths = []
-                archive_paths.append(os.path.join(game_dir, 'patch_win64'))
-                archive_paths.append(os.path.join(game_dir, 'archives_win64'))
-                archive_paths.append(os.path.join(game_dir, 'dlc_win64'))
-
-                vfs = vfs_structure_prep(game_dir, game_id, archive_paths, working_dir)  # , logger=self.logger)
-                self.vfs_set(vfs)
-
+                game_info = GameInfoJC3(game_dir)
             else:
                 self.logger.log('Unknown Game {}'.format(filename))
+
+            if game_info is not None:
+                working_dir = '../work/{}/'.format(game_info.game_id)
+                vfs = vfs_structure_prep(game_info, working_dir)  # , logger=self.logger)
+                self.vfs_set(vfs)
+
         else:
             self.logger.log('Cannot Create {}'.format(filename))
 
@@ -823,43 +811,41 @@ def main():
 
     app.exec_()
 
+    needed = {
+        0x0b73315d,
+        0x536cdf14,
+        0x5618735f,
+        0x5b222c55,
+        0x5db297db,
+        0x6e9b42c0,
+        0x7c962fa6,
+        0x82d0bea7,
+        0x904f4b40,
+        0x90a5413e,
+        0x9ebbfbef,
+        0xa28fbf46,
+        0xba23d341,
+        0xbc425335,
+        0xc402ec5d,
+        0xc60e6202,
+        0xd0f19cd8,
+        0xeb42f07d,
+        0xfb2226c6,
+    }
+
+    vfs = window.vfs
+    prefix = './resources/adf'
+    os.makedirs(prefix, exist_ok=True)
+    for adft in needed:
+        uids = vfs.map_adftype_usage.get(adft, set())
+        for uid in uids:
+            vnode = vfs.table_vfsnode[uid]
+            with vfs.file_obj_from(vnode) as fi:
+                buf = fi.read(vnode.size_u)
+            fn = os.path.join(prefix, '{:08X}.full.adf'.format(adft))
+            if not os.path.isfile(fn):
+                with open(fn, 'wb') as fo:
+                    fo.write(buf)
+            break
+
     return window.vfs
-
-
-if __name__ == "__main__":
-    vfs = main()
-
-    # needed = {
-    #     0x0b73315d,
-    #     0x536cdf14,
-    #     0x5618735f,
-    #     0x5b222c55,
-    #     0x5db297db,
-    #     0x6e9b42c0,
-    #     0x7c962fa6,
-    #     0x82d0bea7,
-    #     0x904f4b40,
-    #     0x90a5413e,
-    #     0x9ebbfbef,
-    #     0xa28fbf46,
-    #     0xba23d341,
-    #     0xbc425335,
-    #     0xc402ec5d,
-    #     0xc60e6202,
-    #     0xd0f19cd8,
-    #     0xeb42f07d,
-    #     0xfb2226c6,
-    # }
-    #
-    # os.makedirs('./resource/adf/', exist_ok=True)
-    # for adft in needed:
-    #     uids = vfs.map_adftype_usage.get(adft, set())
-    #     for uid in uids:
-    #         vnode = vfs.table_vfsnode[uid]
-    #         with vfs.file_obj_from(vnode) as fi:
-    #             buf = fi.read(vnode.size_u)
-    #         fn = './resources/adf/{:08X}.full.adf'.format(adft)
-    #         if not os.path.isfile(fn):
-    #             with open(fn, 'wb') as fo:
-    #                 fo.write(buf)
-    #         break

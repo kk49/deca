@@ -1,8 +1,11 @@
 from .viewer import *
 from ..ff_avtx import Ddsc
 import os
-from PySide2 import QtCore, QtGui, QtWidgets
-from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QComboBox
+from PySide2.QtCore import Qt, QPoint, QRectF, Signal
+from PySide2.QtGui import QImage, QPixmap, QBrush, QColor
+from PySide2.QtWidgets import \
+    QGraphicsView, QSizePolicy, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QGraphicsScene, QGraphicsPixmapItem, \
+    QFrame, QWidget, QToolButton, QLineEdit
 from deca.ff_types import *
 from deca.file import ArchiveFile
 
@@ -10,33 +13,33 @@ from deca.file import ArchiveFile
 # https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview/35514531#35514531
 
 
-class PhotoViewer(QtWidgets.QGraphicsView):
-    photoClicked = QtCore.Signal(QtCore.QPoint)
+class PhotoViewer(QGraphicsView):
+    photoClicked = Signal(QPoint)
 
     def __init__(self, parent):
         super(PhotoViewer, self).__init__(parent)
         self._zoom = 0
         self._empty = True
-        self._scene = QtWidgets.QGraphicsScene(self)
-        self._photo = QtWidgets.QGraphicsPixmapItem()
+        self._scene = QGraphicsScene(self)
+        self._photo = QGraphicsPixmapItem()
         self._scene.addItem(self._photo)
         self.setScene(self._scene)
-        self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(30, 30, 30)))
-        self.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setBackgroundBrush(QBrush(QColor(30, 30, 30)))
+        self.setFrameShape(QFrame.NoFrame)
 
     def hasPhoto(self):
         return not self._empty
 
     def fitInView(self, scale=True):
-        rect = QtCore.QRectF(self._photo.pixmap().rect())
+        rect = QRectF(self._photo.pixmap().rect())
         if not rect.isNull():
             self.setSceneRect(rect)
             if self.hasPhoto():
-                unity = self.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
+                unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
                 self.scale(1 / unity.width(), 1 / unity.height())
                 viewrect = self.viewport().rect()
                 scenerect = self.transform().mapRect(rect)
@@ -49,12 +52,12 @@ class PhotoViewer(QtWidgets.QGraphicsView):
         self._zoom = 0
         if pixmap and not pixmap.isNull():
             self._empty = False
-            self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
             self._photo.setPixmap(pixmap)
         else:
             self._empty = True
-            self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
-            self._photo.setPixmap(QtGui.QPixmap())
+            self.setDragMode(QGraphicsView.NoDrag)
+            self._photo.setPixmap(QPixmap())
         self.fitInView()
 
     def wheelEvent(self, event):
@@ -73,50 +76,53 @@ class PhotoViewer(QtWidgets.QGraphicsView):
                 self._zoom = 0
 
     def toggleDragMode(self):
-        if self.dragMode() == QtWidgets.QGraphicsView.ScrollHandDrag:
-            self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
+        if self.dragMode() == QGraphicsView.ScrollHandDrag:
+            self.setDragMode(QGraphicsView.NoDrag)
         elif not self._photo.pixmap().isNull():
-            self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
 
     def mousePressEvent(self, event):
         if self._photo.isUnderMouse():
-            self.photoClicked.emit(QtCore.QPoint(event.pos()))
+            self.photoClicked.emit(QPoint(event.pos()))
         super(PhotoViewer, self).mousePressEvent(event)
 
 
-class Window(QtWidgets.QWidget):
+class Window(QWidget):
     def __init__(self):
         super(Window, self).__init__()
         self.viewer = PhotoViewer(self)
+
         # 'Load image' button
-        self.btnLoad = QtWidgets.QToolButton(self)
+        self.btnLoad = QToolButton(self)
         self.btnLoad.setText('Load image')
         self.btnLoad.clicked.connect(self.loadImage)
+
         # Button to change from drag/pan to getting pixel info
-        self.btnPixInfo = QtWidgets.QToolButton(self)
+        self.btnPixInfo = QToolButton(self)
         self.btnPixInfo.setText('Enter pixel info mode')
         self.btnPixInfo.clicked.connect(self.pixInfo)
-        self.editPixInfo = QtWidgets.QLineEdit(self)
+        self.editPixInfo = QLineEdit(self)
         self.editPixInfo.setReadOnly(True)
         self.viewer.photoClicked.connect(self.photoClicked)
+
         # Arrange layout
-        VBlayout = QtWidgets.QVBoxLayout(self)
+        VBlayout = QVBoxLayout(self)
         VBlayout.addWidget(self.viewer)
-        HBlayout = QtWidgets.QHBoxLayout()
-        HBlayout.setAlignment(QtCore.Qt.AlignLeft)
+        HBlayout = QHBoxLayout()
+        HBlayout.setAlignment(Qt.AlignLeft)
         HBlayout.addWidget(self.btnLoad)
         HBlayout.addWidget(self.btnPixInfo)
         HBlayout.addWidget(self.editPixInfo)
         VBlayout.addLayout(HBlayout)
 
     def loadImage(self):
-        self.viewer.setPhoto(QtGui.QPixmap('image.jpg'))
+        self.viewer.setPhoto(QPixmap('image.jpg'))
 
     def pixInfo(self):
         self.viewer.toggleDragMode()
 
     def photoClicked(self, pos):
-        if self.viewer.dragMode() == QtWidgets.QGraphicsView.NoDrag:
+        if self.viewer.dragMode() == QGraphicsView.NoDrag:
             self.editPixInfo.setText('%d, %d' % (pos.x(), pos.y()))
 
 
@@ -125,38 +131,65 @@ class DataViewerImage(DataViewer):
         DataViewer.__init__(self)
 
         self.ddsc = None
-
-        self.select_dropdown = QComboBox()
-        self.select_dropdown.setEditable(False)
-        self.select_dropdown.currentIndexChanged.connect(self.select_dropdown_current_index_changed)
-        self.select_dropdown.addItem('A')
-        self.select_dropdown.addItem('B')
-        self.select_dropdown.addItem('C')
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        self.select_dropdown.setSizePolicy(size)
+        self.opaque = False
 
         self.image_display = PhotoViewer(self)
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.image_display.setSizePolicy(size)
 
+        self.select_dropdown = QComboBox()
+        self.select_dropdown.setEditable(False)
+        self.select_dropdown.addItem('A')
+        self.select_dropdown.addItem('B')
+        self.select_dropdown.addItem('C')
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.select_dropdown.setSizePolicy(size)
+        self.select_dropdown.currentIndexChanged.connect(self.select_dropdown_current_index_changed)
+
+        self.bttn_opaque = QPushButton(self)
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.bttn_opaque.setSizePolicy(size)
+        self.bttn_opaque.clicked.connect(self.opaque_clicked)
+
         self.main_layout = QVBoxLayout()
         self.main_layout.addWidget(self.image_display)
         self.main_layout.addWidget(self.select_dropdown)
+        self.main_layout.addWidget(self.bttn_opaque)
         self.setLayout(self.main_layout)
 
-    def select_dropdown_current_index_changed(self, v):
+        self.update_image()
+
+    def update_image(self):
+        if self.opaque:
+            self.bttn_opaque.setText('TURN OPAQUE OFF')
+        else:
+            self.bttn_opaque.setText('TURN OPAQUE ON')
+
+        v = self.select_dropdown.currentIndex()
         if self.ddsc is not None and 0 <= v < len(self.ddsc.mips):
             npimp = self.ddsc.mips[v].data
             if npimp is not None:
+                if self.opaque and npimp.shape[2] == 4:
+                    npimp = npimp.copy()
+                    npimp[:, :, 3] = 0x255
+
                 if npimp.shape[2] == 3:
-                    frmt = QtGui.QImage.Format_RGB888
+                    frmt = QImage.Format_RGB888
                 elif npimp.shape[2] == 4:
-                    frmt = QtGui.QImage.Format_RGBA8888
+                    frmt = QImage.Format_RGBA8888
                 else:
                     raise Exception('Unhandled byte counts for image')
-                qimg = QtGui.QImage(npimp.data, npimp.shape[1], npimp.shape[0], npimp.shape[1] * npimp.shape[2], frmt)
-                pixmap = QtGui.QPixmap.fromImage(qimg)
+
+                qimg = QImage(npimp.data, npimp.shape[1], npimp.shape[0], npimp.shape[1] * npimp.shape[2], frmt)
+                pixmap = QPixmap.fromImage(qimg)
                 self.image_display.setPhoto(pixmap)
+
+    def select_dropdown_current_index_changed(self, v):
+        self.update_image()
+
+    def opaque_clicked(self, checked):
+        self.opaque = not self.opaque
+        self.update_image()
 
     def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
         self.ddsc = None

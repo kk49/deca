@@ -1,4 +1,6 @@
 *.pyc
+*#
+log.txt
 deca_gui.pex
 __PYCACHE__/
 deca.egg-info/

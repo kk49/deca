@@ -8,6 +8,7 @@ import json
 import deca.ff_rtpc
 from deca.errors import DecaFileExists
 from deca.file import ArchiveFile, SubsetFile
+from deca.game_info import GameInfo, game_info_load
 from deca.ff_types import *
 from deca.ff_txt import load_json
 from deca.ff_adf import load_adf, AdfTypeMissing, GdcArchiveEntry
@@ -53,14 +54,14 @@ class VfsPathMap:
 
             self.nodes[k] = v2
 
-    def propose(self, vpath, src, used_at_runtime=False, vnode=None, possible_ftypes=None):
+    def propose(self, vpath, src, used_at_runtime=False, vnode=None, possible_ftypes=FTYPE_ANY_TYPE):
         '''
         Add proposed vpath to map
         :param vpath: string representing vpath
         :param src: currently a vaguely formated list of information about where the vpath came from # TODO
         :param used_at_runtime: bool that indicates if this usage is known to be used by the executable gotten from procmon
         :param vnode: include vnode if the vnode was explicitly labeled, like in a sarc
-        :param possible_ftypes: None, Value, or [Value] of file types that are expect to be connected to vpath
+        :param possible_ftypes: Value, or [Value] of file types that are expect to be connected to vpath
         :return: VpatjInference object
         '''
 
@@ -164,9 +165,8 @@ def game_file_to_sortable_string(v):
 
 
 class VfsStructure:
-    def __init__(self, game_id, working_dir, logger):
-        self.game_id = game_id
-        self.game_dir = None
+    def __init__(self, game_info: GameInfo, working_dir, logger):
+        self.game_info = game_info
 
         self.worlds = ['', 'worlds/base/']
         for widx in range(8):
@@ -270,11 +270,10 @@ class VfsStructure:
 
         return node
 
-    def load_from_archives(self, game_dir, archive_paths, ver=3, debug=False):
-        self.game_dir = game_dir
+    def load_from_archives(self, ver=3, debug=False):  # game_dir, archive_paths,
         self.logger.log('find all tab/arc files')
         input_files = []
-        for fcat in archive_paths:
+        for fcat in self.game_info.archive_path():
             print(fcat)
             if os.path.isdir(fcat):
                 files = os.listdir(fcat)
@@ -426,7 +425,9 @@ class VfsStructure:
                     vnode: VfsNode = vnode
                     if vnode.is_valid():
                         if vnode.vpath is None:
-                            if len(vp.possible_ftypes) == 0 or vnode.ftype in vp.possible_ftypes:
+                            if (len(vp.possible_ftypes) == 0) or (FTYPE_ANY_TYPE in vp.possible_ftypes) or \
+                               (vnode.ftype is None and FTYPE_NO_TYPE in vp.possible_ftypes) or \
+                               (vnode.ftype in vp.possible_ftypes):
                                 self.logger.trace('vpath:add  {} {:08X} {} {} {}'.format(vp.vpath, vp.vhash, len(vp.src), vp.possible_ftypes, vnode.ftype))
                                 vnode.vpath = vp.vpath
                                 found_vpaths.add(vp.vpath)
@@ -774,9 +775,9 @@ class VfsStructure:
         self.logger.log('PROCESS JSONs: Total JSON files {}'.format(len(json_done)))
 
     def find_vpath_exe(self, vpath_map):
-        fn = './resources/{}/all_strings.tsv'.format(self.game_id)
+        fn = './resources/{}/all_strings.tsv'.format(self.game_info.game_id)
         if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/{}/all_strings.tsv'.format(self.game_id))
+            self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/{}/all_strings.tsv'.format(self.game_info.game_id))
             with open(fn, 'r') as f:
                 exe_strings = f.readlines()
             exe_strings = [line.split('\t') for line in exe_strings]
@@ -787,9 +788,9 @@ class VfsStructure:
             self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
 
     def find_vpath_procmon(self, vpath_map):
-        fn = './resources/{}/strings_procmon.txt'.format(self.game_id)
+        fn = './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)
         if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/{}/strings_procmon.txt'.format(self.game_id))
+            self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/{}/strings_procmon.txt'.format(self.game_info.game_id))
             with open(fn) as f:
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)
@@ -798,9 +799,9 @@ class VfsStructure:
             self.logger.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_custom(self, vpath_map):
-        fn = './resources/{}/strings.txt'.format(self.game_id)
+        fn = './resources/{}/strings.txt'.format(self.game_info.game_id)
         if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/{}/strings.txt'.format(self.game_id))
+            self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/{}/strings.txt'.format(self.game_info.game_id))
             with open(fn) as f:
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)
@@ -869,43 +870,7 @@ class VfsStructure:
 
     def find_vpath_by_assoc(self, vpath_map):
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: epe/ee, blo/bl/nl/fl/nl.mdic/fl.mdic, mesh*/model*, avtx/atx?]')
-        pair_exts = [
-            {
-                '.ee': FTYPE_SARC,
-                '.epe': FTYPE_RTPC,
-            },
-            {
-                '.bl': FTYPE_SARC,
-                '.nl': FTYPE_SARC,
-                '.fl': FTYPE_SARC,
-                '.blo': FTYPE_RTPC,
-                '.nl.mdic': [FTYPE_ADF, FTYPE_MDI],
-                '.fl.mdic': [FTYPE_ADF, FTYPE_MDI],
-                '.pfs': [FTYPE_TAG0, FTYPE_PFX],
-                '.obc': FTYPE_OBC,
-            },
-            {
-                '.meshc': FTYPE_ADF,
-                '.hrmeshc': FTYPE_ADF,
-                '.modelc': FTYPE_ADF,
-                '.model_deps': FTYPE_TXT,
-                '.pfxc': [FTYPE_TAG0, FTYPE_PFX],
-            },
-            {
-                '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                '.hmddsc': None,
-                '.atx0': None,
-                '.atx1': None,
-                '.atx2': None,
-                '.atx3': None,
-                '.atx4': None,
-                '.atx5': None,
-                '.atx6': None,
-                '.atx7': None,
-                '.atx8': None,
-                '.atx9': None,
-            },
-        ]
+        pair_exts = self.game_info.file_assoc()
 
         assoc_strings = {}
         for k, v in vpath_map.nodes.items():
@@ -969,7 +934,7 @@ class VfsStructure:
                 self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
 
 
-def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, logger=None, debug=False):
+def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
     os.makedirs(working_dir, exist_ok=True)
 
     if logger is None:
@@ -977,25 +942,19 @@ def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, logger=Non
 
     cache_file = working_dir + 'vfs_cache.pickle'
     if os.path.isfile(cache_file):
-        logger.log('LOADING: {} : {}'.format(game_dir, working_dir))
+        logger.log('LOADING: {} : {}'.format(game_info.game_dir, working_dir))
         with open(cache_file, 'rb') as f:
             vfs = pickle.load(f)
         vfs.logger_set(logger)
         vfs.dump_status()
         logger.log('LOADING: COMPLETE')
     else:
-        logger.log('CREATING: {} {}'.format(game_dir, working_dir))
-        settings = {
-            'game_dir': game_dir,
-            'game_id': game_id,
-            'archive_paths': archive_paths,
-        }
+        logger.log('CREATING: {} {}'.format(game_info.game_dir, working_dir))
 
-        with open(os.path.join(working_dir, 'project.json'), 'w') as f:
-            json.dump(settings, f, indent=2)
+        game_info.save(os.path.join(working_dir, 'project.json'))
 
-        vfs = VfsStructure(game_id, working_dir, logger)
-        vfs.load_from_archives(game_dir, archive_paths, debug=debug)
+        vfs = VfsStructure(game_info, working_dir, logger)
+        vfs.load_from_archives(debug=debug)
         with open(cache_file, 'wb') as f:
             pickle.dump(vfs, f, protocol=pickle.HIGHEST_PROTOCOL)
         logger.log('CREATING: COMPLETE')
@@ -1020,14 +979,10 @@ def vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, logger=Non
 
 
 def vfs_structure_open(project_file, logger=None, debug=False):
-    working_dir = os.path.join(os.path.split(project_file)[0],'')
-    with open(project_file) as f:
-        settings = json.load(f)
-    game_dir = settings['game_dir']
-    game_id = settings['game_id']
-    archive_paths = settings['archive_paths']
+    working_dir = os.path.join(os.path.split(project_file)[0], '')
+    game_info = game_info_load(project_file)
 
-    return vfs_structure_prep(game_dir, game_id, archive_paths, working_dir, logger=logger, debug=debug)
+    return vfs_structure_prep(game_info, working_dir, logger=logger, debug=debug)
 
 
 '''

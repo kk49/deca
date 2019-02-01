@@ -61,22 +61,24 @@ game does not crash before it gets to BETA over screen)
 
 ## References
 #### Gibbed's Just Cause 3 archive exporter
+Learned about ALL about RPTC and ADF files here and filled in some other holes.
+
+Big thanks to Gibbed for creating and sharing his work!!!
+
 https://github.com/gibbed/Gibbed.JustCause3
 
-Learned about RPTC and ADF files here and filled in some other holes.
-
 #### Timothée Feuillet's fork of Rick Gibbed's tools
+This filled in some holes for the ADF parsing
 "A Fork of the Just Cause 3 tools by Rick Gibbed" 
 https://github.com/tim42/gibbed-justcause3-tools-fork
-
-This filled in some holes for the ADF parsing
 
 #### Various Microsoft(tm) websites
 Got most of the info for parsing the custom image formats came from the source documentation for DirectX
 
 #### CFX Decompiler
+I don't have to worry about the CFX files because of this!
 https://github.com/jindrapetrik/jpexs-decompiler
 
-#### Disclaimer (IANAL)
+## Disclaimer (IANAL)
 All product names, logos, and brands are property of their respective owners. All company, product and service names used in this website are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.
 

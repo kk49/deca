@@ -15,7 +15,7 @@ class Builder:
 
     def build_node(self, dst_path: str, vnode: VfsNode, vfs: VfsStructure, src_map):
         if vnode.ftype == FTYPE_SARC:
-            print('BUILD SARC {}'.format(vnode.v_path))
+            print('BUILD SARC {}'.format(vnode.vpath))
 
             # parse existing file
             sarc_old = FileSarc()
@@ -29,8 +29,8 @@ class Builder:
             for i in range(len(sarc_old.entries)):
                 entry_old: EntrySarc = sarc_old.entries[i]
                 entry_new: EntrySarc = sarc_new.entries[i]
-                vpath = entry_old.v_path
-                if entry_old.v_path in src_map:
+                vpath = entry_old.vpath
+                if entry_old.vpath in src_map:
                     src_files[i] = src_map[vpath]
                     sz = os.stat(src_files[i]).st_size
                 else:
@@ -44,7 +44,7 @@ class Builder:
 
             # extract existing file
 
-            fn_dst = os.path.join(dst_path, vnode.v_path.decode('utf-8'))
+            fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))
 
             # fn = vfs.extract_node(vnode, dst_path, do_sha1sum=False, allow_overwrite=True)
 
@@ -59,11 +59,11 @@ class Builder:
                         entry_old: EntrySarc = sarc_old.entries[i]
                         entry_new: EntrySarc = sarc_new.entries[i]
                         if src_files[i] is None:
-                            print('  COPYING {} from old file to new file'.format(entry_old.v_path))
+                            print('  COPYING {} from old file to new file'.format(entry_old.vpath))
                             fsi.seek(entry_old.offset)
                             buf = fsi.read(entry_old.length)
                         else:
-                            print('  INSERTING {} src file to new file'.format(entry_old.v_path))
+                            print('  INSERTING {} src file to new file'.format(entry_old.vpath))
                             with open(src_files[i].decode('utf-8'), 'rb') as f:
                                 buf = f.read(entry_new.length)
 
@@ -76,7 +76,7 @@ class Builder:
 
             return fn_dst.encode('ascii')
         else:
-            raise EDecaBuildError('Cannot build {} : {}'.format(vnode.ftype, vnode.v_path))
+            raise EDecaBuildError('Cannot build {} : {}'.format(vnode.ftype, vnode.vpath))
 
     def build_dir(self, vfs: VfsStructure, src_path: str, dst_path: str):
         # find all changed src files
@@ -125,12 +125,12 @@ class Builder:
                 if pid is not None:
                     pnode = vfs.table_vfsnode[pid]
                     if pnode.ftype != FTYPE_ARC and pnode.ftype != FTYPE_TAB:
-                        if pnode.v_path is None:
+                        if pnode.vpath is None:
                             raise EDecaBuildError('MISSING VPATH FOR uid:{} hash:{:08X}, when packing {}'.format(
-                                pnode.uid, pnode.hashid, vnode.v_path))
+                                pnode.uid, pnode.hashid, vnode.vpath))
                         else:
-                            depends[pnode.v_path] = depends.get(pnode.v_path, set()).union({vnode.v_path})
-                            pack_list.append([pnode.v_path, dst_path.encode('ascii') + pnode.v_path])
+                            depends[pnode.vpath] = depends.get(pnode.vpath, set()).union({vnode.vpath})
+                            pack_list.append([pnode.vpath, dst_path.encode('ascii') + pnode.vpath])
 
         # pprint(depends, width=128)
 

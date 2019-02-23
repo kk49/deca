@@ -29,7 +29,10 @@ class DataViewerAdf(DataViewer):
         sbuf = ''
         if vnode.ftype == FTYPE_ADF_BARE:
             obj = load_adf_bare(buffer, vnode.adf_type)
-            sbuf = 'ADF_BARE: TODO!!!!!!!!!!! {:08x}'.format(vnode.adf_type)
+            if obj is None:
+                sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
+            else:
+                sbuf = obj.dump_to_string()
         else:
             obj = load_adf(buffer)
             if obj is not None:

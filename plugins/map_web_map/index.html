@@ -4,10 +4,18 @@
 <head>
     <meta charset='utf-8' />
     <title>deca Map</title>
-    <link rel="stylesheet" href="./lib/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"
+        integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA=="
+        crossorigin=""/>
     <link rel="stylesheet" href="./lib/crisp_image.css" />
-    <script src="./lib/leaflet/leaflet.js"></script>
-    <script src="./data.js"></script>
+    <link rel="stylesheet" href="./lib/Leaflet.MousePosition/src/L.Control.MousePosition.css" />
+    <script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"
+        integrity="sha512-QVftwZFqvtRNi0ZyCtsznlKSWOStnDORoefr1enyq5mVL4tmKB3S/EnC3rRJcxCPavG10IcrVGSmPh6Qw5lwrg=="
+        crossorigin=""></script>
+    <script src="https://unpkg.com/pouchdb@^5.2.0/dist/pouchdb.js"></script>
+	<script src="https://unpkg.com/leaflet.tilelayer.pouchdbcached@latest/L.TileLayer.PouchDBCached.js"></script>
+    <script src="lib/Leaflet.MousePosition/src/L.Control.MousePosition.js"></script>
+    <script src="data.js"></script>
 
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <style>
@@ -24,6 +32,14 @@
 <script>
     var crs = L.CRS.Simple;
     var map = L.map('mapid', {crs: crs}).setView([-128, 128], 3);
+
+    //     src_to_dst_x_scale = 128 / (16*1024)  # 180.0/(16*1024)
+    //     src_to_dst_y_scale = -128 / (16*1024)  # -90.0/(16*1024)
+    L.control.mousePosition(options={
+        lngFormatter: function (v) { return L.Util.formatNum((v - 128) / 128 * 16 * 1024, 15); },
+        latFormatter: function (v) { return L.Util.formatNum((-v - 128) / 128 * 16 * 1024, 15); },
+        lngFirst: true
+    }).addTo(map);
 
     function onEachFeature(feature, layer) {
         var s = "";
@@ -50,11 +66,11 @@
             if (feature.properties && feature.properties.bookmark_name) {
                 s = s + "<br>name: " + feature.properties.bookmark_name;
             }
-            if (feature.properties && feature.properties.collectable_name) {
-                s = s + "<br>name: " + feature.properties.collectable_name;
+            if (feature.properties && feature.properties.collectable_name_tr) {
+                s = s + "<br>name: " + feature.properties.collectable_name_tr;
             }
-            if (feature.properties && feature.properties.collectable_desc) {
-                s = s + "<br>desc: " + feature.properties.collectable_desc;
+            if (feature.properties && feature.properties.collectable_desc_tr) {
+                s = s + "<br>desc: " + feature.properties.collectable_desc_tr;
             }
             if (feature.properties && feature.properties.collectable_id) {
                 s = s + "<br>id: " + feature.properties.collectable_id;
@@ -237,7 +253,21 @@
                 id: tl[4],
                 opacity: tl[7],
                 className: 'crisp-image',
+                useCache: true,
+	            crossOrigin: true,
                 })
+
+            // Listen to cache hits and misses and spam the console
+            // The cache hits and misses are only from this layer, not from the WMS layer.
+            // layer.on('tilecachehit',function(ev){
+            //     console.log('Cache hit: ', ev.url);
+            // });
+            layer.on('tilecachemiss',function(ev){
+                console.log('Cache miss: ', ev.url);
+            });
+            layer.on('tilecacheerror',function(ev){
+                console.log('Cache error: ', ev.tile, ev.error);
+            });
 
             if(tl[2] == 0) {
                 baseMaps[tl[0]] = layer

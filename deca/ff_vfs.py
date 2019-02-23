@@ -964,7 +964,7 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
     # find external adf types
     vfs.external_adf_types = {}
     adftype_path = './resources/adf/'
-    if os.path.isfile(adftype_path):
+    if os.path.isdir(adftype_path):
         files = os.listdir(adftype_path)
         for file in files:
             fn0, ext0 = os.path.splitext(file)

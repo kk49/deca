@@ -28,9 +28,9 @@ def process_translation_adf(f, sz):
             name = tf.read_strz().decode('utf-8')
             tr[name] = text
 
-    # with open('doc/text_debug.txt', 'w') as dt:
-    #     for k, v in tr.items():
-    #         dt.write('{}\t{}\n'.format(k, v))
+    with open('docs/text_debug.txt', 'w') as dt:
+        for k, v in tr.items():
+            dt.write('{}\t{}\n'.format(k, v))
 
     return tr
 
@@ -227,9 +227,9 @@ def plugin_make_web_map(vfs, wdir):
 
     # load translation
     tr = {}
-    # vnode = vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
-    # with vfs.file_obj_from(vnode, 'rb') as f:
-    #     tr = process_translation_adf(f, vnode.size_u)
+    vnode = vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
+    with vfs.file_obj_from(vnode, 'rb') as f:
+        tr = process_translation_adf(f, vnode.size_u)
 
     # extract geometric features
     dst_x0 = 128
@@ -428,7 +428,7 @@ def plugin_make_web_map(vfs, wdir):
     for v in adf.table_instance_values[0]['Collectibles']:
         obj_id = v['ID']
         cid = v['Name'].decode('utf-8')
-        name = cid + '_name'
+        name = cid
         name = tr.get(name, name)
         desc = cid + '_desc'
         desc = tr.get(desc, desc)
@@ -444,8 +444,8 @@ def plugin_make_web_map(vfs, wdir):
                 'uid': obj_id,
                 'uid_str': '0x{:012X}'.format(obj_id),
                 'collectable_id': cid,
-                'collectable_name': name,
-                'collectable_desc': desc,
+                'collectable_name_tr': name,
+                'collectable_desc_tr': desc,
             },
             'geometry': {
                 'type': 'Point',
@@ -467,7 +467,7 @@ def plugin_make_web_map(vfs, wdir):
 
 
 def main():
-    vfs = vfs_structure_open('./work/gzb/project.json')
+    vfs = vfs_structure_open('../work/gzb/project.json')
     plugin_make_web_map(vfs, vfs.working_dir)
 
 

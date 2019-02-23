@@ -1,21 +1,24 @@
-import pandas as pd
 import sys
 import re
+import csv
 
 paths = set()
 
 for i in range(1, len(sys.argv)):
-    db = pd.read_csv(sys.argv[i])
-    paths0 = db['Path']
-    p = re.compile('^.*\\\dropzone\\\(.*)$')
-    for path in paths0:
-        r = p.match(path)
-        if r is not None:
-            s = r.groups(1)[0]
-            s = s.replace('\\', '/')
-            paths.add(s)
+    with open(sys.argv[i], 'r') as f:
+        db = csv.reader(f, delimiter=',', quotechar='"')
 
-paths = [s for s in paths]
+        p = re.compile(r'^.*\\dropzone\\(.*)$')
+        for row in db:
+            pth = row[6]
+            # print(pth)
+            r = p.match(pth)
+            if r is not None:
+                s = r.groups(1)[0]
+                s = s.replace('\\', '/')
+                paths.add(s)
+
+paths = list(paths)
 paths.sort()
 
 for s in paths:

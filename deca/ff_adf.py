@@ -340,6 +340,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         f.seek(offset)
         # TODO Size may be needed for byte codes?
         # size = (v >> 32) & 0xffffffff
+        # assert(size == 0)
         # v = f.read_c8(size)
         # v = b''.join(v)
         v = f.read_strz()
@@ -415,7 +416,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                     actual_offset = header2[0]
                     actual_size = header2[2]
                     adf_type_hash = None
-                else:  #TODO current guess it that it is a bare ADF instance
+                else:  # TODO current guess it that it is a bare ADF instance
                     header2 = gdf.read_u32(8)
                     actual_offset = e1[0]
                     actual_size = string_offset - actual_offset
@@ -740,5 +741,47 @@ def load_adf(buffer):
             return None
 
 
-def load_adf_bare(buffer, adf_type):
-    return None
+def load_adf_bare(buffer, adf_type, offset):
+    fn = os.path.join('./resources/adf', '{:08X}.full.adf'.format(adf_type))
+
+    if os.path.isfile(fn):
+        with ArchiveFile(open(fn, 'rb')) as fp:
+            obj = Adf()
+            try:
+                obj.deserialize(fp)
+
+                # instance
+                obj.table_instance = [InstanceEntry()]
+                obj.map_instance = {}
+                obj.instance_count = 1
+                obj.instance_offset = None
+
+                obj.table_instance[0].name = 'instance'
+                obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
+                obj.table_instance[0].type_hash = adf_type
+                obj.table_instance[0].offset = xxx
+                obj.table_instance[0].size = xxx
+
+                obj.map_instance[obj.table_instance[0].name_hash] = obj.table_instance[0]
+
+                self.found_strings = set()
+                self.table_instance_values = [None] * len(self.table_instance)
+                for i in range(len(self.table_instance)):
+                    ins = self.table_instance[i]
+                    fp.seek(ins.offset)
+                    # try:
+                    buf = fp.read(ins.size)
+                    with ArchiveFile(io.BytesIO(buf)) as f:
+                        v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name,
+                                          ins.offset, found_strings=self.found_strings)
+                        self.table_instance_values[i] = v
+                    # except AdfTypeMissing as ae:
+                    #     print('Missing HASHID {:08x}'.format(ae.hashid))
+                    # except Exception as exp:
+                    #     print(exp)
+
+                return obj
+            except DecaErrorParse:
+                return None
+    else:
+        return None

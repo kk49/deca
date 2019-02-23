@@ -30,6 +30,14 @@
 <div id="mapid"></div>
 
 <script>
+    var urlParams = new URLSearchParams(window.location.search);
+    var spoilers = urlParams.has('spoilers');
+    var collapse_layers = !urlParams.has('no_collapse_layers');
+    console.log('spoilers = ', spoilers);
+    console.log('collapse_layers = ', collapse_layers);
+
+
+
     var crs = L.CRS.Simple;
     var map = L.map('mapid', {crs: crs}).setView([-128, 128], 3);
 
@@ -51,10 +59,10 @@
             if (feature.properties && feature.properties.uid_str) {
                 s = s + "<br>id: " + feature.properties.uid_str;
             }
-            if (feature.properties && feature.properties.poi_name_tr) {
+            if (spoilers && feature.properties && feature.properties.poi_name_tr) {
                 s = s + "<br>name_tr: " + feature.properties.poi_name_tr;
             }
-            if (feature.properties && feature.properties.poi_desc_tr) {
+            if (spoilers && feature.properties && feature.properties.poi_desc_tr) {
                 s = s + "<br>desc_tr: " + feature.properties.poi_desc_tr;
             }
             if (feature.properties && feature.properties.poi_name) {
@@ -66,10 +74,10 @@
             if (feature.properties && feature.properties.bookmark_name) {
                 s = s + "<br>name: " + feature.properties.bookmark_name;
             }
-            if (feature.properties && feature.properties.collectable_name_tr) {
+            if (spoilers && feature.properties && feature.properties.collectable_name_tr) {
                 s = s + "<br>name: " + feature.properties.collectable_name_tr;
             }
-            if (feature.properties && feature.properties.collectable_desc_tr) {
+            if (spoilers && feature.properties && feature.properties.collectable_desc_tr) {
                 s = s + "<br>desc: " + feature.properties.collectable_desc_tr;
             }
             if (feature.properties && feature.properties.collectable_id) {
@@ -289,7 +297,7 @@
     L.control.layers(
         baseMaps,
         overlayMaps,
-        {collapsed: false}
+        {collapsed: collapse_layers}
     ).addTo(map);
 </script>
 

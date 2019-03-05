@@ -4,6 +4,7 @@ import multiprocessing
 import re
 import pickle
 import json
+import csv
 
 import deca.ff_rtpc
 from deca.errors import DecaFileExists
@@ -11,7 +12,8 @@ from deca.file import ArchiveFile, SubsetFile
 from deca.game_info import GameInfo, game_info_load
 from deca.ff_types import *
 from deca.ff_txt import load_json
-from deca.ff_adf import load_adf, AdfTypeMissing, GdcArchiveEntry
+from deca.ff_adf import load_adf, load_adf_bare, AdfTypeMissing, GdcArchiveEntry
+from deca.ff_adf_export_import import adf_export
 from deca.ff_rtpc import Rtpc
 from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
@@ -220,6 +222,9 @@ class VfsStructure:
                     pf.seek(node.offset)
                     extract_aaf(pf, file_name)
             return open(file_name, mode)
+        elif node.ftype == FTYPE_ADF_BARE:
+            pnode = self.table_vfsnode[node.pid]
+            return self.file_obj_from(pnode, mode)
         elif node.pid is not None:
             pnode = self.table_vfsnode[node.pid]
             pf = self.file_obj_from(pnode, mode)
@@ -359,6 +364,14 @@ class VfsStructure:
                         with self.file_obj_from(node) as f:
                             buffer = f.read(node.size_u)
                         adf = load_adf(buffer)
+
+                        bnode = VfsNode(
+                            ftype=FTYPE_GDCBODY, pid=node.uid, level=node.level,
+                            offset=adf.table_instance[0].offset,
+                            size_c=adf.table_instance[0].size,
+                            size_u=adf.table_instance[0].size)
+                        self.node_add(bnode)
+
                         for entry in adf.table_instance_values[0]:
                             if isinstance(entry, GdcArchiveEntry):
                                 # self.logger.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.vpath))
@@ -368,7 +381,7 @@ class VfsStructure:
                                     ftype = FTYPE_ADF_BARE
                                     # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.vpath))
                                 cnode = VfsNode(
-                                    vhash=entry.vpath_hash, pid=node.uid, level=node.level + 1, index=entry.index,
+                                    vhash=entry.vpath_hash, pid=bnode.uid, level=bnode.level + 1, index=entry.index,
                                     offset=entry.offset, size_c=entry.size, size_u=entry.size, vpath=entry.vpath,
                                     ftype=ftype, adf_type=adf_type)
                                 self.node_add(cnode)
@@ -381,7 +394,8 @@ class VfsStructure:
         self.find_vpath_rtpc(self.possible_vpath_map)
         self.find_vpath_json(self.possible_vpath_map)
         self.find_vpath_exe(self.possible_vpath_map)
-        self.find_vpath_procmon(self.possible_vpath_map)
+        self.find_vpath_procmon_dir(self.possible_vpath_map)
+        self.find_vpath_procmon_file(self.possible_vpath_map)
         self.find_vpath_custom(self.possible_vpath_map)
         self.find_vpath_guess(self.possible_vpath_map)
         self.find_vpath_by_assoc(self.possible_vpath_map)
@@ -787,7 +801,7 @@ class VfsStructure:
                 vpath_map.propose(s, ['EXE', None])
             self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
 
-    def find_vpath_procmon(self, vpath_map):
+    def find_vpath_procmon_file(self, vpath_map):
         fn = './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)
         if os.path.isfile(fn):
             self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/{}/strings_procmon.txt'.format(self.game_info.game_id))
@@ -797,6 +811,30 @@ class VfsStructure:
                 for s in custom_strings:
                     vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
             self.logger.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
+
+    def find_vpath_procmon_dir(self, vpath_map):
+        path_name = './resources/{}/procmon_csv'.format(self.game_info.game_id)
+        fns = os.listdir(path_name)
+        fns = [os.path.join(path_name, fn) for fn in fns]
+        custom_strings = set()
+        for fn in fns:
+            if os.path.isfile(fn):
+                self.logger.log('STRINGS FROM PROCMON DIR: look for hashable strings in {}'.format(fn))
+                with open(fn, 'r') as f:
+                    db = csv.reader(f, delimiter=',', quotechar='"')
+                    p = re.compile(r'^.*\\dropzone\\(.*)$')
+                    for row in db:
+                        pth = row[6]
+                        # print(pth)
+                        r = p.match(pth)
+                        if r is not None:
+                            s = r.groups(1)[0]
+                            s = s.replace('\\', '/')
+                            custom_strings.add(s)
+
+        for s in custom_strings:
+            vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
+        self.logger.log('STRINGS FROM HASH FROM PROCMON DIR: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_custom(self, vpath_map):
         fn = './resources/{}/strings.txt'.format(self.game_info.game_id)
@@ -913,6 +951,23 @@ class VfsStructure:
 
                     with ArchiveFile(open(ofile, 'wb')) as fo:
                         fo.write(buf)
+
+                    if node.ftype == FTYPE_ADF or node.ftype == FTYPE_ADF_BARE:
+                        buffer = b''
+                        with ArchiveFile(self.file_obj_from(node)) as f:
+                            while True:
+                                v = f.read(16 * 1024 * 1024)
+                                if len(v) == 0:
+                                    break
+                                buffer = buffer + v
+
+                        if node.ftype == FTYPE_ADF_BARE:
+                            obj = load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+                        else:
+                            obj = load_adf(buffer)
+
+                        if obj is not None:
+                            adf_export(obj, ofile)
 
                     # TODO
                     # if do_sha1sum:

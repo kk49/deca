@@ -23,12 +23,17 @@ class DataViewerAdf(DataViewer):
         self.setLayout(self.main_layout)
 
     def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+        buffer = b''
         with ArchiveFile(vfs.file_obj_from(vnode)) as f:
-            buffer = f.read(vnode.size_u)
+            while True:
+                v = f.read(16*1024*1024)
+                if len(v) == 0:
+                    break
+                buffer = buffer + v
 
         sbuf = ''
         if vnode.ftype == FTYPE_ADF_BARE:
-            obj = load_adf_bare(buffer, vnode.adf_type)
+            obj = load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
             if obj is None:
                 sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
             else:

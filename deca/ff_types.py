@@ -13,12 +13,14 @@ FTYPE_TXT = 'txt'
 FTYPE_OBC = 'obc'
 FTYPE_RTPC = 'rtpc'
 FTYPE_TAG0 = 'tag0'
-FTYPE_SYMLINK = 'symlink'
 FTYPE_H2014 = 'h2014'
 FTYPE_MDI = 'mdi'
 FTYPE_PFX = 'pfx'
 FTYPE_LFSB5 = 'lFSB5'
 FTYPE_RBMDL = 'RBMDL'
+FTYPE_GDCBODY = 'gdc'
+
+FTYPE_SYMLINK = 'symlink'
 
 FTYPE_NO_TYPE = 'META-NO-TYPE'  # used in file type matching to indicate that file should have no type
 FTYPE_ANY_TYPE = 'META-ANY-TYPE'  # used in file type matching to indicate that file can have any type

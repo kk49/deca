@@ -61,7 +61,7 @@ game does not crash before it gets to BETA over screen)
 
 ## References
 #### Gibbed's Just Cause 3 archive exporter
-Learned about ALL about RPTC and ADF files here and filled in some other holes.
+Learned about ALL the files here and used as a basis to understand changes made in GZ.
 
 Big thanks to Gibbed for creating and sharing his work!!!
 

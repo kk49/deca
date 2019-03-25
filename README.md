@@ -7,6 +7,11 @@ mainly to explore Generation Zero BETA files until it's released.
 
 Written in Python, tested only on Linux, code is a mess, because this is an experiment...
 
+## Discord
+For deca specific and general GenZero (and theHunter?) modding.
+
+https://discord.gg/76PPjq
+
 ## Quick Start
 No installer, just unzip the release file in some directory and start deca_gui.exe. (not signed so windows will complain)
 Go to the menu and under File select New Project ..., find theHunter EXE, and wait 40 minutes the first time.

@@ -2,7 +2,7 @@
 
 ["Everything should be built top-down, except the first time." - Alan Perlis](http://www.cs.yale.edu/homes/perlis-alan/quotes.html)
 
-A hacked up tool for exploring/extracting files from Avalanche Studios APEX engine files, 
+A hacked up tool for exploring/extracting/modding files from Avalanche Studios APEX engine files, 
 mainly to explore Generation Zero BETA files until it's released.
 
 Written in Python, tested only on Linux, code is a mess, because this is an experiment...

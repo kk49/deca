@@ -84,11 +84,11 @@ Got most of the info for parsing the custom image formats came from the source d
 I don't have to worry about the CFX files because of this!
 https://github.com/jindrapetrik/jpexs-decompiler
 
-## Disclaimer (IANAL)
-All product names, logos, and brands are property of their respective owners. All company, product and service names used in this website are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.
-
 ### For map generator and viewing files locally with pouchdb
 add this to chrome command line 
 ```
 --allow-file-access-from-files --allow-file-access --allow-cross-origin-auth-prompt
 ```
+
+## Disclaimer (IANAL)
+All product names, logos, and brands are property of their respective owners. All company, product and service names used in this website are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.

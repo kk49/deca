@@ -814,23 +814,25 @@ class VfsStructure:
 
     def find_vpath_procmon_dir(self, vpath_map):
         path_name = './resources/{}/procmon_csv'.format(self.game_info.game_id)
-        fns = os.listdir(path_name)
-        fns = [os.path.join(path_name, fn) for fn in fns]
         custom_strings = set()
-        for fn in fns:
-            if os.path.isfile(fn):
-                self.logger.log('STRINGS FROM PROCMON DIR: look for hashable strings in {}'.format(fn))
-                with open(fn, 'r') as f:
-                    db = csv.reader(f, delimiter=',', quotechar='"')
-                    p = re.compile(r'^.*\\dropzone\\(.*)$')
-                    for row in db:
-                        pth = row[6]
-                        # print(pth)
-                        r = p.match(pth)
-                        if r is not None:
-                            s = r.groups(1)[0]
-                            s = s.replace('\\', '/')
-                            custom_strings.add(s)
+
+        if os.path.isdir(path_name):
+            fns = os.listdir(path_name)
+            fns = [os.path.join(path_name, fn) for fn in fns]
+            for fn in fns:
+                if os.path.isfile(fn):
+                    self.logger.log('STRINGS FROM PROCMON DIR: look for hashable strings in {}'.format(fn))
+                    with open(fn, 'r') as f:
+                        db = csv.reader(f, delimiter=',', quotechar='"')
+                        p = re.compile(r'^.*\\dropzone\\(.*)$')
+                        for row in db:
+                            pth = row[6]
+                            # print(pth)
+                            r = p.match(pth)
+                            if r is not None:
+                                s = r.groups(1)[0]
+                                s = s.replace('\\', '/')
+                                custom_strings.add(s)
 
         for s in custom_strings:
             vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)

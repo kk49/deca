@@ -1,0 +1,54 @@
+version: build-{build}
+max_jobs: 1
+image: Visual Studio 2017
+clone_folder: C:\prj\deca
+build_script:
+- cmd: >-
+    SET
+
+    SET PATH=C:\Python36-x64;C:\Python36-x64\Scripts;%path%
+
+    cd C:\prj
+
+    c:\Python36-x64\python --version
+
+    c:\Python36-x64\python -m pip list
+
+    c:\Python36-x64\python -m virtualenv venv
+
+    venv\Scripts\activate
+
+    python -m pip install "pip<19.0"
+
+    pip list
+
+    pip install -r deca/requirements.txt
+
+    pip install pyinstaller
+
+    cd C:\prj\deca
+
+    "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+
+    cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll
+
+    pyinstaller entry_point.py
+
+after_build:
+    cd dist\deca
+
+    7z a ..\..\deca-b%APPVEYOR_BUILD_NUMBER%.zip *
+
+artifacts:
+- path: deca-b%APPVEYOR_BUILD_NUMBER%.zip
+
+deploy:
+  artifact: deca-b%APPVEYOR_BUILD_NUMBER%.zip
+  prerelease: true
+  description: 'Test Release'
+  provider: GitHub
+  auth_token:
+    secure: gb7NBwSinsyPgvJSkCDgUNjxAzqCqRbPEN3b0oX1XF92PAxuy2Opyk+Rbvw660R3
+  on:
+    # branch: master                 # release from master branch only
+    APPVEYOR_REPO_TAG: true        # deploy on tag push only

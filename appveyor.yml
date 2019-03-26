@@ -32,7 +32,7 @@ build_script:
 
     cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll
 
-    pyinstaller entry_point.py
+    pyinstaller deca_gui.spec --clean --noconfirm
 
 after_build:
     cd dist\deca

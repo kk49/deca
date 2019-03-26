@@ -35,15 +35,15 @@ build_script:
     pyinstaller deca_gui.spec --clean --noconfirm
 
 after_build:
-    cd dist\deca
+    cd dist\deca_gui
 
-    7z a ..\..\deca-b%APPVEYOR_BUILD_NUMBER%.zip *
+    7z a ..\..\deca_gui-b%APPVEYOR_BUILD_NUMBER%.zip *
 
 artifacts:
-- path: deca-b%APPVEYOR_BUILD_NUMBER%.zip
+- path: deca_gui-b%APPVEYOR_BUILD_NUMBER%.zip
 
 deploy:
-  artifact: deca-b%APPVEYOR_BUILD_NUMBER%.zip
+  artifact: deca_gui-b%APPVEYOR_BUILD_NUMBER%.zip
   prerelease: true
   description: 'Test Release'
   provider: GitHub

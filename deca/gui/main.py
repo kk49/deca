@@ -7,7 +7,7 @@ from deca.ff_vfs import vfs_structure_prep, vfs_structure_open, VfsStructure, Vf
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger
-from deca.game_info import GameInfoGZB, GameInfoTHCOTW, GameInfoJC3
+from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3
 from deca.gui.viewer_adf import DataViewerAdf
 from deca.gui.viewer_rtpc import DataViewerRtpc
 from deca.gui.viewer_image import DataViewerImage
@@ -765,6 +765,8 @@ class MainWindow(QMainWindow):
                 pass
             elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
                 game_info = GameInfoGZB(game_dir)
+            elif exe_name.find('GenerationZero') >= 0:
+                game_info = GameInfoGZ(game_dir)
             elif exe_name.find('theHunterCotW') >= 0:
                 game_info = GameInfoTHCOTW(game_dir)
             elif exe_name.find('JustCause3') >= 0:

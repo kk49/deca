@@ -1,6 +1,6 @@
 from deca.ff_adf import *
 from deca.hash_jenkins import hash_little
-import xlsxwriter
+from deca.xlsxwriter_hack import DecaWorkBook
 
 
 def adf_export(adf: Adf, export_path):
@@ -9,7 +9,7 @@ def adf_export(adf: Adf, export_path):
             fn = export_path + '.xlsx'
 
             src = adf.table_instance_values[0]
-            book = xlsxwriter.Workbook(fn)
+            book = DecaWorkBook(fn)
 
             cell_formats = []
             for att in src['Attribute']:
@@ -26,12 +26,11 @@ def adf_export(adf: Adf, export_path):
                 name = srcw['Name']
                 name_short = '{:08x}'.format(hash_little(name))
                 cellindex = srcw['CellIndex']
-                worksheet = book.add_worksheet(name_short)
-                worksheet.write_string(0, 0, name.decode('utf-8'))
+                worksheet = book.add_worksheet(name.decode('utf-8'))
                 for i in range(rows):
                     for j in range(cols):
                         r = i
-                        c = j + 1
+                        c = j
 
                         cidx = cellindex[j + cols * i]
                         cdata = src['Cell'][cidx]

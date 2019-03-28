@@ -467,7 +467,7 @@ def plugin_make_web_map(vfs, wdir):
 
 
 def main():
-    vfs = vfs_structure_open('../work/gzb/project.json')
+    vfs = vfs_structure_open('../work/gz/project.json')
     plugin_make_web_map(vfs, vfs.working_dir)
 
 

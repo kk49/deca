@@ -30,7 +30,7 @@ def process_translation_adf(f, sz):
 
     with open('docs/text_debug.txt', 'w') as dt:
         for k, v in tr.items():
-            dt.write('{}\t{}\n'.format(k, v))
+            dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>')))
 
     return tr
 
@@ -417,8 +417,9 @@ def plugin_make_web_map(vfs, wdir):
         vnode = vnodes[i]
         with vfs.file_obj_from(vnode, 'rb') as f:
             buffer = f.read(vnode.size_u)
-            with open('d{}.dat'.format(i), 'wb') as fo:
-                fo.write(buffer)
+            # todo dump of different vnodes, one in gdcc is stripped
+            # with open('d{}.dat'.format(i), 'wb') as fo:
+            #     fo.write(buffer)
     vnode = vnodes[1]
     with vfs.file_obj_from(vnode, 'rb') as f:
         buffer = f.read(vnode.size_u)

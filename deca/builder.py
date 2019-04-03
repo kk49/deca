@@ -110,7 +110,7 @@ class Builder:
             pack_list.append([vpath.encode('ascii'), dst.encode('ascii')])
             vpaths_completed[vpath.encode('ascii')] = dst.encode('ascii')
 
-        # calculate dependcies
+        # calculate dependencies
         depends = {}
         while len(pack_list) > 0:
             file = pack_list.pop(0)
@@ -118,19 +118,28 @@ class Builder:
             vpath = file[0]
             dst = file[1]
 
-            vnodes = vfs.map_vpath_to_vfsnodes[vpath]
-            for vnode in vnodes:
-                vnode: VfsNode = vnode
-                pid = vnode.pid
-                if pid is not None:
-                    pnode = vfs.table_vfsnode[pid]
-                    if pnode.ftype != FTYPE_ARC and pnode.ftype != FTYPE_TAB:
-                        if pnode.vpath is None:
-                            raise EDecaBuildError('MISSING VPATH FOR uid:{} hash:{:08X}, when packing {}'.format(
-                                pnode.uid, pnode.hashid, vnode.vpath))
-                        else:
-                            depends[pnode.vpath] = depends.get(pnode.vpath, set()).union({vnode.vpath})
-                            pack_list.append([pnode.vpath, dst_path.encode('ascii') + pnode.vpath])
+            if vpath not in vfs.map_vpath_to_vfsnodes:
+                print('TODO: WARNING: FILE {} NOT HANDLED'.format(vpath))
+            else:
+                vnodes = vfs.map_vpath_to_vfsnodes[vpath]
+                for vnode in vnodes:
+                    vnode: VfsNode = vnode
+                    pid = vnode.pid
+                    if pid is not None:
+                        pnode = vfs.table_vfsnode[pid]
+
+                        if pnode.ftype == FTYPE_GDCBODY:
+                            # handle case of gdcc files
+                            pid = pnode.pid
+                            pnode = vfs.table_vfsnode[pid]
+
+                        if pnode.ftype != FTYPE_ARC and pnode.ftype != FTYPE_TAB:
+                            if pnode.vpath is None:
+                                raise EDecaBuildError('MISSING VPATH FOR uid:{} hash:{:08X}, when packing {}'.format(
+                                    pnode.uid, pnode.vhash, vnode.vpath))
+                            else:
+                                depends[pnode.vpath] = depends.get(pnode.vpath, set()).union({vnode.vpath})
+                                pack_list.append([pnode.vpath, dst_path.encode('ascii') + pnode.vpath])
 
         # pprint(depends, width=128)
 

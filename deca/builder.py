@@ -43,13 +43,13 @@ class Builder:
                 data_write_pos = (data_write_pos + align - 1) // align * align
 
             # extract existing file
-
             fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))
-
             # fn = vfs.extract_node(vnode, dst_path, do_sha1sum=False, allow_overwrite=True)
 
             # modify extracted existing file by overwriting offset to file entry to zero, telling the engine that it is
             # a symbolic link, and should be loaded elsewhere, preferably directly
+            pt, fn = os.path.split(fn_dst)
+            os.makedirs(pt, exist_ok=True)
             with ArchiveFile(open(fn_dst, 'wb')) as fso:
                 with ArchiveFile(vfs.file_obj_from(vnode, 'rb')) as fsi:
                     buf = fsi.read(sarc_old.dir_block_len + 16)

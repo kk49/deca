@@ -1,8 +1,9 @@
 from deca.ff_vfs import vfs_structure_open
 from deca.ff_avtx import Ddsc
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
-from deca.ff_adf import load_adf
+from deca.ff_adf import load_adf, load_adf_bare
 from deca.file import ArchiveFile
+from deca.ff_types import *
 from PIL import Image
 import numpy as np
 import os
@@ -194,7 +195,7 @@ def plugin_make_web_map(vfs, wdir):
     tile_overlays = []
 
     for crit in ['dreadnought', 'harvester', 'hunter', 'scout', 'skirmisher']:
-        for ctype, color in zip(['a', 'b', 'c'], [[255,0,0,255],[0,255,0,255],[0,0,255,255]]):
+        for ctype, color in zip(['a', 'b', 'c'], [[255, 0, 0, 255],[0, 255, 0, 255],[0, 0, 255, 255]]):
             tile_overlays.append([
                 'settings/hp_settings/hp_ai_textures/spawn_maps/spawn_{}_{}.bmp_datac'.format(crit, ctype).encode('ascii'),
                 'tile_spawn_{}_{}'.format(crit, ctype),
@@ -206,14 +207,22 @@ def plugin_make_web_map(vfs, wdir):
         vnode = vfs.map_vpath_to_vfsnodes[fn][0]
 
         with vfs.file_obj_from(vnode) as f:
-            f.seek(vnode.size_u - 8192)
-            buffer = f.read(8192)
+            if vnode.ftype == FTYPE_ADF:
+                buffer = f.read(vnode.size_u)
+                bmp_adf = load_adf(buffer)
+            else:
+                buffer = f.read(vnode.offset + vnode.size_u)
+                bmp_adf = load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
 
-        aimg = np.frombuffer(buffer, count=8 * 1024, dtype=np.uint8)
+        bitfield = bmp_adf.table_instance_values[0]['Layers'][0]['Bitfield']
+        bitfield = np.asarray(bitfield, dtype=np.uint32).data
+
+        aimg = np.frombuffer(bitfield, count=8 * 1024, dtype=np.uint8)
         cimg = np.zeros((512, 512, 4), dtype=np.uint8)
 
         for r in range(256):
             rd = aimg[r * 32:(r + 1) * 32]
+            # print(*['{:02X}'.format(v) for v in rd])
             for c in range(32):
                 for sc in range(8):
                     if rd[c] & (0x01 << sc) == 0:

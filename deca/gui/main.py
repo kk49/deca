@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import argparse
 import pickle
 from deca.errors import *
@@ -15,11 +16,13 @@ from deca.gui.viewer_raw import DataViewerRaw
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
 import PySide2
-from PySide2.QtCore import QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel
-from PySide2.QtGui import QColor, QFont
+from PySide2.QtCore import \
+    QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel, QRegExp
+from PySide2.QtGui import \
+    QColor, QFont
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QTextEdit, QPushButton, QMessageBox, QFileDialog
+    QTabWidget, QTreeView, QTextEdit, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel
 
 
 # from PySide2.QtWebEngineWidgets import QWebEngineView
@@ -383,6 +386,47 @@ class VfsDirModel(QAbstractItemModel):
         return None
 
 
+class DecaSortFilterProxyModel(QSortFilterProxyModel):
+    def __init__(self, *args, **kwargs):
+        QSortFilterProxyModel.__init__(self, *args, **kwargs)
+        self.filter_expr = '.*'
+        self.vis_map = {}
+
+    def check_node(self, index):
+        if index in self.vis_map:
+            return self.vis_map[index]
+
+        tnode = index.internalPointer()
+        vis = False
+        if isinstance(tnode, VfsDirBranch):
+            for r in range(self.sourceModel().rowCount(index)):
+                cindex = self.sourceModel().index(r, 0, index)
+                vis = vis | self.check_node(cindex)
+
+        elif isinstance(tnode, VfsDirLeaf):
+            vis = self.filter_expr.match(tnode.name.decode('utf-8')) is not None
+
+        self.vis_map[index] = vis
+
+        return vis
+
+    def filter_set(self, expr):
+        self.beginResetModel()
+        try:
+            self.filter_expr = re.compile(expr)
+        except Exception as err:
+            self.filter_expr = re.compile('')
+
+        self.vis_map = {}
+        if self.sourceModel() is not None:
+            self.check_node(self.sourceModel().index(0, 0, QModelIndex()))
+        self.endResetModel()
+
+    def filterAcceptsRow(self, source_row: int, source_parent):
+        index = self.sourceModel().index(source_row, 0, source_parent)
+        return self.check_node(index)
+
+
 class VfsDirWidget(QWidget):
     def __init__(self):
         QWidget.__init__(self)
@@ -391,7 +435,10 @@ class VfsDirWidget(QWidget):
         self.vnode_2click_selected = None
 
         # Getting the Model
-        self.model = VfsDirModel()
+        self.source_model = VfsDirModel()
+
+        # prepare filter
+        self.proxy_model = DecaSortFilterProxyModel(self)
 
         # Creating a QTableView
         self.view = QTreeView()
@@ -402,7 +449,7 @@ class VfsDirWidget(QWidget):
         font.setPointSize(8)
         self.view.setFont(font)
         # self.view.setSortingEnabled(True)
-        self.view.setModel(self.model)
+        self.view.setModel(self.proxy_model)
 
         # # QTableView Headers
         self.header = self.view.header()
@@ -417,21 +464,30 @@ class VfsDirWidget(QWidget):
         self.main_layout.addWidget(self.view)
         self.setLayout(self.main_layout)
 
+        self.filter_vfspath_set('.*')
+
     def vfs_set(self, vfs):
-        self.model.vfs_set(vfs)
+        self.source_model.vfs_set(vfs)
+        self.proxy_model.setSourceModel(self.source_model)
 
     def clicked(self, index):
         if index.isValid():
+            index = self.proxy_model.mapToSource(index)
             tnode = index.internalPointer()
-            if (isinstance(tnode, VfsDirLeaf) or isinstance(tnode,
-                                                            VfsDirBranch)) and self.vnode_1click_selected is not None:
+            if (isinstance(tnode, VfsDirLeaf) or isinstance(tnode, VfsDirBranch)) and self.vnode_1click_selected is not None:
                 self.vnode_1click_selected(tnode.vpath())
 
     def double_clicked(self, index):
         if index.isValid():
+            index = self.proxy_model.mapToSource(index)
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
                 self.vnode_2click_selected(tnode.vnodes[0])
+
+    def filter_vfspath_set(self, expr):
+        # self.proxy_model.setFilterRegExp(QRegExp(expr, Qt.CaseInsensitive, QRegExp.RegExp))
+        # self.proxy_model.setFilterKeyColumn(0)
+        self.proxy_model.filter_set(expr)
 
 
 class DataViewWidget(QWidget):
@@ -580,6 +636,18 @@ class MainWidget(QWidget):
         self.nav_widget.setSizePolicy(size)
         # self.nav_widget.updateGeometry()
 
+        # filter
+        self.filter_label = QLabel()
+        self.filter_label.setText('Filter')
+
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setText('.*')
+        self.filter_edit.textChanged.connect(self.filter_text_changed)
+
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(self.filter_label)
+        filter_layout.addWidget(self.filter_edit)
+
         self.bt_extract = QPushButton()
         self.bt_extract.setEnabled(False)
         self.bt_extract.setText('EXTRACT')
@@ -603,6 +671,7 @@ class MainWidget(QWidget):
 
         self.nav_layout = QVBoxLayout()
         self.nav_layout.addWidget(self.nav_widget)
+        self.nav_layout.addLayout(filter_layout)
         self.nav_layout.addWidget(self.bt_extract)
         self.nav_layout.addWidget(self.bt_prep_mod)
         self.nav_layout.addWidget(self.bt_mod_build)
@@ -616,8 +685,8 @@ class MainWidget(QWidget):
 
         # QWidget Layout
         self.main_layout = QHBoxLayout()
-        self.main_layout.addLayout(self.nav_layout)
-        self.main_layout.addWidget(self.data_view)
+        self.main_layout.addLayout(self.nav_layout, stretch=1)
+        self.main_layout.addWidget(self.data_view, stretch=1)
         self.setLayout(self.main_layout)
         self.updateGeometry()
 
@@ -688,6 +757,12 @@ class MainWidget(QWidget):
             self.error_dialog('Build Failed: File Exists: {}'.format(exce.args))
         except EDecaBuildError as exce:
             self.error_dialog('Build Failed: {}'.format(exce.args))
+
+    def filter_text_changed(self):
+        txt = self.filter_edit.text()
+        if len(txt) == 0:
+            txt = '.*'
+        self.vfs_dir_widget.filter_vfspath_set(txt)
 
 
 # ********************

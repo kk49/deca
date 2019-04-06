@@ -106,6 +106,7 @@ c_process_image_func = None
     DXGI_FORMAT_FORCE_UINT = 0xffffffffUL,
 '''
 
+
 def process_image_10(image, f, nx, ny):
     for yi in range(ny):
         for xi in range(nx):

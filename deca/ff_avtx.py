@@ -16,6 +16,9 @@ class DecaImage:
         self.itype = itype
         self.data = data
 
+    def pil_image(self):
+        return Image.fromarray(self.data)
+
 
 class Ddsc:
     def __init__(self):

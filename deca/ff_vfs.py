@@ -19,6 +19,7 @@ from deca.ff_aaf import extract_aaf
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
 from deca.ff_determine import determine_file_type_and_size
+from deca.ff_avtx import Ddsc
 from deca.hash_jenkins import hash_little
 from deca.util import Logger
 
@@ -954,7 +955,7 @@ class VfsStructure:
                     with ArchiveFile(open(ofile, 'wb')) as fo:
                         fo.write(buf)
 
-                    if node.ftype == FTYPE_ADF or node.ftype == FTYPE_ADF_BARE:
+                    if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
                         buffer = b''
                         with ArchiveFile(self.file_obj_from(node)) as f:
                             while True:
@@ -970,6 +971,46 @@ class VfsStructure:
 
                         if obj is not None:
                             adf_export(obj, ofile)
+                    elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+                        ddsc = None
+                        if node.ftype == FTYPE_BMP:
+                            f_ddsc = self.file_obj_from(node)
+                            ddsc = Ddsc()
+                            ddsc.load_bmp(f_ddsc)
+                        elif node.ftype == FTYPE_DDS:
+                            f_ddsc = self.file_obj_from(node)
+                            ddsc = Ddsc()
+                            ddsc.load_dds(f_ddsc)
+                        elif node.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+                            if node.vpath is None:
+                                f_ddsc = self.file_obj_from(node)
+                                ddsc = Ddsc()
+                                ddsc.load_ddsc(f_ddsc)
+                            else:
+                                filename = os.path.splitext(node.vpath)
+                                if len(filename[1]) == 0 and node.ftype == FTYPE_AVTX:
+                                    filename_ddsc = node.vpath
+                                else:
+                                    filename_ddsc = filename[0] + b'.ddsc'
+
+                                if filename_ddsc in self.map_vpath_to_vfsnodes:
+                                    extras = [b'.hmddsc']
+                                    for i in range(1, 16):
+                                        extras.append('.atx{}'.format(i).encode('ascii'))
+                                    f_ddsc = self.file_obj_from(self.map_vpath_to_vfsnodes[filename_ddsc][0])
+                                    f_atxs = []
+                                    for extra in extras:
+                                        filename_atx = filename[0] + extra
+                                        if filename_atx in self.map_vpath_to_vfsnodes:
+                                            f_atxs.append(self.file_obj_from(self.map_vpath_to_vfsnodes[filename_atx][0]))
+                                    ddsc = Ddsc()
+                                    ddsc.load_ddsc(f_ddsc)
+                                    for atx in f_atxs:
+                                        ddsc.load_atx(atx)
+
+                        if ddsc is not None:
+                            npimp = ddsc.mips[0].pil_image()
+                            npimp.save(ofile + '.png')
 
                     # TODO
                     # if do_sha1sum:

@@ -202,6 +202,24 @@ def plugin_make_web_map(vfs, wdir):
                 color
             ])
 
+    tile_overlays.append([
+        'settings/hp_settings/hp_ai_textures/bitmaps/dreadnought_forbidden_map.bmp_datac'.encode('ascii'),
+        'tile_bitmap_dreadnought_forbidden_map',
+        [255, 0, 0, 255]
+    ])
+
+    tile_overlays.append([
+        'settings/hp_settings/hp_ai_textures/bitmaps/flee_reserve_0.bmp_datac'.encode('ascii'),
+        'tile_bitmap_flee_reserve_0',
+        [0, 255, 0, 255]
+    ])
+
+    tile_overlays.append([
+        'settings/hp_settings/hp_ai_textures/bitmaps/animal_forbidden_map_0.bmp_datac'.encode('ascii'),
+        'tile_bitmap_animal_forbidden_map_0',
+        [0, 0, 255, 255]
+    ])
+
     for tileo in tile_overlays:
         fn = tileo[0]
         vnode = vfs.map_vpath_to_vfsnodes[fn][0]

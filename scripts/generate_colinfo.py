@@ -1,6 +1,6 @@
 import json
 
-fn = '/home/xxx/tmp/gz/loc.json'
+fn = './loc.json'
 
 with open(fn, 'r') as f:
     data = json.load(f)
@@ -19,7 +19,7 @@ for ctypeinfo in ctypes:
     for c in data:
         props = c['properties']
         if props['collectable_id'].find(ctype) >= 0:
-            sd[props['collectable_id']] = [props['collectable_name_tr'], props['collectable_desc_tr']]
+            sd[props['collectable_id']] = [props['collectable_name_tr'], props['collectable_desc_tr'], props['position']]
 
     sn = list(sd.keys())
     sn.sort()
@@ -38,5 +38,5 @@ for ctypeinfo in ctypes:
         print('|{}'.format(sd[n][0]))
         print('|{}'.format(desc))
         if do_location:
-            print('|?')
+            print('| {:.1f}, {:.1f}'.format(sd[n][2][0], sd[n][2][2]))
     print('|}')

@@ -86,6 +86,9 @@
             if (feature.properties && feature.properties.comment) {
                 s = s + "<br>cmt: " + feature.properties.comment;
             }
+            if (feature.properties && feature.properties.position) {
+                s = s + "<br>pos: " + feature.properties.position[0].toFixed(1) + ", " + feature.properties.position[2].toFixed(1);
+            }
 
             layer.bindPopup(s)
         }

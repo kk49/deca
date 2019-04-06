@@ -457,7 +457,11 @@ def plugin_make_web_map(vfs, wdir):
         obj_id = v['ID']
         cid = v['Name'].decode('utf-8')
         name = cid
-        name = tr.get(name, name)
+        if name in tr:
+            name = tr[name]
+        else:
+            name = name + "_name"
+            name = tr.get(name, name)
         desc = cid + '_desc'
         desc = tr.get(desc, desc)
         position = v['Position']
@@ -474,6 +478,7 @@ def plugin_make_web_map(vfs, wdir):
                 'collectable_id': cid,
                 'collectable_name_tr': name,
                 'collectable_desc_tr': desc,
+                'position': position,
             },
             'geometry': {
                 'type': 'Point',

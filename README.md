@@ -10,7 +10,7 @@ Written in Python, tested only on Linux, code is a mess, because this is an expe
 ## Discord
 For deca specific and general GenZero (and theHunter?) modding.
 
-https://discord.gg/76PPjq
+https://discord.gg/x5AuPj7
 
 ## Quick Start
 No installer, just unzip the release file in some directory and start deca_gui.exe. (not signed so windows will complain)

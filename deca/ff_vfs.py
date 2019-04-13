@@ -814,7 +814,7 @@ class VfsStructure:
             self.logger.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_procmon_dir(self, vpath_map):
-        path_name = './resources/{}/procmon_csv'.format(self.game_info.game_id)
+        path_name = './procmon_csv/{}'.format(self.game_info.game_id)
         custom_strings = set()
 
         if os.path.isdir(path_name):

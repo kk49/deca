@@ -1,3 +1,4 @@
+GZB
 ```
 2019-01-08 00:50:33.688851: hashes: 44146, mappings missing: 12507, mappings present 31639
 2019-01-08 03:05:58.806540: hashes: 44146, mappings missing: 7354, mappings present 36792
@@ -10,6 +11,13 @@
 2019-01-14 18:40:08.257962: hashes: 44240, mappings missing: 5024, mappings present 39216
 2019-01-14 23:08:42.320006: hashes: 44240, mappings missing: 4863, mappings present 39377
 2019-01-15 00:46:31.593074: hashes: 44240, mappings missing: 4625, mappings present 39615
+```
+
+GZ
+```
+2019-04-08 21:50:59.802404: hashes: 48050, mappings missing: 3595, mappings present 44455, mapping conflict 1
+2019-04-08 22:03:23.048736: hashes: 48050, mappings missing: 3582, mappings present 44468, mapping conflict 1
+
 ```
 
 # Events

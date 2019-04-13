@@ -15,6 +15,7 @@ from deca.gui.viewer_image import DataViewerImage
 from deca.gui.viewer_raw import DataViewerRaw
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
+from deca.cmds.tool_make_web_map import tool_make_web_map
 import PySide2
 from PySide2.QtCore import \
     QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel, QRegExp
@@ -773,21 +774,27 @@ class MainWindow(QMainWindow):
 
         # Menu
         self.menu = self.menuBar()
-        self.file_menu = self.menu.addMenu("File")
+        self.file_menu = self.menu.addMenu('File')
+        self.edit_menu = self.menu.addMenu('Edit')
+        self.tools_menu = self.menu.addMenu('Tools')
 
-        self.project_new_action = QAction("&New Project...")
-        self.project_new_action.triggered.connect(self.project_new)
+        self.action_project_new = QAction("&New Project...")
+        self.action_project_new.triggered.connect(self.project_new)
 
-        self.project_open_action = QAction("&Open Project...")
-        self.project_open_action.triggered.connect(self.project_open)
+        self.action_project_open = QAction("&Open Project...")
+        self.action_project_open.triggered.connect(self.project_open)
 
-        self.exit_action = QAction("E&xit", self)
-        self.exit_action.setShortcut("Ctrl+Q")
-        self.exit_action.triggered.connect(self.exit_app)
+        self.action_exit = QAction("E&xit", self)
+        self.action_exit.setShortcut("Ctrl+Q")
+        self.action_exit.triggered.connect(self.exit_app)
 
-        self.file_menu.addAction(self.project_new_action)
-        self.file_menu.addAction(self.project_open_action)
-        self.file_menu.addAction(self.exit_action)
+        self.action_make_web_map = QAction("Make &Web Map")
+        self.action_make_web_map.triggered.connect(self.tool_make_web_map)
+
+        self.file_menu.addAction(self.action_project_new)
+        self.file_menu.addAction(self.action_project_open)
+        self.file_menu.addAction(self.action_exit)
+        self.tools_menu.addAction(self.action_make_web_map)
 
         # Status Bar
         self.status = self.statusBar()
@@ -872,6 +879,10 @@ class MainWindow(QMainWindow):
     @Slot()
     def exit_app(self, checked):
         self.close()
+
+    @Slot()
+    def tool_make_web_map(self, checked):
+        tool_make_web_map(self.vfs, self.vfs.working_dir, True)
 
 
 def main():

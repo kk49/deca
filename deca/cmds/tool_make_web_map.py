@@ -10,6 +10,7 @@ import os
 import json
 import io
 import matplotlib.pyplot as plt
+import shutil
 
 
 def process_translation_adf(f, sz):
@@ -29,9 +30,10 @@ def process_translation_adf(f, sz):
             name = tf.read_strz().decode('utf-8')
             tr[name] = text
 
-    with open('docs/text_debug.txt', 'w') as dt:
-        for k, v in tr.items():
-            dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>')))
+    if os.path.exists(os.path.join('scratch', 'gz')):
+        with open(os.path.join('scratch', 'gz', 'text_debug.txt'), 'w') as dt:
+            for k, v in tr.items():
+                dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>')))
 
     return tr
 
@@ -39,7 +41,7 @@ def process_translation_adf(f, sz):
 def tileset_make(img, tile_path, tile_size=256, max_zoom=-1):
     # save full image, mainly for debugging
     os.makedirs(tile_path, exist_ok=True)
-    img.save(tile_path + '/full.png')
+    img.save(os.path.join(tile_path, 'full.png'))
 
     # determine zoom levels
     sz = img.size
@@ -64,27 +66,27 @@ def tileset_make(img, tile_path, tile_size=256, max_zoom=-1):
 
         if not os.path.isdir(zpath):
             for x in range(0, 2 ** zlevel):
-                dpath = zpath + '/{}'.format(x)
+                dpath = os.path.join(zpath, '{}'.format(x))
                 os.makedirs(dpath, exist_ok=True)
                 for y in range(0, 2 ** zlevel):
-                    fpath = dpath + '/{}.png'.format(y)
+                    fpath = os.path.join(dpath, '{}.png'.format(y))
                     zimgs[zlevel].crop((x * tile_size, y * tile_size, (x + 1) * tile_size, (y + 1) * tile_size)).save(
                         fpath)
 
     for zlevel in range(zooms, max_zoom+1):
         width = tile_size >> (zlevel - (zooms-1))
-        zpath = tile_path + '/{}'.format(zlevel)
+        zpath = os.path.join(tile_path, '{}'.format(zlevel))
         print('Generate Zoom: {}'.format(zpath))
         if not os.path.isdir(zpath):
             for x in range(0, 2 ** zlevel):
-                dpath = zpath + '/{}'.format(x)
+                dpath = os.path.join(zpath, '{}'.format(x))
                 os.makedirs(dpath, exist_ok=True)
                 for y in range(0, 2 ** zlevel):
-                    fpath = dpath + '/{}.png'.format(y)
+                    fpath = os.path.join(dpath, '{}.png'.format(y))
                     zimgs[(zooms-1)].crop((x * width, y * width, (x + 1) * width, (y + 1) * width)).resize((tile_size, tile_size), Image.NEAREST).save(fpath)
 
 
-def plugin_make_web_map(vfs, wdir):
+def tool_make_web_map(vfs, wdir, copy_support_files):
     force_topo_tiles = False
 
     # BUILD topo map
@@ -129,7 +131,7 @@ def plugin_make_web_map(vfs, wdir):
     cimg = cm(aimg)
     img = Image.fromarray((cimg[:, :, :3] * 255).astype(np.uint8))
 
-    tileset_make(img, wdir + 'map/z0/tile_h')
+    tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_h'))
 
     # BUILD water nvwaveworks map
     # extract full res image
@@ -148,7 +150,7 @@ def plugin_make_web_map(vfs, wdir):
     cimg = cm(aimg)
     img = Image.fromarray((cimg[:, :, :3] * 255).astype(np.uint8))
 
-    tileset_make(img, wdir + 'map/z0/tile_wn')
+    tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wn'))
 
     # BUILD water gerstner map
     # extract full res image
@@ -167,7 +169,7 @@ def plugin_make_web_map(vfs, wdir):
     cimg = cm(aimg)
     img = Image.fromarray((cimg[:, :, :3] * 255).astype(np.uint8))
 
-    tileset_make(img, wdir + 'map/z0/tile_wg')
+    tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wg'))
 
     # TODO parse terrain/nv_water_cull_mask.rawc ? 1 bit per pixel 512x512 pixels
     fn = b'terrain/nv_water_cull_mask.rawc'
@@ -190,7 +192,7 @@ def plugin_make_web_map(vfs, wdir):
     cimg = np.flip(cimg, 0)
     img = Image.fromarray(cimg)
 
-    tileset_make(img, wdir + 'map/z0/tile_wnm')
+    tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wnm'))
 
     tile_overlays = []
 
@@ -250,7 +252,7 @@ def plugin_make_web_map(vfs, wdir):
         # cimg = np.flip(cimg, 0)
         img = Image.fromarray(cimg)
 
-        tileset_make(img, wdir + 'map/z0/{}'.format(tileo[1]))
+        tileset_make(img, os.path.join(wdir, 'map', 'z0', '{}'.format(tileo[1])))
 
     # load translation
     tr = {}
@@ -487,9 +489,9 @@ def plugin_make_web_map(vfs, wdir):
         }
         collectables.append(obj)
 
-    dpath = wdir + 'map/z0'
+    dpath = os.path.join(wdir, 'map', 'z0')
     os.makedirs(dpath, exist_ok=True)
-    fpath = dpath + '/data.js'
+    fpath = os.path.join(dpath, 'data.js')
 
     with open(fpath, 'w') as f:
         f.write('var region_data = {};\n'.format(json.dumps(regions, indent=4)))
@@ -498,10 +500,23 @@ def plugin_make_web_map(vfs, wdir):
         f.write('var bookmark_data = {};\n'.format(json.dumps(bookmarks, indent=4)))
         f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
 
+    if copy_support_files:
+        dst = os.path.join(dpath, 'index.html')
+        if os.path.exists(dst):
+            print('WARNING: {} already exists will not over-write'.format(dst))
+        else:
+            shutil.copyfile(os.path.join('.', 'tool_resources', 'make_web_map', 'index.html'), dst)
+
+        dst = os.path.join(dpath, 'lib')
+        if os.path.exists(dst):
+            print('WARNING: {} already exists will not over-write'.format(dst))
+        else:
+            shutil.copytree(os.path.join('.', 'tool_resources', 'make_web_map', 'lib'), dst)
+
 
 def main():
     vfs = vfs_structure_open('../work/gz/project.json')
-    plugin_make_web_map(vfs, vfs.working_dir)
+    tool_make_web_map(vfs, vfs.working_dir, False)
 
 
 if __name__ == "__main__":

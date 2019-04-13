@@ -3,9 +3,10 @@
 block_cipher = None
 
 added_files = [
-    ('resources/gz/*', 'resources/gz'),
-    ('resources/gzb/*', 'resources/gzb'),
-    ('resources/hp/*', 'resources/hp'),
+    ('resources/gz', 'resources/gz'),
+    ('resources/gzb', 'resources/gzb'),
+    ('resources/hp', 'resources/hp'),
+    ('tool_resources/make_web_map', 'tool_resources/make_web_map'),
 ]
 
 a = Analysis(
@@ -23,7 +24,8 @@ a = Analysis(
     noarchive=False)
 
 pyz = PYZ(
-    a.pure, a.zipped_data,
+    a.pure,
+    a.zipped_data,
     cipher=block_cipher)
 
 exe = EXE(

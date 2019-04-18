@@ -71,7 +71,11 @@ class VfsPathMap:
         if isinstance(vpath, str):
             vpath = vpath.encode('ascii', 'ignore')
         elif isinstance(vpath, bytes):
-            pass
+            try:
+                vpath.decode('utf-8')
+            except UnicodeDecodeError:
+                self.logger.log('propose: BAD STRING NOT UTF-8 {}'.format(vpath))
+                return None
         else:
             self.logger.log('propose: BAD STRING {}'.format(vpath))
             return None

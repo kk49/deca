@@ -491,13 +491,17 @@ def tool_make_web_map(vfs, wdir, copy_support_files):
 
     dpath = os.path.join(wdir, 'map', 'z0')
     os.makedirs(dpath, exist_ok=True)
-    fpath = os.path.join(dpath, 'data.js')
 
+    fpath = os.path.join(dpath, 'data_full.js')
     with open(fpath, 'w') as f:
         f.write('var region_data = {};\n'.format(json.dumps(regions, indent=4)))
         f.write('var global_collectable_data = {};\n'.format(json.dumps(global_collectables, indent=4)))
         f.write('var poi_data = {};\n'.format(json.dumps(pois, indent=4)))
         f.write('var bookmark_data = {};\n'.format(json.dumps(bookmarks, indent=4)))
+        f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
+
+    fpath = os.path.join(dpath, 'data.js')
+    with open(fpath, 'w') as f:
         f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
 
     if copy_support_files:
@@ -506,6 +510,12 @@ def tool_make_web_map(vfs, wdir, copy_support_files):
             print('WARNING: {} already exists will not over-write'.format(dst))
         else:
             shutil.copyfile(os.path.join('.', 'tool_resources', 'make_web_map', 'index.html'), dst)
+
+        dst = os.path.join(dpath, 'full.html')
+        if os.path.exists(dst):
+            print('WARNING: {} already exists will not over-write'.format(dst))
+        else:
+            shutil.copyfile(os.path.join('.', 'tool_resources', 'make_web_map', 'full.html'), dst)
 
         dst = os.path.join(dpath, 'lib')
         if os.path.exists(dst):

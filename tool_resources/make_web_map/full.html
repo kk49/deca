@@ -15,7 +15,7 @@
     <script src="https://unpkg.com/pouchdb@^5.2.0/dist/pouchdb.js"></script>
 	<script src="https://unpkg.com/leaflet.tilelayer.pouchdbcached@latest/L.TileLayer.PouchDBCached.js"></script>
     <script src="lib/Leaflet.MousePosition/src/L.Control.MousePosition.js"></script>
-    <script src="data.js"></script>
+    <script src="data_full.js"></script>
 
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <style>
@@ -35,6 +35,7 @@
     var collapse_layers = !urlParams.has('no_collapse_layers');
     console.log('spoilers = ', spoilers);
     console.log('collapse_layers = ', collapse_layers);
+
 
     var crs = L.CRS.Simple;
     var map = L.map('mapid', {crs: crs}).setView([-128, 128], 3);
@@ -218,23 +219,35 @@
 
     var all_layers = [
         ['Topo', true, 0, 'Topo map from GZ', 'tile_t', './{id}/{z}/{x}/{y}.png', 6, 1.0],
-        ['Runner A Spawn Map', false, 1, 'spawn_skirmisher_a from GZ', 'tile_spawn_skirmisher_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Runner B Spawn Map', false, 1, 'spawn_skirmisher_b from GZ', 'tile_spawn_skirmisher_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Runner C Spawn Map', false, 1, 'spawn_skirmisher_c from GZ', 'tile_spawn_skirmisher_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Seeker A Spawn Map', false, 1, 'spawn_scout_a from GZ', 'tile_spawn_scout_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Seeker B Spawn Map', false, 1, 'spawn_scout_b from GZ', 'tile_spawn_scout_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Seeker C Spawn Map', false, 1, 'spawn_scout_c from GZ', 'tile_spawn_scout_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Hunter A Spawn Map', false, 1, 'spawn_hunter_a from GZ', 'tile_spawn_hunter_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Hunter B Spawn Map', false, 1, 'spawn_hunter_b from GZ', 'tile_spawn_hunter_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Hunter C Spawn Map', false, 1, 'spawn_hunter_c from GZ', 'tile_spawn_hunter_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Harvester A Spawn Map', false, 1, 'spawn_harvester_a from GZ', 'tile_spawn_harvester_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Harvester B Spawn Map', false, 1, 'spawn_harvester_b from GZ', 'tile_spawn_harvester_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Harvester C Spawn Map', false, 1, 'spawn_harvester_c from GZ', 'tile_spawn_harvester_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Tank A Spawn Map', false, 1, 'spawn_dreadnought_a from GZ', 'tile_spawn_dreadnought_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Tank B Spawn Map', false, 1, 'spawn_dreadnought_b from GZ', 'tile_spawn_dreadnought_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
-        ['Tank C Spawn Map', false, 1, 'spawn_dreadnought_c from GZ', 'tile_spawn_dreadnought_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['Height', false, 0, 'Height map from GZ', 'tile_h', './{id}/{z}/{x}/{y}.png', 1, 1.0],
+        ['Water NVWaveworks Mask', false, 0, 'Water NVWaveworks Mask from GZ', 'tile_wnm', './{id}/{z}/{x}/{y}.png', 1, 1.0],
+        ['Water NVWaveworks', false, 0, 'Water NVWaveworks from GZ', 'tile_wn', './{id}/{z}/{x}/{y}.png', 2, 1.0],
+        ['Water Gerstner', false, 0, 'Water Gerstner from GZ', 'tile_wg', './{id}/{z}/{x}/{y}.png', 2, 1.0],
+        ['spawn_skirmisher_a', false, 1, 'spawn_skirmisher_a from GZ', 'tile_spawn_skirmisher_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_skirmisher_b', false, 1, 'spawn_skirmisher_b from GZ', 'tile_spawn_skirmisher_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_skirmisher_c', false, 1, 'spawn_skirmisher_c from GZ', 'tile_spawn_skirmisher_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_scout_a', false, 1, 'spawn_scout_a from GZ', 'tile_spawn_scout_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_scout_b', false, 1, 'spawn_scout_b from GZ', 'tile_spawn_scout_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_scout_c', false, 1, 'spawn_scout_c from GZ', 'tile_spawn_scout_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_hunter_a', false, 1, 'spawn_hunter_a from GZ', 'tile_spawn_hunter_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_hunter_b', false, 1, 'spawn_hunter_b from GZ', 'tile_spawn_hunter_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_hunter_c', false, 1, 'spawn_hunter_c from GZ', 'tile_spawn_hunter_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_harvester_a', false, 1, 'spawn_harvester_a from GZ', 'tile_spawn_harvester_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_harvester_b', false, 1, 'spawn_harvester_b from GZ', 'tile_spawn_harvester_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_harvester_c', false, 1, 'spawn_harvester_c from GZ', 'tile_spawn_harvester_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_dreadnought_a', false, 1, 'spawn_dreadnought_a from GZ', 'tile_spawn_dreadnought_a', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_dreadnought_b', false, 1, 'spawn_dreadnought_b from GZ', 'tile_spawn_dreadnought_b', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['spawn_dreadnought_c', false, 1, 'spawn_dreadnought_c from GZ', 'tile_spawn_dreadnought_c', './{id}/{z}/{x}/{y}.png', 1, 0.5],
 
-        ['Collectibles', false, 2, 'CRegion from GZ', '', collectable_data, 0, 1.0],
+        ['animal_forbidden_map_0', false, 1, 'animal forbidden bitmap from GZ', 'tile_bitmap_animal_forbidden_map_0', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['dreadnought_forbidden_map', false, 1, 'dreadnought forbidden bitmap from GZ', 'tile_bitmap_dreadnought_forbidden_map', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+        ['flee_reserve_0', false, 1, 'flee reserve 0 from GZ', 'tile_bitmap_flee_reserve_0', './{id}/{z}/{x}/{y}.png', 1, 0.5],
+
+        ['CRegions', false, 2, 'CRegion from GZ', '', region_data, 0, 1.0],
+        ['CCollectables', false, 2, 'CCollectable from GZ', '', global_collectable_data, 0, 1.0],
+        ['CPOIs', false, 2, 'CRegion from GZ', '', poi_data, 0, 1.0],
+        ['CBookmarks', false, 2, 'CRegion from GZ', '', bookmark_data, 0, 1.0],
+        ['Collection.collectionc', false, 2, 'CRegion from GZ', '', collectable_data, 0, 1.0],
     ];
 
     var baseMaps = {}

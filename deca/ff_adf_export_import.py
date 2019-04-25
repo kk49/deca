@@ -3,10 +3,13 @@ from deca.hash_jenkins import hash_little
 from deca.xlsxwriter_hack import DecaWorkBook
 
 
-def adf_export(adf: Adf, export_path):
+def adf_export(adf: Adf, export_path, allow_overwrite=False):
     if len(adf.table_instance) == 1:
         if adf.table_instance[0].type_hash == 0x0B73315D:
             fn = export_path + '.xlsx'
+
+            if not allow_overwrite and os.path.exists(fn):
+                raise DecaFileExists(fn)
 
             src = adf.table_instance_values[0]
             book = DecaWorkBook(fn)

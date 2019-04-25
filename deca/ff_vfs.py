@@ -954,10 +954,11 @@ class VfsStructure:
                     buf = f.read(node.size_u)
 
                     if not allow_overwrite and os.path.isfile(ofile):
-                        raise DecaFileExists(ofile)
-
-                    with ArchiveFile(open(ofile, 'wb')) as fo:
-                        fo.write(buf)
+                        self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile))
+                        # raise DecaFileExists(ofile)
+                    else:
+                        with ArchiveFile(open(ofile, 'wb')) as fo:
+                            fo.write(buf)
 
                     if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
                         buffer = b''
@@ -974,7 +975,7 @@ class VfsStructure:
                             obj = load_adf(buffer)
 
                         if obj is not None:
-                            adf_export(obj, ofile)
+                            adf_export(obj, ofile, allow_overwrite=allow_overwrite)
                     elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
                         ddsc = None
                         if node.ftype == FTYPE_BMP:
@@ -1013,8 +1014,12 @@ class VfsStructure:
                                         ddsc.load_atx(atx)
 
                         if ddsc is not None:
-                            npimp = ddsc.mips[0].pil_image()
-                            npimp.save(ofile + '.png')
+                            ofile_img = ofile + '.png'
+                            if not allow_overwrite and os.path.isfile(ofile_img):
+                                self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile_img))
+                            else:
+                                npimp = ddsc.mips[0].pil_image()
+                                npimp.save(ofile_img)
 
                     # TODO
                     # if do_sha1sum:
@@ -1033,7 +1038,10 @@ class VfsStructure:
         vpath_re = re.compile(vpath)
         for k, v in self.map_vpath_to_vfsnodes.items():
             if vpath_re.match(k):
-                self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
+                try:
+                    self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
+                except DecaFileExists as e:
+                    self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
 
 def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):

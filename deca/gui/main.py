@@ -639,7 +639,7 @@ class MainWidget(QWidget):
 
         # filter
         self.filter_label = QLabel()
-        self.filter_label.setText('Filter')
+        self.filter_label.setText('Filter (Python Expression Syntax)')
 
         self.filter_edit = QLineEdit()
         self.filter_edit.setText('.*')

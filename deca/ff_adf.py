@@ -236,24 +236,48 @@ class InstanceEntry:
 
 MetaTypeString = ['Primative', 'Structure', 'Pointer', 'Array', 'InlineArray', 'String', '6', 'BitField', 'Enumeration', 'StringHash']
 
+typedef_s8 = 0x580D0A62
+typedef_u8 = 0x0ca2821d
+typedef_s16 = 0xD13FCF93
+typedef_u16 = 0x86d152bd
+typedef_s32 = 0x192fe633
+typedef_u32 = 0x075e4e4f
+typedef_s64 = 0xAF41354F
+typedef_u64 = 0xA139E01F
+typedef_f32 = 0x7515a207
+typedef_f64 = 0xC609F663
+
+prim_types = {
+    typedef_s8,
+    typedef_u8,
+    typedef_s16,
+    typedef_u16,
+    typedef_s32,
+    typedef_u32,
+    typedef_s64,
+    typedef_u64,
+    typedef_f32,
+    typedef_f64,
+}
+
+prim_type_names = {
+    0x580D0A62: 'sint08',
+    0x0ca2821d: 'uint08',
+    0xD13FCF93: 'sint16',
+    0x86d152bd: 'uint16',
+    0x192fe633: 'sint32',
+    0x075e4e4f: 'uint32',
+    0xAF41354F: 'sint64',
+    0xA139E01F: 'uint64',
+    0x7515a207: 'float',
+    0xC609F663: 'double',
+    0x8955583e: 'string',
+}
+
 
 def dump_type(type_id, type_map, offset=0):
-    prim_types = {
-        0x580D0A62: 'sint08',
-        0x0ca2821d: 'uint08',
-        0xD13FCF93: 'sint16',
-        0x86d152bd: 'uint16',
-        0x192fe633: 'sint32',
-        0x075e4e4f: 'uint32',
-        0xAF41354F: 'sint64',
-        0xA139E01F: 'uint64',
-        0x7515a207: 'float',
-        0xC609F663: 'double',
-        0x8955583e: 'name',
-    }
-
-    if type_id in prim_types:
-        return '{}PrimType: {}\n'.format(' ' * offset, prim_types[type_id])
+    if type_id in prim_type_names:
+        return '{}PrimType: {}\n'.format(' ' * offset, prim_type_names[type_id])
 
     if type_id not in type_map:
         return '{}UNKNOWN TYPE: {:08x}\n'.format(' ' * offset, type_id)
@@ -261,7 +285,7 @@ def dump_type(type_id, type_map, offset=0):
     type_def = type_map[type_id]
 
     space = ' ' * offset
-    sbuf = space + MetaTypeString[type_def.metatype] +'\n'
+    sbuf = space + MetaTypeString[type_def.metatype] + '\n'
     if type_def.metatype == 0:  # Primative
         pass
     elif type_def.metatype == 1:  # Structure
@@ -287,52 +311,110 @@ def dump_type(type_id, type_map, offset=0):
     return sbuf
 
 
-typedef_s8 = 0x580D0A62
-typedef_u8 = 0x0ca2821d
-typedef_s16 = 0xD13FCF93
-typedef_u16 = 0x86d152bd
-typedef_s32 = 0x192fe633
-typedef_u32 = 0x075e4e4f
-typedef_s64 = 0xAF41354F
-typedef_u64 = 0xA139E01F
-typedef_f32 = 0x7515a207
-typedef_f64 = 0xC609F663
+def adf_type_id_to_str(type_id, type_map):
+    if type_id in prim_type_names:
+        return prim_type_names[type_id]
 
-prim_types = {
-    typedef_s8,
-    typedef_u8,
-    typedef_s16,
-    typedef_u16,
-    typedef_s32,
-    typedef_u32,
-    typedef_s64,
-    typedef_u64,
-    typedef_f32,
-    typedef_f64,
-}
+    type_def = type_map[type_id]
+
+    if type_def.metatype == 0:  # Primative
+        pass
+    elif type_def.metatype == 1:  # Structure
+        return 'Structure: TODO'
+    elif type_def.metatype == 2:  # Pointer
+        return 'Pointer: TODO'
+    elif type_def.metatype == 3:  # Array
+        return 'Array of {}'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
+    elif type_def.metatype == 4:  # Inline Array
+        return 'Inline Array of {}'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
+    elif type_def.metatype == 7:  # BitField
+        return 'Bitfield: TODO'
+    elif type_def.metatype == 8:  # Enumeration
+        return 'Enum: TODO'
+    elif type_def.metatype == 9:  # String Hash
+        return 'String Hash'
+    else:
+        raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
+
+
+class AdfValue:
+    def __init__(self, value, type_id, info_offset, data_offset=None):
+        self.value = value
+        self.type_id = type_id
+        self.info_offset = info_offset
+        if data_offset is None:
+            self.data_offset = info_offset
+        else:
+            self.data_offset = data_offset
+
+    def __repr__(self):
+        if self.data_offset == self.info_offset:
+            return '{} : 0x{:08X} @ {}(0x{:08x})'.format(self.value, self.type_id, self.data_offset, self.data_offset)
+        else:
+            return '{} : 0x{:08X} @ {}(0x{:08x}) <- {}(0x{:08x})'.format(self.value, self.type_id, self.data_offset, self.data_offset, self.info_offset, self.info_offset)
+
+
+def adf_format(v, type_map, indent=0):
+    if isinstance(v, AdfValue):
+        if v.data_offset == v.info_offset:
+            s = '  ' * indent + 'Type: {}(0x{:08X}), Data Offset: {}(0x{:08x})'.format(adf_type_id_to_str(v.type_id, type_map), v.type_id, v.info_offset, v.info_offset)
+        else:
+            s = '  ' * indent + 'Type: {}(0x{:08X}), Info Offset: {}(0x{:08x}), Data Offset: {}(0x{:08x})'.format(adf_type_id_to_str(v.type_id, type_map), v.type_id, v.info_offset, v.info_offset, v.data_offset, v.data_offset)
+
+        s = s + '\n'
+
+        s = s + adf_format(v.value, type_map, indent+1)
+
+        return s
+    elif isinstance(v, dict):
+        s = '  ' * indent + '{\n'
+        for k, iv in v.items():
+            s = s + '  ' * (indent+1) + k + ':\n'
+            s = s + adf_format(iv, type_map, indent + 2)
+        s = s + '  ' * indent + '}\n'
+    elif isinstance(v, list):
+        s = '  ' * indent + '[\n'
+        for iv in v:
+            s = s + adf_format(iv, type_map, indent + 1)
+        s = s + '  ' * indent + ']\n'
+    else:
+        s = '  ' * indent + '{}\n'.format(v)
+
+    return s
 
 
 def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset, bit_offset=None, found_strings=None):
+    dpos = f.tell()
     if type_id == typedef_s8:
         v = f.read_s8()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_u8:
         v = f.read_u8()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_s16:
         v = f.read_s16()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_u16:
         v = f.read_u16()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_s32:
         v = f.read_s32()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_u32:
         v = f.read_u32()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_s64:
         v = f.read_s64()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_u64:
         v = f.read_u64()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_f32:
         v = f.read_f32()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == typedef_f64:
         v = f.read_f64()
+        v = AdfValue(v, type_id, dpos)
     elif type_id == 0x8955583e:
         v = f.read_u64()
         opos = f.tell()
@@ -344,6 +426,8 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         # v = f.read_c8(size)
         # v = b''.join(v)
         v = f.read_strz()
+
+        v = AdfValue(v, type_id, dpos, offset)
 
         if found_strings is not None:
             found_strings.add(v)
@@ -358,6 +442,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             opos = f.tell()
             f.seek(v0[0])
             v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
+            v = AdfValue(v, v0[2], dpos, v0[0])
             f.seek(opos)
     elif type_id == 0x178842fe:  # gdc/global.gdcc
         # TODO this should probably be it's own file type and the adf should be considered a wrapper
@@ -468,7 +553,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         elif type_def.metatype == 2:  # Pointer
             v0 = f.read_u64()
             v = (v0, 'NOTE: {}: {:016x} to {:08x}'.format(type_def.name, v0, type_def.element_type_hash))
-            # TODO sure how this is used yet, but it's used by effects so lower priority
+            # TODO not sure how this is used yet, but it's used by effects so lower priority
             # raise AdfTypeMissing(type_id)
         elif type_def.metatype == 3:  # Array
             v0 = f.read_u32(4)
@@ -519,10 +604,14 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                     p1 = f.tell()
                     # print(p0, p1, p1-p0)
             f.seek(opos)
+
+            v = AdfValue(v, type_id, dpos, offset)
         elif type_def.metatype == 4:  # Inline Array
             v = [None] * type_def.element_length
             for i in range(type_def.element_length):
                 v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
+
+            v = AdfValue(v, type_id, dpos)
         elif type_def.metatype == 7:  # BitField
             if type_def.size == 1:
                 v = f.read_u8()
@@ -644,7 +733,7 @@ class Adf:
                 info.name.decode('utf-8'),
                 info.offset, info.size, info.offset, info.offset + info.size)
 
-            sbuf = sbuf + pformat(v, width=1024) + '\n'
+            sbuf = sbuf + adf_format(v, self.map_typedef) + '\n'
 
         return sbuf
 

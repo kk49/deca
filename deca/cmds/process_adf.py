@@ -10,6 +10,7 @@ if len(sys.argv) < 2:
     in_file = '/home/krys/prj/work/gzb/extracted/graphs/check_region_difficulty.graphc'
     in_file = '/home/krys/prj/work/gzb/extracted/graphs/check_region_difficulty.graphc'
     in_file = '/home/krys/prj/work/gzb/extracted/gdc/global.gdcc'
+    in_file = '/home/krys/prj/work/gz/extracted/environment/base.environc'
 else:
     in_file = sys.argv[1]
 

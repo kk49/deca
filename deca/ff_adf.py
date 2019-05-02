@@ -385,7 +385,7 @@ def adf_format(v, type_map, indent=0):
 
 def adf_convert_to_value_only(v):
     if isinstance(v, AdfValue):
-        return v.value
+        return adf_convert_to_value_only(v.value)
     elif isinstance(v, dict):
         n = {}
         for k, iv in v.items():

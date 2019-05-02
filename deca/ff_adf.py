@@ -387,34 +387,34 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
     dpos = f.tell()
     if type_id == typedef_s8:
         v = f.read_s8()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u8:
         v = f.read_u8()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_s16:
         v = f.read_s16()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u16:
         v = f.read_u16()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_s32:
         v = f.read_s32()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u32:
         v = f.read_u32()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_s64:
         v = f.read_s64()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u64:
         v = f.read_u64()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_f32:
         v = f.read_f32()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_f64:
         v = f.read_f64()
-        v = AdfValue(v, type_id, dpos)
+        v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == 0x8955583e:
         v = f.read_u64()
         opos = f.tell()
@@ -427,7 +427,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         # v = b''.join(v)
         v = f.read_strz()
 
-        v = AdfValue(v, type_id, dpos, offset)
+        v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
 
         if found_strings is not None:
             found_strings.add(v)
@@ -442,7 +442,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             opos = f.tell()
             f.seek(v0[0])
             v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
-            v = AdfValue(v, v0[2], dpos, v0[0])
+            v = AdfValue(v, v0[2], dpos + abs_offset, v0[0] + abs_offset)
             f.seek(opos)
     elif type_id == 0x178842fe:  # gdc/global.gdcc
         # TODO this should probably be it's own file type and the adf should be considered a wrapper
@@ -605,13 +605,13 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                     # print(p0, p1, p1-p0)
             f.seek(opos)
 
-            v = AdfValue(v, type_id, dpos, offset)
+            v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
         elif type_def.metatype == 4:  # Inline Array
             v = [None] * type_def.element_length
             for i in range(type_def.element_length):
                 v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
 
-            v = AdfValue(v, type_id, dpos)
+            v = AdfValue(v, type_id, dpos + abs_offset)
         elif type_def.metatype == 7:  # BitField
             if type_def.size == 1:
                 v = f.read_u8()

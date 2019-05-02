@@ -12,7 +12,7 @@ from deca.file import ArchiveFile, SubsetFile
 from deca.game_info import GameInfo, game_info_load
 from deca.ff_types import *
 from deca.ff_txt import load_json
-from deca.ff_adf import load_adf, load_adf_bare, AdfTypeMissing, GdcArchiveEntry
+from deca.ff_adf import load_adf, load_adf_bare, AdfTypeMissing, GdcArchiveEntry, adf_convert_to_value_only
 from deca.ff_adf_export_import import adf_export
 from deca.ff_rtpc import Rtpc
 from deca.ff_aaf import extract_aaf
@@ -377,7 +377,8 @@ class VfsStructure:
                             size_u=adf.table_instance[0].size)
                         self.node_add(bnode)
 
-                        for entry in adf.table_instance_values[0]:
+                        adf_instance = adf_convert_to_value_only(adf.table_instance_values[0])
+                        for entry in adf_instance:
                             if isinstance(entry, GdcArchiveEntry):
                                 # self.logger.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.vpath))
                                 adf_type = entry.adf_type_hash
@@ -654,7 +655,7 @@ class VfsStructure:
                     if len(adf.table_instance_values) > 0 and \
                             adf.table_instance_values[0] is not None and \
                             isinstance(adf.table_instance_values[0], dict):
-                        obj0 = adf.table_instance_values[0]
+                        obj0 = adf_convert_to_value_only(adf.table_instance_values[0])
 
                         fns = []
                         # self name patch files

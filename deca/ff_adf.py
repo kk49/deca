@@ -383,6 +383,20 @@ def adf_format(v, type_map, indent=0):
     return s
 
 
+def adf_convert_to_value_only(v):
+    if isinstance(v, AdfValue):
+        return v.value
+    elif isinstance(v, dict):
+        n = {}
+        for k, iv in v.items():
+            n[k] = adf_convert_to_value_only(iv)
+        return n
+    elif isinstance(v, list):
+        return [adf_convert_to_value_only(iv) for iv in v]
+    else:
+        return v
+
+
 def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset, bit_offset=None, found_strings=None):
     dpos = f.tell()
     if type_id == typedef_s8:
@@ -427,12 +441,12 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         # v = b''.join(v)
         v = f.read_strz()
 
-        v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
-
         if found_strings is not None:
             found_strings.add(v)
 
         f.seek(opos)
+
+        v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
     # TODO: optional type? this seems to be missing in some cases, i.e. the case of meshc files for CharacterMesh1UVMesh
     elif type_id == 0xdefe88ed:  # Optional value
         v0 = f.read_u32(4)
@@ -442,8 +456,8 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             opos = f.tell()
             f.seek(v0[0])
             v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
-            v = AdfValue(v, v0[2], dpos + abs_offset, v0[0] + abs_offset)
             f.seek(opos)
+            v = AdfValue(v, v0[2], dpos + abs_offset, v0[0] + abs_offset)
     elif type_id == 0x178842fe:  # gdc/global.gdcc
         # TODO this should probably be it's own file type and the adf should be considered a wrapper
         v = []

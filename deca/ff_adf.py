@@ -338,7 +338,7 @@ def adf_type_id_to_str(type_id, type_map):
 
 
 class AdfValue:
-    def __init__(self, value, type_id, info_offset, data_offset=None):
+    def __init__(self, value, type_id, info_offset, data_offset=None, bit_offset=None, comment=None):
         self.value = value
         self.type_id = type_id
         self.info_offset = info_offset
@@ -346,20 +346,40 @@ class AdfValue:
             self.data_offset = info_offset
         else:
             self.data_offset = data_offset
+        self.bit_offset = bit_offset
+        self.comment = comment
 
     def __repr__(self):
-        if self.data_offset == self.info_offset:
-            return '{} : 0x{:08X} @ {}(0x{:08x})'.format(self.value, self.type_id, self.data_offset, self.data_offset)
-        else:
-            return '{} : 0x{:08X} @ {}(0x{:08x}) <- {}(0x{:08x})'.format(self.value, self.type_id, self.data_offset, self.data_offset, self.info_offset, self.info_offset)
+        s = '{} : 0x{:08X} @ {}(0x{:08x})'.format(self.value, self.type_id, self.data_offset, self.data_offset)
+
+        if self.bit_offset is not None:
+            s = s + '[{}]'.format(self.bit_offset)
+
+        if self.data_offset != self.info_offset:
+            s = s + ' <- {}(0x{:08x})'.format(self.info_offset, self.info_offset)
+
+        if self.comment is not None:
+            s = s + '  # {}'.format(self.comment)
+
+        return s
 
 
 def adf_format(v, type_map, indent=0):
+    s = ''
     if isinstance(v, AdfValue):
-        if v.data_offset == v.info_offset:
-            s = '  ' * indent + 'Type: {}(0x{:08X}), Data Offset: {}(0x{:08x})'.format(adf_type_id_to_str(v.type_id, type_map), v.type_id, v.info_offset, v.info_offset)
-        else:
-            s = '  ' * indent + 'Type: {}(0x{:08X}), Info Offset: {}(0x{:08x}), Data Offset: {}(0x{:08x})'.format(adf_type_id_to_str(v.type_id, type_map), v.type_id, v.info_offset, v.info_offset, v.data_offset, v.data_offset)
+        type_def = type_map.get(v.type_id, TypeDef())
+        
+        s = s + '  ' * indent + '{}(0x{:08X}), Data Offset: {}(0x{:08x})'.format(
+            adf_type_id_to_str(v.type_id, type_map), v.type_id, v.data_offset, v.data_offset)
+
+        if v.bit_offset is not None:
+            s = s + '[{}]'.format(v.bit_offset)
+
+        if v.data_offset != v.info_offset:
+            s = s + ', Info Offset: {}(0x{:08x})'.format(v.info_offset, v.info_offset)
+
+        if v.comment is not None:
+            s = s + '  # {}'.format(v.comment)
 
         s = s + '\n'
 
@@ -367,32 +387,32 @@ def adf_format(v, type_map, indent=0):
 
         return s
     elif isinstance(v, dict):
-        s = '  ' * indent + '{\n'
+        # s = s + '  ' * indent + '{\n'
         for k, iv in v.items():
             s = s + '  ' * (indent+1) + k + ':\n'
             s = s + adf_format(iv, type_map, indent + 2)
-        s = s + '  ' * indent + '}\n'
+        # s = s + '  ' * indent + '}\n'
     elif isinstance(v, list):
-        s = '  ' * indent + '[\n'
+        # s = s + '  ' * indent + '[\n'
         for iv in v:
             s = s + adf_format(iv, type_map, indent + 1)
-        s = s + '  ' * indent + ']\n'
+        # s = s + '  ' * indent + ']\n'
     else:
         s = '  ' * indent + '{}\n'.format(v)
 
     return s
 
 
-def adf_convert_to_value_only(v):
+def adf_value_extract(v):
     if isinstance(v, AdfValue):
-        return adf_convert_to_value_only(v.value)
+        return adf_value_extract(v.value)
     elif isinstance(v, dict):
         n = {}
         for k, iv in v.items():
-            n[k] = adf_convert_to_value_only(iv)
+            n[k] = adf_value_extract(iv)
         return n
     elif isinstance(v, list):
-        return [adf_convert_to_value_only(iv) for iv in v]
+        return [adf_value_extract(iv) for iv in v]
     else:
         return v
 
@@ -430,14 +450,13 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         v = f.read_f64()
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == 0x8955583e:
-        v = f.read_u64()
+        offset = f.read_u32()
+        length = f.read_u32()
         opos = f.tell()
-        offset = v & 0xffffffff
         f.seek(offset)
         # TODO Size may be needed for byte codes?
-        # size = (v >> 32) & 0xffffffff
-        # assert(size == 0)
-        # v = f.read_c8(size)
+
+        # v = f.read_c8(length)
         # v = b''.join(v)
         v = f.read_strz()
 
@@ -563,25 +582,33 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 # print(nm, vt)
             p1 = f.tell()
             f.seek(p0 + type_def.size)
-            # print(p0, p1, p1-p0, type_def.size)
+
+            v = AdfValue(v, type_id, p0 + abs_offset)
+
         elif type_def.metatype == 2:  # Pointer
             v0 = f.read_u64()
             v = (v0, 'NOTE: {}: {:016x} to {:08x}'.format(type_def.name, v0, type_def.element_type_hash))
             # TODO not sure how this is used yet, but it's used by effects so lower priority
             # raise AdfTypeMissing(type_id)
-        elif type_def.metatype == 3:  # Array
-            v0 = f.read_u32(4)
-            opos = f.tell()
+        elif type_def.metatype == 3 or type_def.metatype == 4:  # Array or Inline Array
+            if type_def.metatype == 3:
+                v0 = f.read_u32(4)
+                opos = f.tell()
 
-            offset = v0[0]
-            flags = v0[1]
-            length = v0[2]
-            unknown = v0[3]
-            align = None
-            # aligning based on element size info
-            # if type_def.element_type_hash not in prim_types:
-            #     align = 4
-            f.seek(offset)
+                offset = v0[0]
+                flags = v0[1]
+                length = v0[2]
+                unknown = v0[3]
+                align = None
+                # aligning based on element size info
+                # if type_def.element_type_hash not in prim_types:
+                #     align = 4
+                f.seek(offset)
+            else:
+                opos = None
+                offset = f.tell()
+                length = type_def.element_length
+                align = None
 
             if type_def.element_type_hash == typedef_u8:
                 # v = list(f.read_u8(length))
@@ -617,15 +644,11 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                     v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
                     p1 = f.tell()
                     # print(p0, p1, p1-p0)
-            f.seek(opos)
+
+            if opos is not None:
+                f.seek(opos)
 
             v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
-        elif type_def.metatype == 4:  # Inline Array
-            v = [None] * type_def.element_length
-            for i in range(type_def.element_length):
-                v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
-
-            v = AdfValue(v, type_id, dpos + abs_offset)
         elif type_def.metatype == 7:  # BitField
             if type_def.size == 1:
                 v = f.read_u8()
@@ -641,6 +664,8 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             if bit_offset is None:
                 raise Exception('Missing bit offset')
             v = (v >> bit_offset) & 1
+
+            v = AdfValue(v, type_id, dpos + abs_offset, bit_offset=bit_offset)
         elif type_def.metatype == 8:  # Enumeration
             if type_def.size != 4:
                 raise Exception('Unknown enum size')
@@ -649,28 +674,30 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 vs = type_def.members[v].name
             else:
                 vs = None
-            v = [v, vs]
+
+            v = AdfValue(v, type_id, dpos + abs_offset, comment=vs)
         elif type_def.metatype == 9:  # String Hash
             if type_def.size == 4:
                 v = f.read_u32()
                 if v in map_stringhash:
-                    v = map_stringhash[v].value
+                    vs = map_stringhash[v].value
                 elif v == 0xDEADBEEF:
-                    v = b''
+                    vs = b''
                 else:
-                    v = (v, 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v))
+                    vs = 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v)
             elif type_def.size == 6:
                 v0 = f.read_u32()
                 v1 = f.read_u16()
                 v = v1 << 32 | v0
-                v = (v, 'OBJID {} 0x{:016x}'.format(type_def.size, v))
+                vs = 'OBJID {} 0x{:016x}'.format(type_def.size, v)
             elif type_def.size == 8:
                 v = f.read_u64()
-                v = (v, 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v))
+                vs = 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v)
             else:
                 v = f.read(type_def.size)
-                v = (v, 'NOT EXPECTED {}'.format(type_def.size))
+                vs = 'NOT EXPECTED {}'.format(type_def.size)
 
+            v = AdfValue(v, type_id, dpos + abs_offset, comment=vs)
         else:
             raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
 
@@ -702,6 +729,7 @@ class Adf:
         self.map_instance = {}
 
         self.found_strings = set()
+        self.table_instance_full_values = []
         self.table_instance_values = []
 
     def dump_to_string(self):
@@ -740,14 +768,15 @@ class Adf:
             sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
 
         sbuf = sbuf + '\n--------instances\n'
-        for info, v in zip(self.table_instance, self.table_instance_values):
+        for info, v, fv in zip(self.table_instance, self.table_instance_values, self.table_instance_full_values):
             sbuf = sbuf + 'instances\t{:08x}\t{:08x}\t{}\t{}\t{}\t{:08x}-{:08x}\n'.format(
                 info.name_hash,
                 info.type_hash,
                 info.name.decode('utf-8'),
                 info.offset, info.size, info.offset, info.offset + info.size)
 
-            sbuf = sbuf + adf_format(v, self.map_typedef) + '\n'
+            # sbuf = sbuf + pformat(v, width=1024) + '\n'
+            sbuf = sbuf + adf_format(fv, self.map_typedef) + '\n'
 
         return sbuf
 
@@ -820,6 +849,7 @@ class Adf:
 
         self.found_strings = set()
         self.table_instance_values = [None] * len(self.table_instance)
+        self.table_instance_full_values = [None] * len(self.table_instance)
         for i in range(len(self.table_instance)):
             ins = self.table_instance[i]
             fp.seek(ins.offset)
@@ -827,7 +857,8 @@ class Adf:
             buf = fp.read(ins.size)
             with ArchiveFile(io.BytesIO(buf)) as f:
                 v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name, ins.offset, found_strings=self.found_strings)
-                self.table_instance_values[i] = v
+                self.table_instance_full_values[i] = v
+                self.table_instance_values[i] = adf_value_extract(v)
             # except AdfTypeMissing as ae:
             #     print('Missing HASHID {:08x}'.format(ae.hashid))
             # except Exception as exp:
@@ -870,6 +901,7 @@ def load_adf_bare(buffer, adf_type, offset, size):
 
             obj.found_strings = set()
             obj.table_instance_values = [None] * len(obj.table_instance)
+            obj.table_instance_full_values = [None] * len(obj.table_instance)
             for i in range(len(obj.table_instance)):
                 ins = obj.table_instance[i]
                 # try:
@@ -878,7 +910,8 @@ def load_adf_bare(buffer, adf_type, offset, size):
                     v = read_instance(
                         f, ins.type_hash, obj.map_typedef, obj.map_stringhash, obj.table_name,
                         0, found_strings=obj.found_strings)
-                    obj.table_instance_values[i] = v
+                    obj.table_instance_full_values[i] = v
+                    obj.table_instance_values[i] = adf_value_extract(v)
                 # except AdfTypeMissing as ae:
                 #     print('Missing HASHID {:08x}'.format(ae.hashid))
                 # except Exception as exp:

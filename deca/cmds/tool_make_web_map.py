@@ -1,7 +1,7 @@
 from deca.ff_vfs import vfs_structure_open
 from deca.ff_avtx import Ddsc
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
-from deca.ff_adf import load_adf, load_adf_bare, adf_convert_to_value_only
+from deca.ff_adf import load_adf, load_adf_bare
 from deca.file import ArchiveFile
 from deca.ff_types import *
 from PIL import Image
@@ -17,15 +17,13 @@ def process_translation_adf(f, sz):
     buffer = f.read(sz)
     adf = load_adf(buffer)
 
-    adf_instance = adf_convert_to_value_only(adf.table_instance_values[0])
-    txt_buffer = adf_instance['Text']
+    txt_buffer = adf.table_instance_values[0]['Text']
     txt_buffer = [(t + 256) % 256 for t in txt_buffer]
     txt_buffer = bytearray(txt_buffer)
 
     tr = {}
     with ArchiveFile(io.BytesIO(txt_buffer)) as tf:
-        adf_instance = adf_convert_to_value_only(adf.table_instance_values[0])
-        for prs in adf_instance['SortedPairs']:
+        for prs in adf.table_instance_values[0]['SortedPairs']:
             tf.seek(prs['TextOffset'])
             text = tf.read_strz().decode('utf-8')
             tf.seek(prs['NameOffset'])
@@ -236,8 +234,7 @@ def tool_make_web_map(vfs, wdir, copy_support_files):
                 buffer = f.read(vnode.offset + vnode.size_u)
                 bmp_adf = load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
 
-        bmp_adf_instance = adf_convert_to_value_only(bmp_adf.table_instance_values[0])
-        bitfield = bmp_adf_instance['Layers'][0]['Bitfield']
+        bitfield = bmp_adf.table_instance_values[0]['Layers'][0]['Bitfield']
         bitfield = np.asarray(bitfield, dtype=np.uint32).data
 
         aimg = np.frombuffer(bitfield, count=8 * 1024, dtype=np.uint8)
@@ -458,8 +455,7 @@ def tool_make_web_map(vfs, wdir, copy_support_files):
         adf = load_adf(buffer)
 
     collectables = []
-    adf_instance = adf_convert_to_value_only(adf.table_instance_values[0])
-    for v in adf_instance['Collectibles']:
+    for v in adf.table_instance_values[0]['Collectibles']:
         obj_id = v['ID']
         cid = v['Name'].decode('utf-8')
         name = cid

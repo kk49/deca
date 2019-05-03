@@ -1,6 +1,7 @@
 import sys
 import io
 import os
+import enum
 from deca.errors import *
 from deca.file import ArchiveFile, SubsetFile
 from deca.util import dump_block
@@ -234,7 +235,20 @@ class InstanceEntry:
     #     return v
 
 
-MetaTypeString = ['Primative', 'Structure', 'Pointer', 'Array', 'InlineArray', 'String', '6', 'BitField', 'Enumeration', 'StringHash']
+class MetaType(enum.IntEnum):
+    Primative = 0
+    Structure = 1
+    Pointer = 2
+    Array = 3
+    InlineArray = 4
+    String = 5
+    MetaType6 = 6
+    Bitfield = 7
+    Enumeration = 8
+    StringHash = 9
+
+
+# MetaTypeString = ['Primative', 'Structure', 'Pointer', 'Array', 'InlineArray', 'String', '6', 'BitField', 'Enumeration', 'StringHash']
 
 typedef_s8 = 0x580D0A62
 typedef_u8 = 0x0ca2821d
@@ -285,7 +299,7 @@ def dump_type(type_id, type_map, offset=0):
     type_def = type_map[type_id]
 
     space = ' ' * offset
-    sbuf = space + MetaTypeString[type_def.metatype] + '\n'
+    sbuf = space + '{}\n'.format(MetaType(type_def.metatype).name)
     if type_def.metatype == 0:  # Primative
         pass
     elif type_def.metatype == 1:  # Structure
@@ -320,17 +334,17 @@ def adf_type_id_to_str(type_id, type_map):
     if type_def.metatype == 0:  # Primative
         pass
     elif type_def.metatype == 1:  # Structure
-        return 'Structure: TODO'
+        return 'Structure'
     elif type_def.metatype == 2:  # Pointer
-        return 'Pointer: TODO'
+        return 'Pointer'
     elif type_def.metatype == 3:  # Array
-        return 'Array of {}'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
+        return 'Array of {}s'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
     elif type_def.metatype == 4:  # Inline Array
-        return 'Inline Array of {}'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
+        return 'Inline Array of {}s'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
     elif type_def.metatype == 7:  # BitField
-        return 'Bitfield: TODO'
+        return 'Bitfield'
     elif type_def.metatype == 8:  # Enumeration
-        return 'Enum: TODO'
+        return 'Enum'
     elif type_def.metatype == 9:  # String Hash
         return 'String Hash'
     else:
@@ -368,8 +382,9 @@ def adf_format(v, type_map, indent=0):
     s = ''
     if isinstance(v, AdfValue):
         type_def = type_map.get(v.type_id, TypeDef())
-        
-        s = s + '  ' * indent + '{}(0x{:08X}), Data Offset: {}(0x{:08x})'.format(
+
+        s = ''
+        s = s + '{}(0x{:08X}), Data Offset: {}(0x{:08x})'.format(
             adf_type_id_to_str(v.type_id, type_map), v.type_id, v.data_offset, v.data_offset)
 
         if v.bit_offset is not None:
@@ -378,29 +393,45 @@ def adf_format(v, type_map, indent=0):
         if v.data_offset != v.info_offset:
             s = s + ', Info Offset: {}(0x{:08x})'.format(v.info_offset, v.info_offset)
 
-        if v.comment is not None:
-            s = s + '  # {}'.format(v.comment)
-
-        s = s + '\n'
-
-        s = s + adf_format(v.value, type_map, indent+1)
+        value_info = s
+        s = ''
+        if type_def.metatype is None or type_def.metatype == MetaType.Primative:
+            s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
+        elif type_def.metatype == MetaType.Structure:
+            s = s + '  ' * indent + '# ' + value_info + '\n'
+            s = s + '  ' * indent + '{\n'
+            for k, iv in v.value.items():
+                s = s + '  ' * (indent + 1) + k + ':\n'
+                s = s + adf_format(iv, type_map, indent + 2)
+            s = s + '  ' * indent + '}\n'
+        elif type_def.metatype == MetaType.Pointer:
+            s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
+        elif type_def.metatype in {MetaType.Array, MetaType.InlineArray}:
+            s = s + '  ' * indent + '# ' + value_info + '\n'
+            s = s + '  ' * indent + '[\n'
+            for iv in v.value:
+                s = s + adf_format(iv, type_map, indent + 1)
+            s = s + '  ' * indent + ']\n'
+        elif type_def.metatype == MetaType.String:
+            s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
+        elif type_def.metatype == MetaType.Bitfield:
+            s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
+        elif type_def.metatype == MetaType.Enumeration:
+            s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
+        elif type_def.metatype == MetaType.StringHash:
+            if type_def.size == 4:
+                vp = '0x{:08x}'.format(v.value)
+            elif type_def.size == 6:
+                vp = '0x{:012x}'.format(v.value)
+            elif type_def.size == 6:
+                vp = '0x{:016x}'.format(v.value)
+            else:
+                vp = v.value
+            s = s + '  ' * indent + '{} ({})  # {}\n'.format(v.comment, vp, value_info)
 
         return s
-    elif isinstance(v, dict):
-        # s = s + '  ' * indent + '{\n'
-        for k, iv in v.items():
-            s = s + '  ' * (indent+1) + k + ':\n'
-            s = s + adf_format(iv, type_map, indent + 2)
-        # s = s + '  ' * indent + '}\n'
-    elif isinstance(v, list):
-        # s = s + '  ' * indent + '[\n'
-        for iv in v:
-            s = s + adf_format(iv, type_map, indent + 1)
-        # s = s + '  ' * indent + ']\n'
     else:
-        s = '  ' * indent + '{}\n'.format(v)
-
-    return s
+        return '  ' * indent + '{}\n'.format(v)
 
 
 def adf_value_extract(v):

@@ -925,10 +925,10 @@ class VfsStructure:
 
         assoc_strings = {}
         for k, v in vpath_map.nodes.items():
-            file_ext = k.decode('utf-8').split('.', 1)
-            if len(file_ext) == 2:
+            file_ext = os.path.splitext(k.decode('utf-8'))
+            if len(file_ext[0]) > 0 and len(file_ext[1]) > 0:
                 file = file_ext[0]
-                ext = '.' + file_ext[1]
+                ext = file_ext[1]
                 for pe in pair_exts:
                     if ext in pe:
                         for pk, pv in pe.items():

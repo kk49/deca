@@ -328,6 +328,8 @@ def dump_type(type_id, type_map, offset=0):
 def adf_type_id_to_str(type_id, type_map):
     if type_id in prim_type_names:
         return prim_type_names[type_id]
+    if type_id == 0xdefe88ed:
+        return 'OPTIONAL'
 
     type_def = type_map[type_id]
 
@@ -395,7 +397,10 @@ def adf_format(v, type_map, indent=0):
 
         value_info = s
         s = ''
-        if type_def.metatype is None or type_def.metatype == MetaType.Primative:
+        if v.type_id == 0xdefe88ed:
+            s = s + '  ' * indent + '# {}\n'.format(value_info)
+            s = s + adf_format(v.value, type_map, indent)
+        elif type_def.metatype is None or type_def.metatype == MetaType.Primative:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
         elif type_def.metatype == MetaType.Structure:
             s = s + '  ' * indent + '# ' + value_info + '\n'
@@ -507,7 +512,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             f.seek(v0[0])
             v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
             f.seek(opos)
-            v = AdfValue(v, v0[2], dpos + abs_offset, v0[0] + abs_offset)
+            v = AdfValue(v, type_id, dpos + abs_offset, v0[0] + abs_offset)
     elif type_id == 0x178842fe:  # gdc/global.gdcc
         # TODO this should probably be it's own file type and the adf should be considered a wrapper
         v = []

@@ -862,10 +862,16 @@ class VfsStructure:
             guess_strings['settings/hp_settings/reserve_{}.bin'.format(res_i)] = FTYPE_RTPC
             guess_strings['settings/hp_settings/reserve_{}.bl'.format(res_i)] = FTYPE_SARC
             guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
+            guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
             for zoom_i in [1, 2, 3]:
                 for index in range(500):
                     fn = 'textures/ui/map_reserve_{}/zoom{}/{}.ddsc'.format(res_i, zoom_i, index)
                     guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
+
+        for zoom_i in [1, 2, 3]:
+            for index in range(500):
+                fn = 'textures/ui/warboard_map/zoom{}/{}.ddsc'.format(zoom_i, index)
+                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
 
         for world in self.worlds:
             for i in range(64):
@@ -1002,16 +1008,19 @@ class VfsStructure:
                                     extras = [b'.hmddsc']
                                     for i in range(1, 16):
                                         extras.append('.atx{}'.format(i).encode('ascii'))
-                                    f_ddsc = self.file_obj_from(self.map_vpath_to_vfsnodes[filename_ddsc][0])
-                                    f_atxs = []
+
+                                    files = [
+                                        [filename_ddsc, self.file_obj_from(self.map_vpath_to_vfsnodes[filename_ddsc][0])]
+                                    ]
+
                                     for extra in extras:
                                         filename_atx = filename[0] + extra
                                         if filename_atx in self.map_vpath_to_vfsnodes:
-                                            f_atxs.append(self.file_obj_from(self.map_vpath_to_vfsnodes[filename_atx][0]))
+                                            files.append(
+                                                [filename_atx, self.file_obj_from(self.map_vpath_to_vfsnodes[filename_atx][0])]
+                                            )
                                     ddsc = Ddsc()
-                                    ddsc.load_ddsc(f_ddsc)
-                                    for atx in f_atxs:
-                                        ddsc.load_atx(atx)
+                                    ddsc.load_ddsc_atx(files)
 
                         if ddsc is not None:
                             ofile_img = ofile + '.png'
@@ -1050,23 +1059,37 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
     if logger is None:
         logger = Logger(working_dir)
 
+    version = 0
+    vfs = None
     cache_file = working_dir + 'vfs_cache.pickle'
     if os.path.isfile(cache_file):
         logger.log('LOADING: {} : {}'.format(game_info.game_dir, working_dir))
         with open(cache_file, 'rb') as f:
-            vfs = pickle.load(f)
+            data = pickle.load(f)
+
+        if isinstance(data, list):
+            version = data[0]
+            vfs = data[1]
+        else:
+            version = 1
+            vfs = data
+
         vfs.logger_set(logger)
         vfs.dump_status()
         logger.log('LOADING: COMPLETE')
-    else:
+
+    if version < 1:
         logger.log('CREATING: {} {}'.format(game_info.game_dir, working_dir))
 
         game_info.save(os.path.join(working_dir, 'project.json'))
 
+        version = 1
         vfs = VfsStructure(game_info, working_dir, logger)
         vfs.load_from_archives(debug=debug)
         with open(cache_file, 'wb') as f:
-            pickle.dump(vfs, f, protocol=pickle.HIGHEST_PROTOCOL)
+            data = [version, vfs]
+            data = vfs
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
         logger.log('CREATING: COMPLETE')
 
     vfs.working_dir = working_dir

@@ -114,6 +114,31 @@ def tool_make_web_map(vfs, wdir, copy_support_files):
 
         tileset_make(img, topo_dst_path)
 
+    # BUILD warboard map
+    topo_dst_path = wdir + 'map/z0/tile_wb'
+    if not os.path.isdir(topo_dst_path) or force_topo_tiles:  # this is slow so only do it once
+        # extract full res image
+        ai = []
+        for i in range(16):
+            ai.append([None] * 16)
+        for i in range(256):
+            x = i % 16
+            y = i // 16
+            fn = 'textures/ui/warboard_map/zoom3/{}.ddsc'.format(i)
+            fn = fn.encode('ascii')
+            vnode = vfs.map_vpath_to_vfsnodes[fn][0]
+            img = Ddsc()
+            with vfs.file_obj_from(vnode) as f:
+                img.load_ddsc(f)
+            ai[y][x] = img.mips[0].data
+
+        for i in range(16):
+            ai[i] = np.hstack(ai[i])
+        ai = np.vstack(ai)
+        img = Image.fromarray(ai)
+
+        tileset_make(img, topo_dst_path)
+
     # BUILD height map
     # extract full res image
     fn = b'terrain/global_heightfield.rawc'

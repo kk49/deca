@@ -7,7 +7,7 @@ from PIL import Image
 
 
 class DecaImage:
-    def __init__(self, sx=None, sy=None, depth_cnt=None, depth_idx=None, pixel_format=None, itype=None, data=None):
+    def __init__(self, sx=None, sy=None, depth_cnt=None, depth_idx=None, pixel_format=None, itype=None, data=None, filename=None):
         self.size_x = sx
         self.size_y = sy
         self.depth_cnt = depth_cnt
@@ -15,6 +15,7 @@ class DecaImage:
         self.pixel_format = pixel_format
         self.itype = itype
         self.data = data
+        self.filename = filename
 
     def pil_image(self):
         return Image.fromarray(self.data)
@@ -34,7 +35,7 @@ class Ddsc:
         im.convert('RGBA')
         self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='dds', data=np.array(im))]
 
-    def load_ddsc(self, f):
+    def load_ddsc(self, f, filename=None):
         header = f.read(128)
         fh = ArchiveFile(io.BytesIO(header))
 
@@ -89,8 +90,9 @@ class Ddsc:
             # print('Execute time: {} s'.format(t1 - t0))
             mip.itype = 'ddsc'
             mip.data = inp
+            mip.filename = filename
 
-    def load_atx(self, f):
+    def load_atx(self, f, filename=None):
         first_loaded = 0
         while first_loaded < len(self.mips):
             if self.mips[first_loaded].data is None:
@@ -124,7 +126,12 @@ class Ddsc:
 
             mip.itype = 'atx'
             mip.data = inp
+            mip.filename = filename
 
+    def load_ddsc_atx(self, files):
+        self.load_ddsc(files[0][1], filename=files[0][0])
+        for finfo in files[1:]:
+            self.load_atx(finfo[1], filename=finfo[0])
 
 # if dump:
 #     im = PIL.Image.fromarray(inp)

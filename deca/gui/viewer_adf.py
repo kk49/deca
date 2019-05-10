@@ -33,7 +33,7 @@ class DataViewerAdf(DataViewer):
 
         sbuf = ''
         if vnode.ftype == FTYPE_ADF_BARE:
-            obj = load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
+            obj = load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u, vfs.map_adftypes)
             if obj is None:
                 sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
             else:

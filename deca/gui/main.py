@@ -161,7 +161,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                     if node.used_at_runtime_depth is not None:
                         return used_color_calc(node.used_at_runtime_depth)
                 elif column == 5:
-                    if node.adf_type is not None and node.adf_type not in self.vfs.external_adf_types:
+                    if node.adf_type is not None and node.adf_type not in self.vfs.map_adftypes:
                         return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:
@@ -382,7 +382,7 @@ class VfsDirModel(QAbstractItemModel):
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
                 elif column == 5:
-                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.external_adf_types:
+                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.map_adftypes:
                         return QColor(Qt.red)
         return None
 
@@ -838,21 +838,21 @@ class MainWindow(QMainWindow):
         filename = QFileDialog.getOpenFileName(self, 'Create Project ...', game_loc, 'Game EXE (*.exe *.EXE)')
 
         if filename is not None and len(filename[0]) > 0:
-            exe_name = filename[0]
-            game_dir, exe_name = os.path.split(exe_name)
+            exe_path = filename[0]
+            game_dir, exe_name = os.path.split(exe_path)
             game_dir = os.path.join(game_dir, '')
 
             game_info = None
             if False:
                 pass
             elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-                game_info = GameInfoGZB(game_dir)
+                game_info = GameInfoGZB(game_dir, exe_name)
             elif exe_name.find('GenerationZero') >= 0:
-                game_info = GameInfoGZ(game_dir)
+                game_info = GameInfoGZ(game_dir, exe_name)
             elif exe_name.find('theHunterCotW') >= 0:
-                game_info = GameInfoTHCOTW(game_dir)
+                game_info = GameInfoTHCOTW(game_dir, exe_name)
             elif exe_name.find('JustCause3') >= 0:
-                game_info = GameInfoJC3(game_dir)
+                game_info = GameInfoJC3(game_dir, exe_name)
             else:
                 self.logger.log('Unknown Game {}'.format(filename))
 

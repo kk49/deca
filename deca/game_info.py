@@ -4,13 +4,15 @@ import json
 
 
 class GameInfo:
-    def __init__(self, game_dir, game_id):
+    def __init__(self, game_dir, exe_name, game_id):
         self.game_dir = game_dir
+        self.exe_name = exe_name
         self.game_id = game_id
 
     def save(self, filename):
         settings = {
             'game_dir': self.game_dir,
+            'exe_name': self.exe_name,
             'game_id': self.game_id,
             'archive_paths': self.archive_path(),
         }
@@ -38,8 +40,8 @@ class GameInfo:
 
 
 class GameInfoGZ(GameInfo):
-    def __init__(self, game_dir):
-        GameInfo.__init__(self, game_dir, 'gz')
+    def __init__(self, game_dir, exe_name):
+        GameInfo.__init__(self, game_dir, exe_name, 'gz')
 
     def archive_path(self):
         archive_paths = []
@@ -99,8 +101,8 @@ class GameInfoGZ(GameInfo):
 
 
 class GameInfoGZB(GameInfo):
-    def __init__(self, game_dir):
-        GameInfo.__init__(self, game_dir, 'gzb')
+    def __init__(self, game_dir, exe_name):
+        GameInfo.__init__(self, game_dir, exe_name, 'gzb')
 
     def archive_path(self):
         archive_paths = []
@@ -160,8 +162,8 @@ class GameInfoGZB(GameInfo):
 
 
 class GameInfoTHCOTW(GameInfo):
-    def __init__(self, game_dir):
-        GameInfo.__init__(self, game_dir, 'hp')
+    def __init__(self, game_dir, exe_name):
+        GameInfo.__init__(self, game_dir, exe_name, 'hp')
 
     def archive_path(self):
         archive_paths = []
@@ -211,8 +213,8 @@ class GameInfoTHCOTW(GameInfo):
 
 
 class GameInfoJC3(GameInfo):
-    def __init__(self, game_dir):
-        GameInfo.__init__(self, game_dir, 'jc3')
+    def __init__(self, game_dir, exe_name):
+        GameInfo.__init__(self, game_dir, exe_name, 'jc3')
 
     def archive_path(self):
         archive_paths = []
@@ -267,15 +269,16 @@ def game_info_load(project_file):
     with open(project_file) as f:
         settings = json.load(f)
     game_dir = settings['game_dir']
+    exe_name = settings['exe_name']
     game_id = settings['game_id']
 
     if game_id == 'gz':
-        return GameInfoGZ(game_dir)
+        return GameInfoGZ(game_dir, exe_name)
     elif game_id == 'hp':
-        return GameInfoTHCOTW(game_dir)
+        return GameInfoTHCOTW(game_dir, exe_name)
     elif game_id == 'jc3':
-        return GameInfoJC3(game_dir)
+        return GameInfoJC3(game_dir, exe_name)
     elif game_id == 'gzb':
-        return GameInfoGZB(game_dir)
+        return GameInfoGZB(game_dir, exe_name)
     else:
         raise NotImplementedError()

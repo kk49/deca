@@ -12,7 +12,7 @@ from deca.file import ArchiveFile, SubsetFile
 from deca.game_info import GameInfo, game_info_load
 from deca.ff_types import *
 from deca.ff_txt import load_json
-from deca.ff_adf import load_adf, load_adf_bare, AdfTypeMissing, GdcArchiveEntry
+from deca.ff_adf import load_adf, load_adf_bare, AdfTypeMissing, GdcArchiveEntry, extract_adftypes_from_exe
 from deca.ff_adf_export_import import adf_export
 from deca.ff_rtpc import Rtpc
 from deca.ff_aaf import extract_aaf
@@ -179,7 +179,8 @@ class VfsStructure:
         for widx in range(8):
             self.worlds.append('worlds/world{}/'.format(widx))
 
-        self.external_adf_types = None
+        self.map_adftypes = {}
+        self.map_adftype_filenames = {}
 
         self.working_dir = working_dir
         self.logger = logger
@@ -279,6 +280,12 @@ class VfsStructure:
                     node.used_depth_set(pnode.used_at_runtime_depth + 1)
 
         return node
+
+    def extract_adftypes_from_exe(self, debug=False):
+        save_dir = os.path.join(self.working_dir, 'adf_types')
+        os.makedirs(save_dir, exist_ok=True)
+        exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
+        self.map_adftypes, self.map_adftype_filenames = extract_adftypes_from_exe(exe_path, save_dir)
 
     def load_from_archives(self, ver=3, debug=False):  # game_dir, archive_paths,
         self.logger.log('find all tab/arc files')
@@ -1085,6 +1092,11 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
 
         version = 1
         vfs = VfsStructure(game_info, working_dir, logger)
+
+        # parse exe
+        vfs.extract_adftypes_from_exe(debug=debug)
+
+        # parse archive files
         vfs.load_from_archives(debug=debug)
         with open(cache_file, 'wb') as f:
             data = [version, vfs]
@@ -1093,20 +1105,6 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
         logger.log('CREATING: COMPLETE')
 
     vfs.working_dir = working_dir
-
-    # find external adf types
-    vfs.external_adf_types = {}
-    adftype_path = './resources/adf/'
-    if os.path.isdir(adftype_path):
-        files = os.listdir(adftype_path)
-        for file in files:
-            fn0, ext0 = os.path.splitext(file)
-            fn, ext = os.path.splitext(fn0)
-            try:
-                adftype_hash = int(fn, 16)
-                vfs.external_adf_types[adftype_hash] = adftype_path + file
-            except ValueError:
-                pass
 
     return vfs
 

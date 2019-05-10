@@ -2,6 +2,8 @@ import sys
 import io
 import os
 import enum
+import pickle
+from io import BytesIO
 from deca.errors import *
 from deca.file import ArchiveFile, SubsetFile
 from deca.util import dump_block
@@ -59,8 +61,6 @@ class StringHash:
         self.value_hash = f.read_u32()
         self.unknown = f.read_u32()
 
-        # print(self.value, self.value_hash, self.unknown)
-
 
 class MemberDef:
     def __init__(self):
@@ -95,20 +95,17 @@ class EnumDef:
         # print(self.name, self.value)
 
 
-'''
-        public enum TypeDefinitionType : uint
-        {
-            Primitive = 0,
-            Structure = 1,
-            Pointer = 2,
-            Array = 3,
-            InlineArray = 4,
-            String = 5,
-            BitField = 7,
-            Enumeration = 8,
-            StringHash = 9,
-        }
-'''
+class MetaType(enum.IntEnum):
+    Primative = 0
+    Structure = 1
+    Pointer = 2
+    Array = 3
+    InlineArray = 4
+    String = 5
+    MetaType6 = 6
+    Bitfield = 7
+    Enumeration = 8
+    StringHash = 9
 
 
 class TypeDef:
@@ -169,44 +166,6 @@ class TypeDef:
         else:
             raise Exception('Unknown Typedef Type {}'.format(self.metatype))
 
-    # def read(self, type_systems, f):
-    #     if self.metatype == 0:  # Primative
-    #         pass
-    #     elif self.metatype == 1:  # Structure
-    #         v = {}
-    #         for m in self.members:
-    #             v[m.name] = m.read(type_systems, f)
-    #         return v
-    #     elif self.metatype == 2:  # Pointer
-    #         raise Exception('Not Implement')
-    #     elif self.metatype == 3:  # Array
-    #         raise Exception('Not Implement')
-    #     elif self.metatype == 4:  # Inline Array
-    #         raise Exception('Not Implement')
-    #     elif self.metatype == 7:  # BitField
-    #         raise Exception('Not Implement')
-    #     elif self.metatype == 8:  # Enumeration
-    #         raise Exception('Not Implement')
-    #     elif self.metatype == 9:  # String Hash
-    #         raise Exception('Not Implement')
-    #     else:
-    #         raise Exception('Unknown Typedef Type {}'.format(self.metatype))
-
-
-'''
- public uint NameHash;
-            public uint TypeHash;
-            public uint Offset;
-            public uint Size;
-            public string Name;
-            public MemoryStream Data; // instance data (from offset to offset+size)
-            public List<InstanceMemberInfo> Members; // members of instance info
-            public TypeDefinition Type;
-            public int InlineArrayIndex; // The index of the member after which to put the inline array
-            public uint MinInlineArraySize; // I don't like this, but that's the only solution for some ADF files...
-
-'''
-
 
 class InstanceEntry:
     def __init__(self):
@@ -233,22 +192,6 @@ class InstanceEntry:
     #     f.seek(self.offset)
     #     v = td.read(type_systems, f)
     #     return v
-
-
-class MetaType(enum.IntEnum):
-    Primative = 0
-    Structure = 1
-    Pointer = 2
-    Array = 3
-    InlineArray = 4
-    String = 5
-    MetaType6 = 6
-    Bitfield = 7
-    Enumeration = 8
-    StringHash = 9
-
-
-# MetaTypeString = ['Primative', 'Structure', 'Pointer', 'Array', 'InlineArray', 'String', '6', 'BitField', 'Enumeration', 'StringHash']
 
 typedef_s8 = 0x580D0A62
 typedef_u8 = 0x0ca2821d
@@ -435,6 +378,14 @@ def adf_format(v, type_map, indent=0):
             s = s + '  ' * indent + '{} ({})  # {}\n'.format(v.comment, vp, value_info)
 
         return s
+    elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], GdcArchiveEntry):
+        s = ''
+        s = s + '  ' * indent + '[\n'
+        for ent in v:
+            s = s + '  ' * (indent + 1) + '{}\n'.format(ent)
+        s = s + '  ' * indent + ']\n'
+
+        return s
     else:
         return '  ' * indent + '{}\n'.format(v)
 
@@ -453,7 +404,7 @@ def adf_value_extract(v):
         return v
 
 
-def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset, bit_offset=None, found_strings=None):
+def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset=None, found_strings=None):
     dpos = f.tell()
     if type_id == typedef_s8:
         v = f.read_s8()
@@ -510,7 +461,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
         else:
             opos = f.tell()
             f.seek(v0[0])
-            v = read_instance(f, v0[2], map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
+            v = read_instance(f, v0[2], map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
             f.seek(opos)
             v = AdfValue(v, type_id, dpos + abs_offset, v0[0] + abs_offset)
     elif type_id == 0x178842fe:  # gdc/global.gdcc
@@ -613,7 +564,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
             for m in type_def.members:
                 f.seek(p0 + m.offset)
                 nm = m.name.decode('utf-8')
-                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, table_name, abs_offset, bit_offset=m.bit_offset, found_strings=found_strings)
+                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, abs_offset, bit_offset=m.bit_offset, found_strings=found_strings)
                 v[nm] = vt
                 # print(nm, vt)
             p1 = f.tell()
@@ -677,7 +628,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                     if align is not None:
                         nudge = (align - p0 % align) % align
                         f.seek(p0 + nudge)  # v0[0] offset ele 0, v0[1] stride?
-                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, table_name, abs_offset, found_strings=found_strings)
+                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
                     p1 = f.tell()
                     # print(p0, p1, p1-p0)
 
@@ -698,7 +649,9 @@ def read_instance(f, type_id, map_typdef, map_stringhash, table_name, abs_offset
                 raise Exception('Unknown bitfield size')
 
             if bit_offset is None:
-                raise Exception('Missing bit offset')
+                bit_offset = 0
+                print('Missing bit offset')
+                # raise Exception('Missing bit offset')
             v = (v >> bit_offset) & 1
 
             v = AdfValue(v, type_id, dpos + abs_offset, bit_offset=bit_offset)
@@ -753,9 +706,9 @@ class Adf:
         self.nametable_offset = None
         self.total_size = None
 
-        self.unknown = None
+        self.unknown = []
 
-        self.comment = ''
+        self.comment = b''
         self.table_name = []
         self.table_stringhash = []
         self.map_stringhash = {}
@@ -799,9 +752,10 @@ class Adf:
 
         sbuf = sbuf + '\n--------typedefs\n'
         # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
-        for v in self.map_typedef.items():
-            sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
-            sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
+        if len(self.table_typedef) > 0:  # handle adfb by not printing out entire type table
+            for v in self.map_typedef.items():
+                sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
+                sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
 
         sbuf = sbuf + '\n--------instances\n'
         for info, v, fv in zip(self.table_instance, self.table_instance_values, self.table_instance_full_values):
@@ -816,7 +770,7 @@ class Adf:
 
         return sbuf
 
-    def deserialize(self, fp):
+    def deserialize(self, fp, process_instances=True):
         header = fp.read(0x40)
 
         fh = ArchiveFile(io.BytesIO(header))
@@ -886,19 +840,20 @@ class Adf:
         self.found_strings = set()
         self.table_instance_values = [None] * len(self.table_instance)
         self.table_instance_full_values = [None] * len(self.table_instance)
-        for i in range(len(self.table_instance)):
-            ins = self.table_instance[i]
-            fp.seek(ins.offset)
-            # try:
-            buf = fp.read(ins.size)
-            with ArchiveFile(io.BytesIO(buf)) as f:
-                v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, self.table_name, ins.offset, found_strings=self.found_strings)
-                self.table_instance_full_values[i] = v
-                self.table_instance_values[i] = adf_value_extract(v)
-            # except AdfTypeMissing as ae:
-            #     print('Missing HASHID {:08x}'.format(ae.hashid))
-            # except Exception as exp:
-            #     print(exp)
+        if process_instances:
+            for i in range(len(self.table_instance)):
+                ins = self.table_instance[i]
+                fp.seek(ins.offset)
+                # try:
+                buf = fp.read(ins.size)
+                with ArchiveFile(io.BytesIO(buf)) as f:
+                    v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, ins.offset, found_strings=self.found_strings)
+                    self.table_instance_full_values[i] = v
+                    self.table_instance_values[i] = adf_value_extract(v)
+                # except AdfTypeMissing as ae:
+                #     print('Missing HASHID {:08x}'.format(ae.hashid))
+                # except Exception as exp:
+                #     print(exp)
 
 
 def load_adf(buffer):
@@ -911,50 +866,87 @@ def load_adf(buffer):
             return None
 
 
-def load_adf_bare(buffer, adf_type, offset, size):
-    fn = os.path.join('./resources/adf', '{:08X}.full.adf'.format(adf_type))
-
-    if os.path.isfile(fn):
-        try:
-            obj = Adf()
-
-            with ArchiveFile(open(fn, 'rb')) as fp:
-                obj.deserialize(fp)
-
-            # instance
-            obj.table_instance = [InstanceEntry()]
-            obj.map_instance = {}
-            obj.instance_count = 1
-            obj.instance_offset = None
-
-            obj.table_instance[0].name = b'instance'
-            obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
-            obj.table_instance[0].type_hash = adf_type
-            obj.table_instance[0].offset = offset
-            obj.table_instance[0].size = size
-
-            obj.map_instance[obj.table_instance[0].name_hash] = obj.table_instance[0]
-
-            obj.found_strings = set()
-            obj.table_instance_values = [None] * len(obj.table_instance)
-            obj.table_instance_full_values = [None] * len(obj.table_instance)
-            for i in range(len(obj.table_instance)):
-                ins = obj.table_instance[i]
-                # try:
-                with ArchiveFile(io.BytesIO(buffer)) as f:
-                    f.seek(ins.offset)
-                    v = read_instance(
-                        f, ins.type_hash, obj.map_typedef, obj.map_stringhash, obj.table_name,
-                        0, found_strings=obj.found_strings)
-                    obj.table_instance_full_values[i] = v
-                    obj.table_instance_values[i] = adf_value_extract(v)
-                # except AdfTypeMissing as ae:
-                #     print('Missing HASHID {:08x}'.format(ae.hashid))
-                # except Exception as exp:
-                #     print(exp)
-
-            return obj
-        except DecaErrorParse:
-            return None
-    else:
+def load_adf_bare(buffer, adf_type, offset, size, map_typedef):
+    if adf_type not in map_typedef:
         return None
+
+    try:
+        obj = Adf()
+
+        # instance
+        obj.table_instance = [InstanceEntry()]
+        obj.map_instance = {}
+        obj.instance_count = 1
+        obj.instance_offset = None
+
+        obj.map_typedef = map_typedef
+
+        obj.table_instance[0].name = b'instance'
+        obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
+        obj.table_instance[0].type_hash = adf_type
+        obj.table_instance[0].offset = offset
+        obj.table_instance[0].size = size
+
+        obj.map_instance[obj.table_instance[0].name_hash] = obj.table_instance[0]
+
+        obj.found_strings = set()
+        obj.table_instance_values = [None] * len(obj.table_instance)
+        obj.table_instance_full_values = [None] * len(obj.table_instance)
+        for i in range(len(obj.table_instance)):
+            ins = obj.table_instance[i]
+            # try:
+            with ArchiveFile(io.BytesIO(buffer)) as f:
+                f.seek(ins.offset)
+                v = read_instance(
+                    f, ins.type_hash, obj.map_typedef, obj.map_stringhash, ins.offset, found_strings=obj.found_strings)
+                obj.table_instance_full_values[i] = v
+                obj.table_instance_values[i] = adf_value_extract(v)
+            # except AdfTypeMissing as ae:
+            #     print('Missing HASHID {:08x}'.format(ae.hashid))
+            # except Exception as exp:
+            #     print(exp)
+
+        return obj
+    except DecaErrorParse:
+        return None
+
+
+def extract_adftypes_from_exe(exepath, dst_dir):
+    exe_stat = os.stat(exepath)
+
+    map_type_filename = {}
+    map_type = {}
+
+    with open(exepath, 'rb') as f:
+        exe = f.read(exe_stat.st_size)
+
+    poss = 0
+    while True:
+        poss = exe.find(b' FDA\x04\x00\x00\x00', poss+1)
+        if poss < 0:
+            break
+        exe_short = exe[poss:]
+        with ArchiveFile(BytesIO(exe_short)) as f:
+            adf = Adf()
+            adf.deserialize(f, process_instances=False)
+
+            exe_short = exe[poss:poss+adf.total_size]
+            fn = 'offset_{:08x}.adf'.format(poss)
+            fn_full = os.path.join(dst_dir, fn)
+            with open(fn_full, 'wb') as fw:
+                fw.write(exe_short)
+
+            for k, v in adf.map_typedef.items():
+                ts = map_type_filename.get(k, set())
+                ts.add(fn)
+                map_type_filename[k] = ts
+                map_type[k] = v
+
+    with open(os.path.join(dst_dir, 'map_type_filename.pickle'), 'wb') as fw:
+        pickle.dump(map_type_filename, fw)
+    with open(os.path.join(dst_dir, 'map_type.pickle'), 'wb') as fw:
+        pickle.dump(map_type, fw)
+
+    return map_type, map_type_filename
+
+

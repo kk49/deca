@@ -13,7 +13,6 @@ dist/
 build/
 scratch/
 procmon_csv/
-resources/adf/
 process_image.*
 deca/process_image_python.c*
 deca/process_image_python.html

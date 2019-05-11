@@ -436,6 +436,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
     elif type_id == typedef_f64:
         v = f.read_f64()
         v = AdfValue(v, type_id, dpos + abs_offset)
+
     elif type_id == 0x8955583e:
         offset = f.read_u32()
         length = f.read_u32()
@@ -453,6 +454,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
         f.seek(opos)
 
         v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
+
     # TODO: optional type? this seems to be missing in some cases, i.e. the case of meshc files for CharacterMesh1UVMesh
     elif type_id == 0xdefe88ed:  # Optional value
         v0 = f.read_u32(4)
@@ -464,6 +466,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
             v = read_instance(f, v0[2], map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
             f.seek(opos)
             v = AdfValue(v, type_id, dpos + abs_offset, v0[0] + abs_offset)
+
     elif type_id == 0x178842fe:  # gdc/global.gdcc
         # TODO this should probably be it's own file type and the adf should be considered a wrapper
         v = []
@@ -541,16 +544,6 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 idx += 1
             v = dir_contents
 
-    elif type_id == 0xb5b062f1:  # MDIC
-        # TODO this should probably be it's own file type and the adf should be considered a wrapper
-        v = []
-        while True:
-            t = f.read_u8()
-            if t is None:
-                break
-            v.append(t)
-        v = bytearray(v)
-        # v = ['{:02x}'.format(v[i]) for i in range(len(v))]
     else:
         if type_id not in map_typdef:
             raise AdfTypeMissing(type_id)
@@ -712,8 +705,11 @@ class Adf:
         self.table_name = []
         self.table_stringhash = []
         self.map_stringhash = {}
+
         self.table_typedef = []
         self.map_typedef = {}
+        self.extended_map_typedef = {}
+
         self.table_instance = []
         self.map_instance = {}
 
@@ -766,11 +762,14 @@ class Adf:
                 info.offset, info.size, info.offset, info.offset + info.size)
 
             # sbuf = sbuf + pformat(v, width=1024) + '\n'
-            sbuf = sbuf + adf_format(fv, self.map_typedef) + '\n'
+            sbuf = sbuf + adf_format(fv, self.extended_map_typedef) + '\n'
 
         return sbuf
 
-    def deserialize(self, fp, process_instances=True):
+    def deserialize(self, fp, map_typedef=None, process_instances=True):
+        if map_typedef is None:
+            map_typedef = {}
+
         header = fp.read(0x40)
 
         fh = ArchiveFile(io.BytesIO(header))
@@ -821,11 +820,17 @@ class Adf:
 
         # typedef
         self.table_typedef = [TypeDef() for i in range(self.typedef_count)]
+
+        self.extended_map_typedef = {}
+        for k, v in map_typedef.items():
+            self.extended_map_typedef[k] = v
+
         self.map_typedef = {}
         fp.seek(self.typedef_offset)
         for i in range(self.typedef_count):
             self.table_typedef[i].deserialize(fp, self.table_name)
             self.map_typedef[self.table_typedef[i].type_hash] = self.table_typedef[i]
+            self.extended_map_typedef[self.table_typedef[i].type_hash] = self.table_typedef[i]
 
         # print(typedef_map)
 
@@ -847,7 +852,7 @@ class Adf:
                 # try:
                 buf = fp.read(ins.size)
                 with ArchiveFile(io.BytesIO(buf)) as f:
-                    v = read_instance(f, ins.type_hash, self.map_typedef, self.map_stringhash, ins.offset, found_strings=self.found_strings)
+                    v = read_instance(f, ins.type_hash, self.extended_map_typedef, self.map_stringhash, ins.offset, found_strings=self.found_strings)
                     self.table_instance_full_values[i] = v
                     self.table_instance_values[i] = adf_value_extract(v)
                 # except AdfTypeMissing as ae:
@@ -856,11 +861,11 @@ class Adf:
                 #     print(exp)
 
 
-def load_adf(buffer):
+def load_adf(buffer, map_typedef):
     with ArchiveFile(io.BytesIO(buffer)) as fp:
         obj = Adf()
         try:
-            obj.deserialize(fp)
+            obj.deserialize(fp, map_typedef)
             return obj
         except DecaErrorParse:
             return None

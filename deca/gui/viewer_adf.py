@@ -39,7 +39,7 @@ class DataViewerAdf(DataViewer):
             else:
                 sbuf = obj.dump_to_string()
         else:
-            obj = load_adf(buffer)
+            obj = load_adf(buffer, vfs.map_adftypes)
             if obj is not None:
                 sbuf = obj.dump_to_string()
         self.text_box.setText(sbuf)

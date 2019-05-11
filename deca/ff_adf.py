@@ -748,10 +748,9 @@ class Adf:
 
         sbuf = sbuf + '\n--------typedefs\n'
         # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
-        if len(self.table_typedef) > 0:  # handle adfb by not printing out entire type table
-            for v in self.map_typedef.items():
-                sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
-                sbuf = sbuf + dump_type(v[0], self.map_typedef, 2)
+        for v in self.map_typedef.items():
+            sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
+            sbuf = sbuf + dump_type(v[0], self.extended_map_typedef, 2)
 
         sbuf = sbuf + '\n--------instances\n'
         for info, v, fv in zip(self.table_instance, self.table_instance_values, self.table_instance_full_values):
@@ -884,7 +883,7 @@ def load_adf_bare(buffer, adf_type, offset, size, map_typedef):
         obj.instance_count = 1
         obj.instance_offset = None
 
-        obj.map_typedef = map_typedef
+        obj.extended_map_typedef = map_typedef
 
         obj.table_instance[0].name = b'instance'
         obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
@@ -903,7 +902,7 @@ def load_adf_bare(buffer, adf_type, offset, size, map_typedef):
             with ArchiveFile(io.BytesIO(buffer)) as f:
                 f.seek(ins.offset)
                 v = read_instance(
-                    f, ins.type_hash, obj.map_typedef, obj.map_stringhash, ins.offset, found_strings=obj.found_strings)
+                    f, ins.type_hash, obj.extended_map_typedef, obj.map_stringhash, ins.offset, found_strings=obj.found_strings)
                 obj.table_instance_full_values[i] = v
                 obj.table_instance_values[i] = adf_value_extract(v)
             # except AdfTypeMissing as ae:

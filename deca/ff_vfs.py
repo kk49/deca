@@ -969,6 +969,8 @@ class VfsStructure:
                     if not allow_overwrite and os.path.isfile(ofile):
                         self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile))
                         # raise DecaFileExists(ofile)
+                    elif node.ftype == FTYPE_ADF_BARE:
+                        self.logger.log('WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(ofile))
                     else:
                         with ArchiveFile(open(ofile, 'wb')) as fo:
                             fo.write(buf)
@@ -988,7 +990,10 @@ class VfsStructure:
                             obj = load_adf(buffer, self.map_adftypes)
 
                         if obj is not None:
-                            adf_export(obj, ofile, allow_overwrite=allow_overwrite)
+                            try:
+                                adf_export(obj, ofile, allow_overwrite=allow_overwrite)
+                            except DecaFileExists as e:
+                                self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
                     elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
                         ddsc = None
                         if node.ftype == FTYPE_BMP:

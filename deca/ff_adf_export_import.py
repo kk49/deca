@@ -27,7 +27,6 @@ def adf_export(adf: Adf, export_path, allow_overwrite=False):
                 cols = srcw['Cols']
                 rows = srcw['Rows']
                 name = srcw['Name']
-                name_short = '{:08x}'.format(hash_little(name))
                 cellindex = srcw['CellIndex']
                 worksheet = book.add_worksheet(name.decode('utf-8'))
                 for i in range(rows):
@@ -46,21 +45,31 @@ def adf_export(adf: Adf, export_path, allow_overwrite=False):
                             if didx < len(src['BoolData']):
                                 worksheet.write_boolean(r, c, src['BoolData'][didx], cell_format=cell_format)
                             else:
-                                pass
                                 # worksheet.write_string(r, c, 'Missing BoolData {}'.format(didx), cell_format=cell_format)
+                                pass
                         elif ctype == 1:
                             if didx < len(src['StringData']):
                                 worksheet.write_string(r, c, src['StringData'][didx].decode('utf-8'), cell_format=cell_format)
                             else:
-                                pass
                                 # worksheet.write_string(r, c, 'Missing StringData {}'.format(didx), cell_format=cell_format)
+                                pass
                         elif ctype == 2:
                             if didx < len(src['ValueData']):
                                 worksheet.write_number(r, c, src['ValueData'][didx], cell_format=cell_format)
                             else:
-                                pass
                                 # worksheet.write_string(r, c, 'Missing ValueData {}'.format(didx), cell_format=cell_format)
+                                pass
                         else:
                             raise NotImplemented('Unhandled Cell Type {}'.format(ctype))
 
             book.close()
+        else:
+            fn = export_path + '.txt'
+
+            if not allow_overwrite and os.path.exists(fn):
+                raise DecaFileExists(fn)
+
+            str = adf.dump_to_string()
+
+            with open(fn, 'wt') as f:
+                f.write(str)

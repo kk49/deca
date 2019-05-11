@@ -899,41 +899,4 @@ def main():
 
     app.exec_()
 
-    needed = {
-        0x0b73315d,
-        0x536cdf14,
-        0x5618735f,
-        0x5b222c55,
-        0x5db297db,
-        0x6e9b42c0,
-        0x7c962fa6,
-        0x82d0bea7,
-        0x904f4b40,
-        0x90a5413e,
-        0x9ebbfbef,
-        0xa28fbf46,
-        0xba23d341,
-        0xbc425335,
-        0xc402ec5d,
-        0xc60e6202,
-        0xd0f19cd8,
-        0xeb42f07d,
-        0xfb2226c6,
-    }
-
-    vfs = window.vfs
-    prefix = './resources/adf'
-    os.makedirs(prefix, exist_ok=True)
-    for adft in needed:
-        uids = vfs.map_adftype_usage.get(adft, set())
-        for uid in uids:
-            vnode = vfs.table_vfsnode[uid]
-            with vfs.file_obj_from(vnode) as fi:
-                buf = fi.read(vnode.size_u)
-            fn = os.path.join(prefix, '{:08X}.full.adf'.format(adft))
-            if not os.path.isfile(fn):
-                with open(fn, 'wb') as fo:
-                    fo.write(buf)
-            break
-
     return window.vfs

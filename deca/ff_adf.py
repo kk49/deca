@@ -902,7 +902,7 @@ def load_adf_bare(buffer, adf_type, offset, size, map_typedef):
             with ArchiveFile(io.BytesIO(buffer)) as f:
                 f.seek(ins.offset)
                 v = read_instance(
-                    f, ins.type_hash, obj.extended_map_typedef, obj.map_stringhash, ins.offset, found_strings=obj.found_strings)
+                    f, ins.type_hash, obj.extended_map_typedef, obj.map_stringhash, 0, found_strings=obj.found_strings)
                 obj.table_instance_full_values[i] = v
                 obj.table_instance_values[i] = adf_value_extract(v)
             # except AdfTypeMissing as ae:

@@ -377,7 +377,10 @@ class VfsStructure:
                             buffer = f.read(node.size_u)
                         adf = load_adf(buffer, self.map_adftypes)
 
+                        bnode_name = b'gdc/global.gdc.DECA'
                         bnode = VfsNode(
+                            vhash=deca.hash_jenkins.hash_little(bnode_name),
+                            vpath=bnode_name,
                             ftype=FTYPE_GDCBODY, pid=node.uid, level=node.level,
                             offset=adf.table_instance[0].offset,
                             size_c=adf.table_instance[0].size,

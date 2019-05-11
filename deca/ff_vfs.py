@@ -375,7 +375,7 @@ class VfsStructure:
                         any_change = True
                         with self.file_obj_from(node) as f:
                             buffer = f.read(node.size_u)
-                        adf = load_adf(buffer)
+                        adf = load_adf(buffer, self.map_adftypes)
 
                         bnode = VfsNode(
                             ftype=FTYPE_GDCBODY, pid=node.uid, level=node.level,
@@ -633,7 +633,7 @@ class VfsStructure:
                 with self.file_obj_from(node) as f:
                     buffer = f.read(node.size_u)
                 try:
-                    adf = load_adf(buffer)
+                    adf = load_adf(buffer, self.map_adftypes)
                     for sh in adf.table_stringhash:
                         vpath_map.propose(sh.value, [FTYPE_ADF, node])
                         remove_prefix = b'intermediate/'
@@ -983,9 +983,9 @@ class VfsStructure:
                                 buffer = buffer + v
 
                         if node.ftype == FTYPE_ADF_BARE:
-                            obj = load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+                            obj = load_adf_bare(buffer, node.adf_type, node.offset, node.size_u, self.map_adftypes)
                         else:
-                            obj = load_adf(buffer)
+                            obj = load_adf(buffer, self.map_adftypes)
 
                         if obj is not None:
                             adf_export(obj, ofile, allow_overwrite=allow_overwrite)

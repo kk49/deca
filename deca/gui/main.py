@@ -4,7 +4,7 @@ import re
 import argparse
 import pickle
 from deca.errors import *
-from deca.ff_vfs import vfs_structure_prep, vfs_structure_open, VfsStructure, VfsNode
+from deca.vfs_db import vfs_structure_prep, vfs_structure_open, VfsStructure, VfsNode
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger
@@ -15,7 +15,7 @@ from deca.gui.viewer_image import DataViewerImage
 from deca.gui.viewer_raw import DataViewerRaw
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
-from deca.cmds.tool_make_web_map import tool_make_web_map
+from deca.cmds.tool_make_web_map import ToolMakeWebMap
 import PySide2
 from PySide2.QtCore import \
     QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel, QRegExp
@@ -161,7 +161,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                     if node.used_at_runtime_depth is not None:
                         return used_color_calc(node.used_at_runtime_depth)
                 elif column == 5:
-                    if node.adf_type is not None and node.adf_type not in self.vfs.map_adftypes:
+                    if node.adf_type is not None and node.adf_type not in self.vfs.adf_db.map_type_def:
                         return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:
@@ -382,7 +382,7 @@ class VfsDirModel(QAbstractItemModel):
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
                 elif column == 5:
-                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.map_adftypes:
+                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.adf_db.map_type_def:
                         return QColor(Qt.red)
         return None
 
@@ -882,7 +882,8 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def tool_make_web_map(self, checked):
-        tool_make_web_map(self.vfs, self.vfs.working_dir, True)
+        tool = ToolMakeWebMap(self.vfs)
+        tool.make_web_map(self.vfs.working_dir, True)
 
 
 def main():

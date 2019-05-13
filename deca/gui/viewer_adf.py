@@ -1,7 +1,6 @@
 from .viewer import *
 from ..ff_types import FTYPE_ADF_BARE, FTYPE_ADF
 from ..file import ArchiveFile
-from ..ff_adf import load_adf, load_adf_bare
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
@@ -33,13 +32,13 @@ class DataViewerAdf(DataViewer):
 
         sbuf = ''
         if vnode.ftype == FTYPE_ADF_BARE:
-            obj = load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u, vfs.map_adftypes)
+            obj = vfs.adf_db.load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
             if obj is None:
                 sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
             else:
                 sbuf = obj.dump_to_string()
         else:
-            obj = load_adf(buffer, vfs.map_adftypes)
+            obj = vfs.adf_db.load_adf(buffer)
             if obj is not None:
                 sbuf = obj.dump_to_string()
         self.text_box.setText(sbuf)

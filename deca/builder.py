@@ -1,4 +1,4 @@
-from deca.ff_vfs import VfsStructure, VfsNode
+from deca.vfs_base import VfsBase, VfsNode
 from deca.ff_types import *
 from deca.ff_sarc import FileSarc, EntrySarc
 from deca.errors import *
@@ -13,7 +13,7 @@ class Builder:
     def __init__(self):
         pass
 
-    def build_node(self, dst_path: str, vnode: VfsNode, vfs: VfsStructure, src_map):
+    def build_node(self, dst_path: str, vnode: VfsNode, vfs: VfsBase, src_map):
         if vnode.ftype == FTYPE_SARC:
             print('BUILD SARC {}'.format(vnode.vpath))
 
@@ -78,7 +78,7 @@ class Builder:
         else:
             raise EDecaBuildError('Cannot build {} : {}'.format(vnode.ftype, vnode.vpath))
 
-    def build_dir(self, vfs: VfsStructure, src_path: str, dst_path: str):
+    def build_dir(self, vfs: VfsBase, src_path: str, dst_path: str):
         # find all changed src files
         src_files = []
 
@@ -174,7 +174,7 @@ class Builder:
             for k, v in vpaths_completed.items():
                 print(v.decode('utf-8'))
 
-    def build_src(self, vfs: VfsStructure, src_file: str, dst_path: str):
+    def build_src(self, vfs: VfsBase, src_file: str, dst_path: str):
         # TODO Eventually process a simple script to update files based on relative addressing to handle other mods and
         #  patches
         pass

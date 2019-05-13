@@ -860,97 +860,101 @@ class Adf:
                 #     print(exp)
 
 
-def load_adf(buffer, map_typedef):
-    with ArchiveFile(io.BytesIO(buffer)) as fp:
-        obj = Adf()
+class AdfDatabase:
+    def __init__(self, db_dir):
+        self.db_dir = db_dir
+        self.map_type_def = {}
+        self.map_type_filename = {}
+
+    def extract_types_from_exe(self, exepath):
+        self.map_type_def = {}
+        self.map_type_filename = {}
+
+        exe_stat = os.stat(exepath)
+
+        with open(exepath, 'rb') as f:
+            exe = f.read(exe_stat.st_size)
+
+        poss = 0
+        while True:
+            poss = exe.find(b' FDA\x04\x00\x00\x00', poss + 1)
+            if poss < 0:
+                break
+            exe_short = exe[poss:]
+            with ArchiveFile(BytesIO(exe_short)) as f:
+                adf = Adf()
+                adf.deserialize(f, process_instances=False)
+
+                exe_short = exe[poss:poss + adf.total_size]
+                fn = 'offset_{:08x}.adf'.format(poss)
+                fn_full = os.path.join(self.db_dir, fn)
+                with open(fn_full, 'wb') as fw:
+                    fw.write(exe_short)
+
+                for k, v in adf.map_typedef.items():
+                    ts = self.map_type_filename.get(k, set())
+                    ts.add(fn)
+                    self.map_type_filename[k] = ts
+                    self.map_type_def[k] = v
+
+        with open(os.path.join(self.db_dir, 'map_type_filename.pickle'), 'wb') as fw:
+            pickle.dump(self.map_type_filename, fw)
+        with open(os.path.join(self.db_dir, 'map_type.pickle'), 'wb') as fw:
+            pickle.dump(self.map_type_def, fw)
+
+    def load_adf(self, buffer):
+        with ArchiveFile(io.BytesIO(buffer)) as fp:
+            obj = Adf()
+            try:
+                obj.deserialize(fp, self.map_type_def)
+                return obj
+            except DecaErrorParse:
+                return None
+
+    def load_adf_bare(self, buffer, adf_type, offset, size):
+        if adf_type not in self.map_type_def:
+            return None
+
         try:
-            obj.deserialize(fp, map_typedef)
+            obj = Adf()
+
+            # instance
+            obj.table_instance = [InstanceEntry()]
+            obj.map_instance = {}
+            obj.instance_count = 1
+            obj.instance_offset = None
+
+            obj.extended_map_typedef = self.map_type_def
+
+            obj.table_instance[0].name = b'instance'
+            obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
+            obj.table_instance[0].type_hash = adf_type
+            obj.table_instance[0].offset = offset
+            obj.table_instance[0].size = size
+
+            obj.map_instance[obj.table_instance[0].name_hash] = obj.table_instance[0]
+
+            obj.found_strings = set()
+            obj.table_instance_values = [None] * len(obj.table_instance)
+            obj.table_instance_full_values = [None] * len(obj.table_instance)
+            for i in range(len(obj.table_instance)):
+                ins = obj.table_instance[i]
+                # try:
+                with ArchiveFile(io.BytesIO(buffer)) as f:
+                    f.seek(ins.offset)
+                    v = read_instance(
+                        f, ins.type_hash, obj.extended_map_typedef, obj.map_stringhash, 0, found_strings=obj.found_strings)
+                    obj.table_instance_full_values[i] = v
+                    obj.table_instance_values[i] = adf_value_extract(v)
+                # except AdfTypeMissing as ae:
+                #     print('Missing HASHID {:08x}'.format(ae.hashid))
+                # except Exception as exp:
+                #     print(exp)
+
             return obj
         except DecaErrorParse:
             return None
 
 
-def load_adf_bare(buffer, adf_type, offset, size, map_typedef):
-    if adf_type not in map_typedef:
-        return None
-
-    try:
-        obj = Adf()
-
-        # instance
-        obj.table_instance = [InstanceEntry()]
-        obj.map_instance = {}
-        obj.instance_count = 1
-        obj.instance_offset = None
-
-        obj.extended_map_typedef = map_typedef
-
-        obj.table_instance[0].name = b'instance'
-        obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
-        obj.table_instance[0].type_hash = adf_type
-        obj.table_instance[0].offset = offset
-        obj.table_instance[0].size = size
-
-        obj.map_instance[obj.table_instance[0].name_hash] = obj.table_instance[0]
-
-        obj.found_strings = set()
-        obj.table_instance_values = [None] * len(obj.table_instance)
-        obj.table_instance_full_values = [None] * len(obj.table_instance)
-        for i in range(len(obj.table_instance)):
-            ins = obj.table_instance[i]
-            # try:
-            with ArchiveFile(io.BytesIO(buffer)) as f:
-                f.seek(ins.offset)
-                v = read_instance(
-                    f, ins.type_hash, obj.extended_map_typedef, obj.map_stringhash, 0, found_strings=obj.found_strings)
-                obj.table_instance_full_values[i] = v
-                obj.table_instance_values[i] = adf_value_extract(v)
-            # except AdfTypeMissing as ae:
-            #     print('Missing HASHID {:08x}'.format(ae.hashid))
-            # except Exception as exp:
-            #     print(exp)
-
-        return obj
-    except DecaErrorParse:
-        return None
-
-
-def extract_adftypes_from_exe(exepath, dst_dir):
-    exe_stat = os.stat(exepath)
-
-    map_type_filename = {}
-    map_type = {}
-
-    with open(exepath, 'rb') as f:
-        exe = f.read(exe_stat.st_size)
-
-    poss = 0
-    while True:
-        poss = exe.find(b' FDA\x04\x00\x00\x00', poss+1)
-        if poss < 0:
-            break
-        exe_short = exe[poss:]
-        with ArchiveFile(BytesIO(exe_short)) as f:
-            adf = Adf()
-            adf.deserialize(f, process_instances=False)
-
-            exe_short = exe[poss:poss+adf.total_size]
-            fn = 'offset_{:08x}.adf'.format(poss)
-            fn_full = os.path.join(dst_dir, fn)
-            with open(fn_full, 'wb') as fw:
-                fw.write(exe_short)
-
-            for k, v in adf.map_typedef.items():
-                ts = map_type_filename.get(k, set())
-                ts.add(fn)
-                map_type_filename[k] = ts
-                map_type[k] = v
-
-    with open(os.path.join(dst_dir, 'map_type_filename.pickle'), 'wb') as fw:
-        pickle.dump(map_type_filename, fw)
-    with open(os.path.join(dst_dir, 'map_type.pickle'), 'wb') as fw:
-        pickle.dump(map_type, fw)
-
-    return map_type, map_type_filename
 
 

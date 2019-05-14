@@ -1,6 +1,7 @@
 from deca.vfs_base import VfsBase, VfsNode
 from deca.ff_types import *
 from deca.ff_sarc import FileSarc, EntrySarc
+from deca.ff_avtx import image_import
 from deca.errors import *
 from deca.file import ArchiveFile
 import os
@@ -103,12 +104,28 @@ class Builder:
         for file in src_files:
             vpath = file[0]
             src = file[1]
+            print('vpath: {}, src: {}'.format(vpath, src))
             dst = os.path.join(dst_path, vpath)
             dstdir = os.path.dirname(dst)
             os.makedirs(dstdir, exist_ok=True)
-            shutil.copy2(src, dst)
-            pack_list.append([vpath.encode('ascii'), dst.encode('ascii')])
-            vpaths_completed[vpath.encode('ascii')] = dst.encode('ascii')
+
+            if src.find('REFERENCE_ONLY') >= 0:
+                pass  # DO NOT USE THESE FILES
+            elif src.endswith('.ddsc.dds'):
+                vpath = vpath[0:-4].encode('ascii')
+                vnode = vfs.map_vpath_to_vfsnodes[vpath][0]
+
+                # make ddsc.dds into ddsc and avtxs
+                compiled_files = image_import(vfs, vnode, src.encode('ascii'), dst_path.encode('ascii'))
+                for cfile in compiled_files:
+                    vpath = cfile[0]
+                    dst = cfile[1]
+                    pack_list.append([vpath, dst])
+                    vpaths_completed[vpath] = dst
+            else:
+                shutil.copy2(src, dst)
+                pack_list.append([vpath.encode('ascii'), dst.encode('ascii')])
+                vpaths_completed[vpath.encode('ascii')] = dst.encode('ascii')
 
         # calculate dependencies
         depends = {}

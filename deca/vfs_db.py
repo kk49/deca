@@ -18,7 +18,7 @@ from deca.ff_adf_export_import import adf_export
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
-from deca.ff_avtx import Ddsc
+from deca.ff_avtx import Ddsc, image_export
 from deca.util import Logger
 from deca.hash_jenkins import hash_little
 
@@ -723,83 +723,28 @@ class VfsStructure(VfsBase):
                     ofiledir = os.path.dirname(ofile)
                     os.makedirs(ofiledir, exist_ok=True)
 
-                    buf = f.read(node.size_u)
+                    export_raw = True
+                    try:
+                        if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
+                            if node.ftype == FTYPE_ADF_BARE:
+                                export_raw = False
+                                self.logger.log('WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(ofile))
 
-                    if not allow_overwrite and os.path.isfile(ofile):
-                        self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile))
-                        # raise DecaFileExists(ofile)
-                    elif node.ftype == FTYPE_ADF_BARE:
-                        self.logger.log('WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(ofile))
-                    else:
-                        with ArchiveFile(open(ofile, 'wb')) as fo:
-                            fo.write(buf)
+                            adf_export(self, node, ofile, allow_overwrite=allow_overwrite)
+                        elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+                            export_raw = False
+                            image_export(self, node, ofile, allow_overwrite=allow_overwrite)
+                    except DecaFileExists as e:
+                        self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-                    if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
-                        buffer = b''
-                        with ArchiveFile(self.file_obj_from(node)) as f:
-                            while True:
-                                v = f.read(16 * 1024 * 1024)
-                                if len(v) == 0:
-                                    break
-                                buffer = buffer + v
-
-                        if node.ftype == FTYPE_ADF_BARE:
-                            obj = self.adf_db.load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+                    if export_raw:
+                        if not allow_overwrite and os.path.isfile(ofile):
+                            self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile))
+                            # raise DecaFileExists(ofile)
                         else:
-                            obj = self.adf_db.load_adf(buffer)
-
-                        if obj is not None:
-                            try:
-                                adf_export(obj, ofile, allow_overwrite=allow_overwrite)
-                            except DecaFileExists as e:
-                                self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
-                    elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-                        ddsc = None
-                        if node.ftype == FTYPE_BMP:
-                            f_ddsc = self.file_obj_from(node)
-                            ddsc = Ddsc()
-                            ddsc.load_bmp(f_ddsc)
-                        elif node.ftype == FTYPE_DDS:
-                            f_ddsc = self.file_obj_from(node)
-                            ddsc = Ddsc()
-                            ddsc.load_dds(f_ddsc)
-                        elif node.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-                            if node.vpath is None:
-                                f_ddsc = self.file_obj_from(node)
-                                ddsc = Ddsc()
-                                ddsc.load_ddsc(f_ddsc)
-                            else:
-                                filename = os.path.splitext(node.vpath)
-                                if len(filename[1]) == 0 and node.ftype == FTYPE_AVTX:
-                                    filename_ddsc = node.vpath
-                                else:
-                                    filename_ddsc = filename[0] + b'.ddsc'
-
-                                if filename_ddsc in self.map_vpath_to_vfsnodes:
-                                    extras = [b'.hmddsc']
-                                    for i in range(1, 16):
-                                        extras.append('.atx{}'.format(i).encode('ascii'))
-
-                                    files = [
-                                        [filename_ddsc, self.file_obj_from(self.map_vpath_to_vfsnodes[filename_ddsc][0])]
-                                    ]
-
-                                    for extra in extras:
-                                        filename_atx = filename[0] + extra
-                                        if filename_atx in self.map_vpath_to_vfsnodes:
-                                            files.append(
-                                                [filename_atx, self.file_obj_from(self.map_vpath_to_vfsnodes[filename_atx][0])]
-                                            )
-                                    ddsc = Ddsc()
-                                    ddsc.load_ddsc_atx(files)
-
-                        if ddsc is not None:
-                            ofile_img = ofile + '.png'
-                            if not allow_overwrite and os.path.isfile(ofile_img):
-                                self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile_img))
-                            else:
-                                npimp = ddsc.mips[0].pil_image()
-                                npimp.save(ofile_img)
+                            buf = f.read(node.size_u)
+                            with ArchiveFile(open(ofile, 'wb')) as fo:
+                                fo.write(buf)
 
                     # TODO
                     # if do_sha1sum:

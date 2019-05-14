@@ -1,11 +1,11 @@
 import os
 
-from deca.file import ArchiveFile, SubsetFile
-from deca.game_info import GameInfo
-from deca.ff_types import *
-from deca.ff_aaf import extract_aaf
-from deca.ff_determine import determine_file_type_and_size
 from deca.hash_jenkins import hash_little
+from deca.file import ArchiveFile, SubsetFile
+from deca.ff_types import *
+from deca.ff_determine import determine_file_type_and_size
+from deca.game_info import GameInfo
+from deca.ff_aaf import extract_aaf
 
 
 class VfsPathNode:

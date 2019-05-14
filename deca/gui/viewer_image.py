@@ -1,5 +1,6 @@
 from .viewer import *
 from ..ff_avtx import Ddsc
+import deca.ff_avtx
 import os
 from PySide2.QtCore import Qt, QPoint, QRectF, Signal
 from PySide2.QtGui import QImage, QPixmap, QBrush, QColor
@@ -195,49 +196,8 @@ class DataViewerImage(DataViewer):
         self.ddsc = None
         self.select_dropdown.clear()
 
-        if vnode.ftype == FTYPE_BMP:
-            f_ddsc = vfs.file_obj_from(vnode)
-            ddsc = Ddsc()
-            ddsc.load_bmp(f_ddsc)
-            self.ddsc = ddsc
-        elif vnode.ftype == FTYPE_DDS:
-            f_ddsc = vfs.file_obj_from(vnode)
-            ddsc = Ddsc()
-            ddsc.load_dds(f_ddsc)
-            self.ddsc = ddsc
-        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-            if vnode.vpath is None:
-                f_ddsc = vfs.file_obj_from(vnode)
-                ddsc = Ddsc()
-                ddsc.load_ddsc(f_ddsc)
-                self.ddsc = ddsc
-            else:
-                filename = os.path.splitext(vnode.vpath)
-                if len(filename[1]) == 0 and vnode.ftype == FTYPE_AVTX:
-                    filename_ddsc = vnode.vpath
-                else:
-                    filename_ddsc = filename[0] + b'.ddsc'
-
-                if filename_ddsc in vfs.map_vpath_to_vfsnodes:
-                    extras = [b'.hmddsc']
-                    for i in range(1, 16):
-                        extras.append('.atx{}'.format(i).encode('ascii'))
-
-                    files = []
-                    files.append([
-                        filename_ddsc,
-                        vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_ddsc][0]),
-                    ])
-                    for extra in extras:
-                        filename_atx = filename[0] + extra
-                        if filename_atx in vfs.map_vpath_to_vfsnodes:
-                            files.append([
-                                filename_atx,
-                                vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_atx][0]),
-                            ])
-                    ddsc = Ddsc()
-                    ddsc.load_ddsc_atx(files)
-                    self.ddsc = ddsc
+        if vnode.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+            self.ddsc = deca.ff_avtx.image_load(vfs, vnode)
 
         if self.ddsc is not None and self.ddsc.mips is not None:
             first_valid = None

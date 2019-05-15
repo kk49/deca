@@ -102,7 +102,7 @@ class Builder:
                     pass
                 else:
                     vpath = cpath[len(src_path):].encode('ascii')
-                    vpath.replace(b'\\', b'/')
+                    vpath = vpath.replace(b'\\', b'/')
                     src_files.append([vpath, cpath])
 
         # copy src modified files to build directory

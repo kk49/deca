@@ -290,7 +290,7 @@ def image_export(vfs, node, ofile, allow_overwrite=False):
             raise DecaFileExists(existing_files)
 
 
-def image_import(vfs, node, ifile, opath):
+def image_import(vfs, node, ifile: str, opath: str):
     print('Importing Image: {}\n  input {}\n  opath {}'.format(node.vpath, ifile, opath))
     ddsc = image_load(vfs, node, save_raw_data=True)
 
@@ -298,30 +298,32 @@ def image_import(vfs, node, ifile, opath):
     if ddsc is not None:
         with open(ifile, 'rb') as file_in:
             dsc_header = file_in.read(37 * 4 - 5 * 4)  # skip dds header
-
-            fout = None
-            fout_name = None
-            vpath_out = None
             for mip in ddsc.mips:
-                print('{} x {} : {}'.format(mip.size_x, mip.size_y, mip.filename))
-
-                if vpath_out != mip.filename:
-                    if vpath_out is not None:
-                        compiled_files.append((vpath_out, fout_name))
-                        fout.close()
-
-                    vpath_out = mip.filename
-                    fout_name = os.path.join(opath, vpath_out)
-                    fout = open(fout_name, 'wb')
-                    if fout_name.endswith(b'.ddsc'):
-                        fout.write(ddsc.header_buffer)
-
                 buffer = file_in.read(len(mip.raw_data))
-                fout.write(buffer)
+                mip.raw_data = buffer
 
-            if vpath_out is not None:
-                compiled_files.append((vpath_out, fout_name))
-                fout.close()
+        out_vpaths = [mip.filename for mip in ddsc.mips]
+        out_vpaths = set(out_vpaths)
+
+        for vpath_out in out_vpaths:
+            fout_name = os.path.join(opath, vpath_out.decode('utf-8'))
+
+            with open(fout_name, 'wb') as file_out:
+                if vpath_out.endswith(b'.ddsc'):
+                    file_out.write(ddsc.header_buffer)
+                    # DDSC files have high to low resolution
+                    for mip_index in range(0, len(ddsc.mips)):
+                        mip = ddsc.mips[mip_index]
+                        if vpath_out == mip.filename:
+                            file_out.write(mip.raw_data)
+                else:
+                    # HMDDSC ATX files have low to high resolution
+                    for mip_index in range(len(ddsc.mips)-1, -1, -1):
+                        mip = ddsc.mips[mip_index]
+                        if vpath_out == mip.filename:
+                            file_out.write(mip.raw_data)
+
+            compiled_files.append((vpath_out, fout_name))
 
     return compiled_files
 

@@ -65,7 +65,7 @@ class Builder:
                             buf = fsi.read(entry_old.length)
                         else:
                             print('  INSERTING {} src file to new file'.format(entry_old.vpath))
-                            with open(src_files[i].decode('utf-8'), 'rb') as f:
+                            with open(src_files[i], 'rb') as f:
                                 buf = f.read(entry_new.length)
 
                         fso.seek(entry_new.META_entry_offset_ptr)
@@ -75,13 +75,18 @@ class Builder:
                         fso.seek(entry_new.offset)
                         fso.write(buf)
 
-            return fn_dst.encode('ascii')
+            return fn_dst
         else:
             raise EDecaBuildError('Cannot build {} : {}'.format(vnode.ftype, vnode.vpath))
 
     def build_dir(self, vfs: VfsBase, src_path: str, dst_path: str):
         # find all changed src files
         src_files = []
+
+        if isinstance(src_path, bytes):
+            src_path = src_path.decode('utf-8')
+        if isinstance(dst_path, bytes):
+            dst_path = dst_path.decode('utf-8')
 
         wl = [src_path]
         while len(wl) > 0:
@@ -96,36 +101,38 @@ class Builder:
                 if ext == '.deca_sha1sum':
                     pass
                 else:
-                    src_files.append([cpath[len(src_path):], cpath])
+                    vpath = cpath[len(src_path):].encode('ascii')
+                    vpath.replace(b'\\', b'/')
+                    src_files.append([vpath, cpath])
 
         # copy src modified files to build directory
         vpaths_completed = {}
         pack_list = []
         for file in src_files:
-            vpath = file[0]
-            src = file[1]
-            print('vpath: {}, src: {}'.format(vpath, src))
-            dst = os.path.join(dst_path, vpath)
-            dstdir = os.path.dirname(dst)
-            os.makedirs(dstdir, exist_ok=True)
+            vpath: bytes = file[0]
+            fpath: str = file[1]
+            # print('vpath: {}, src: {}'.format(vpath, fpath))
+            dst = os.path.join(dst_path, vpath.decode('utf-8'))
+            dst_dir = os.path.dirname(dst)
+            os.makedirs(dst_dir, exist_ok=True)
 
-            if src.find('REFERENCE_ONLY') >= 0:
+            if fpath.find('REFERENCE_ONLY') >= 0:
                 pass  # DO NOT USE THESE FILES
-            elif src.endswith('.ddsc.dds'):
-                vpath = vpath[0:-4].encode('ascii')
+            elif fpath.endswith('.ddsc.dds'):
+                vpath = vpath[0:-4]
                 vnode = vfs.map_vpath_to_vfsnodes[vpath][0]
 
                 # make ddsc.dds into ddsc and avtxs
-                compiled_files = image_import(vfs, vnode, src.encode('ascii'), dst_path.encode('ascii'))
+                compiled_files = image_import(vfs, vnode, fpath, dst_path)
                 for cfile in compiled_files:
                     vpath = cfile[0]
                     dst = cfile[1]
                     pack_list.append([vpath, dst])
                     vpaths_completed[vpath] = dst
             else:
-                shutil.copy2(src, dst)
-                pack_list.append([vpath.encode('ascii'), dst.encode('ascii')])
-                vpaths_completed[vpath.encode('ascii')] = dst.encode('ascii')
+                shutil.copy2(fpath, dst)
+                pack_list.append([vpath, dst])
+                vpaths_completed[vpath] = dst
 
         # calculate dependencies
         depends = {}
@@ -156,11 +163,13 @@ class Builder:
                                     pnode.uid, pnode.vhash, vnode.vpath))
                             else:
                                 depends[pnode.vpath] = depends.get(pnode.vpath, set()).union({vnode.vpath})
-                                pack_list.append([pnode.vpath, dst_path.encode('ascii') + pnode.vpath])
+                                pack_list.append([pnode.vpath, os.path.join(dst_path, pnode.vpath.decode('utf-8'))])
 
         # pprint(depends, width=128)
 
         any_changes = True
+        vpaths_todo = set()
+
         while any_changes:
             any_changes = False
             vpaths_todo = set()
@@ -189,7 +198,7 @@ class Builder:
         else:
             print('BUILD SUCCESS:')
             for k, v in vpaths_completed.items():
-                print(v.decode('utf-8'))
+                print(v)
 
     def build_src(self, vfs: VfsBase, src_file: str, dst_path: str):
         # TODO Eventually process a simple script to update files based on relative addressing to handle other mods and

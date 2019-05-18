@@ -60,6 +60,8 @@ class FileSarc:
         self.strings0 = None
         self.strings = None
         self.entries = None
+        self.entries_begin = None
+        self.entries_end = None
 
     def deserialize(self, fin):
         with ArchiveFile(fin) as f:
@@ -71,8 +73,10 @@ class FileSarc:
             assert(self.ver2 in {2, 3})
             self.dir_block_len = f.read_u32()
 
+            self.entries = []
+
             if self.ver2 == 2:
-                self.entries = []
+                self.entries_begin = f.tell()
                 end_pos = f.tell() + self.dir_block_len
                 idx = 0
                 while f.tell() + 12 <= end_pos:  # 12 is minimum length of v2 sarc entry and they pad with some zeros
@@ -88,9 +92,12 @@ class FileSarc:
                 if len(self.strings[-1]) == 0:
                     self.strings = self.strings[:-1]
 
+                self.entries_begin = f.tell()
                 self.entries = [EntrySarc(index=i, vpath=self.strings[i], ) for i in range(len(self.strings))]
                 for ent in self.entries:
                     ent.deserialize_v3(f)
+
+            self.entries_end = f.tell()
 
     def dump_str(self):
         sbuf = ''

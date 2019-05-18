@@ -32,17 +32,22 @@ class Builder:
                 entry_old: EntrySarc = sarc_old.entries[i]
                 entry_new: EntrySarc = sarc_new.entries[i]
                 vpath = entry_old.vpath
+
                 if entry_old.vpath in src_map:
                     src_files[i] = src_map[vpath]
                     sz = os.stat(src_files[i]).st_size
                 else:
                     sz = entry_old.length
 
-                entry_new.offset = data_write_pos
-                entry_new.length = sz
-                data_write_pos = data_write_pos + sz
-                align = 4
-                data_write_pos = (data_write_pos + align - 1) // align * align
+                if entry_old.offset == 0:
+                    entry_new.offset = 0
+                    entry_new.length = sz
+                else:
+                    entry_new.offset = data_write_pos
+                    entry_new.length = sz
+                    data_write_pos = data_write_pos + sz
+                    align = 4
+                    data_write_pos = (data_write_pos + align - 1) // align * align
 
             # extract existing file
             fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))
@@ -60,21 +65,26 @@ class Builder:
                     for i in range(len(sarc_old.entries)):
                         entry_old: EntrySarc = sarc_old.entries[i]
                         entry_new: EntrySarc = sarc_new.entries[i]
-                        if src_files[i] is None:
-                            print('  COPYING {} from old file to new file'.format(entry_old.vpath))
-                            fsi.seek(entry_old.offset)
-                            buf = fsi.read(entry_old.length)
-                        else:
-                            print('  INSERTING {} src file to new file'.format(entry_old.vpath))
-                            with open(src_files[i], 'rb') as f:
-                                buf = f.read(entry_new.length)
 
                         fso.seek(entry_new.META_entry_offset_ptr)
                         fso.write_u32(entry_new.offset)
                         fso.seek(entry_new.META_entry_size_ptr)
                         fso.write_u32(entry_new.length)
-                        fso.seek(entry_new.offset)
-                        fso.write(buf)
+
+                        if entry_new.offset != 0:
+                            if src_files[i] is None:
+                                print('  COPYING {} from old file to new file'.format(entry_old.vpath))
+                                fsi.seek(entry_old.offset)
+                                buf = fsi.read(entry_old.length)
+                            else:
+                                print('  INSERTING {} src file to new file'.format(entry_old.vpath))
+                                with open(src_files[i], 'rb') as f:
+                                    buf = f.read(entry_new.length)
+
+                            fso.seek(entry_new.offset)
+                            fso.write(buf)
+                        else:
+                            print('  SYMLINK {}'.format(entry_old.vpath))
 
             return fn_dst
         else:

@@ -588,13 +588,13 @@ class MainWidget(QWidget):
         self.current_vnode = None
         self.current_vpath = None
 
-        self.log_widget = QTextEdit()
-        self.log_widget.setReadOnly(True)
-        font = QFont("Courier", 8)
-        self.log_widget.setFont(font)
-        self.log_widget.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.log_widget.setSizePolicy(size)
+        # self.log_widget = QTextEdit()
+        # self.log_widget.setReadOnly(True)
+        # font = QFont("Courier", 8)
+        # self.log_widget.setFont(font)
+        # self.log_widget.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        # self.log_widget.setSizePolicy(size)
 
         # Create VFS Node table
         self.vfs_node_widget = VfsNodeTableWidget(show_mapped=True)
@@ -626,7 +626,7 @@ class MainWidget(QWidget):
         # self.web_map_widget.show()
 
         self.nav_widget = QTabWidget()
-        self.nav_widget.addTab(self.log_widget, 'Log')
+        # self.nav_widget.addTab(self.log_widget, 'Log')
         self.nav_widget.addTab(self.vfs_dir_widget, 'Directory')
         self.nav_widget.addTab(self.vfs_node_widget_non_mapped, 'Non-Mapped List')
         self.nav_widget.addTab(self.vfs_node_widget, 'Raw List')
@@ -805,18 +805,19 @@ class MainWindow(QMainWindow):
 
         self.main_widget = MainWidget()
 
-        class WidgetLogger(Logger):
-            def __init__(self, wdir, log_widget):
-                Logger.__init__(self, wdir)
-                self.log_widget = log_widget
+        # class WidgetLogger(Logger):
+        #     def __init__(self, wdir, log_widget):
+        #         Logger.__init__(self, wdir)
+        #         self.log_widget = log_widget
+        #
+        #     def log_base(self, level, s):
+        #         msg = Logger.log_base(self, level, s)
+        #         if level <= 0:
+        #             self.log_widget.append(msg)
+        #             self.log_widget.repaint()
+        # self.logger = WidgetLogger('./', self.main_widget.log_widget)
 
-            def log_base(self, level, s):
-                msg = Logger.log_base(self, level, s)
-                if level <= 0:
-                    self.log_widget.append(msg)
-                    self.log_widget.repaint()
-
-        self.logger = WidgetLogger('./', self.main_widget.log_widget)
+        self.logger = Logger('./')
 
         self.setCentralWidget(self.main_widget)
 

@@ -1,10 +1,11 @@
 import os
 import io
 import time
+import pprint
 import numpy as np
 from PIL import Image
 from deca.file import ArchiveFile
-from deca.errors import DecaFileExists
+from deca.errors import *
 from deca.ff_types import *
 import deca.dxgi
 
@@ -47,11 +48,6 @@ class Ddsc:
         im = Image.open(f)
         im.convert('RGBA')
         self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='bmp', data=np.array(im))]
-
-    def load_dds(self, f):
-        im = Image.open(f)
-        im.convert('RGBA')
-        self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='dds', data=np.array(im))]
 
     def load_ddsc(self, f, filename=None, save_raw_data=False):
         header = f.read(128)
@@ -164,6 +160,161 @@ class Ddsc:
         for finfo in files[1:]:
             self.load_atx(finfo[1], filename=finfo[0], save_raw_data=save_raw_data)
 
+    def load_dds(self, f):
+        im = Image.open(f)
+        im.convert('RGBA')
+        self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='dds', data=np.array(im))]
+
+    def load_dds_new(self, f, load_raw_data=False):
+        if isinstance(f, str) or isinstance(f, bytes):
+            with ArchiveFile(open(f, 'rb')) as f:
+                return self.load_dds_new(f, load_raw_data=load_raw_data)
+        else:
+            magic = f.read(4)
+
+            if magic != b'DDS ':
+                raise EDecaIncorrectFileFormat('load_dds')
+
+            # DDS_HEADER
+            header = {}
+            header['dwSize'] = f.read_u32()
+            header['dwFlags'] = f.read_u32()
+            header['dwHeight'] = f.read_u32()
+            header['dwWidth'] = f.read_u32()
+            header['dwPitchOrLinearSize'] = f.read_u32()
+            header['dwDepth'] = f.read_u32()
+            header['dwMipMapCount'] = f.read_u32()
+
+            header['dwReserved1'] = []
+            for i in range(11):
+                header['dwReserved1'].append(f.read_u32())
+
+            # PIXEL_FORMAT
+            pixel_format = {}
+            pixel_format['dwSize'] = f.read_u32()
+            pixel_format['dwFlags'] = f.read_u32()
+            pixel_format['dwFourCC'] = f.read(4)
+            pixel_format['dwRGBBitCount'] = f.read_u32()
+            pixel_format['dwRBitMask'] = f.read_u32()
+            pixel_format['dwGBitMask'] = f.read_u32()
+            pixel_format['dwBBitMask'] = f.read_u32()
+            pixel_format['dwABitMask'] = f.read_u32()
+
+            # DDS_HEADER continued
+            header['ddspf'] = pixel_format
+            header['dwCaps'] = f.read_u32()
+            header['dwCaps2'] = f.read_u32()
+            header['dwCaps3'] = f.read_u32()
+            header['dwCaps4'] = f.read_u32()
+            header['dwReserved2'] = f.read_u32()
+
+            # DDS_HEADER_DXT10
+            header_dxt10 = {}
+            if header['ddspf']['dwFourCC'] == b'DX10':
+                header_dxt10['dxgiFormat'] = f.read_u32()
+                header_dxt10['resourceDimension'] = f.read_u32()
+                header_dxt10['miscFlag'] = f.read_u32()
+                header_dxt10['arraySize'] = f.read_u32()
+                header_dxt10['miscFlags2'] = f.read_u32()
+
+            pprint.pprint(header)
+            pprint.pprint(header_dxt10)
+
+
+            '''
+            DDSD_CAPS;          Required in every .dds file.	0x1
+            DDSD_HEIGHT;        Required in every .dds file.	0x2
+            DDSD_WIDTH;         Required in every .dds file.	0x4
+            DDSD_PITCH;         Required when pitch is provided for an uncompressed texture.	0x8
+            DDSD_PIXELFORMAT;   Required in every .dds file.	0x1000
+            DDSD_MIPMAPCOUNT;   Required in a mipmapped texture.	0x20000
+            DDSD_LINEARSIZE;    Required when pitch is provided for a compressed texture.	0x80000
+            DDSD_DEPTH;         Required in a depth texture.	0x800000
+            '''
+            dwFlagsTest = [
+                [0x1, 'DDSD_CAPS'],
+                [0x2, 'DDSD_HEIGHT'],
+                [0x4, 'DDSD_WIDTH'],
+                [0x8, 'DDSD_PITCH'],
+                [0x1000, 'DDSD_PIXELFORMAT'],
+                [0x20000, 'DDSD_MIPMAPCOUNT'],
+                [0x80000, 'DDSD_LINEARSIZE'],
+                [0x800000, 'DDSD_DEPTH'],
+            ]
+            dwFlags = header['dwFlags']
+            for test in dwFlagsTest:
+                if 0 != dwFlags & test[0]:
+                    print('dwFlags: {}'.format(test[1]))
+
+            '''
+            DDSCAPS_COMPLEX	Optional; 0x8
+                must be used on any file that contains more than one surface (a mipmap, a cubic environment map, or 
+                mipmapped volume texture).
+            DDSCAPS_MIPMAP	Optional; 0x400000
+                should be used for a mipmap.	
+            DDSCAPS_TEXTURE	Required; 0x1000
+            '''
+            dwCapsTest = [
+                [0x8, 'DDSCAPS_COMPLEX'],
+                [0x400000, 'DDSCAPS_MIPMAP'],
+                [0x1000, 'DDSCAPS_TEXTURE'],
+            ]
+            dwCaps = header['dwCaps']
+            for test in dwCapsTest:
+                if 0 != dwCaps & test[0]:
+                    print('dwCaps: {}'.format(test[1]))
+
+            '''
+            DDSCAPS2_CUBEMAP	Required for a cube map.	0x200
+            DDSCAPS2_CUBEMAP_POSITIVEX	Required when these surfaces are stored in a cube map.	0x400
+            DDSCAPS2_CUBEMAP_NEGATIVEX	Required when these surfaces are stored in a cube map.	0x800
+            DDSCAPS2_CUBEMAP_POSITIVEY	Required when these surfaces are stored in a cube map.	0x1000
+            DDSCAPS2_CUBEMAP_NEGATIVEY	Required when these surfaces are stored in a cube map.	0x2000
+            DDSCAPS2_CUBEMAP_POSITIVEZ	Required when these surfaces are stored in a cube map.	0x4000
+            DDSCAPS2_CUBEMAP_NEGATIVEZ	Required when these surfaces are stored in a cube map.	0x8000
+            DDSCAPS2_VOLUME	Required for a volume texture.	0x200000
+            '''
+            dwCaps2Test = [
+                [0x200, 'DDSCAPS2_CUBEMAP'],
+                [0x400, 'DDSCAPS2_CUBEMAP_POSITIVEX'],
+                [0x800, 'DDSCAPS2_CUBEMAP_NEGATIVEX'],
+                [0x1000, 'DDSCAPS2_CUBEMAP_POSITIVEY'],
+                [0x2000, 'DDSCAPS2_CUBEMAP_NEGATIVEY'],
+                [0x4000, 'DDSCAPS2_CUBEMAP_POSITIVEZ'],
+                [0x8000, 'DDSCAPS2_CUBEMAP_NEGATIVEZ'],
+                [0x200000, 'DDSCAPS2_VOLUME'],
+            ]
+            dwCaps2 = header['dwCaps2']
+            for test in dwCaps2Test:
+                if 0 != dwCaps2 & test[0]:
+                    print('dwCaps2: {}'.format(test[1]))
+
+            '''
+            DDPF_ALPHAPIXELS	Texture contains alpha data; dwRGBAlphaBitMask contains valid data.	0x1
+            DDPF_ALPHA	Used in some older DDS files for alpha channel only uncompressed data (dwRGBBitCount contains 
+                the alpha channel bitcount; dwABitMask contains valid data)	0x2
+            DDPF_FOURCC	Texture contains compressed RGB data; dwFourCC contains valid data.	0x4
+            DDPF_RGB	Texture contains uncompressed RGB data; dwRGBBitCount and the RGB masks 
+                (dwRBitMask, dwGBitMask, dwBBitMask) contain valid data.	0x40
+            DDPF_YUV	Used in some older DDS files for YUV uncompressed data (dwRGBBitCount contains the YUV bit count; 
+                dwRBitMask contains the Y mask, dwGBitMask contains the U mask, dwBBitMask contains the V mask)	0x200
+            DDPF_LUMINANCE	Used in some older DDS files for single channel color uncompressed data (dwRGBBitCount 
+                contains the luminance channel bit count; dwRBitMask contains the channel mask). Can be combined with 
+                DDPF_ALPHAPIXELS for a two channel DDS file.	0x20000
+            '''
+            dwPFFlagsTest = [
+                [0x1, 'DDPF_ALPHAPIXELS'],
+                [0x2, 'DDPF_ALPHA'],
+                [0x4, 'DDPF_FOURCC'],
+                [0x40, 'DDPF_RGB'],
+                [0x200, 'DDPF_YUV'],
+                [0x20000, 'DDPF_LUMINANCE'],
+            ]
+            dwPFFlags = header['ddspf']['dwFlags']
+            for test in dwPFFlagsTest:
+                if 0 != dwPFFlags & test[0]:
+                    print('dwPFFlags: {}'.format(test[1]))
+
 
 def image_load(vfs, vnode, save_raw_data=False):
     if vnode.ftype == FTYPE_BMP:
@@ -205,6 +356,8 @@ def image_load(vfs, vnode, save_raw_data=False):
                         ])
                 ddsc = Ddsc()
                 ddsc.load_ddsc_atx(files, save_raw_data=save_raw_data)
+            else:
+                raise EDecaFileMissing('File {} is missing.'.format(filename_ddsc))
     return ddsc
 
 
@@ -287,7 +440,7 @@ def image_export(vfs, node, ofile, allow_overwrite=False):
 
         # raise exception if any files could not be overwritten
         if len(existing_files) > 0:
-            raise DecaFileExists(existing_files)
+            raise EDecaFileExists(existing_files)
 
 
 def image_import(vfs, node, ifile: str, opath: str):

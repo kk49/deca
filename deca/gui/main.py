@@ -740,21 +740,21 @@ class MainWidget(QWidget):
         if self.current_vpath is not None:
             try:
                 self.vfs.extract_nodes(self.current_vpath, self.vfs.working_dir + 'extracted/', False)
-            except DecaFileExists as exce:
+            except EDecaFileExists as exce:
                 self.error_dialog('Extacted Canceled: File Exists: {}'.format(exce.args))
 
     def bt_prep_mod_clicked(self, checked):
         if self.current_vpath is not None:
             try:
                 self.vfs.extract_nodes(self.current_vpath, self.vfs.working_dir + 'mod/', True)
-            except DecaFileExists as exce:
+            except EDecaFileExists as exce:
                 self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 
     def bt_mod_build_clicked(self, checked):
         try:
             self.builder.build_dir(self.vfs, self.vfs.working_dir + 'mod/', self.vfs.working_dir + 'build/')
             self.dialog_good('BUILD SUCCESS')
-        except DecaFileExists as exce:
+        except EDecaFileExists as exce:
             self.error_dialog('Build Failed: File Exists: {}'.format(exce.args))
         except EDecaBuildError as exce:
             self.error_dialog('Build Failed: {}'.format(exce.args))

@@ -9,7 +9,7 @@ import csv
 from deca.file import ArchiveFile
 from deca.vfs_base import VfsBase, VfsNode, VfsPathNode, VfsPathMap
 from deca.game_info import GameInfo, game_info_load
-from deca.errors import DecaFileExists
+from deca.errors import EDecaFileExists
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
@@ -734,7 +734,7 @@ class VfsStructure(VfsBase):
                         elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
                             export_raw = False
                             image_export(self, node, ofile, allow_overwrite=allow_overwrite)
-                    except DecaFileExists as e:
+                    except EDecaFileExists as e:
                         self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
                     if export_raw:
@@ -765,7 +765,7 @@ class VfsStructure(VfsBase):
             if vpath_re.match(k):
                 try:
                     self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
-                except DecaFileExists as e:
+                except EDecaFileExists as e:
                     self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
 
@@ -808,8 +808,7 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
         # parse archive files
         vfs.load_from_archives(debug=debug)
         with open(cache_file, 'wb') as f:
-            # data = [version, vfs]
-            data = vfs
+            data = [version, vfs]
             pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
         logger.log('CREATING: COMPLETE')
 

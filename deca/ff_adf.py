@@ -774,12 +774,12 @@ class Adf:
         fh = ArchiveFile(io.BytesIO(header))
 
         if len(header) < 0x40:
-            raise DecaErrorParse('File Too Short')
+            raise EDecaErrorParse('File Too Short')
 
         magic = fh.read_strl(4)
 
         if magic != b' FDA':
-            raise DecaErrorParse('Magic does not match')
+            raise EDecaErrorParse('Magic does not match')
 
         self.version = fh.read_u32()
 
@@ -908,7 +908,7 @@ class AdfDatabase:
             try:
                 obj.deserialize(fp, self.map_type_def)
                 return obj
-            except DecaErrorParse:
+            except EDecaErrorParse:
                 return None
 
     def load_adf_bare(self, buffer, adf_type, offset, size):
@@ -952,7 +952,7 @@ class AdfDatabase:
                 #     print(exp)
 
             return obj
-        except DecaErrorParse:
+        except EDecaErrorParse:
             return None
 
 

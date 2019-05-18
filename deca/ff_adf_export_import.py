@@ -23,7 +23,7 @@ def adf_export(vfs, node, export_path, allow_overwrite=False):
                 fn = export_path + '.xlsx'
 
                 if not allow_overwrite and os.path.exists(fn):
-                    raise DecaFileExists(fn)
+                    raise EDecaFileExists(fn)
 
                 src = adf.table_instance_values[0]
                 book = DecaWorkBook(fn)
@@ -81,7 +81,7 @@ def adf_export(vfs, node, export_path, allow_overwrite=False):
                 fn = export_path + '.txt'
 
                 if not allow_overwrite and os.path.exists(fn):
-                    raise DecaFileExists(fn)
+                    raise EDecaFileExists(fn)
 
                 str = adf.dump_to_string()
 

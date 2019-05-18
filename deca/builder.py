@@ -6,6 +6,7 @@ from deca.errors import *
 from deca.file import ArchiveFile
 import os
 import shutil
+import re
 from pprint import pprint, pformat
 from copy import deepcopy
 
@@ -118,6 +119,8 @@ class Builder:
 
             if fpath.find('REFERENCE_ONLY') >= 0:
                 pass  # DO NOT USE THESE FILES
+            elif re.match(r'^.*\.ddsc$', fpath) or re.match(r'^.*\.hmddsc$', fpath) or re.match(r'^.*\.atx?$', fpath):
+                pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
             elif fpath.endswith('.ddsc.dds'):
                 vpath = vpath[0:-4]
                 vnode = vfs.map_vpath_to_vfsnodes[vpath][0]

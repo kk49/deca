@@ -44,10 +44,10 @@ class Ddsc:
         self.mip_count = None
         self.mips = None
 
-    def load_bmp(self, f):
+    def load_bmp(self, f, filename=None):
         im = Image.open(f)
         im.convert('RGBA')
-        self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='bmp', data=np.array(im))]
+        self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='bmp', data=np.array(im), filename=filename)]
 
     def load_ddsc(self, f, filename=None, save_raw_data=False):
         header = f.read(128)
@@ -318,11 +318,11 @@ class Ddsc:
 
 def image_load(vfs, vnode, save_raw_data=False):
     if vnode.ftype == FTYPE_BMP:
-        f_ddsc = vfs.file_obj_from(vnode)
+        f_ddsc = vfs.file_obj_from(vnode, filename=vnode.vpath)
         ddsc = Ddsc()
         ddsc.load_bmp(f_ddsc)
     elif vnode.ftype == FTYPE_DDS:
-        f_ddsc = vfs.file_obj_from(vnode)
+        f_ddsc = vfs.file_obj_from(vnode, filename=vnode.vpath)
         ddsc = Ddsc()
         ddsc.load_dds(f_ddsc)
     elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
@@ -361,82 +361,122 @@ def image_load(vfs, vnode, save_raw_data=False):
     return ddsc
 
 
-def image_export(vfs, node, ofile, allow_overwrite=False):
+def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_overwrite=False):
     existing_files = []
     ddsc = image_load(vfs, node, save_raw_data=True)
+
     if ddsc is not None:
-        ofile = os.path.splitext(ofile)[0]
-        ofile = ofile + '.ddsc'
+        multifile = node.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}
 
-        # export to reference png file
-        ofile_img = ofile + '.REFERENCE_ONLY.png'
-        if not allow_overwrite and os.path.isfile(ofile_img):
-            existing_files.append(ofile_img)
-        else:
-            npimp = ddsc.mips[0].pil_image()
-            npimp.save(ofile_img)
+        if export_raw or not multifile:
+            if multifile:
+                cnodes = [mip.filename for mip in ddsc.mips]
+                cnodes = set(cnodes)
+                cnodes = [vfs.map_vpath_to_vfsnodes[cnode][0] for cnode in cnodes]
+            else:
+                cnodes = [node]
 
-        ofile_img = ofile + '.dds'
+            for cnode in cnodes:
+                if cnode.vpath is None:
+                    ofile = extract_dir + '{:08X}.dat'.format(cnode.vhash)
+                else:
+                    ofile = extract_dir + '{}'.format(cnode.vpath.decode('utf-8'))
 
-        flags = 0
-        flags = flags | 0x1         # DDSD_CAPS
-        flags = flags | 0x2         # DDSD_HEIGHT
-        flags = flags | 0x4         # DDSD_WIDTH
-        # flags = flags | 0x8         # DDSD_PITCH
-        flags = flags | 0x1000      # DDSD_PIXELFORMAT
-        flags = flags | 0x20000     # DDSD_MIPMAPCOUNT
-        flags = flags | 0x80000     # DDSD_LINEARSIZE
+                ofiledir = os.path.dirname(ofile)
+                os.makedirs(ofiledir, exist_ok=True)
 
-        dwCaps1 = 0x8 | 0x1000 | 0x400000
-        dwCaps2 = 0
-        resourceDimension = 3
+                if not allow_overwrite  and os.path.isfile(ofile):
+                    existing_files.append(ofile)
+                else:
+                    with open(ofile, 'wb') as fo:
+                        with vfs.file_obj_from(cnode) as fi:
+                            buffer = fi.read(cnode.size_u)
+                            fo.write(buffer)
 
-        if ddsc.depth > 1:
-            flags = flags | 0x800000        # DDSD_DEPTH
-            dwCaps2 = dwCaps2 | 0x200000
-            resourceDimension = 4
+        if export_processed and multifile:
+            if node.vpath is None:
+                ofile = extract_dir + '{:08X}.dat'.format(node.vhash)
+            else:
+                ofile = extract_dir + '{}'.format(node.vpath.decode('utf-8'))
 
-        with ArchiveFile(open(ofile_img, 'wb')) as f:
-            # magic word
-            f.write(b'DDS ')
-            # DDS_HEADER
-            f.write_u32(124)            # dwSize
-            f.write_u32(flags)          # dwFlags
-            f.write_u32(ddsc.ny0)       # dwHeight
-            f.write_u32(ddsc.nx0)       # dwWidth
-            f.write_u32(len(ddsc.mips[0].raw_data))  # dwPitchOrLinearSize
-            f.write_u32(ddsc.depth)     # dwDepth
-            f.write_u32(ddsc.full_mip_count)  # dwMipMapCount
-            for i in range(11):
-                f.write_u32(0)  # dwReserved1
+            ofiledir = os.path.dirname(ofile)
+            os.makedirs(ofiledir, exist_ok=True)
 
-            # PIXEL_FORMAT
-            DDPF_FOURCC = 0x4
-            f.write_u32(32)  # DWORD dwSize
-            f.write_u32(DDPF_FOURCC)  # DWORD dwFlags
-            f.write(b'DX10')  # DWORD dwFourCC
-            f.write_u32(0)  # DWORD dwRGBBitCount
-            f.write_u32(0)  # DWORD dwRBitMask
-            f.write_u32(0)  # DWORD dwGBitMask
-            f.write_u32(0)  # DWORD dwBBitMask
-            f.write_u32(0)  # DWORD dwABitMask
+            ofile = os.path.splitext(ofile)[0]
+            ofile = ofile + '.ddsc'
 
-            # DDS_HEADER, cont...
-            f.write_u32(dwCaps1)          # dwCaps
-            f.write_u32(dwCaps2)          # dwCaps2
-            f.write_u32(0)          # dwCaps3
-            f.write_u32(0)          # dwCaps4
-            f.write_u32(0)          # dwReserved2
+            # export to reference png file
+            ofile_img = ofile + '.REFERENCE_ONLY.png'
+            if not allow_overwrite and os.path.isfile(ofile_img):
+                existing_files.append(ofile_img)
+            else:
+                npimp = ddsc.mips[0].pil_image()
+                npimp.save(ofile_img)
 
-            # DDS_HEADER_DXT10
-            f.write_u32(ddsc.pixel_format)  # DXGI_FORMAT              dxgiFormat;
-            f.write_u32(resourceDimension)  # D3D10_RESOURCE_DIMENSION resourceDimension;
-            f.write_u32(0)  # UINT                     miscFlag;
-            f.write_u32(1)  # UINT                     arraySize;
-            f.write_u32(0)  # UINT                     miscFlags2;
+            # export dds with all mip levels
+            ofile_img = ofile + '.dds'
+            if not allow_overwrite and os.path.isfile(ofile_img):
+                existing_files.append(ofile_img)
+            else:
+                flags = 0
+                flags = flags | 0x1         # DDSD_CAPS
+                flags = flags | 0x2         # DDSD_HEIGHT
+                flags = flags | 0x4         # DDSD_WIDTH
+                # flags = flags | 0x8         # DDSD_PITCH
+                flags = flags | 0x1000      # DDSD_PIXELFORMAT
+                flags = flags | 0x20000     # DDSD_MIPMAPCOUNT
+                flags = flags | 0x80000     # DDSD_LINEARSIZE
 
-            for mip in ddsc.mips:
-                f.write(mip.raw_data)
+                dwCaps1 = 0x8 | 0x1000 | 0x400000
+                dwCaps2 = 0
+                resourceDimension = 3
+
+                if ddsc.depth > 1:
+                    flags = flags | 0x800000        # DDSD_DEPTH
+                    dwCaps2 = dwCaps2 | 0x200000
+                    resourceDimension = 4
+
+                with ArchiveFile(open(ofile_img, 'wb')) as f:
+                    # magic word
+                    f.write(b'DDS ')
+                    # DDS_HEADER
+                    f.write_u32(124)            # dwSize
+                    f.write_u32(flags)          # dwFlags
+                    f.write_u32(ddsc.ny0)       # dwHeight
+                    f.write_u32(ddsc.nx0)       # dwWidth
+                    f.write_u32(len(ddsc.mips[0].raw_data))  # dwPitchOrLinearSize
+                    f.write_u32(ddsc.depth)     # dwDepth
+                    f.write_u32(ddsc.full_mip_count)  # dwMipMapCount
+                    for i in range(11):
+                        f.write_u32(0)  # dwReserved1
+
+                    # PIXEL_FORMAT
+                    DDPF_FOURCC = 0x4
+                    f.write_u32(32)  # DWORD dwSize
+                    f.write_u32(DDPF_FOURCC)  # DWORD dwFlags
+                    f.write(b'DX10')  # DWORD dwFourCC
+                    f.write_u32(0)  # DWORD dwRGBBitCount
+                    f.write_u32(0)  # DWORD dwRBitMask
+                    f.write_u32(0)  # DWORD dwGBitMask
+                    f.write_u32(0)  # DWORD dwBBitMask
+                    f.write_u32(0)  # DWORD dwABitMask
+
+                    # DDS_HEADER, cont...
+                    f.write_u32(dwCaps1)          # dwCaps
+                    f.write_u32(dwCaps2)          # dwCaps2
+                    f.write_u32(0)          # dwCaps3
+                    f.write_u32(0)          # dwCaps4
+                    f.write_u32(0)          # dwReserved2
+
+                    # DDS_HEADER_DXT10
+                    f.write_u32(ddsc.pixel_format)  # DXGI_FORMAT              dxgiFormat;
+                    f.write_u32(resourceDimension)  # D3D10_RESOURCE_DIMENSION resourceDimension;
+                    f.write_u32(0)  # UINT                     miscFlag;
+                    f.write_u32(1)  # UINT                     arraySize;
+                    f.write_u32(0)  # UINT                     miscFlags2;
+
+                    for mip in ddsc.mips:
+                        f.write(mip.raw_data)
 
         # raise exception if any files could not be overwritten
         if len(existing_files) > 0:

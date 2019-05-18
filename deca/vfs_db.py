@@ -709,7 +709,7 @@ class VfsStructure(VfsBase):
 
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
 
-    def extract_node(self, node: VfsNode, extract_dir: str, do_sha1sum, allow_overwrite):
+    def extract_node(self, node: VfsNode, extract_dir: str, export_raw, export_processed, do_sha1sum, allow_overwrite):
         if node.is_valid():
             if node.offset is not None:
                 with ArchiveFile(self.file_obj_from(node)) as f:
@@ -723,21 +723,21 @@ class VfsStructure(VfsBase):
                     ofiledir = os.path.dirname(ofile)
                     os.makedirs(ofiledir, exist_ok=True)
 
-                    export_raw = True
+                    do_export_raw = export_raw
                     try:
                         if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
                             if node.ftype == FTYPE_ADF_BARE:
-                                export_raw = False
+                                do_export_raw = False
                                 self.logger.log('WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(ofile))
-
-                            adf_export(self, node, ofile, allow_overwrite=allow_overwrite)
+                            if export_processed:
+                                adf_export(self, node, ofile, allow_overwrite=allow_overwrite)
                         elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-                            export_raw = False
-                            image_export(self, node, ofile, allow_overwrite=allow_overwrite)
+                            do_export_raw = False
+                            image_export(self, node, extract_dir, export_raw, export_processed, allow_overwrite=allow_overwrite)
                     except EDecaFileExists as e:
                         self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-                    if export_raw:
+                    if do_export_raw:
                         if not allow_overwrite and os.path.isfile(ofile):
                             self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile))
                             # raise DecaFileExists(ofile)
@@ -759,12 +759,12 @@ class VfsStructure(VfsBase):
 
         return None
 
-    def extract_nodes(self, vpath: str, extract_dir: str, do_sha1sum, allow_overwrite=False):
+    def extract_nodes(self, vpath: str, extract_dir: str, export_raw, export_processed, do_sha1sum, allow_overwrite=False):
         vpath_re = re.compile(vpath)
         for k, v in self.map_vpath_to_vfsnodes.items():
             if vpath_re.match(k):
                 try:
-                    self.extract_node(v[0], extract_dir, do_sha1sum, allow_overwrite)
+                    self.extract_node(v[0], extract_dir, export_raw, export_processed, do_sha1sum, allow_overwrite)
                 except EDecaFileExists as e:
                     self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 

@@ -23,7 +23,7 @@ from PySide2.QtGui import \
     QColor, QFont
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QTextEdit, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel
+    QTabWidget, QTreeView, QTextEdit, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel, QCheckBox
 
 
 # from PySide2.QtWebEngineWidgets import QWebEngineView
@@ -649,6 +649,18 @@ class MainWidget(QWidget):
         filter_layout.addWidget(self.filter_label)
         filter_layout.addWidget(self.filter_edit)
 
+        self.chkbx_export_raw = QCheckBox()
+        self.chkbx_export_raw.setText('Export Raw Files')
+        self.chkbx_export_raw.setChecked(False)
+
+        self.chkbx_export_processed = QCheckBox()
+        self.chkbx_export_processed.setText('Export Processed Files')
+        self.chkbx_export_processed.setChecked(True)
+
+        export_layout = QHBoxLayout()
+        export_layout.addWidget(self.chkbx_export_raw)
+        export_layout.addWidget(self.chkbx_export_processed)
+
         self.bt_extract = QPushButton()
         self.bt_extract.setEnabled(False)
         self.bt_extract.setText('EXTRACT')
@@ -673,6 +685,7 @@ class MainWidget(QWidget):
         self.nav_layout = QVBoxLayout()
         self.nav_layout.addWidget(self.nav_widget)
         self.nav_layout.addLayout(filter_layout)
+        self.nav_layout.addLayout(export_layout)
         self.nav_layout.addWidget(self.bt_extract)
         self.nav_layout.addWidget(self.bt_prep_mod)
         self.nav_layout.addWidget(self.bt_mod_build)
@@ -739,14 +752,22 @@ class MainWidget(QWidget):
     def bt_extract_clicked(self, checked):
         if self.current_vpath is not None:
             try:
-                self.vfs.extract_nodes(self.current_vpath, self.vfs.working_dir + 'extracted/', False)
+                self.vfs.extract_nodes(
+                    self.current_vpath, self.vfs.working_dir + 'extracted/',
+                    self.chkbx_export_raw.isChecked(),
+                    self.chkbx_export_processed.isChecked(),
+                    False)
             except EDecaFileExists as exce:
                 self.error_dialog('Extacted Canceled: File Exists: {}'.format(exce.args))
 
     def bt_prep_mod_clicked(self, checked):
         if self.current_vpath is not None:
             try:
-                self.vfs.extract_nodes(self.current_vpath, self.vfs.working_dir + 'mod/', True)
+                self.vfs.extract_nodes(
+                    self.current_vpath, self.vfs.working_dir + 'mod/',
+                    self.chkbx_export_raw.isChecked(),
+                    self.chkbx_export_processed.isChecked(),
+                    True)
             except EDecaFileExists as exce:
                 self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 

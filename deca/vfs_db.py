@@ -724,18 +724,23 @@ class VfsStructure(VfsBase):
                     os.makedirs(ofiledir, exist_ok=True)
 
                     do_export_raw = export_raw
-                    try:
-                        if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
-                            if node.ftype == FTYPE_ADF_BARE:
+
+                    if node.ftype == FTYPE_ADF_BARE:
+                        do_export_raw = False
+                        self.logger.log(
+                            'WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(
+                                ofile))
+
+                    if export_processed:
+                        try:
+                            if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
+                                if export_processed:
+                                    adf_export(self, node, ofile, allow_overwrite=allow_overwrite)
+                            elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
                                 do_export_raw = False
-                                self.logger.log('WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(ofile))
-                            if export_processed:
-                                adf_export(self, node, ofile, allow_overwrite=allow_overwrite)
-                        elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-                            do_export_raw = False
-                            image_export(self, node, extract_dir, export_raw, export_processed, allow_overwrite=allow_overwrite)
-                    except EDecaFileExists as e:
-                        self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+                                image_export(self, node, extract_dir, export_raw, export_processed, allow_overwrite=allow_overwrite)
+                        except EDecaFileExists as e:
+                            self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
                     if do_export_raw:
                         if not allow_overwrite and os.path.isfile(ofile):

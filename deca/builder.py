@@ -33,13 +33,15 @@ class Builder:
                 entry_new: EntrySarc = sarc_new.entries[i]
                 vpath = entry_old.vpath
 
+                make_symlink = False
                 if entry_old.vpath in src_map:
                     src_files[i] = src_map[vpath]
                     sz = os.stat(src_files[i]).st_size
+                    make_symlink = True
                 else:
                     sz = entry_old.length
 
-                if entry_old.offset == 0:
+                if entry_old.offset == 0 or make_symlink:
                     entry_new.offset = 0
                     entry_new.length = sz
                 else:
@@ -71,20 +73,22 @@ class Builder:
                         fso.seek(entry_new.META_entry_size_ptr)
                         fso.write_u32(entry_new.length)
 
-                        if entry_new.offset != 0:
-                            if src_files[i] is None:
-                                print('  COPYING {} from old file to new file'.format(entry_old.vpath))
-                                fsi.seek(entry_old.offset)
-                                buf = fsi.read(entry_old.length)
-                            else:
-                                print('  INSERTING {} src file to new file'.format(entry_old.vpath))
-                                with open(src_files[i], 'rb') as f:
-                                    buf = f.read(entry_new.length)
+                        buf = None
 
+                        if entry_new.offset == 0:
+                            print('  SYMLINK {}'.format(entry_old.vpath))
+                        elif src_files[i] is not None:
+                            print('  INSERTING {} src file to new file'.format(entry_old.vpath))
+                            with open(src_files[i], 'rb') as f:
+                                buf = f.read(entry_new.length)
+                        else:
+                            print('  COPYING {} from old file to new file'.format(entry_old.vpath))
+                            fsi.seek(entry_old.offset)
+                            buf = fsi.read(entry_old.length)
+
+                        if buf is not None:
                             fso.seek(entry_new.offset)
                             fso.write(buf)
-                        else:
-                            print('  SYMLINK {}'.format(entry_old.vpath))
 
             return fn_dst
         else:

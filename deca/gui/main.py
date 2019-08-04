@@ -8,7 +8,7 @@ from deca.vfs_db import vfs_structure_prep, vfs_structure_open, VfsStructure, Vf
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger
-from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3
+from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
 from deca.gui.viewer_adf import DataViewerAdf
 from deca.gui.viewer_rtpc import DataViewerRtpc
 from deca.gui.viewer_image import DataViewerImage
@@ -875,6 +875,8 @@ class MainWindow(QMainWindow):
                 game_info = GameInfoTHCOTW(game_dir, exe_name)
             elif exe_name.find('JustCause3') >= 0:
                 game_info = GameInfoJC3(game_dir, exe_name)
+            elif exe_name.find('JustCause4') >= 0:
+                game_info = GameInfoJC4(game_dir, exe_name)
             else:
                 self.logger.log('Unknown Game {}'.format(filename))
 

@@ -43,11 +43,25 @@ class VfsStructure(VfsBase):
         exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
         self.adf_db.extract_types_from_exe(exe_path)
 
-    def load_from_archives(self, ver=3, debug=False):  # game_dir, archive_paths,
+    def load_from_archives(self, ver, debug=False):  # game_dir, archive_paths,
         self.logger.log('find all tab/arc files')
         input_files = []
-        for fcat in self.game_info.archive_path():
-            print(fcat)
+
+        dir_in = self.game_info.archive_path()
+        dir_found = []
+
+        while len(dir_in) > 0:
+            d = dir_in.pop(0)
+            if os.path.isdir(d):
+                dir_found.append(d)
+                files = os.listdir(d)
+                for file in files:
+                    ff = os.path.join(d, file)
+                    if os.path.isdir(ff):
+                        dir_in.append(ff)
+
+        for fcat in dir_found:
+            self.logger.log('Processing Directory: {}'.format(fcat))
             if os.path.isdir(fcat):
                 files = os.listdir(fcat)
                 ifns = []
@@ -88,6 +102,7 @@ class VfsStructure(VfsBase):
                         cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid, level=node.level)
                         self.node_add(cnode)
                     elif node.ftype == FTYPE_TAB:
+                        self.logger.log('Processing TAB: {}'.format(node.pvpath))
                         node.processed = True
                         any_change = True
                         with ArchiveFile(open(node.pvpath, 'rb'), debug=debug) as f:
@@ -158,6 +173,8 @@ class VfsStructure(VfsBase):
                                 self.node_add(cnode)
                                 self.possible_vpath_map.propose(cnode.vpath, [FTYPE_ADF, node], vnode=cnode)
 
+                    else:
+                        pass
                 idx = idx + 1
             self.logger.log('Expand Archives Phase {}: End'.format(phase_id))
 
@@ -811,7 +828,7 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
         vfs.prepare_adf_db(debug=debug)
 
         # parse archive files
-        vfs.load_from_archives(debug=debug)
+        vfs.load_from_archives(debug=debug, ver=game_info.archive_version)
         with open(cache_file, 'wb') as f:
             data = [version, vfs]
             pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)

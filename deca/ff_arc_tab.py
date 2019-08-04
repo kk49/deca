@@ -86,7 +86,10 @@ class TabFileV4(TabFileBase):
             if fbt[i] is None:
                 fbt[i] = fbt[i-1]
         for i in range(1, len(fbt)-1):
-            self.file_table[fbt[i]].file_block_table.append(self.file_block_table[i])
+            if fbt[i] is not None:
+                self.file_table[fbt[i]].file_block_table.append(self.file_block_table[i])
+            else:
+                pass
 
         return True
 

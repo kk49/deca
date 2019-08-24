@@ -140,12 +140,13 @@ class TypeDef:
         elif self.metatype == 2:  # Pointer
             count = f.read_u32()
             if count != 0:
-                raise Exception('Not Implemented: count == {}'.format(count))
+                # raise Exception('Not Implemented: count == {}'.format(count))
+                print('Pointer: Not Implemented: count == {}'.format(count))
         elif self.metatype == 3:  # Array
             count = f.read_u32()
             if count != 0:
                 # raise Exception('Not Implemented: count == {}'.format(count))
-                print('Not Implemented: count == {}'.format(count))
+                print('Array: Not Implemented: count == {}'.format(count))
         elif self.metatype == 4:  # Inline Array
             count = f.read_u32()
             if count != 0:

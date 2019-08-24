@@ -6,15 +6,15 @@ build_script:
 - cmd: >-
     SET
 
-    SET PATH=C:\Python36-x64;C:\Python36-x64\Scripts;%path%
+    SET PATH=C:\Python37-x64;C:\Python37-x64\Scripts;%path%
 
     cd C:\prj
 
-    c:\Python36-x64\python --version
+    c:\Python37-x64\python --version
 
-    c:\Python36-x64\python -m pip list
+    c:\Python37-x64\python -m pip list
 
-    c:\Python36-x64\python -m virtualenv venv
+    c:\Python37-x64\python -m virtualenv venv
 
     venv\Scripts\activate
 

@@ -7,7 +7,7 @@ deca.egg-info/
 test/
 tools/
 work/
-venv36/
+venv*/
 .idea/
 dist/
 build/

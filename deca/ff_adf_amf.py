@@ -489,6 +489,7 @@ def gltf_amf_reformat_buffers(model, mesh_header, mesh_buffers):
         b'AmfFormat_R16G16_SNORM': b'AmfFormat_R32G32_FLOAT',
         b'AmfFormat_R16_SNORM': b'AmfFormat_R32_FLOAT',
         b'AmfFormat_R16_UNORM': b'AmfFormat_R32_FLOAT',
+        b'AmfFormat_R16_UINT': b'AmfFormat_R32_UINT',
         b'AmfFormat_R32_UNIT_VEC_AS_FLOAT': b'AmfFormat_R32G32B32_FLOAT',
         b'AmfFormat_R32_R8G8B8A8_UNORM_AS_FLOAT': b'AmfFormat_R8G8B8A8_UNORM',
     }

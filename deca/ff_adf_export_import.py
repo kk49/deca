@@ -273,48 +273,51 @@ def adf_export(vfs, node, export_path, allow_overwrite=False):
                             accessor.count = mesh.vertexCount
                             if stream_attr.format[1] == b'AmfFormat_R16G16B16_SNORM':
                                 accessor.type = "VEC3"
-                                accessor.componentType = 5122  # (SHORT)
+                                accessor.componentType = pyg.SHORT
                                 accessor.normalized = True
                             elif stream_attr.format[1] == b'AmfFormat_R16G16_SNORM':
                                 accessor.type = "VEC2"
-                                accessor.componentType = 5122  # (SHORT)
+                                accessor.componentType = pyg.SHORT
                                 accessor.normalized = True
                             elif stream_attr.format[1] == b'AmfFormat_R16G16_UNORM':
                                 accessor.type = "VEC2"
-                                accessor.componentType = 5123  # (UNSIGNED_SHORT)
+                                accessor.componentType = pyg.UNSIGNED_SHORT
                                 accessor.normalized = True
                             elif stream_attr.format[1] == b'AmfFormat_R16_SNORM':
                                 accessor.type = "SCALAR"
-                                accessor.componentType = 5122  # (SHORT)
+                                accessor.componentType = pyg.SHORT
                                 accessor.normalized = True
+                            elif stream_attr.format[1] == b'AmfFormat_R32_UINT':
+                                accessor.type = "SCALAR"
+                                accessor.componentType = pyg.UNSIGNED_INT
                             elif stream_attr.format[1] == b'AmfFormat_R8G8B8A8_UNORM':
                                 accessor.type = "VEC4"
-                                accessor.componentType = 5121  # (UNSIGNED_BYTE)
+                                accessor.componentType = pyg.UNSIGNED_BYTE
                                 accessor.normalized = True
                             elif stream_attr.format[1] == b'AmfFormat_R8G8B8A8_UINT':
                                 accessor.type = "VEC4"
-                                accessor.componentType = 5121  # (UNSIGNED_BYTE)
+                                accessor.componentType = pyg.UNSIGNED_BYTE
                             elif stream_attr.format[1] == b'AmfFormat_R32_UNIT_VEC_AS_FLOAT':
                                 accessor.type = "SCALAR"
-                                accessor.componentType = 5126  # (FLOAT)
+                                accessor.componentType = pyg.FLOAT
                             elif stream_attr.format[1] == b'AmfFormat_R32_R8G8B8A8_UNORM_AS_FLOAT':
                                 accessor.type = "SCALAR"
-                                accessor.componentType = 5126  # (FLOAT)
+                                accessor.componentType = pyg.FLOAT
                             elif stream_attr.format[1] == b'AmfFormat_R32_FLOAT':
                                 accessor.type = "SCALAR"
-                                accessor.componentType = 5126  # (FLOAT)
+                                accessor.componentType = pyg.FLOAT
                             elif stream_attr.format[1] == b'AmfFormat_R32G32_FLOAT':
                                 accessor.type = "VEC2"
-                                accessor.componentType = 5126  # (FLOAT)
+                                accessor.componentType = pyg.FLOAT
                             elif stream_attr.format[1] == b'AmfFormat_R32G32B32_FLOAT':
                                 accessor.type = "VEC3"
-                                accessor.componentType = 5126  # (FLOAT)
+                                accessor.componentType = pyg.FLOAT
                             elif stream_attr.format[1] == b'AmfFormat_R32G32B32A32_FLOAT_P1':
                                 accessor.type = "VEC4"
-                                accessor.componentType = 5126  # (FLOAT)
+                                accessor.componentType = pyg.FLOAT
                             elif stream_attr.format[1] == b'AmfFormat_R32G32B32A32_FLOAT_N1':
                                 accessor.type = "VEC4"
-                                accessor.componentType = 5126  # (FLOAT)
+                                accessor.componentType = pyg.FLOAT
                             else:
                                 raise NotImplementedError('Unknown Stream Format: {}'.format(stream_attr.format[1]))
 

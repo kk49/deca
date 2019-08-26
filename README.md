@@ -79,6 +79,10 @@ This filled in some holes for the ADF parsing
 "A Fork of the Just Cause 3 tools by Rick Gibbed" 
 https://github.com/tim42/gibbed-justcause3-tools-fork
 
+### Lukas Cone (PredatorCZ) Apex Tools
+This has information about how stranger AmfBuffer formats are "compressed"
+https://github.com/PredatorCZ/ApexLib
+
 #### Various Microsoft(tm) websites
 Got most of the info for parsing the custom image formats came from the source documentation for DirectX
 

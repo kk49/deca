@@ -298,7 +298,7 @@ def adf_type_id_to_str(type_id, type_map):
 
 
 class AdfValue:
-    def __init__(self, value, type_id, info_offset, data_offset=None, bit_offset=None, comment=None):
+    def __init__(self, value, type_id, info_offset, data_offset=None, bit_offset=None, enum_string=None, hash_string=None):
         self.value = value
         self.type_id = type_id
         self.info_offset = info_offset
@@ -307,7 +307,8 @@ class AdfValue:
         else:
             self.data_offset = data_offset
         self.bit_offset = bit_offset
-        self.comment = comment
+        self.enum_string = enum_string
+        self.hash_string = hash_string
 
     def __repr__(self):
         s = '{} : 0x{:08X} @ {}(0x{:08x})'.format(self.value, self.type_id, self.data_offset, self.data_offset)
@@ -318,8 +319,11 @@ class AdfValue:
         if self.data_offset != self.info_offset:
             s = s + ' <- {}(0x{:08x})'.format(self.info_offset, self.info_offset)
 
-        if self.comment is not None:
-            s = s + '  # {}'.format(self.comment)
+        if self.enum_string is not None:
+            s = s + '  # {}'.format(self.enum_string)
+
+        if self.hash_string is not None:
+            s = s + '  # {}'.format(self.hash_string)
 
         return s
 
@@ -366,7 +370,7 @@ def adf_format(v, type_map, indent=0):
         elif type_def.metatype == MetaType.Bitfield:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
         elif type_def.metatype == MetaType.Enumeration:
-            s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
+            s = s + '  ' * indent + '{} ({})  # {}\n'.format(v.enum_string, v.value, value_info)
         elif type_def.metatype == MetaType.StringHash:
             if type_def.size == 4:
                 vp = '0x{:08x}'.format(v.value)
@@ -376,7 +380,7 @@ def adf_format(v, type_map, indent=0):
                 vp = '0x{:016x}'.format(v.value)
             else:
                 vp = v.value
-            s = s + '  ' * indent + '{} ({})  # {}\n'.format(v.comment, vp, value_info)
+            s = s + '  ' * indent + '{} ({})  # {}\n'.format(v.hash_string, vp, value_info)
 
         return s
     elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], GdcArchiveEntry):
@@ -658,7 +662,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
             else:
                 vs = None
 
-            v = AdfValue(v, type_id, dpos + abs_offset, comment=vs)
+            v = AdfValue(v, type_id, dpos + abs_offset, enum_string=vs)
         elif type_def.metatype == 9:  # String Hash
             if type_def.size == 4:
                 v = f.read_u32()
@@ -680,7 +684,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 v = f.read(type_def.size)
                 vs = 'NOT EXPECTED {}'.format(type_def.size)
 
-            v = AdfValue(v, type_id, dpos + abs_offset, comment=vs)
+            v = AdfValue(v, type_id, dpos + abs_offset, hash_string=vs)
         else:
             raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
 

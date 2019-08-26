@@ -40,6 +40,14 @@ def dump_block(blk, width, format='hex'):
         print(line)
 
 
+def remove_prefix_if_present(prefix, s):
+    if s.find(prefix) == 0:
+        return s[len(prefix):]
+    else:
+        return None
+
+
+
 '''
 JENKINS HASH code from 
 https://github.com/gibbed/Gibbed.JustCause3/blob/master/projects/Gibbed.JustCause3.FileFormats/StringHelpers.cs

@@ -19,7 +19,7 @@ from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
 from deca.ff_avtx import Ddsc, image_export
-from deca.util import Logger
+from deca.util import Logger, remove_prefix_if_present
 from deca.hash_jenkins import hash_little
 
 
@@ -412,15 +412,15 @@ class VfsStructure(VfsBase):
                     adf = self.adf_db.load_adf(buffer)
                     for sh in adf.table_stringhash:
                         vpath_map.propose(sh.value, [FTYPE_ADF, node])
-                        remove_prefix = b'intermediate/'
-                        if sh.value.find(remove_prefix) == 0:
-                            vpath_map.propose(sh.value[len(remove_prefix):], [FTYPE_ADF, node])
+                        rp = remove_prefix_if_present(b'intermediate/', sh)
+                        if rp is not None:
+                            vpath_map.propose(rp, [FTYPE_ADF, node])
 
                     for sh in adf.found_strings:
                         vpath_map.propose(sh, [FTYPE_ADF, node], False, None)
-                        remove_prefix = b'intermediate/'
-                        if sh.find(remove_prefix) == 0:
-                            vpath_map.propose(sh[len(remove_prefix):], [FTYPE_ADF, node])
+                        rp = remove_prefix_if_present(b'intermediate/', sh)
+                        if rp is not None:
+                            vpath_map.propose(rp, [FTYPE_ADF, node])
 
                     for sh in adf.table_name:
                         s = sh[1]

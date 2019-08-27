@@ -5,9 +5,17 @@
 **Code contributions are more than welcome!!!**
 
 A hacked up tool for exploring/extracting/modding files from Avalanche Studios APEX engine files, 
-mainly to explore Generation Zero BETA files until it's released.
+mainly Generation Zero.
 
 Written in Python, tested only on Linux, code is a mess, because this is an experiment...
+
+## Key Features
+* Export (modelc, meshc, hrmeshc) to GLTF 2.0 (material models not complete/missing, no bones)
+* Export ADF encoded spreadsheets
+* Export textures to PNG
+* Parsing all ADF files (Gen Zero)
+* GUI to explore archive files
+* Basic rebuilding of archive files to update textures, Characters/Machines work. Set pieces do not.
 
 ## Discord
 For deca specific and general GenZero (and theHunter?) modding.
@@ -51,10 +59,9 @@ game does not crash before it gets to BETA over screen)
 |SARC| GZB|Done?| double check code to see if something is not understood |
 |AVTX, ATX, DDSC, HMDDSC| GZB|Done? | double check code to see if something is not understood |
 |ADF| GZB | Extractable, Parsed | Partial Handling of GameDataCollection (0x178842fe)|
-| |  |  | Missing MDIC (0xb5b062f1) |
-| |  |  | Missing code for types that do not seem to exist in GZB |
+| |  |  | Export of modelc, meshc, hrmeshc to GLTF 2.0 (material models not correct?, missing bones) |
+| |  |  | Missing code for types that have hardcoded parsers in EXE(?) |
 | |  |  | stringlookup not fully grokked |
-| |  |  | models, hrmesh, mesh, not fully grokked |
 |RTPC| GZB | Extractable, Parsed |  |
 |OGG| GZB| Extractable | Ogg file, can be extracted |
 |TAG0| GZB | Extractable |  |
@@ -62,9 +69,8 @@ game does not crash before it gets to BETA over screen)
 |CFX| GZB | Extractable | Autodesk Scaleform https://github.com/jindrapetrik/jpexs-decompiler |
 |RIFF| GZB | Extractable |  |
 |lFSB5| GZB | Extractable |  |
-|RBMDL|JC3|Extractable| Extracted Not parsed |
 |.obc| GZB | Extractable | found a correlation in file size, guess at record size/count |
-|...| 0% | 0% |  Missed some add to table|
+|RBMDL|JC3| Extractable |  |
 
 ## References
 #### Gibbed's Just Cause 3 archive exporter
@@ -79,7 +85,7 @@ This filled in some holes for the ADF parsing
 "A Fork of the Just Cause 3 tools by Rick Gibbed" 
 https://github.com/tim42/gibbed-justcause3-tools-fork
 
-### Lukas Cone (PredatorCZ) Apex Tools
+#### Lukas Cone (PredatorCZ) Apex Tools
 This has information about how stranger AmfBuffer formats are "compressed"
 https://github.com/PredatorCZ/ApexLib
 

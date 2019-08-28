@@ -59,7 +59,7 @@ game does not crash before it gets to BETA over screen)
 |SARC| GZB|Done?| double check code to see if something is not understood |
 |AVTX, ATX, DDSC, HMDDSC| GZB|Done? | double check code to see if something is not understood |
 |ADF| GZB | Extractable, Parsed | Partial Handling of GameDataCollection (0x178842fe)|
-| |  |  | Export of modelc, meshc, hrmeshc to GLTF 2.0 (material models not correct?, missing bones) |
+| |  |  | Export of modelc, meshc, hrmeshc, mdic to GLTF 2.0 (material models not correct?, missing bones) |
 | |  |  | Missing code for types that have hardcoded parsers in EXE(?) |
 | |  |  | stringlookup not fully grokked |
 |RTPC| GZB | Extractable, Parsed |  |

@@ -71,7 +71,7 @@ class Ddsc:
         while fh.tell() < 128:
             self.unknown.append(fh.read_u32())
 
-        print('Compression Format: {}'.format(self.pixel_format))
+        # print('Compression Format: {}'.format(self.pixel_format))
 
         nx = self.nx0
         ny = self.ny0

@@ -9,6 +9,7 @@ from deca.file import ArchiveFile, SubsetFile
 from deca.util import dump_block
 from pprint import pformat
 from deca.hash_jenkins import hash_little
+from deca.ff_types import FTYPE_ADF_BARE
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
@@ -961,5 +962,23 @@ class AdfDatabase:
             return None
 
 
+def buffer_read(f):
+    buffer = b''
+    while True:
+        v = f.read(16 * 1024 * 1024)
+        if len(v) == 0:
+            break
+        buffer = buffer + v
+
+    return buffer
 
 
+def adf_node_read(vfs, node):
+    with ArchiveFile(vfs.file_obj_from(node)) as f:
+        buffer = buffer_read(f)
+    if node.ftype == FTYPE_ADF_BARE:
+        adf = vfs.adf_db.load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+    else:
+        adf = vfs.adf_db.load_adf(buffer)
+
+    return adf

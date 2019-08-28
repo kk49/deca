@@ -323,7 +323,7 @@ def convert_R32_R8G8B8A8_UNORM_AS_FLOAT(data_out, data_in, attrs: AmfStreamAttri
 
 
 def convert_R8G8B8A8_TANGENT_SPACE(data_out, data_in, attrs: AmfStreamAttribute, pack):
-    raise NotImplementedError('convert_R10G10B10A2_UNORM')
+    raise NotImplementedError('convert_R8G8B8A8_TANGENT_SPACE')
 
 
 def convert_R32G32B32A32_FLOAT_P1(data_out, data_in, attrs: AmfStreamAttribute, pack):
@@ -389,7 +389,7 @@ field_format_info = {
     b'AmfFormat_R16G16_SINT': FormatInfo('2i2', '2i2', convert_copy),
     b'AmfFormat_R32_FLOAT': FormatInfo('f4', 'f4', convert_copy),
     b'AmfFormat_R32_UINT': FormatInfo('u4', 'u4', convert_copy),
-    b'AmfFormat_R32_SINT': FormatInfo('s4', 's4', convert_copy),
+    b'AmfFormat_R32_SINT': FormatInfo('i4', 'i4', convert_copy),
     b'AmfFormat_R8G8_UNORM': FormatInfo('2u1', '2f4', convert_norm_u8),
     b'AmfFormat_R8G8_UINT': FormatInfo('2u1', '2u1', convert_copy),
     b'AmfFormat_R8G8_SNORM': FormatInfo('2i1', '2f4', convert_norm_s8),
@@ -401,17 +401,28 @@ field_format_info = {
     b'AmfFormat_R16_SINT': FormatInfo('i2', 'i2', convert_copy),
     b'AmfFormat_R8_UNORM': FormatInfo('u1', 'f4', convert_norm_u8),
     b'AmfFormat_R8_UINT': FormatInfo('u1', 'u1', convert_copy),
-    b'AmfFormat_R8_SNORM': FormatInfo('s1', 'f4', convert_norm_s8),
-    b'AmfFormat_R8_SINT': FormatInfo('s1', 's1', convert_copy),
+    b'AmfFormat_R8_SNORM': FormatInfo('i1', 'f4', convert_norm_s8),
+    b'AmfFormat_R8_SINT': FormatInfo('i1', 'i1', convert_copy),
     b'AmfFormat_R32_UNIT_VEC_AS_FLOAT': FormatInfo('f4', '3f4', convert_R32_UNIT_VEC_AS_FLOAT),
     b'AmfFormat_R32_R8G8B8A8_UNORM_AS_FLOAT': FormatInfo('f4', '4f4', convert_R32_R8G8B8A8_UNORM_AS_FLOAT),
-    b'AmfFormat_R8G8B8A8_TANGENT_SPACE': FormatInfo('4s1', '4f4', convert_R8G8B8A8_TANGENT_SPACE),
+    b'AmfFormat_R8G8B8A8_TANGENT_SPACE': FormatInfo('4i1', '4f4', convert_R8G8B8A8_TANGENT_SPACE),
     b'AmfFormat_R32G32B32A32_FLOAT_P1': FormatInfo('4f4', '3f4', convert_R32G32B32A32_FLOAT_P1),
     b'AmfFormat_R32G32B32A32_FLOAT_N1': FormatInfo('4f4', '3f4', convert_R32G32B32A32_FLOAT_N1),
 }
 
 
-def gltf_amf_reformat_buffers(model, mesh_header, mesh_buffers):
+def amf_meshc_reformat(mesh_header, mesh_buffers):
+    # TODO this should be a parameter, remove model parameter
+    vertex_format_translate = {
+        b'AmfFormat_R16G16B16_SNORM': b'AmfFormat_R32G32B32_FLOAT',
+        b'AmfFormat_R16G16_SNORM': b'AmfFormat_R32G32_FLOAT',
+        b'AmfFormat_R16_SNORM': b'AmfFormat_R32_FLOAT',
+        b'AmfFormat_R16_UNORM': b'AmfFormat_R32_FLOAT',
+        b'AmfFormat_R16_UINT': b'AmfFormat_R32_UINT',
+        b'AmfFormat_R32_UNIT_VEC_AS_FLOAT': b'AmfFormat_R32G32B32_FLOAT',
+        b'AmfFormat_R32_R8G8B8A8_UNORM_AS_FLOAT': b'AmfFormat_R8G8B8A8_UNORM',
+    }
+
     # get references to raw_buffers
     raw_buffers_index = [buffer.data for buffer in mesh_buffers.indexBuffers]
     raw_buffers_vertex = [buffer.data for buffer in mesh_buffers.vertexBuffers]
@@ -484,15 +495,6 @@ def gltf_amf_reformat_buffers(model, mesh_header, mesh_buffers):
                 else:
                     raise Exception('Overlapping stream detected in buffer {}: {} {}'.format(bidx, e0, e1))
 
-    gltf_format_translate = {
-        b'AmfFormat_R16G16B16_SNORM': b'AmfFormat_R32G32B32_FLOAT',
-        b'AmfFormat_R16G16_SNORM': b'AmfFormat_R32G32_FLOAT',
-        b'AmfFormat_R16_SNORM': b'AmfFormat_R32_FLOAT',
-        b'AmfFormat_R16_UNORM': b'AmfFormat_R32_FLOAT',
-        b'AmfFormat_R16_UINT': b'AmfFormat_R32_UINT',
-        b'AmfFormat_R32_UNIT_VEC_AS_FLOAT': b'AmfFormat_R32G32B32_FLOAT',
-        b'AmfFormat_R32_R8G8B8A8_UNORM_AS_FLOAT': b'AmfFormat_R8G8B8A8_UNORM',
-    }
     lod_group: AmfLodGroup
     for lg_idx, lod_group in enumerate(mesh_header.lodGroups):
         mesh: AmfMesh
@@ -528,7 +530,7 @@ def gltf_amf_reformat_buffers(model, mesh_header, mesh_buffers):
                     sattr_in: AmfStreamAttribute = sab_attr[ridx]
 
                     format_in = sattr_in.format[1]
-                    format_out = gltf_format_translate.get(format_in, format_in)
+                    format_out = vertex_format_translate.get(format_in, format_in)
 
                     if sattr_in.usage[1] == b'AmfUsage_Tangent':
                         format_out = b'AmfFormat_R32G32B32A32_FLOAT_P1'

@@ -412,7 +412,7 @@ class VfsStructure(VfsBase):
                     adf = self.adf_db.load_adf(buffer)
                     for sh in adf.table_stringhash:
                         vpath_map.propose(sh.value, [FTYPE_ADF, node])
-                        rp = remove_prefix_if_present(b'intermediate/', sh)
+                        rp = remove_prefix_if_present(b'intermediate/', sh.value)
                         if rp is not None:
                             vpath_map.propose(rp, [FTYPE_ADF, node])
 

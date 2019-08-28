@@ -649,6 +649,22 @@ class MainWidget(QWidget):
         filter_layout.addWidget(self.filter_label)
         filter_layout.addWidget(self.filter_edit)
 
+        self.vhash_to_vpath_label = QLabel()
+        self.vhash_to_vpath_label.setText('VHash -> VPath')
+
+        self.vhash_to_vpath_in_edit = QLineEdit()
+        self.vhash_to_vpath_in_edit.setText('0')
+        self.vhash_to_vpath_in_edit.textChanged.connect(self.vhash_to_vpath_text_changed)
+
+        self.vhash_to_vpath_out_edit = QLineEdit()
+        self.vhash_to_vpath_out_edit.setReadOnly(True)
+
+        vhash_to_vpath_layout = QHBoxLayout()
+        vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_label)
+        vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_in_edit)
+        vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_out_edit)
+        vhash_to_vpath_layout.setStretch(2,1)
+
         self.chkbx_export_raw = QCheckBox()
         self.chkbx_export_raw.setText('Export Raw Files')
         self.chkbx_export_raw.setChecked(False)
@@ -685,6 +701,7 @@ class MainWidget(QWidget):
         self.nav_layout = QVBoxLayout()
         self.nav_layout.addWidget(self.nav_widget)
         self.nav_layout.addLayout(filter_layout)
+        self.nav_layout.addLayout(vhash_to_vpath_layout)
         self.nav_layout.addLayout(export_layout)
         self.nav_layout.addWidget(self.bt_extract)
         self.nav_layout.addWidget(self.bt_prep_mod)
@@ -785,6 +802,21 @@ class MainWidget(QWidget):
         if len(txt) == 0:
             txt = '.*'
         self.vfs_dir_widget.filter_vfspath_set(txt)
+
+    def vhash_to_vpath_text_changed(self):
+        txt_in = self.vhash_to_vpath_in_edit.text()
+
+        txt_out = ''
+        if self.vfs is not None and self.vfs.map_hash_to_vpath is not None:
+            try:
+                val_in = int(txt_in, 0)
+                txt_out = self.vfs.map_hash_to_vpath.get(val_in, '')
+                if isinstance(txt_out, set) and len(txt_out) > 0:
+                    txt_out = list(txt_out)[0].decode('utf-8')
+            except ValueError:
+                pass
+
+        self.vhash_to_vpath_out_edit.setText(txt_out)
 
 
 # ********************

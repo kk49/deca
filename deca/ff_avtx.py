@@ -318,11 +318,11 @@ class Ddsc:
 
 def image_load(vfs, vnode, save_raw_data=False):
     if vnode.ftype == FTYPE_BMP:
-        f_ddsc = vfs.file_obj_from(vnode, filename=vnode.vpath)
+        f_ddsc = vfs.file_obj_from(vnode)
         ddsc = Ddsc()
         ddsc.load_bmp(f_ddsc)
     elif vnode.ftype == FTYPE_DDS:
-        f_ddsc = vfs.file_obj_from(vnode, filename=vnode.vpath)
+        f_ddsc = vfs.file_obj_from(vnode)
         ddsc = Ddsc()
         ddsc.load_dds(f_ddsc)
     elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:

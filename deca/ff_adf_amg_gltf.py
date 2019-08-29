@@ -331,22 +331,19 @@ class Deca3dModelc:
                     # add material
                     gltf_material = pyg.Material()
                     gltf_material.name = material.name.decode('utf-8')
-                    gltf_material.pbrMetallicRoughness = pyg.PbrMetallicRoughness()
 
-                    gltf_material.pbrMetallicRoughness.metallicFactor = 0.0
-                    gltf_material.pbrMetallicRoughness.roughnessFactor = 0.0
-                    # gltf_material.pbrMetallicRoughness.baseColorFactor = [1.0, 1.0, 1.0, 1.0]
-
+                    mat_sg = {}
                     tid = textures[0]
                     if tid is not None:
-                        gltf_material.pbrMetallicRoughness.baseColorTexture = pyg.MaterialTexture(index=tid)
+                        mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                    tid = textures[2]
+                    if tid is not None:
+                        mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+                    gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
 
                     tid = textures[1]
                     if tid is not None:
                         gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
-
-                    # gltf_material.occlusionTexture =
-                    #     pyg.MaterialTexture(index=textures[2])
 
                     if material.attributes['UseEmissive']:
                         gltf_material.emissiveFactor = [1.0, 1.0, 1.0]

@@ -836,6 +836,16 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
 
     vfs.working_dir = working_dir
 
+    # dump vpath file if not present
+    vpath_file = os.path.join(vfs.working_dir, 'vpaths.txt')
+    if not os.path.isfile(vpath_file):
+        logger.log('CREATING: vpaths.txt')
+        vpaths = list(vfs.map_vpath_to_vfsnodes.keys())
+        vpaths.sort()
+        with open(vpath_file, 'w') as f:
+            for vpath in vpaths:
+                f.write('{}\n'.format(vpath))
+
     return vfs
 
 

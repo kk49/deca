@@ -1,5 +1,6 @@
 import os
 import copy
+import numpy as np
 from deca.util import remove_prefix_if_present
 from deca.ff_avtx import image_load
 from deca.ff_adf import *
@@ -12,6 +13,39 @@ def _get_or_none(index, list_data):
         return list_data[index]
     else:
         return None
+
+
+class Deca3dMatrix:
+    def __init__(self, col_major=None, row_major=None):
+        assert not ((col_major is not None) and (row_major is not None))
+
+        self.data = None
+
+        if col_major is not None:
+            self.data = np.array(col_major).reshape(4, 4).transpose()
+
+        if row_major is not None:
+            self.data = np.array(col_major).reshape(4, 4)
+
+    def prep(self):
+        if self.data is None:
+            self.data = np.identity(4)
+
+    def translate(self, vec3):
+        self.prep()
+        self.data[0:3, 3] += vec3
+
+    def col_major_list(self):
+        if self.data is None:
+            return None
+        else:
+            return list(self.data.transpose().reshape((-1,)))
+
+    def row_major_list(self):
+        if self.data is None:
+            return None
+        else:
+            return list(self.data.reshape((-1,)))
 
 
 class Deca3dDatabase:
@@ -387,6 +421,22 @@ class Deca3dModelc:
         return self.models
 
 
+class DecaGltfScene:
+    def __init__(self, deca_gltf, name=None):
+        if isinstance(name, bytes):
+            name = name.decode('utf-8')
+        self.deca_gltf = deca_gltf
+        self.index = None
+        self.scene = pyg.Scene(name=name)
+
+    def __enter__(self):
+        self.deca_gltf.gltf_push(self)
+        return self.scene
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.deca_gltf.gltf_pop(self)
+
+
 class DecaGltfNode:
     def __init__(self, deca_gltf, name=None, matrix=None):
         if isinstance(name, bytes):
@@ -396,11 +446,11 @@ class DecaGltfNode:
         self.node = pyg.Node(name=name, matrix=matrix)
 
     def __enter__(self):
-        self.deca_gltf.gltf_node_push(self)
+        self.deca_gltf.gltf_push(self)
         return self.node
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.deca_gltf.gltf_node_pop(self)
+        self.deca_gltf.gltf_pop(self)
 
 
 class DecaGltf:
@@ -412,8 +462,8 @@ class DecaGltf:
         self.db = Deca3dDatabase(self.vfs, self.export_dir)
         self.lod = None
         self.gltf = None
-        self.g_scene = None
-        self.d_node_stack = []
+        self.d_stack = []
+        self.d_scene = None
         self.d_node_world = None
         self.d_node_objects = None
 
@@ -423,53 +473,66 @@ class DecaGltf:
         self.gltf = pyg.GLTF2()
         self.gltf.asset.version = "2.0"
         self.gltf.asset.generator = "DECA extractor"
-        self.g_scene = pyg.Scene()
-        self.gltf.scene = len(self.gltf.scenes)
-        self.gltf.scenes.append(self.g_scene)
-        self.d_node_stack = []
-        self.d_node_world = DecaGltfNode(self, name='World')
-        self.d_node_objects = DecaGltfNode(self, name='Objects')
+        self.d_stack = []
+        self.d_scene = DecaGltfScene(self, name='Scene0')
 
     def gltf_save(self):
         assert self.gltf is not None
-        assert len(self.d_node_stack) == 0
+        assert len(self.d_stack) == 0
         fn = os.path.join(self.export_dir, 'model-lod_{}.gltf'.format(self.lod))
         self.gltf.save_json(fn)
         self.lod = None
         self.gltf = None
-        self.g_scene = None
-        self.d_node_world = None
-        self.d_node_objects = None
+        self.d_scene = None
 
-    def n_world(self):
-        return self.d_node_world
+    def scene(self):
+        return self.d_scene
 
-    def n_objects(self):
-        return self.d_node_objects
+    def gltf_push(self, item):
+        if isinstance(item, DecaGltfScene):
+            assert len(self.d_stack) == 0
+            if item.index is None:
+                item.index = len(self.gltf.scenes)
+                self.gltf.nodes.append(item.scene)
+                if item.index == 0:
+                    self.gltf.scene = item.index
 
-    def gltf_node_push(self, node: DecaGltfNode):
-        if node.index is None:
-            node.index = len(self.gltf.nodes)
-            self.gltf.nodes.append(node.node)
-            if len(self.d_node_stack) == 0:
-                self.g_scene.nodes.append(node.index)
-            else:
-                self.d_node_stack[-1].node.children.append(node.index)
+        elif isinstance(item, DecaGltfNode):
+            assert len(self.d_stack) > 0  # at least scene has to be on stack
+            assert item not in self.d_stack  # cannot already be on stack
 
-        assert not any([n == node.index for n in self.d_node_stack])
-        assert len(self.d_node_stack) == 0 or node.index in self.d_node_stack[-1].node.children
-        self.d_node_stack.append(node)
+            parent = self.d_stack[-1]
+            assert isinstance(parent, DecaGltfNode) or isinstance(parent, DecaGltfScene)
 
-    def gltf_node_pop(self, node):
-        assert len(self.d_node_stack) > 0
-        assert self.d_node_stack[-1] == node
-        self.d_node_stack.pop(-1)
+            if item.index is None:
+                item.index = len(self.gltf.nodes)
+                self.gltf.nodes.append(item.node)
 
-    def export_modelc(self, vpath, transform):
+                if isinstance(parent, DecaGltfScene):
+                    parent.scene.nodes.append(item.index)
+                elif isinstance(parent, DecaGltfNode):
+                    parent.node.children.append(item.index)
+
+            if isinstance(parent, DecaGltfScene):
+                assert item.index in parent.scene.nodes  # assert that is childen of parent
+            elif isinstance(parent, DecaGltfNode):
+                assert item.index in parent.node.children  # assert that is childen of parent
+
+        self.d_stack.append(item)
+
+    def gltf_pop(self, item):
+        assert len(self.d_stack) > 0
+        assert self.d_stack[-1] == item
+        self.d_stack.pop(-1)
+
+    def export_modelc(self, vpath, transform: Deca3dMatrix):
+        if transform is None:
+            transform = Deca3dMatrix()
+
         self.vfs.logger.log('export_modelc: Started')
         # setup materials
         meshes_all = self.db.gltf_add_modelc(self.gltf, vpath)
-        with DecaGltfNode(self, matrix=transform):
+        with DecaGltfNode(self, matrix=transform.col_major_list()):
             for submeshes in meshes_all[self.lod]:
                 for submesh in submeshes:
                     with DecaGltfNode(self) as mesh_node:

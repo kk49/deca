@@ -3,7 +3,7 @@ from typing import List
 from .ff_adf import *
 from .xlsxwriter_hack import DecaWorkBook
 from .ff_adf_amf import AABB
-from .ff_adf_amg_gltf import DecaGltf, DecaGltfNode
+from .ff_adf_amg_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 from .vfs_db import VfsStructure, VfsNode
 
 
@@ -71,13 +71,13 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsStructure, vnode: VfsNode, export_path, a
 
 def adf_export_amf_model_0xf7c20a69(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite):
     gltf = DecaGltf(vfs, export_path)
-    for lod in range(1):
-        gltf.gltf_create(lod)
-        with gltf.n_objects():
+    with gltf.scene():
+        for lod in range(1):
+            gltf.gltf_create(lod)
             for vnode in vnodes:
                 with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath)):
                     gltf.export_modelc(vnode.vpath, None)
-        gltf.gltf_save()
+            gltf.gltf_save()
 
 
 def adf_export_mdic_0xb5b062f1(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite):
@@ -85,24 +85,25 @@ def adf_export_mdic_0xb5b062f1(vfs: VfsStructure, vnodes: List[VfsNode], export_
     gltf = DecaGltf(vfs, export_path)
     gltf.gltf_create(lod)
 
-    aabb = None
-    with gltf.n_world() as n_world:
+    with gltf.scene():
         for vnode in vnodes:
-            with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath)):
-                adf = adf_node_read(vfs, vnode)
-                mdic = adf.table_instance_values[0]
-                models = [list(vfs.map_hash_to_vpath.get(m, [None]))[0] for m in mdic['Models']]
-                instances = mdic['Instances']
-                aabb = AABB(all6=mdic['AABB']).union(aabb)
+            adf = adf_node_read(vfs, vnode)
+            mdic = adf.table_instance_values[0]
+            models = [list(vfs.map_hash_to_vpath.get(m, [None]))[0] for m in mdic['Models']]
+            instances = mdic['Instances']
+            aabb = AABB(all6=mdic['AABB'])
+            mid = aabb.mid()
+            with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath)) as mdic_node:
+                mdic_node.translation = list(mid)
                 for instance in instances:
-                    transform = instance['Transform']
+                    transform = Deca3dMatrix(col_major=instance['Transform'])
+                    transform.translate(-mid)
                     model_index = instance['ModelIndex']
                     model = models[model_index]
                     if model is None:
                         vfs.logger.log('Missing model 0x{:08x}'.format(model_index))
                     else:
                         gltf.export_modelc(model, transform)
-        n_world.translation = list(-aabb.mid())
 
     gltf.gltf_save()
 
@@ -129,21 +130,21 @@ def adf_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwr
                     f.write(s)
 
 
-def adf_export(vfs: VfsStructure, vnodes: VfsNode, extract_dir, allow_overwrite=False):
+def adf_export(vfs: VfsStructure, vnodes: List[VfsNode], extract_dir, allow_overwrite=False):
 
     vnodes_modelc = []
     vnodes_mdic = []
-    vnodes_other = []
+    vnodes_other = vnodes
 
-    expr_modelc = re.compile(rb'.*modelc')
-    expr_mdic = re.compile(rb'.*mdic')
-    for vnode in vnodes:
-        if expr_mdic.match(vnode.vpath) is not None:
-            vnodes_mdic.append(vnode)
-        elif expr_modelc.match(vnode.vpath) is not None:
-            vnodes_modelc.append(vnode)
-        else:
-            vnodes_other.append(vnode)
+    # expr_modelc = re.compile(rb'.*modelc')
+    # expr_mdic = re.compile(rb'.*mdic')
+    # for vnode in vnodes:
+    #     if expr_mdic.match(vnode.vpath) is not None:
+    #         vnodes_mdic.append(vnode)
+    #     elif expr_modelc.match(vnode.vpath) is not None:
+    #         vnodes_modelc.append(vnode)
+    #     else:
+    #         vnodes_other.append(vnode)
 
     # export any modelc files
     if len(vnodes_modelc) > 0:

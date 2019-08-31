@@ -552,6 +552,26 @@ class VfsStructure(VfsBase):
                             fn, ext = os.path.splitext(s)
                             if ext == b'.tga':
                                 vpath_map.propose(fn + b'.ddsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
+                            elif ext == b'.skeleton':
+                                vpath_map.propose(fn + b'.bsk', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0])
+                            elif ext == b'.ragdoll':
+                                vpath_map.propose(fn + b'.brd', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0])
+                                vpath_map.propose(fn + b'.ragdolsettingsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
+                            elif ext == b'.al':
+                                vpath_map.propose(fn + b'.afsmb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
+                                vpath_map.propose(fn + b'.asb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
+                            elif ext == b'.mdp':
+                                vpath_map.propose(fn + b'.mdpc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
+                            elif ext == b'.mtune':
+                                vpath_map.propose(fn + b'.mtunec', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
+
+                            '''
+                            animations/skeletons/characters/machines/skirmisher_secondary_motion.skeleton -> bsk tag0
+                            animations/ragdoll/skirmisher_sm.ragdoll -> brd tag0 , ragdolsettingsc ADF, ADF_BARE
+                            animations/statemachines/machines/skirmisher/skirmisher_base.al -> {afsmb, asb} rtpc
+                            editor/entities/characters/machines/skirmisher/skir_damage.mdp -> mdpc ADF, ADF_BARE
+                            editor/entities/characters/default_ground_alignment.mtune -> mtunec ADF, ADF_BARE
+                            '''
         q.put(vpath_map)
 
     def find_vpath_json(self, vpath_map):

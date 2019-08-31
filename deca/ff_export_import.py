@@ -9,7 +9,7 @@ from .ff_export_import_adf import adf_export
 from .ff_avtx import Ddsc, image_export
 
 
-StrBytes = TypeVar('StrBytes', str, bytes, VfsNode)
+NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
 def expand_vpaths(vfs: VfsStructure, vs):
@@ -80,7 +80,7 @@ def extract_node_raw(
     return None
 
 
-def extract_raw(vfs: VfsStructure, vnodes: List[StrBytes], extract_dir: str, do_sha1sum, allow_overwrite=False):
+def extract_raw(vfs: VfsStructure, vnodes: List[NodeListElement], extract_dir: str, do_sha1sum, allow_overwrite=False):
     vs = expand_vpaths(vfs, vnodes)
     for i, v in enumerate(vs):
         vnode = None
@@ -106,7 +106,7 @@ def extract_raw(vfs: VfsStructure, vnodes: List[StrBytes], extract_dir: str, do_
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
 
-def extract_processed(vfs: VfsStructure, vnodes: List[StrBytes], extract_dir: str, do_sha1sum, allow_overwrite=False):
+def extract_processed(vfs: VfsStructure, vnodes: List[NodeListElement], extract_dir: str, do_sha1sum, allow_overwrite=False):
     vs = expand_vpaths(vfs, vnodes)
 
     vs_adf = []

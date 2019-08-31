@@ -16,6 +16,8 @@ from deca.gui.viewer_raw import DataViewerRaw
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
+from deca.ff_export_import import extract_raw, extract_processed
+
 import PySide2
 from PySide2.QtCore import \
     QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel, QRegExp
@@ -769,22 +771,22 @@ class MainWidget(QWidget):
     def bt_extract_clicked(self, checked):
         if self.current_vpath is not None:
             try:
-                self.vfs.extract_nodes(
-                    self.current_vpath, self.vfs.working_dir + 'extracted/',
-                    self.chkbx_export_raw.isChecked(),
-                    self.chkbx_export_processed.isChecked(),
-                    False)
+                extract_dir = self.vfs.working_dir + 'extracted/'
+                if self.chkbx_export_raw.isChecked():
+                    extract_raw(self.vfs, [self.current_vpath], extract_dir, False)
+                if self.chkbx_export_processed.isChecked():
+                    extract_processed(self.vfs, [self.current_vpath], extract_dir, False)
             except EDecaFileExists as exce:
                 self.error_dialog('Extacted Canceled: File Exists: {}'.format(exce.args))
 
     def bt_prep_mod_clicked(self, checked):
         if self.current_vpath is not None:
             try:
-                self.vfs.extract_nodes(
-                    self.current_vpath, self.vfs.working_dir + 'mod/',
-                    self.chkbx_export_raw.isChecked(),
-                    self.chkbx_export_processed.isChecked(),
-                    True)
+                extract_dir = self.vfs.working_dir + 'mod/'
+                if self.chkbx_export_raw.isChecked():
+                    extract_raw(self.vfs, [self.current_vpath], extract_dir, True)
+                if self.chkbx_export_processed.isChecked():
+                    extract_processed(self.vfs, [self.current_vpath], extract_dir, True)
             except EDecaFileExists as exce:
                 self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 

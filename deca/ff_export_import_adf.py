@@ -1,11 +1,11 @@
-import pprint
-from deca.ff_adf import *
-from deca.xlsxwriter_hack import DecaWorkBook
-from deca.ff_adf_amf import AABB
-from deca.ff_adf_amg_gltf import DecaGltf, DecaGltfNode
+from .ff_adf import *
+from .xlsxwriter_hack import DecaWorkBook
+from .ff_adf_amf import AABB
+from .ff_adf_amg_gltf import DecaGltf, DecaGltfNode
+from .vfs_db import VfsStructure, VfsNode
 
 
-def adf_export_xlsx_0x0b73315d(adf, vfs, node, export_path, allow_overwrite):
+def adf_export_xlsx_0x0b73315d(adf, vfs: VfsStructure, node: VfsNode, export_path, allow_overwrite):
     fn = export_path + '.xlsx'
 
     if not allow_overwrite and os.path.exists(fn):
@@ -65,7 +65,7 @@ def adf_export_xlsx_0x0b73315d(adf, vfs, node, export_path, allow_overwrite):
     book.close()
 
 
-def adf_export_amf_model_0xf7c20a69(adf, vfs, node, export_path, allow_overwrite):
+def adf_export_amf_model_0xf7c20a69(adf, vfs: VfsStructure, node: VfsNode, export_path, allow_overwrite):
     gltf = DecaGltf(vfs, export_path)
     for lod in range(1):
         gltf.gltf_create(lod)
@@ -74,7 +74,7 @@ def adf_export_amf_model_0xf7c20a69(adf, vfs, node, export_path, allow_overwrite
         gltf.gltf_save()
 
 
-def adf_export_mdic_0xb5b062f1(adf, vfs, node, export_path, allow_overwrite):
+def adf_export_mdic_0xb5b062f1(adf, vfs: VfsStructure, node: VfsNode, export_path, allow_overwrite):
     mdic = adf.table_instance_values[0]
     models = [list(vfs.map_hash_to_vpath.get(m, [None]))[0] for m in mdic['Models']]
     instances = mdic['Instances']
@@ -99,11 +99,11 @@ def adf_export_mdic_0xb5b062f1(adf, vfs, node, export_path, allow_overwrite):
     gltf.gltf_save()
 
 
-def adf_export_multi(vfs, vpaths, root_export_path, allow_overwrite=False):
+def adf_export_multi(vfs: VfsStructure, vpaths, root_export_path, allow_overwrite=False):
     pass
 
 
-def adf_export(vfs, node, export_path, allow_overwrite=False):
+def adf_export(vfs: VfsStructure, node: VfsNode, export_path, allow_overwrite=False):
     adf = adf_node_read(vfs, node)
     if adf is not None:
         if len(adf.table_instance) == 1:

@@ -14,11 +14,9 @@ from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
 from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry
-from deca.ff_adf_export_import import adf_export
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
-from deca.ff_avtx import Ddsc, image_export
 from deca.util import Logger, remove_prefix_if_present
 from deca.hash_jenkins import hash_little
 
@@ -725,70 +723,6 @@ class VfsStructure(VfsBase):
                 vpath_map.propose(fn, ['ASSOC', None], possible_ftypes=v)
 
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
-
-    def extract_node(self, node: VfsNode, extract_dir: str, export_raw, export_processed, do_sha1sum, allow_overwrite):
-        if node.is_valid():
-            if node.offset is not None:
-                with ArchiveFile(self.file_obj_from(node)) as f:
-                    if node.vpath is None:
-                        ofile = extract_dir + '{:08X}.dat'.format(node.vhash)
-                    else:
-                        ofile = extract_dir + '{}'.format(node.vpath.decode('utf-8'))
-
-                    self.logger.log('Exporting {}'.format(ofile))
-
-                    ofiledir = os.path.dirname(ofile)
-                    os.makedirs(ofiledir, exist_ok=True)
-
-                    do_export_raw = export_raw
-
-                    if node.ftype == FTYPE_ADF_BARE:
-                        do_export_raw = False
-                        self.logger.log(
-                            'WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(
-                                ofile))
-
-                    if export_processed:
-                        try:
-                            if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
-                                if export_processed:
-                                    adf_export(self, node, ofile, allow_overwrite=allow_overwrite)
-                            elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-                                do_export_raw = False
-                                image_export(self, node, extract_dir, export_raw, export_processed, allow_overwrite=allow_overwrite)
-                        except EDecaFileExists as e:
-                            self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
-
-                    if do_export_raw:
-                        if not allow_overwrite and os.path.isfile(ofile):
-                            self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile))
-                            # raise DecaFileExists(ofile)
-                        else:
-                            buf = f.read(node.size_u)
-                            with ArchiveFile(open(ofile, 'wb')) as fo:
-                                fo.write(buf)
-
-                    # TODO
-                    # if do_sha1sum:
-                    #     # path, file = os.path.split(ofile)
-                    #     # sfile = os.path.join(path, '.' + file)
-                    #     sfile = ofile + '.deca_sha1sum'
-                    #     hsha = sha1(buf).hexdigest()
-                    #     self.logger.log('SHA1SUM {} {}'.format(hsha, sfile))
-                    #     with open(sfile, 'w') as fo:
-                    #         fo.write(hsha)
-                return ofile
-
-        return None
-
-    def extract_nodes(self, vpath: str, extract_dir: str, export_raw, export_processed, do_sha1sum, allow_overwrite=False):
-        vpath_re = re.compile(vpath)
-        for k, v in self.map_vpath_to_vfsnodes.items():
-            if vpath_re.match(k):
-                try:
-                    self.extract_node(v[0], extract_dir, export_raw, export_processed, do_sha1sum, allow_overwrite)
-                except EDecaFileExists as e:
-                    self.logger.log('WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
 
 def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):

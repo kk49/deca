@@ -54,7 +54,7 @@ class Deca3dTexture:
 
     def add_to_gltf(self, vfs, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if not self.texture_saved:
-            vfs.logger.log('Setup Texture: {}'.format(self.vpath))
+            vfs.logger.log('Texture:Setup: {}'.format(self.vpath))
             # dump textures
             texture_fn = None
             if len(self.vpath) > 0:
@@ -62,7 +62,16 @@ class Deca3dTexture:
                 if len(texture_node) > 0:
                     texture_node = texture_node[0]
                     ddsc = image_load(vfs, texture_node, save_raw_data=True)
-                    npimp = ddsc.mips[0].pil_image()
+
+                    mips = None
+                    for i in range(len(ddsc.mips)):
+                        if ddsc.mips[i].data is not None:
+                            mips = ddsc.mips[i]
+                            break
+                        else:
+                            vfs.logger.log('Texture:Setup: Missing LOD {}'.format(i))
+
+                    npimp = mips.pil_image()
                     texture_fn = self.vpath.decode('utf-8')
                     texture_fn = texture_fn.replace('/', '_') + '.png'
                     texture_fn_full = os.path.join(db.export_dir, texture_fn)

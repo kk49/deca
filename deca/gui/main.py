@@ -3,6 +3,7 @@ import os
 import re
 import argparse
 import pickle
+from typing import List
 from deca.errors import *
 from deca.vfs_db import vfs_structure_prep, vfs_structure_open, VfsStructure, VfsNode
 from deca.ff_types import *
@@ -20,12 +21,16 @@ from deca.ff_export_import import extract_raw, extract_processed
 
 import PySide2
 from PySide2.QtCore import \
-    QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel, QRegExp
+    QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel, QRegExp, \
+    QItemSelection
+
 from PySide2.QtGui import \
     QColor, QFont
+
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QTextEdit, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel, QCheckBox
+    QTabWidget, QTreeView, QTextEdit, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel, QCheckBox, \
+    QAbstractItemView
 
 
 # from PySide2.QtWebEngineWidgets import QWebEngineView
@@ -179,7 +184,7 @@ class VfsNodeTableWidget(QWidget):
     def __init__(self, show_mapped):
         QWidget.__init__(self)
 
-        self.vnode_1click_selected = None
+        self.vnode_selection_changed = None
         self.vnode_2click_selected = None
 
         # Getting the Model
@@ -187,6 +192,7 @@ class VfsNodeTableWidget(QWidget):
 
         # Creating a QTableView
         self.table_view = QTableView()
+        self.table_view.clicked.connect(self.clicked)
         self.table_view.doubleClicked.connect(self.double_clicked)
         font = self.table_view.font()
         font.setPointSize(8)
@@ -215,6 +221,12 @@ class VfsNodeTableWidget(QWidget):
 
     def vfs_set(self, vfs):
         self.model.vfs_set(vfs)
+
+    def clicked(self, index):
+        if index.isValid():
+            if self.vnode_selection_changed is not None:
+                items = list(set([self.model.table[idx.row()] for idx in self.table_view.selectedIndexes()]))
+                self.vnode_selection_changed(items)
 
     def double_clicked(self, index):
         if index.isValid():
@@ -434,7 +446,7 @@ class VfsDirWidget(QWidget):
     def __init__(self):
         QWidget.__init__(self)
 
-        self.vnode_1click_selected = None
+        self.vnode_selection_changed = None
         self.vnode_2click_selected = None
 
         # Getting the Model
@@ -447,6 +459,8 @@ class VfsDirWidget(QWidget):
         self.view = QTreeView()
         self.view.doubleClicked.connect(self.double_clicked)
         self.view.clicked.connect(self.clicked)
+        self.view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.view.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
         font = self.view.font()
         font.setPointSize(8)
@@ -475,10 +489,12 @@ class VfsDirWidget(QWidget):
 
     def clicked(self, index):
         if index.isValid():
-            index = self.proxy_model.mapToSource(index)
-            tnode = index.internalPointer()
-            if (isinstance(tnode, VfsDirLeaf) or isinstance(tnode, VfsDirBranch)) and self.vnode_1click_selected is not None:
-                self.vnode_1click_selected(tnode.vpath())
+            if self.vnode_selection_changed is not None:
+                items = self.view.selectedIndexes()
+                items = [self.proxy_model.mapToSource(idx) for idx in items]
+                items = list(set([idx.internalPointer() for idx in items]))
+                items = [idx.vpath() for idx in items if isinstance(idx, VfsDirLeaf) or isinstance(idx, VfsDirBranch)]
+                self.vnode_selection_changed(items)
 
     def double_clicked(self, index):
         if index.isValid():
@@ -524,8 +540,8 @@ class DataViewWidget(QWidget):
     def vfs_set(self, vfs):
         self.vfs = vfs
 
-    def vnode_1click_selected(self, vpath: str):
-        print('DataViewWidget:vnode_1click_selected: {}'.format(vpath))
+    def vnode_selection_changed(self, vpaths):
+        print('DataViewWidget:vnode_selection_changed: {}'.format(vpaths))
 
     def vnode_2click_selected(self, vnode: VfsNode):
         print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))
@@ -588,7 +604,7 @@ class MainWidget(QWidget):
         self.vfs = None
         self.builder = Builder()
         self.current_vnode = None
-        self.current_vpath = None
+        self.current_vpaths = None
 
         # self.log_widget = QTextEdit()
         # self.log_widget.setReadOnly(True)
@@ -600,7 +616,7 @@ class MainWidget(QWidget):
 
         # Create VFS Node table
         self.vfs_node_widget = VfsNodeTableWidget(show_mapped=True)
-        self.vfs_node_widget.vnode_1click_selected = self.vnode_1click_selected
+        self.vfs_node_widget.vnode_selection_changed = self.vnode_selection_changed
         self.vfs_node_widget.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # size.setHorizontalStretch(1)
@@ -608,7 +624,7 @@ class MainWidget(QWidget):
 
         # Create VFS Node table
         self.vfs_node_widget_non_mapped = VfsNodeTableWidget(show_mapped=False)
-        self.vfs_node_widget_non_mapped.vnode_1click_selected = self.vnode_1click_selected
+        self.vfs_node_widget_non_mapped.vnode_selection_changed = self.vnode_selection_changed
         self.vfs_node_widget_non_mapped.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # size.setHorizontalStretch(1)
@@ -616,7 +632,7 @@ class MainWidget(QWidget):
 
         # Create VFS dir table
         self.vfs_dir_widget = VfsDirWidget()
-        self.vfs_dir_widget.vnode_1click_selected = self.vnode_1click_selected
+        self.vfs_dir_widget.vnode_selection_changed = self.vnode_selection_changed
         self.vfs_dir_widget.vnode_2click_selected = self.vnode_2click_selected
         # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         # size.setHorizontalStretch(1)
@@ -752,14 +768,28 @@ class MainWidget(QWidget):
         msg.setStandardButtons(QMessageBox.Ok)
         retval = msg.exec_()
 
-    def vnode_1click_selected(self, vpath: str):
-        self.current_vpath = vpath
-        self.data_view.vnode_1click_selected(vpath)
-        if self.current_vpath is not None:
-            self.bt_extract.setText('EXTRACT: {}'.format(self.current_vpath))
+    def vnode_selection_changed(self, vpaths):
+        self.current_vpaths = vpaths
+        if self.current_vpaths is None or len(self.current_vpaths) == 0:
+            self.bt_extract.setEnabled(False)
+            self.bt_prep_mod.setEnabled(False)
+            str_vpaths = ''
+        else:
             self.bt_extract.setEnabled(True)
-            self.bt_prep_mod.setText('PREP MOD: {}'.format(self.current_vpath))
             self.bt_prep_mod.setEnabled(True)
+
+            if len(self.current_vpaths) == 1:
+                if isinstance(vpaths[0], bytes):
+                    str_vpaths = vpaths[0].decode('utf-8')
+                else:
+                    str_vpaths = vpaths[0]
+            else:
+                str_vpaths = '**MULTIPLE**'
+
+        self.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
+        self.bt_prep_mod.setText('PREP MOD: {}'.format(str_vpaths))
+
+        self.data_view.vnode_selection_changed(vpaths)
 
     def vnode_2click_selected(self, vnode: VfsNode):
         self.current_vnode = vnode
@@ -769,24 +799,24 @@ class MainWidget(QWidget):
         #     self.bt_extract.setEnabled(True)
 
     def bt_extract_clicked(self, checked):
-        if self.current_vpath is not None:
+        if self.current_vpaths is not None and len(self.current_vpaths) > 0:
             try:
                 extract_dir = self.vfs.working_dir + 'extracted/'
                 if self.chkbx_export_raw.isChecked():
-                    extract_raw(self.vfs, [self.current_vpath], extract_dir, False)
+                    extract_raw(self.vfs, self.current_vpaths, extract_dir, False)
                 if self.chkbx_export_processed.isChecked():
-                    extract_processed(self.vfs, [self.current_vpath], extract_dir, False)
+                    extract_processed(self.vfs, self.current_vpaths, extract_dir, False)
             except EDecaFileExists as exce:
-                self.error_dialog('Extacted Canceled: File Exists: {}'.format(exce.args))
+                self.error_dialog('Extraction Canceled: File Exists: {}'.format(exce.args))
 
     def bt_prep_mod_clicked(self, checked):
-        if self.current_vpath is not None:
+        if self.current_vpaths is not None and len(self.current_vpaths) > 0:
             try:
                 extract_dir = self.vfs.working_dir + 'mod/'
                 if self.chkbx_export_raw.isChecked():
-                    extract_raw(self.vfs, [self.current_vpath], extract_dir, True)
+                    extract_raw(self.vfs, self.current_vpaths, extract_dir, True)
                 if self.chkbx_export_processed.isChecked():
-                    extract_processed(self.vfs, [self.current_vpath], extract_dir, True)
+                    extract_processed(self.vfs, self.current_vpaths, extract_dir, True)
             except EDecaFileExists as exce:
                 self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 

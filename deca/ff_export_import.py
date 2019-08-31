@@ -12,6 +12,26 @@ from .ff_avtx import Ddsc, image_export
 StrBytes = TypeVar('StrBytes', str, bytes, VfsNode)
 
 
+def expand_vpaths(vfs: VfsStructure, vs):
+    vos = []
+
+    for v in vs:
+        id = v
+        if isinstance(v, str):
+            id = v.encode('ascii')
+
+        if isinstance(id, bytes):
+            expr = re.compile(id)
+            for k in vfs.map_vpath_to_vfsnodes:
+                m = expr.match(k)
+                if m is not None:
+                    vos.append(k)
+        else:
+            vos.append(v)
+
+    return vos
+
+
 def extract_node_raw(
         vfs: VfsStructure,
         node: VfsNode,
@@ -61,13 +81,11 @@ def extract_node_raw(
 
 
 def extract_raw(vfs: VfsStructure, vnodes: List[StrBytes], extract_dir: str, do_sha1sum, allow_overwrite=False):
-    vs = vnodes.copy()
+    vs = expand_vpaths(vfs, vnodes)
     for i, v in enumerate(vs):
         vnode = None
         id = None
-        if isinstance(v, str):
-            id = str.encode('ascii')
-        elif isinstance(v, bytes):
+        if isinstance(v, bytes):
             id = v
         elif isinstance(v, VfsNode):
             vnode = v
@@ -88,56 +106,16 @@ def extract_raw(vfs: VfsStructure, vnodes: List[StrBytes], extract_dir: str, do_
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
 
-def extract_node_processed(
-        vfs: VfsStructure,
-        node: VfsNode,
-        extract_dir: str,
-        do_sha1sum,
-        allow_overwrite):
-    if node.is_valid():
-        if node.offset is not None:
-            with ArchiveFile(vfs.file_obj_from(node)) as f:
-                if node.vpath is None:
-                    ofile = extract_dir + '{:08X}.dat'.format(node.vhash)
-                else:
-                    ofile = extract_dir + '{}'.format(node.vpath.decode('utf-8'))
-
-                vfs.logger.log('Exporting {}'.format(ofile))
-
-                ofiledir = os.path.dirname(ofile)
-                os.makedirs(ofiledir, exist_ok=True)
-
-                try:
-                    if node.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
-                        adf_export(vfs, node, ofile, allow_overwrite=allow_overwrite)
-                    elif node.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-                        image_export(vfs, node, extract_dir, False, True, allow_overwrite=allow_overwrite)
-                except EDecaFileExists as e:
-                    vfs.logger.log(
-                        'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
-
-                # TODO
-                # if do_sha1sum:
-                #     # path, file = os.path.split(ofile)
-                #     # sfile = os.path.join(path, '.' + file)
-                #     sfile = ofile + '.deca_sha1sum'
-                #     hsha = sha1(buf).hexdigest()
-                #     vfs.logger.log('SHA1SUM {} {}'.format(hsha, sfile))
-                #     with open(sfile, 'w') as fo:
-                #         fo.write(hsha)
-            return ofile
-
-    return None
-
-
 def extract_processed(vfs: VfsStructure, vnodes: List[StrBytes], extract_dir: str, do_sha1sum, allow_overwrite=False):
-    vs = vnodes.copy()
+    vs = expand_vpaths(vfs, vnodes)
+
+    vs_adf = []
+    vs_images = []
+    vs_other = []
     for i, v in enumerate(vs):
         vnode = None
         id = None
-        if isinstance(v, str):
-            id = str.encode('ascii')
-        elif isinstance(v, bytes):
+        if isinstance(v, bytes):
             id = v
         elif isinstance(v, VfsNode):
             vnode = v
@@ -150,9 +128,34 @@ def extract_processed(vfs: VfsStructure, vnodes: List[StrBytes], extract_dir: st
             else:
                 raise EDecaFileMissing('extract_raw: Missing {}'.format(id.decode('utf-8')))
 
-        if vnode is not None:
+        if vnode is not None and vnode.is_valid() and vnode.offset is not None:
             try:
-                extract_node_processed(vfs, vnode, extract_dir, do_sha1sum, allow_overwrite)
+                if vnode.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
+                    vs_adf.append(vnode)
+                elif vnode.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+                    vs_images.append(vnode)
+                else:
+                    vs_other.append(vnode)
+
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+
+    for vnode in vs_images:
+        if vnode.vpath is None:
+            ofile = extract_dir + '{:08X}.dat'.format(vnode.vhash)
+        else:
+            ofile = extract_dir + '{}'.format(vnode.vpath.decode('utf-8'))
+
+        vfs.logger.log('Exporting {}'.format(ofile))
+
+        ofiledir = os.path.dirname(ofile)
+        os.makedirs(ofiledir, exist_ok=True)
+
+        try:
+            image_export(vfs, vnode, extract_dir, False, True, allow_overwrite=allow_overwrite)
+        except EDecaFileExists as e:
+            vfs.logger.log(
+                'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+
+    adf_export(vfs, vs_adf, extract_dir, allow_overwrite)

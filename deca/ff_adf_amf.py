@@ -26,8 +26,8 @@ class AABB:
             return AABB(min3=self.min, max3=self.max)
         else:
             return AABB(
-                min3=np.min(self.min, other.min),
-                max3=np.max(self.max, other.max),
+                min3=np.fmin(self.min, other.min),
+                max3=np.fmax(self.max, other.max),
             )
 
 

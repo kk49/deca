@@ -378,6 +378,22 @@ class Deca3dModelc:
         return self.models
 
 
+class DecaGltfNode:
+    def __init__(self, deca_gltf, name=None, matrix=None):
+        if isinstance(name, bytes):
+            name = name.decode('utf-8')
+        self.deca_gltf = deca_gltf
+        self.index = None
+        self.node = pyg.Node(name=name, matrix=matrix)
+
+    def __enter__(self):
+        self.deca_gltf.gltf_node_push(self)
+        return self.node
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.deca_gltf.gltf_node_pop(self)
+
+
 class DecaGltf:
     def __init__(self, vfs, export_path):
         self.vfs = vfs
@@ -388,6 +404,9 @@ class DecaGltf:
         self.lod = None
         self.gltf = None
         self.g_scene = None
+        self.d_node_stack = []
+        self.d_node_world = None
+        self.d_node_objects = None
 
     def gltf_create(self, lod):
         assert self.gltf is None
@@ -398,30 +417,52 @@ class DecaGltf:
         self.g_scene = pyg.Scene()
         self.gltf.scene = len(self.gltf.scenes)
         self.gltf.scenes.append(self.g_scene)
+        self.d_node_stack = []
+        self.d_node_world = DecaGltfNode(self, name='World')
+        self.d_node_objects = DecaGltfNode(self, name='Objects')
 
     def gltf_save(self):
         assert self.gltf is not None
+        assert len(self.d_node_stack) == 0
         fn = os.path.join(self.export_dir, 'model-lod_{}.gltf'.format(self.lod))
         self.gltf.save_json(fn)
         self.lod = None
         self.gltf = None
         self.g_scene = None
+        self.d_node_world = None
+        self.d_node_objects = None
+
+    def n_world(self):
+        return self.d_node_world
+
+    def n_objects(self):
+        return self.d_node_objects
+
+    def gltf_node_push(self, node: DecaGltfNode):
+        if node.index is None:
+            node.index = len(self.gltf.nodes)
+            self.gltf.nodes.append(node.node)
+            if len(self.d_node_stack) == 0:
+                self.g_scene.nodes.append(node.index)
+            else:
+                self.d_node_stack[-1].node.children.append(node.index)
+
+        assert not any([n == node.index for n in self.d_node_stack])
+        assert len(self.d_node_stack) == 0 or node.index in self.d_node_stack[-1].node.children
+        self.d_node_stack.append(node)
+
+    def gltf_node_pop(self, node):
+        assert len(self.d_node_stack) > 0
+        assert self.d_node_stack[-1] == node
+        self.d_node_stack.pop(-1)
 
     def export_modelc(self, vpath, transform):
         self.vfs.logger.log('export_modelc: Started')
         # setup materials
         meshes_all = self.db.gltf_add_modelc(self.gltf, vpath)
-        model_node = pyg.Node()
-        model_node.matrix = transform
-        for submeshes in meshes_all[self.lod]:
-            for submesh in submeshes:
-                mesh_node = pyg.Node()
-                mesh_node.mesh = submesh
-                mesh_node_idx = len(self.gltf.nodes)
-                self.gltf.nodes.append(mesh_node)
-                model_node.children.append(mesh_node_idx)
-
-        model_node_idx = len(self.gltf.nodes)
-        self.gltf.nodes.append(model_node)
-        self.g_scene.nodes.append(model_node_idx)
+        with DecaGltfNode(self, matrix=transform):
+            for submeshes in meshes_all[self.lod]:
+                for submesh in submeshes:
+                    with DecaGltfNode(self) as mesh_node:
+                        mesh_node.mesh = submesh
         self.vfs.logger.log('export_modelc: Complete')

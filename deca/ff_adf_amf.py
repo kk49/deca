@@ -7,6 +7,30 @@ from deca.ff_adf import Adf, AdfValue, adf_value_extract
 # TODO classes based on data in GenZero files, how dynamic do we have to be?
 
 
+class AABB:
+    def __init__(self, all6: [np.ndarray, list] = None, min3: [np.ndarray, list] = None, max3: [np.ndarray, list] = None):
+        if all6 is not None and min3 is None and max3 is None:
+            self.min = np.array(all6[0:3])
+            self.max = np.array(all6[3:6])
+        elif all6 is None and min3 is not None and max3 is not None:
+            self.min = np.array(min3)
+            self.max = np.array(max3)
+        else:
+            raise ValueError('AABB::__init__: incorrect parameters')
+
+    def mid(self):
+        return 0.5 * (self.min + self.max)
+
+    def union(self, other):
+        if other is None:
+            return AABB(min3=self.min, max3=self.max)
+        else:
+            return AABB(
+                min3=np.min(self.min, other.min),
+                max3=np.max(self.max, other.max),
+            )
+
+
 class AmfClass:
     def __init__(self):
         pass

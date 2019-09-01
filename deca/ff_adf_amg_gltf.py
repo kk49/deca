@@ -49,9 +49,10 @@ class Deca3dMatrix:
 
 
 class Deca3dDatabase:
-    def __init__(self, vfs, export_dir):
+    def __init__(self, vfs, resource_prefix_abs, resource_prefix_uri):
         self.vfs = vfs
-        self.export_dir = export_dir
+        self.resource_prefix_abs = resource_prefix_abs
+        self.resource_prefix_uri = resource_prefix_uri
         self.map_vpath_to_texture = {}
         self.map_vpath_to_meshc = {}
         self.map_vpath_to_modelc = {}
@@ -90,32 +91,36 @@ class Deca3dTexture:
         if not self.texture_saved:
             vfs.logger.log('Texture:Setup: {}'.format(self.vpath))
             # dump textures
-            texture_fn = None
+            texture_fn_uri = None
             if len(self.vpath) > 0:
                 texture_node = vfs.map_vpath_to_vfsnodes.get(self.vpath, [])
                 if len(texture_node) > 0:
-                    texture_node = texture_node[0]
-                    ddsc = image_load(vfs, texture_node, save_raw_data=True)
+                    texture_fn = self.vpath.decode('utf-8') + '.png'
+                    texture_fn_uri = os.path.join(db.resource_prefix_uri, texture_fn)
+                    texture_fn_absolute = os.path.join(db.resource_prefix_abs, texture_fn)
 
-                    mips = None
-                    for i in range(len(ddsc.mips)):
-                        if ddsc.mips[i].data is not None:
-                            mips = ddsc.mips[i]
-                            break
-                        else:
-                            vfs.logger.log('Texture:Setup: Missing LOD {}'.format(i))
+                    if not os.path.isfile(texture_fn_absolute):
+                        texture_node = texture_node[0]
+                        ddsc = image_load(vfs, texture_node, save_raw_data=True)
 
-                    npimp = mips.pil_image()
-                    texture_fn = self.vpath.decode('utf-8')
-                    texture_fn = texture_fn.replace('/', '_') + '.png'
-                    texture_fn_full = os.path.join(db.export_dir, texture_fn)
-                    npimp.save(texture_fn_full)
+                        mips = None
+                        for i in range(len(ddsc.mips)):
+                            if ddsc.mips[i].data is not None:
+                                mips = ddsc.mips[i]
+                                break
+                            else:
+                                vfs.logger.log('Texture:Setup: Missing LOD {}'.format(i))
+
+                        os.makedirs(os.path.dirname(texture_fn_absolute), exist_ok=True)
+                        npimp = mips.pil_image()
+                        npimp.save(texture_fn_absolute)
                 else:
                     vfs.logger.log('WARNING: Missing Texture file: {}'.format(self.vpath))
 
-            if texture_fn is not None:
+            # Setup GLTF.Image
+            if texture_fn_uri is not None:
                 gltf_image = pyg.Image()
-                gltf_image.uri = texture_fn
+                gltf_image.uri = texture_fn_uri
                 image_idx = len(gltf.images)
                 gltf.images.append(gltf_image)
 
@@ -124,8 +129,10 @@ class Deca3dTexture:
                 # gltf_texture.sampler
                 # gltf_texture.extras
 
-                self.gltf_id = len(gltf.textures)
+                texture_index = len(gltf.textures)
                 gltf.textures.append(gltf_texture)
+
+                self.gltf_id = texture_index
 
             self.texture_saved = True
 
@@ -174,27 +181,29 @@ class Deca3dMeshc:
             vertex_buffer_fns = []
             vertex_buffer_ids = []
 
-            for buffer in mesh_buffers.indexBuffers:
-                index = len(gltf.buffers)
-                fn = os.path.join(db.export_dir, 'buffer_index_{:03}.bin'.format(index))
-                with open(fn, 'wb') as f:
-                    f.write(buffer.data)
-                index_buffer_fns.append(fn)
+            for index, buffer in enumerate(mesh_buffers.indexBuffers):
+                fn = self.vpath.decode('utf-8') + '.buffer_index_{:03}.bin'.format(index)
+                fn_uri = os.path.join(db.resource_prefix_uri, fn)
+                fn_abs = os.path.join(db.resource_prefix_abs, fn)
+                if not os.path.isfile(fn_abs):
+                    os.makedirs(os.path.dirname(fn_abs), exist_ok=True)
+                    with open(fn_abs, 'wb') as f:
+                        f.write(buffer.data)
+                index_buffer_fns.append(fn_abs)
                 index_buffer_ids.append(len(gltf.buffers))
-                gltf.buffers.append(pyg.Buffer(
-                    uri=os.path.basename(fn),
-                    byteLength=os.stat(fn).st_size))
+                gltf.buffers.append(pyg.Buffer(uri=fn_uri, byteLength=os.stat(fn_abs).st_size))
 
-            for buffer in mesh_buffers.vertexBuffers:
-                index = len(gltf.buffers)
-                fn = os.path.join(db.export_dir, 'buffer_vertex_{:03}.bin'.format(index))
-                with open(fn, 'wb') as f:
-                    f.write(buffer.data)
-                vertex_buffer_fns.append(fn)
+            for index, buffer in enumerate(mesh_buffers.vertexBuffers):
+                fn = self.vpath.decode('utf-8') + '.buffer_vertex_{:03}.bin'.format(index)
+                fn_uri = os.path.join(db.resource_prefix_uri, fn)
+                fn_abs = os.path.join(db.resource_prefix_abs, fn)
+                if not os.path.isfile(fn_abs):
+                    os.makedirs(os.path.dirname(fn_abs), exist_ok=True)
+                    with open(fn_abs, 'wb') as f:
+                        f.write(buffer.data)
+                vertex_buffer_fns.append(fn_abs)
                 vertex_buffer_ids.append(len(gltf.buffers))
-                gltf.buffers.append(pyg.Buffer(
-                    uri=os.path.basename(fn),
-                    byteLength=os.stat(fn).st_size))
+                gltf.buffers.append(pyg.Buffer(uri=fn_uri, byteLength=os.stat(fn_abs).st_size))
 
             self.meshes = {}
             lod_group: AmfLodGroup
@@ -454,33 +463,37 @@ class DecaGltfNode:
 
 
 class DecaGltf:
-    def __init__(self, vfs, export_path):
+    def __init__(self, vfs, export_path, filename, lod=0, save_to_one_dir=False):
         self.vfs = vfs
-        self.export_dir = export_path + '.dir'
-        os.makedirs(self.export_dir, exist_ok=True)
-
-        self.db = Deca3dDatabase(self.vfs, self.export_dir)
-        self.lod = None
-        self.gltf = None
-        self.d_stack = []
-        self.d_scene = None
-        self.d_node_world = None
-        self.d_node_objects = None
-
-    def gltf_create(self, lod):
-        assert self.gltf is None
+        self.filename = filename
         self.lod = lod
+        self.save_to_one_dir = save_to_one_dir
         self.gltf = pyg.GLTF2()
         self.gltf.asset.version = "2.0"
         self.gltf.asset.generator = "DECA extractor"
         self.d_stack = []
         self.d_scene = DecaGltfScene(self, name='Scene0')
 
+        if self.save_to_one_dir:
+            self.export_path = os.path.join(export_path, filename + '.dir', 'model-lod_{}.gltf'.format(self.lod))
+            self.resource_prefix_abs = os.path.join(export_path, filename + '.dir')
+            self.resource_prefix_uri = ''
+        else:
+            self.export_path = os.path.join(export_path, filename + '-lod_{}.gltf'.format(self.lod))
+            self.resource_prefix_abs = export_path
+            self.resource_prefix_uri = ''
+            dirs = os.path.dirname(filename)
+            while len(dirs) > 0:
+                self.resource_prefix_uri += '../'
+                dirs = os.path.dirname(dirs)
+        os.makedirs(os.path.dirname(self.export_path), exist_ok=True)
+
+        self.db = Deca3dDatabase(self.vfs, self.resource_prefix_abs, self.resource_prefix_uri)
+
     def gltf_save(self):
         assert self.gltf is not None
         assert len(self.d_stack) == 0
-        fn = os.path.join(self.export_dir, 'model-lod_{}.gltf'.format(self.lod))
-        self.gltf.save_json(fn)
+        self.gltf.save_json(self.export_path)
         self.lod = None
         self.gltf = None
         self.d_scene = None

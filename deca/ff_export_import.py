@@ -12,9 +12,10 @@ from .ff_avtx import Ddsc, image_export
 NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
-def expand_vpaths(vfs: VfsStructure, vs):
+def expand_vpaths(vfs: VfsStructure, vs, mask):
     vos = []
 
+    expr_mask = re.compile(mask)
     for v in vs:
         id = v
         if isinstance(v, str):
@@ -23,8 +24,7 @@ def expand_vpaths(vfs: VfsStructure, vs):
         if isinstance(id, bytes):
             expr = re.compile(id)
             for k in vfs.map_vpath_to_vfsnodes:
-                m = expr.match(k)
-                if m is not None:
+                if expr.match(k) and expr_mask.match(k):
                     vos.append(k)
         else:
             vos.append(v)
@@ -80,8 +80,14 @@ def extract_node_raw(
     return None
 
 
-def extract_raw(vfs: VfsStructure, vnodes: List[NodeListElement], extract_dir: str, do_sha1sum, allow_overwrite=False):
-    vs = expand_vpaths(vfs, vnodes)
+def extract_raw(
+        vfs: VfsStructure,
+        vnodes: List[NodeListElement],
+        mask: bytes,
+        extract_dir: str,
+        do_sha1sum=False,
+        allow_overwrite=False):
+    vs = expand_vpaths(vfs, vnodes, mask)
     for i, v in enumerate(vs):
         vnode = None
         id = None
@@ -106,8 +112,15 @@ def extract_raw(vfs: VfsStructure, vnodes: List[NodeListElement], extract_dir: s
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
 
-def extract_processed(vfs: VfsStructure, vnodes: List[NodeListElement], extract_dir: str, do_sha1sum, allow_overwrite=False):
-    vs = expand_vpaths(vfs, vnodes)
+def extract_processed(
+        vfs: VfsStructure,
+        vnodes: List[NodeListElement],
+        mask: bytes,
+        extract_dir: str,
+        do_sha1sum=False,
+        allow_overwrite=False,
+        save_to_one_dir=True):
+    vs = expand_vpaths(vfs, vnodes, mask)
 
     vs_adf = []
     vs_images = []
@@ -158,4 +171,4 @@ def extract_processed(vfs: VfsStructure, vnodes: List[NodeListElement], extract_
             vfs.logger.log(
                 'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-    adf_export(vfs, vs_adf, extract_dir, allow_overwrite)
+    adf_export(vfs, vs_adf, extract_dir, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)

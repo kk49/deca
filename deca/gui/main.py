@@ -605,6 +605,7 @@ class MainWidget(QWidget):
         self.builder = Builder()
         self.current_vnode = None
         self.current_vpaths = None
+        self.filter_mask = b'^.*$'
 
         # self.log_widget = QTextEdit()
         # self.log_widget.setReadOnly(True)
@@ -691,9 +692,14 @@ class MainWidget(QWidget):
         self.chkbx_export_processed.setText('Export Processed Files')
         self.chkbx_export_processed.setChecked(True)
 
+        self.chkbx_export_save_to_one_dir = QCheckBox()
+        self.chkbx_export_save_to_one_dir.setText('Export Gltf To One Dir')
+        self.chkbx_export_save_to_one_dir.setChecked(False)
+
         export_layout = QHBoxLayout()
         export_layout.addWidget(self.chkbx_export_raw)
         export_layout.addWidget(self.chkbx_export_processed)
+        export_layout.addWidget(self.chkbx_export_save_to_one_dir)
 
         self.bt_extract = QPushButton()
         self.bt_extract.setEnabled(False)
@@ -802,10 +808,11 @@ class MainWidget(QWidget):
         if self.current_vpaths is not None and len(self.current_vpaths) > 0:
             try:
                 extract_dir = self.vfs.working_dir + 'extracted/'
+                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
                 if self.chkbx_export_raw.isChecked():
-                    extract_raw(self.vfs, self.current_vpaths, extract_dir, False)
+                    extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
                 if self.chkbx_export_processed.isChecked():
-                    extract_processed(self.vfs, self.current_vpaths, extract_dir, False)
+                    extract_processed(self.vfs, self.current_vpaths, self.filter_mask, extract_dir, save_to_one_dir=save_to_one_dir)
             except EDecaFileExists as exce:
                 self.error_dialog('Extraction Canceled: File Exists: {}'.format(exce.args))
 
@@ -813,10 +820,11 @@ class MainWidget(QWidget):
         if self.current_vpaths is not None and len(self.current_vpaths) > 0:
             try:
                 extract_dir = self.vfs.working_dir + 'mod/'
+                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
                 if self.chkbx_export_raw.isChecked():
-                    extract_raw(self.vfs, self.current_vpaths, extract_dir, True)
+                    extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
                 if self.chkbx_export_processed.isChecked():
-                    extract_processed(self.vfs, self.current_vpaths, extract_dir, True)
+                    extract_processed(self.vfs, self.current_vpaths, self.filter_mask, extract_dir, save_to_one_dir=save_to_one_dir)
             except EDecaFileExists as exce:
                 self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 
@@ -832,7 +840,14 @@ class MainWidget(QWidget):
     def filter_text_changed(self):
         txt = self.filter_edit.text()
         if len(txt) == 0:
-            txt = '.*'
+            txt = '^.*$'
+        else:
+            if txt[0] != '^':
+                txt = '^' + txt
+            if txt[-1] != '$':
+                txt = txt + '$'
+
+        self.filter_mask = txt.encode('ascii')
         self.vfs_dir_widget.filter_vfspath_set(txt)
 
     def vhash_to_vpath_text_changed(self):

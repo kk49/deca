@@ -67,8 +67,8 @@ class Deca3dDatabase:
         self.map_vpath_to_meshc[vpath] = item
         return item.add_to_gltf(self.vfs, self, gltf)
 
-    def gltf_add_modelc(self, gltf, vpath):
-        item = self.map_vpath_to_modelc.get(vpath, Deca3dModelc(vpath))
+    def gltf_add_modelc(self, gltf, vpath, material_properties=None):
+        item = self.map_vpath_to_modelc.get(vpath, Deca3dModelc(vpath, material_properties))
         self.map_vpath_to_modelc[vpath] = item
         return item.add_to_gltf(self.vfs, self, gltf)
 
@@ -351,9 +351,10 @@ class Deca3dModelc:
     # The model stores it's material, texture info, ... in the gltf when used
     # The model writes out it's support files (textures) when used
     # The model creates a copy of the DecaMeshc mesh when it "loads" it meshc file
-    def __init__(self, vpath):
+    def __init__(self, vpath, material_properties=None):
         self.vpath = vpath
         self.models = None
+        self.material_properties = material_properties
 
     def add_to_gltf(self, vfs, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.models is None:
@@ -380,6 +381,12 @@ class Deca3dModelc:
                     for texture_vpath in material.textures:
                         textures.append(db.gltf_add_texture(gltf, texture_vpath))
 
+                    # [0] diffused color ,
+                    # [1] normal bump map ,
+                    # [2] MPM? ,
+                    # [4] emissive , UseEmissive & EmissiveTextureHasColor
+                    # [17] color_mask , UseColorMask
+
                     # add material
                     gltf_material = pyg.Material()
                     gltf_material.name = material.name.decode('utf-8')
@@ -391,6 +398,7 @@ class Deca3dModelc:
                     tid = textures[2]
                     if tid is not None:
                         mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+
                     gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
 
                     tid = textures[1]
@@ -404,6 +412,12 @@ class Deca3dModelc:
                             gltf_material.emissiveTexture = pyg.MaterialTexture(index=tid)
                     else:
                         gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
+
+                    # FOR TESTING, need to figure out how to use colormask with gltf
+                    # if material.attributes['UseColorMask']:
+                    #     tid = textures[17]
+                    #     if tid is not None:
+                    #         mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
 
                     material_idx = len(gltf.materials)
                     gltf.materials.append(gltf_material)
@@ -538,13 +552,13 @@ class DecaGltf:
         assert self.d_stack[-1] == item
         self.d_stack.pop(-1)
 
-    def export_modelc(self, vpath, transform: Deca3dMatrix):
+    def export_modelc(self, vpath, transform: Deca3dMatrix, material_properties=None):
         if transform is None:
             transform = Deca3dMatrix()
 
         self.vfs.logger.log('export_modelc: Started')
         # setup materials
-        meshes_all = self.db.gltf_add_modelc(self.gltf, vpath)
+        meshes_all = self.db.gltf_add_modelc(self.gltf, vpath, material_properties)
         with DecaGltfNode(self, matrix=transform.col_major_list()):
             for submeshes in meshes_all[self.lod]:
                 for submesh in submeshes:

@@ -131,8 +131,18 @@ def adf_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwr
                 adf_export_amf_model_0xf7c20a69(vfs, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
             elif adf.table_instance[0].type_hash == 0xb5b062f1:  # mdic
                 adf_export_mdic_0xb5b062f1(vfs, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
-            else:
-                fn = export_path + '.txt'
+
+
+def adf_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
+    for vnode in vnodes:
+        try:
+            if save_to_processed:
+                adf_export_node(vfs, vnode, export_path, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
+
+            if save_to_text:
+                adf = adf_node_read(vfs, vnode)
+
+                fn = os.path.join(export_path, vnode.vpath.decode('utf-8')) + '.txt'
 
                 if not allow_overwrite and os.path.exists(fn):
                     raise EDecaFileExists(fn)
@@ -142,11 +152,6 @@ def adf_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwr
                 with open(fn, 'wt') as f:
                     f.write(s)
 
-
-def adf_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_one_dir=True):
-    for vnode in vnodes:
-        try:
-            adf_export_node(vfs, vnode, export_path, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
         except EDecaFileExists as e:
             vfs.logger.log(
                 'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))

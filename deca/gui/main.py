@@ -16,6 +16,7 @@ from deca.gui.viewer_image import DataViewerImage
 from deca.gui.viewer_raw import DataViewerRaw
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
+from deca.gui.viewer_obc import DataViewerObc
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import extract_raw, extract_processed
 
@@ -520,6 +521,7 @@ class DataViewWidget(QWidget):
         self.tab_image = DataViewerImage()
         self.tab_adf = DataViewerAdf()
         self.tab_rtpc = DataViewerRtpc()
+        self.tab_obc = DataViewerObc()
 
         self.tab_widget = QTabWidget()
         self.tab_raw_index = self.tab_widget.addTab(self.tab_raw, 'Raw/Hex')
@@ -528,6 +530,7 @@ class DataViewWidget(QWidget):
         self.tab_image_index = self.tab_widget.addTab(self.tab_image, 'Image')
         self.tab_adf_index = self.tab_widget.addTab(self.tab_adf, 'ADF')
         self.tab_rtpc_index = self.tab_widget.addTab(self.tab_rtpc, 'RTPC')
+        self.tab_obc_index = self.tab_widget.addTab(self.tab_obc, 'OBC')
 
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         size.setVerticalStretch(1)
@@ -549,52 +552,38 @@ class DataViewWidget(QWidget):
         self.tab_widget.setTabEnabled(self.tab_raw_index, True)
         self.tab_raw.vnode_process(self.vfs, vnode)
 
-        if vnode.ftype == FTYPE_TXT:
-            self.tab_text.vnode_process(self.vfs, vnode)
+        self.tab_widget.setTabEnabled(self.tab_text_index, False)
+        self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
+        self.tab_widget.setTabEnabled(self.tab_image_index, False)
+        self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+        self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
+        self.tab_widget.setTabEnabled(self.tab_obc_index, False)
+
+        if vnode.ftype in {FTYPE_TXT}:
             self.tab_widget.setTabEnabled(self.tab_text_index, True)
-            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
-            self.tab_widget.setTabEnabled(self.tab_image_index, False)
-            self.tab_widget.setTabEnabled(self.tab_adf_index, False)
-            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
+            self.tab_text.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_text_index)
-        elif vnode.ftype == FTYPE_SARC:
-            self.tab_sarc.vnode_process(self.vfs, vnode)
-            self.tab_widget.setTabEnabled(self.tab_text_index, False)
+        elif vnode.ftype in {FTYPE_SARC}:
             self.tab_widget.setTabEnabled(self.tab_sarc_index, True)
-            self.tab_widget.setTabEnabled(self.tab_image_index, False)
-            self.tab_widget.setTabEnabled(self.tab_adf_index, False)
-            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
+            self.tab_sarc.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_sarc_index)
         elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC, FTYPE_DDS, FTYPE_BMP}:
-            self.tab_image.vnode_process(self.vfs, vnode)
-            self.tab_widget.setTabEnabled(self.tab_text_index, False)
-            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
-            self.tab_widget.setTabEnabled(self.tab_adf_index, False)
-            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
+            self.tab_image.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_image_index)
         elif vnode.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
-            self.tab_adf.vnode_process(self.vfs, vnode)
-            self.tab_widget.setTabEnabled(self.tab_text_index, False)
-            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
-            self.tab_widget.setTabEnabled(self.tab_image_index, False)
             self.tab_widget.setTabEnabled(self.tab_adf_index, True)
-            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
+            self.tab_adf.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_adf_index)
-        elif vnode.ftype == FTYPE_RTPC:
-            self.tab_rtpc.vnode_process(self.vfs, vnode)
-            self.tab_widget.setTabEnabled(self.tab_text_index, False)
-            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
-            self.tab_widget.setTabEnabled(self.tab_image_index, False)
-            self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+        elif vnode.ftype in {FTYPE_RTPC}:
             self.tab_widget.setTabEnabled(self.tab_rtpc_index, True)
+            self.tab_rtpc.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_rtpc_index)
+        elif vnode.ftype in {FTYPE_OBC}:
+            self.tab_widget.setTabEnabled(self.tab_obc_index, True)
+            self.tab_obc.vnode_process(self.vfs, vnode)
+            self.tab_widget.setCurrentIndex(self.tab_obc_index)
         else:
-            self.tab_widget.setTabEnabled(self.tab_text_index, False)
-            self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
-            self.tab_widget.setTabEnabled(self.tab_image_index, False)
-            self.tab_widget.setTabEnabled(self.tab_adf_index, False)
-            self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
             self.tab_widget.setCurrentIndex(self.tab_raw_index)
 
 
@@ -688,6 +677,10 @@ class MainWidget(QWidget):
         self.chkbx_export_raw.setText('Export Raw Files')
         self.chkbx_export_raw.setChecked(False)
 
+        self.chkbx_export_text = QCheckBox()
+        self.chkbx_export_text.setText('Export As Text')
+        self.chkbx_export_text.setChecked(False)
+
         self.chkbx_export_processed = QCheckBox()
         self.chkbx_export_processed.setText('Export Processed Files')
         self.chkbx_export_processed.setChecked(True)
@@ -699,6 +692,7 @@ class MainWidget(QWidget):
         export_layout = QHBoxLayout()
         export_layout.addWidget(self.chkbx_export_raw)
         export_layout.addWidget(self.chkbx_export_processed)
+        export_layout.addWidget(self.chkbx_export_text)
         export_layout.addWidget(self.chkbx_export_save_to_one_dir)
 
         self.bt_extract = QPushButton()
@@ -808,11 +802,19 @@ class MainWidget(QWidget):
         if self.current_vpaths is not None and len(self.current_vpaths) > 0:
             try:
                 extract_dir = self.vfs.working_dir + 'extracted/'
-                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
+
                 if self.chkbx_export_raw.isChecked():
                     extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
-                if self.chkbx_export_processed.isChecked():
-                    extract_processed(self.vfs, self.current_vpaths, self.filter_mask, extract_dir, save_to_one_dir=save_to_one_dir)
+
+                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
+                save_to_text = self.chkbx_export_text.isChecked()
+                save_to_processed = self.chkbx_export_processed.isChecked()
+
+                extract_processed(
+                    self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
+                    save_to_processed=save_to_processed,
+                    save_to_text=save_to_text,
+                    save_to_one_dir=save_to_one_dir)
             except EDecaFileExists as exce:
                 self.error_dialog('Extraction Canceled: File Exists: {}'.format(exce.args))
 
@@ -820,11 +822,19 @@ class MainWidget(QWidget):
         if self.current_vpaths is not None and len(self.current_vpaths) > 0:
             try:
                 extract_dir = self.vfs.working_dir + 'mod/'
-                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
+
                 if self.chkbx_export_raw.isChecked():
                     extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
-                if self.chkbx_export_processed.isChecked():
-                    extract_processed(self.vfs, self.current_vpaths, self.filter_mask, extract_dir, save_to_one_dir=save_to_one_dir)
+
+                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
+                save_to_text = self.chkbx_export_text.isChecked()
+                save_to_processed = self.chkbx_export_processed.isChecked()
+
+                extract_processed(
+                    self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
+                    save_to_processed=save_to_processed,
+                    save_to_text=save_to_text,
+                    save_to_one_dir=save_to_one_dir)
             except EDecaFileExists as exce:
                 self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
 

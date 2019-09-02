@@ -120,6 +120,8 @@ def extract_processed(
         extract_dir: str,
         do_sha1sum=False,
         allow_overwrite=False,
+        save_to_processed=False,
+        save_to_text=False,
         save_to_one_dir=True):
     vs = expand_vpaths(vfs, vnodes, mask)
 
@@ -158,23 +160,24 @@ def extract_processed(
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-    for vnode in vs_images:
-        if vnode.vpath is None:
-            ofile = extract_dir + '{:08X}.dat'.format(vnode.vhash)
-        else:
-            ofile = extract_dir + '{}'.format(vnode.vpath.decode('utf-8'))
+    if save_to_processed:
+        for vnode in vs_images:
+            if vnode.vpath is None:
+                ofile = extract_dir + '{:08X}.dat'.format(vnode.vhash)
+            else:
+                ofile = extract_dir + '{}'.format(vnode.vpath.decode('utf-8'))
 
-        vfs.logger.log('Exporting {}'.format(ofile))
+            vfs.logger.log('Exporting {}'.format(ofile))
 
-        ofiledir = os.path.dirname(ofile)
-        os.makedirs(ofiledir, exist_ok=True)
+            ofiledir = os.path.dirname(ofile)
+            os.makedirs(ofiledir, exist_ok=True)
 
-        try:
-            image_export(vfs, vnode, extract_dir, False, True, allow_overwrite=allow_overwrite)
-        except EDecaFileExists as e:
-            vfs.logger.log(
-                'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+            try:
+                image_export(vfs, vnode, extract_dir, False, True, allow_overwrite=allow_overwrite)
+            except EDecaFileExists as e:
+                vfs.logger.log(
+                    'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-    adf_export(vfs, vs_adf, extract_dir, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
+    adf_export(vfs, vs_adf, extract_dir, allow_overwrite=allow_overwrite, save_to_processed=save_to_processed, save_to_text=save_to_text, save_to_one_dir=save_to_one_dir)
 
-    rtpc_export(vfs, vs_rtpc, extract_dir, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
+    rtpc_export(vfs, vs_rtpc, extract_dir, allow_overwrite=allow_overwrite, save_to_processed=save_to_processed, save_to_text=save_to_text, save_to_one_dir=save_to_one_dir)

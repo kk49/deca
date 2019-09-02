@@ -47,6 +47,17 @@ class Deca3dMatrix:
         else:
             return list(self.data.reshape((-1,)))
 
+    @staticmethod
+    def matmul(a, b):
+        if a is None or a.data is None:
+            return b
+        if b is None or b.data is None:
+            return a
+
+        mat = Deca3dMatrix()
+        mat.data = np.matmul(a.data, b.data)
+        return mat
+
 
 class Deca3dDatabase:
     def __init__(self, vfs, resource_prefix_abs, resource_prefix_uri):
@@ -559,7 +570,7 @@ class DecaGltf:
         self.vfs.logger.log('export_modelc: Started')
         # setup materials
         meshes_all = self.db.gltf_add_modelc(self.gltf, vpath, material_properties)
-        with DecaGltfNode(self, matrix=transform.col_major_list()):
+        with DecaGltfNode(self, name=os.path.basename(vpath), matrix=transform.col_major_list()):
             for submeshes in meshes_all[self.lod]:
                 for submesh in submeshes:
                     with DecaGltfNode(self) as mesh_node:

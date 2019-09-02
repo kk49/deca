@@ -259,5 +259,7 @@ class Rtpc:
         self.root_node = RtpcNode()
         self.root_node.deserialize(f)
 
+        return self
+
     def dump_to_string(self):
         return self.root_node.dump_to_string()

@@ -506,7 +506,7 @@ class DecaGltf:
             assert len(self.d_stack) == 0
             if item.index is None:
                 item.index = len(self.gltf.scenes)
-                self.gltf.nodes.append(item.scene)
+                self.gltf.scenes.append(item.scene)
                 if item.index == 0:
                     self.gltf.scene = item.index
 

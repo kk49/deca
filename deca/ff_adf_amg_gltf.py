@@ -285,10 +285,10 @@ class Deca3dMeshc:
                         elif stream_attr.format[1] == b'AmfFormat_R32G32B32_FLOAT':
                             accessor.type = "VEC3"
                             accessor.componentType = pyg.FLOAT
-                        elif stream_attr.format[1] == b'AmfFormat_R32G32B32A32_FLOAT_P1':
+                        elif stream_attr.format[1] == b'DecaFormat_R32G32B32A32_FLOAT_P1':
                             accessor.type = "VEC4"
                             accessor.componentType = pyg.FLOAT
-                        elif stream_attr.format[1] == b'AmfFormat_R32G32B32A32_FLOAT_N1':
+                        elif stream_attr.format[1] == b'DecaFormat_R32G32B32A32_FLOAT_N1':
                             accessor.type = "VEC4"
                             accessor.componentType = pyg.FLOAT
                         else:

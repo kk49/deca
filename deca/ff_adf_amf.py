@@ -347,8 +347,44 @@ def convert_R32_R8G8B8A8_UNORM_AS_FLOAT(data_out, data_in, attrs: AmfStreamAttri
 
 
 def convert_R8G8B8A8_TANGENT_SPACE(data_out, data_in, attrs: AmfStreamAttribute, pack):
-    raise NotImplementedError('convert_R8G8B8A8_TANGENT_SPACE')
+    if pack:
+        raise NotImplementedError('convert_R8G8B8A8_TANGENT_SPACE: pack')
+    else:
+        # from http://www.humus.name/Articles/Persson_CreatingVastGameWorlds.pdf
 
+        angles = np.pi * (data_in[:, :] * (1.0 / 0xff) * 2.0 - 1.0)
+
+        sc0x = np.sin(angles[:, 0])
+        sc0y = np.cos(angles[:, 0])
+        sc0z = np.sin(angles[:, 1])
+        sc0w = np.cos(angles[:, 1])
+        sc1x = np.sin(angles[:, 2])
+        sc1y = np.cos(angles[:, 2])
+        sc1z = np.sin(angles[:, 3])
+        sc1w = np.cos(angles[:, 3])
+
+        t = np.array([sc0y * np.abs(sc0z), sc0x * np.abs(sc0z), sc0w]).transpose()
+        b = np.array([sc1y * np.abs(sc1z), sc1x * np.abs(sc1z), sc1w]).transpose()
+        n = np.cross(t, b)
+        n[angles[:, 3] <= 0.0] = -n[angles[:, 3] <= 0.0]
+
+        data_out[:, 0:3] = n
+        data_out[:, 3:6] = t
+
+        """incorrect version?
+        q = data_in[:, :] * (1.0 / 0xff) * 2.0 - 1.0
+
+        x = 0
+        y = 1
+        z = 2
+        w = 3
+        t = np.array([1.0, 0.0, 0.0]) + np.array([-2.0, 2.0, 2.0]) * q[:, [y]] * q[:, [y, x, w]] + np.array([-2.0, -2.0, 2.0]) * q[:, [z]] * q[:, [z, w, x]]
+        # b = np.array([0.0, 1.0, 0.0]) + np.array([2.0, -2.0, 2.0]) * q[:, [z]] * q[:, [w, z, y]] + np.array([2.0, -2.0, -2.0]) * q[:, [x]] * q[:, [y, x, w]]
+        n = np.array([0.0, 0.0, 1.0]) + np.array([2.0, 2.0, -2.0]) * q[:, [x]] * q[:, [z, w, x]] + np.array([-2.0, 2.0, -2.0]) * q[:, [y]] * q[:, [w, z, y]]
+
+        data_out[:, 0:3] = n
+        data_out[:, 3:6] = t
+        """
 
 def convert_R32G32B32A32_FLOAT_P1(data_out, data_in, attrs: AmfStreamAttribute, pack):
     if pack:
@@ -406,10 +442,10 @@ field_format_info = {
     b'AmfFormat_R8G8B8A8_UINT': FormatInfo('4u1', '4u1', convert_copy),
     b'AmfFormat_R8G8B8A8_SNORM': FormatInfo('4i1', '4f4', convert_norm_s8),
     b'AmfFormat_R8G8B8A8_SINT': FormatInfo('4i1', '4i1', convert_copy),
-    b'AmfFormat_R16G16_FLOAT': FormatInfo('2f2', '2f2', convert_copy),
-    b'AmfFormat_R16G16_UNORM': FormatInfo('2u2', '2f2', convert_norm_u16),
+    b'AmfFormat_R16G16_FLOAT': FormatInfo('2f2', '2f4', convert_copy),
+    b'AmfFormat_R16G16_UNORM': FormatInfo('2u2', '2f4', convert_norm_u16),
     b'AmfFormat_R16G16_UINT': FormatInfo('2u2', '2u2', convert_copy),
-    b'AmfFormat_R16G16_SNORM': FormatInfo('2i2', '2f2', convert_norm_s16),
+    b'AmfFormat_R16G16_SNORM': FormatInfo('2i2', '2f4', convert_norm_s16),
     b'AmfFormat_R16G16_SINT': FormatInfo('2i2', '2i2', convert_copy),
     b'AmfFormat_R32_FLOAT': FormatInfo('f4', 'f4', convert_copy),
     b'AmfFormat_R32_UINT': FormatInfo('u4', 'u4', convert_copy),
@@ -429,9 +465,9 @@ field_format_info = {
     b'AmfFormat_R8_SINT': FormatInfo('i1', 'i1', convert_copy),
     b'AmfFormat_R32_UNIT_VEC_AS_FLOAT': FormatInfo('f4', '3f4', convert_R32_UNIT_VEC_AS_FLOAT),
     b'AmfFormat_R32_R8G8B8A8_UNORM_AS_FLOAT': FormatInfo('f4', '4f4', convert_R32_R8G8B8A8_UNORM_AS_FLOAT),
-    b'AmfFormat_R8G8B8A8_TANGENT_SPACE': FormatInfo('4i1', '4f4', convert_R8G8B8A8_TANGENT_SPACE),
-    b'AmfFormat_R32G32B32A32_FLOAT_P1': FormatInfo('4f4', '3f4', convert_R32G32B32A32_FLOAT_P1),
-    b'AmfFormat_R32G32B32A32_FLOAT_N1': FormatInfo('4f4', '3f4', convert_R32G32B32A32_FLOAT_N1),
+    b'AmfFormat_R8G8B8A8_TANGENT_SPACE': FormatInfo('4u1', '6f4', convert_R8G8B8A8_TANGENT_SPACE),  # normal, tangent
+    b'DecaFormat_R32G32B32A32_FLOAT_P1': FormatInfo('4f4', '3f4', convert_R32G32B32A32_FLOAT_P1),
+    b'DecaFormat_R32G32B32A32_FLOAT_N1': FormatInfo('4f4', '3f4', convert_R32G32B32A32_FLOAT_N1),
 }
 
 
@@ -525,6 +561,7 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
         for m_idx, mesh in enumerate(lod_group.meshes):
             vs_dict = vinfo_dict[lg_idx][m_idx]
 
+            sa_attr_org = mesh.streamAttributes
             sa_attr = np.array(mesh.streamAttributes)
             sa_aidx = np.array(list(range(len(sa_attr))))
             sa_usage = np.array([sa.usage[1] for sa in mesh.streamAttributes])
@@ -533,6 +570,8 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
             sa_stream_offset = np.array([sa.streamOffset for sa in mesh.streamAttributes])
             sa_stream_stride = np.array([sa.streamStride for sa in mesh.streamAttributes])
             sa_stream_packing_data = np.array([sa.packingData for sa in mesh.streamAttributes])
+
+            mesh.streamAttributes = []
 
             for bidx, vs_info in vs_dict.items():
                 sab_aidx = sa_aidx[sa_stream_index == bidx]
@@ -546,7 +585,8 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                 attributes_out = []
                 attributes_index = []
                 dtype_in = []
-                dtype_mem = []
+                dtype_in_mem = []
+                dtype_out_mem = []
                 dtype_out = []
 
                 offset = 0
@@ -554,32 +594,40 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     sattr_in: AmfStreamAttribute = sab_attr[ridx]
 
                     format_in = sattr_in.format[1]
-                    format_out = vertex_format_translate.get(format_in, format_in)
+                    usage_in = sattr_in.usage[1]
+                    formats_out = [vertex_format_translate.get(format_in, format_in)]
+                    usages_out = [usage_in]
 
-                    if sattr_in.usage[1] == b'AmfUsage_Tangent':
-                        format_out = b'AmfFormat_R32G32B32A32_FLOAT_P1'
-                        # format_out = b'AmfFormat_R32G32B32A32_FLOAT_N1'
+                    if usage_in == b'AmfUsage_Tangent':
+                        formats_out = [b'DecaFormat_R32G32B32A32_FLOAT_P1']
+                        # formats_out = [b'DecaFormat_R32G32B32A32_FLOAT_N1']
+
+                    if usage_in == b'AmfUsage_TangentSpace':
+                        usages_out = [b'AmfUsage_Normal', b'AmfUsage_Tangent']
+                        formats_out = [b'AmfFormat_R32G32B32_FLOAT', b'DecaFormat_R32G32B32A32_FLOAT_P1']
 
                     fi_in = field_format_info[format_in]
-                    fi_out = field_format_info[format_out]
-
-                    sattr_out = AmfStreamAttribute()
-                    sattr_out.format = (None, format_out)
-                    sattr_out.streamStride = None
-                    sattr_out.streamOffset = offset
-                    sattr_out.streamIndex = sattr_in.streamIndex
-                    sattr_out.packingData = (0., 0.)
-                    sattr_out.usage = sattr_in.usage
-
-                    offset = offset + np.dtype(fi_out.dtype_raw).itemsize
-
                     attributes_in.append(sattr_in)
-                    attributes_out.append(sattr_out)
-                    attributes_index.append(sab_aidx[ridx])
-
                     dtype_in.append(fi_in.dtype_raw)
-                    dtype_mem.append(fi_in.dtype_mem)
-                    dtype_out.append(fi_out.dtype_raw)
+                    dtype_in_mem.append(fi_in.dtype_mem)
+
+                    for format_out, usage_out in zip(formats_out, usages_out):
+                        fi_out = field_format_info[format_out]
+                        sattr_out = AmfStreamAttribute()
+                        sattr_out.format = (None, format_out)
+                        sattr_out.streamStride = None
+                        sattr_out.streamOffset = offset
+                        sattr_out.streamIndex = sattr_in.streamIndex
+                        sattr_out.packingData = (0., 0.)
+                        sattr_out.usage = (None, usage_out)
+
+                        offset = offset + np.dtype(fi_out.dtype_raw).itemsize
+
+                        attributes_out.append(sattr_out)
+                        attributes_index.append(sab_aidx[ridx])
+
+                        dtype_out.append(fi_out.dtype_raw)
+                        dtype_out_mem.append(fi_out.dtype_mem)
 
                 # update the record stride once we have calculated it
                 vs_info[3] = offset
@@ -588,10 +636,12 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
 
                 # setup conversion types
                 dtype_in = str.join(', ', dtype_in)
-                dtype_mem = str.join(', ', dtype_mem)
+                dtype_in_mem = str.join(', ', dtype_in_mem)
+                dtype_out_mem = str.join(', ', dtype_out_mem)
                 dtype_out = str.join(', ', dtype_out)
                 dtype_in = np.dtype(dtype_in)
-                dtype_mem = np.dtype(dtype_mem)
+                dtype_in_mem = np.dtype(dtype_in_mem)
+                dtype_out_mem = np.dtype(dtype_out_mem)
                 dtype_out = np.dtype(dtype_out)
 
                 # get original stream
@@ -599,22 +649,24 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
 
                 # translate original stream
                 data_in = np.frombuffer(buf_in, dtype=dtype_in)
-                data_mem = np.zeros(data_in.shape, dtype=dtype_mem)
-                data_out = np.zeros(data_in.shape, dtype=dtype_out)
+                data_in_mem = np.zeros(data_in.shape, dtype=dtype_in_mem)
                 for idx, sattr_in in enumerate(attributes_in):
-                    sattr_out = attributes_out[idx]
                     fidx = 'f{}'.format(idx)
                     finfo_in = field_format_info[sattr_in.format[1]]
+                    preconvert_scale(data_in_mem[fidx], data_in[fidx], sattr_in, False, finfo_in.converter)
+
+                data_out = np.zeros(data_in.shape, dtype=dtype_out)
+                data_out_mem = np.frombuffer(data_in_mem.tobytes(), dtype=dtype_out_mem)
+                for idx, sattr_out in enumerate(attributes_out):
+                    fidx = 'f{}'.format(idx)
                     finfo_out = field_format_info[sattr_out.format[1]]
-                    preconvert_scale(data_mem[fidx], data_in[fidx], sattr_in, False, finfo_in.converter)
-                    preconvert_scale(data_out[fidx], data_mem[fidx], sattr_out, True, finfo_out.converter)
+                    preconvert_scale(data_out[fidx], data_out_mem[fidx], sattr_out, True, finfo_out.converter)
 
                 # store updated stream
                 vs_info[4] = bytes(data_out.data)
 
                 # update attributes that use the current stream
-                for aidx, aout in zip(attributes_index, attributes_out):
-                    mesh.streamAttributes[aidx] = aout
+                mesh.streamAttributes = mesh.streamAttributes + attributes_out
 
                 pass  # bidx
 

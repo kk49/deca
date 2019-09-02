@@ -13,7 +13,7 @@ b'CRigidObject'
 '''
 
 
-def rtpc_export_node_ccharacter_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure):
+def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, material_properties=None):
     for child in rtpc.child_table:
         child_class = b''
         if PropName.CLASS_NAME.value in child.prop_map:
@@ -26,21 +26,41 @@ def rtpc_export_node_ccharacter_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: Vfs
 
             if part_modelc_vpath is not None:
                 with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
-                    gltf.export_modelc(part_modelc_vpath, part_matrix)
-        elif child_class == b'CSecondaryMotionAttachment':
+                    gltf.export_modelc(part_modelc_vpath, part_matrix, material_properties=material_properties)
+
+        elif child_class == b'SCharacterPart':
+            part_modelc_vpath = child.prop_map[0xb498c27d].data
+            if part_modelc_vpath is not None:
+                with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
+                    gltf.export_modelc(part_modelc_vpath, None, material_properties=material_properties)
+
+        elif child_class == b'CPartProp':
+            part_modelc_vhash = child.prop_map[0xa74f2259].data
+            part_modelc_vpath = list(vfs.map_hash_to_vpath[part_modelc_vhash])[0]
+            part_matrix = Deca3dMatrix(col_major=child.prop_map[0x6ca6d4b9].data)
+
+            if part_modelc_vpath is not None:
+                with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
+                    gltf.export_modelc(part_modelc_vpath, part_matrix, material_properties=material_properties)
+
+        elif child_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
             part_modelc_vpath = child.prop_map[0x0f94740b].data
             part_matrix = Deca3dMatrix(col_major=child.prop_map[0x6ca6d4b9].data)
 
             if part_modelc_vpath is not None:
                 with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
-                    gltf.export_modelc(part_modelc_vpath, part_matrix)
-        elif child_class == b'SCharacterPart':
-            part_modelc_vpath = child.prop_map[0xb498c27d].data
-            if part_modelc_vpath is not None:
-                with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
-                    gltf.export_modelc(part_modelc_vpath, None)
+                    gltf.export_modelc(part_modelc_vpath, part_matrix, material_properties=material_properties)
 
-        rtpc_export_node_ccharacter_recurse(child, gltf, vfs)
+        elif child_class in {b'CModelAttachementWeaponComponent'}:
+            if 0xf9dcf6ab in child.prop_map:
+                part_modelc_vpath = child.prop_map[0xf9dcf6ab].data
+                part_matrix = Deca3dMatrix(col_major=child.prop_map[0x6ca6d4b9].data)
+
+                if part_modelc_vpath is not None:
+                    with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
+                        gltf.export_modelc(part_modelc_vpath, part_matrix, material_properties=material_properties)
+
+        rtpc_export_node_recurse(child, gltf, vfs)
 
 
 def rtpc_export_node_ccharacter(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
@@ -55,36 +75,10 @@ def rtpc_export_node_ccharacter(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNod
                 with DecaGltfNode(gltf, name=os.path.basename(base_model)):
                     gltf.export_modelc(base_model, None)
 
-            rtpc_export_node_ccharacter_recurse(rtpc, gltf, vfs)
+            rtpc_export_node_recurse(rtpc, gltf, vfs)
 
     gltf.gltf_save()
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
-
-
-def rtpc_export_node_cmotorbike_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, material_properties=None):
-    for child in rtpc.child_table:
-        child_class = b''
-        if PropName.CLASS_NAME.value in child.prop_map:
-            child_class = child.prop_map[PropName.CLASS_NAME.value].data
-
-        if child_class == b'CPartProp':
-            part_modelc_vhash = child.prop_map[0xa74f2259].data
-            part_modelc_vpath = list(vfs.map_hash_to_vpath[part_modelc_vhash])[0]
-            part_matrix = Deca3dMatrix(col_major=child.prop_map[0x6ca6d4b9].data)
-
-            if part_modelc_vpath is not None:
-                with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
-                    gltf.export_modelc(part_modelc_vpath, part_matrix, material_properties=material_properties)
-
-        elif child_class == b'CSkeletalAnimatedObject':
-            part_modelc_vpath = child.prop_map[0x0f94740b].data
-            part_matrix = Deca3dMatrix(col_major=child.prop_map[0x6ca6d4b9].data)
-
-            if part_modelc_vpath is not None:
-                with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
-                    gltf.export_modelc(part_modelc_vpath, part_matrix, material_properties=material_properties)
-
-        rtpc_export_node_cmotorbike_recurse(child, gltf, vfs)
 
 
 def rtpc_export_node_cmotorbike(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
@@ -99,7 +93,53 @@ def rtpc_export_node_cmotorbike(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNod
         }
 
         with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath.decode('utf-8'))):
-            rtpc_export_node_cmotorbike_recurse(rtpc, gltf, vfs, material_properties=material_properties)
+            rtpc_export_node_recurse(rtpc, gltf, vfs, material_properties=material_properties)
+
+    gltf.gltf_save()
+    vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
+
+
+def rtpc_export_node_c_bullet_weapon_base(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+    vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
+    gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+
+    with gltf.scene():
+        with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath.decode('utf-8'))):
+            entity_type = rtpc.prop_map[0xd31ab684].data
+            base_model = rtpc.prop_map[0xf9dcf6ab].data
+            with DecaGltfNode(gltf, name=os.path.basename(base_model)):
+                gltf.export_modelc(base_model, None)
+
+            rtpc_export_node_recurse(rtpc, gltf, vfs)
+
+    gltf.gltf_save()
+    vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
+
+
+def rtpc_export_node_c_weapon_mod_item(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+    vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
+    gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+
+    with gltf.scene():
+        with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath.decode('utf-8'))):
+            entity_type = rtpc.prop_map[0xd31ab684].data
+            if 0xf9dcf6ab in rtpc.prop_map:
+                base_model = rtpc.prop_map[0xf9dcf6ab].data
+                with DecaGltfNode(gltf, name=os.path.basename(base_model)):
+                    gltf.export_modelc(base_model, None)
+
+            rtpc_export_node_recurse(rtpc, gltf, vfs)
+
+    gltf.gltf_save()
+    vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
+
+
+def rtpc_export_node_c_silencer_item(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+    vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
+    gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+
+    with gltf.scene():
+        rtpc_export_node_recurse(rtpc, gltf, vfs)
 
     gltf.gltf_save()
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
@@ -119,6 +159,12 @@ def rtpc_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overw
             rtpc_export_node_ccharacter(child, vfs, vnode, export_path, allow_overwrite, save_to_one_dir)
         elif child_class == b'CMotorBike':
             rtpc_export_node_cmotorbike(child, vfs, vnode, export_path, allow_overwrite, save_to_one_dir)
+        elif child_class == b'CBulletWeaponBase':
+            rtpc_export_node_c_bullet_weapon_base(child, vfs, vnode, export_path, allow_overwrite, save_to_one_dir)
+        elif child_class == b'CWeaponModItem':
+            rtpc_export_node_c_weapon_mod_item(child, vfs, vnode, export_path, allow_overwrite, save_to_one_dir)
+        elif child_class == b'CSilencerItem':
+            rtpc_export_node_c_silencer_item(child, vfs, vnode, export_path, allow_overwrite, save_to_one_dir)
 
 
 def rtpc_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_one_dir=True):

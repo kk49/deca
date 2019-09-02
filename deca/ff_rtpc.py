@@ -1,6 +1,7 @@
 from deca.file import ArchiveFile
 import struct
 from enum import IntEnum
+from typing import List, Dict
 
 # Node Types
 
@@ -184,9 +185,9 @@ class RtpcNode:
         self.data_offset = None
         self.prop_count = None
         self.child_count = None
-        self.prop_table = []
+        self.prop_table: List[RtpcProperty] = []
         self.prop_map = {}
-        self.child_table = []
+        self.child_table: List[RtpcNode] = []
         self.child_map = {}
 
     def __repr__(self):
@@ -244,7 +245,7 @@ class Rtpc:
     def __init__(self):
         self.magic = None
         self.version = None
-        self.root_node = None
+        self.root_node: RtpcNode = None
 
     def deserialize(self, fraw):
         f = ArchiveFile(fraw)

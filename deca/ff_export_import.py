@@ -6,6 +6,7 @@ from .file import *
 from .ff_types import *
 from .vfs_db import VfsStructure, VfsNode
 from .ff_export_import_adf import adf_export
+from .ff_export_import_rtpc import rtpc_export
 from .ff_avtx import Ddsc, image_export
 
 
@@ -123,6 +124,7 @@ def extract_processed(
     vs = expand_vpaths(vfs, vnodes, mask)
 
     vs_adf = []
+    vs_rtpc = []
     vs_images = []
     vs_other = []
     for i, v in enumerate(vs):
@@ -145,6 +147,8 @@ def extract_processed(
             try:
                 if vnode.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
                     vs_adf.append(vnode)
+                elif vnode.ftype in {FTYPE_RTPC}:
+                    vs_rtpc.append(vnode)
                 elif vnode.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
                     vs_images.append(vnode)
                 else:
@@ -172,3 +176,5 @@ def extract_processed(
                 'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
     adf_export(vfs, vs_adf, extract_dir, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
+
+    rtpc_export(vfs, vs_rtpc, extract_dir, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)

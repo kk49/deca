@@ -144,7 +144,6 @@ def adf_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwr
 
 
 def adf_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_one_dir=True):
-    # export other files
     for vnode in vnodes:
         try:
             adf_export_node(vfs, vnode, export_path, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)

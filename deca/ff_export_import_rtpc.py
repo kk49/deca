@@ -34,6 +34,11 @@ def rtpc_export_node_ccharacter_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: Vfs
             if part_modelc_vpath is not None:
                 with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
                     gltf.export_modelc(part_modelc_vpath, part_matrix)
+        elif child_class == b'SCharacterPart':
+            part_modelc_vpath = child.prop_map[0xb498c27d].data
+            if part_modelc_vpath is not None:
+                with DecaGltfNode(gltf, name=os.path.basename(part_modelc_vpath)):
+                    gltf.export_modelc(part_modelc_vpath, None)
 
         rtpc_export_node_ccharacter_recurse(child, gltf, vfs)
 
@@ -44,9 +49,11 @@ def rtpc_export_node_ccharacter(rtpc: RtpcNode, vfs: VfsStructure, vnode: VfsNod
 
     with gltf.scene():
         with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath.decode('utf-8'))):
-            base_model = rtpc.prop_map[0xe8129fe6].data
-            with DecaGltfNode(gltf, name=os.path.basename(base_model)):
-                gltf.export_modelc(base_model, None)
+            character_type = rtpc.prop_map[0xd31ab684].data
+            if character_type == b'Machine':
+                base_model = rtpc.prop_map[0xe8129fe6].data
+                with DecaGltfNode(gltf, name=os.path.basename(base_model)):
+                    gltf.export_modelc(base_model, None)
 
             rtpc_export_node_ccharacter_recurse(rtpc, gltf, vfs)
 

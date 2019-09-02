@@ -5,8 +5,8 @@ from .errors import *
 from .file import *
 from .ff_types import *
 from .vfs_db import VfsStructure, VfsNode
-from .ff_export_import_adf import adf_export
-from .ff_export_import_rtpc import rtpc_export
+from .export_import_adf import adf_export
+from .export_import_rtpc import rtpc_export
 from .ff_avtx import Ddsc, image_export
 
 

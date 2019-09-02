@@ -17,7 +17,7 @@ from deca.gui.viewer_raw import DataViewerRaw
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
-from deca.ff_export_import import extract_raw, extract_processed
+from deca.export_import import extract_raw, extract_processed
 
 import PySide2
 from PySide2.QtCore import \

@@ -24,6 +24,20 @@ def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, 
         ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[0x6ca6d4b9].data)
         world_matrix = Deca3dMatrix.matmul(world_matrix, ref_matrix)
 
+    if material_properties is None:
+        material_properties = {}
+    else:
+        material_properties = material_properties.copy()
+
+    if 0x46afe5b4 in rtpc.prop_map:
+        material_properties['color_mask_r'] = rtpc.prop_map[0x46afe5b4].data
+
+    if 0xb4331697 in rtpc.prop_map:
+        material_properties['color_mask_g'] = rtpc.prop_map[0xb4331697].data
+
+    if 0x98796658 in rtpc.prop_map:
+        material_properties['color_mask_b'] = rtpc.prop_map[0x98796658].data
+
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data
         rtpc_model_vpath = list(vfs.map_hash_to_vpath[rtpc_modelc_vhash])[0]
@@ -41,12 +55,6 @@ def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, 
         entity_type = rtpc.prop_map[0xd31ab684].data
         if 0xf9dcf6ab in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xf9dcf6ab].data
-    elif rtpc_class in {b'CMotorBike'}:
-        material_properties = {
-            'color_mask_r': rtpc.prop_map[0x46afe5b4].data,
-            'color_mask_g': rtpc.prop_map[0xb4331697].data,
-            'color_mask_b': rtpc.prop_map[0x98796658].data,
-        }
 
     if rtpc_model_vpath is not None:
         gltf.export_modelc(rtpc_model_vpath, world_matrix, material_properties=material_properties)

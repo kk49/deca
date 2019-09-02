@@ -3,6 +3,7 @@ from deca.ff_avtx import Ddsc
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.file import ArchiveFile
 from deca.ff_types import *
+from deca.ff_adf_amf import AABB
 from PIL import Image
 import numpy as np
 import os
@@ -10,6 +11,7 @@ import json
 import io
 import matplotlib.pyplot as plt
 import shutil
+import re
 
 
 class ToolMakeWebMap:
@@ -519,6 +521,45 @@ class ToolMakeWebMap:
             }
             collectables.append(obj)
 
+        # get all mdic AABBs
+        mdic_expr = re.compile(rb'^.*mdic$')
+
+        mdics = []
+        for fn, vnodes in self.vfs.map_vpath_to_vfsnodes.items():
+            if mdic_expr.match(fn) and len(vnodes) > 0:
+                vnode = vnodes[0]
+                with self.vfs.file_obj_from(vnode, 'rb') as f:
+                    buffer = f.read(vnode.size_u)
+                    adf = self.vfs.adf_db.load_adf(buffer)
+                    aabb = AABB(all6=adf.table_instance_values[0]['AABB'])
+                    border = [
+                        [aabb.min[0], aabb.min[2]],
+                        [aabb.max[0], aabb.min[2]],
+                        [aabb.max[0], aabb.max[2]],
+                        [aabb.min[0], aabb.max[2]],
+                    ]
+
+                    coords = []
+                    for pt in border:
+                        x = pt[0] * src_to_dst_x_scale + dst_x0
+                        y = pt[1] * src_to_dst_y_scale + dst_y0
+                        coords.append([x, y])
+
+                    obj = {
+                        'type': 'Feature',
+                        'properties': {
+                            'type': 'mdic',
+                            'uid': vnode.vhash,
+                            'uid_str': vnode.vpath.decode('utf-8'),
+                            'comment': '',
+                        },
+                        'geometry': {
+                            'type': 'Polygon',
+                            'coordinates': [coords]
+                        },
+                    }
+                    mdics.append(obj)
+
         dpath = os.path.join(wdir, 'map', 'z0')
         os.makedirs(dpath, exist_ok=True)
 
@@ -529,6 +570,7 @@ class ToolMakeWebMap:
             f.write('var poi_data = {};\n'.format(json.dumps(pois, indent=4)))
             f.write('var bookmark_data = {};\n'.format(json.dumps(bookmarks, indent=4)))
             f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
+            f.write('var mdic_data = {};\n'.format(json.dumps(mdics, indent=4)))
 
         fpath = os.path.join(dpath, 'data.js')
         with open(fpath, 'w') as f:

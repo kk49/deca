@@ -1,5 +1,4 @@
 import struct
-import pprint
 import numpy as np
 from deca.ff_adf import Adf, AdfValue, adf_value_extract
 
@@ -385,6 +384,7 @@ def convert_R8G8B8A8_TANGENT_SPACE(data_out, data_in, attrs: AmfStreamAttribute,
         data_out[:, 0:3] = n
         data_out[:, 3:6] = t
         """
+
 
 def convert_R32G32B32A32_FLOAT_P1(data_out, data_in, attrs: AmfStreamAttribute, pack):
     if pack:

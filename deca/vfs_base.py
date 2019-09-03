@@ -211,6 +211,8 @@ class VfsBase:
             pf.seek(node.offset)
             pf = SubsetFile(pf, node.size_u)
             return pf
+        elif node.pvpath is not None:
+            return open(node.pvpath, mode)
         else:
             raise Exception('NOT IMPLEMENTED: DEFAULT')
 

@@ -19,6 +19,7 @@ from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
 from deca.util import Logger, remove_prefix_if_present
 from deca.hash_jenkins import hash_little
+from deca.ff_determine import determine_file_type_and_size
 
 
 def game_file_to_sortable_string(v):
@@ -69,6 +70,16 @@ class VfsStructure(VfsBase):
                 ifns.sort(key=game_file_to_sortable_string)
                 for ifn in ifns:
                     input_files.append(os.path.join(fcat, ifn))
+
+        self.logger.log('process unarchived files')
+        for ua_file in self.game_info.unarchived_files():
+            with open(ua_file, 'rb') as f:
+                ftype, fsize = determine_file_type_and_size(f, os.stat(ua_file).st_size)
+            vpath = os.path.basename(ua_file).encode('utf-8')
+            vhash = deca.hash_jenkins.hash_little(vpath)
+            self.node_add(VfsNode(
+                vhash=vhash, vpath=vpath, pvpath=ua_file, ftype=ftype,
+                size_u=fsize, size_c=fsize, offset=0))
 
         self.logger.log('process all game tab / arc files')
         for ta_file in input_files:
@@ -346,51 +357,53 @@ class VfsStructure(VfsBase):
                 adf_done.add(node.vhash)
                 indexes.append(idx)
 
-        q = multiprocessing.Queue()
-
-        if os.name != 'nt':
-            nprocs = max(1, multiprocessing.cpu_count() // 2)  # assuming hyperthreading exists and slows down processing
-
-            indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
-
-            procs = []
-            for idxs in indexes2:
-                self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-                p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs,))
-                self.logger.log('Process: {}: Start'.format(p))
-                p.start()
-                procs.append(p)
-        else:
-            procs = [None]
-            self.find_vpath_adf_core(q, indexes)
-
         scount = 0
-        for i in range(len(procs)):
-            self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
-            vpath_map_work, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage = q.get()
-            scount += len(vpath_map_work.nodes)
 
-            vpath_map.merge(vpath_map_work)
+        if len(indexes) > 0:
+            q = multiprocessing.Queue()
 
-            for k, v in adf_missing_types.items():
-                self.adf_missing_types[k] = self.adf_missing_types.get(k, []) + v
+            if os.name != 'nt':
+                nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 2))   # assuming hyperthreading exists and slows down processing
 
-            for k, v in map_name_usage.items():
-                self.map_name_usage[k] = self.map_name_usage.get(k, set()).union(v)
+                indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
 
-            for k, v in map_vhash_usage.items():
-                self.map_vhash_usage[k] = self.map_vhash_usage.get(k, set()).union(v)
+                procs = []
+                for idxs in indexes2:
+                    self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
+                    p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs,))
+                    self.logger.log('Process: {}: Start'.format(p))
+                    p.start()
+                    procs.append(p)
+            else:
+                procs = [None]
+                self.find_vpath_adf_core(q, indexes)
 
-            for k, v in map_adftype_usage.items():
-                self.map_adftype_usage[k] = self.map_adftype_usage.get(k, set()).union(v)
+            for i in range(len(procs)):
+                self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
+                vpath_map_work, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage = q.get()
+                scount += len(vpath_map_work.nodes)
 
-            self.logger.log('Process Done {} of {}'.format(i + 1, len(procs)))
+                vpath_map.merge(vpath_map_work)
 
-        for p in procs:
-            if p is not None:
-                self.logger.log('Process: {}: Joining'.format(p))
-                p.join()
-                self.logger.log('Process: {}: Joined'.format(p))
+                for k, v in adf_missing_types.items():
+                    self.adf_missing_types[k] = self.adf_missing_types.get(k, []) + v
+
+                for k, v in map_name_usage.items():
+                    self.map_name_usage[k] = self.map_name_usage.get(k, set()).union(v)
+
+                for k, v in map_vhash_usage.items():
+                    self.map_vhash_usage[k] = self.map_vhash_usage.get(k, set()).union(v)
+
+                for k, v in map_adftype_usage.items():
+                    self.map_adftype_usage[k] = self.map_adftype_usage.get(k, set()).union(v)
+
+                self.logger.log('Process Done {} of {}'.format(i + 1, len(procs)))
+
+            for p in procs:
+                if p is not None:
+                    self.logger.log('Process: {}: Joining'.format(p))
+                    p.join()
+                    self.logger.log('Process: {}: Joined'.format(p))
 
         self.logger.log('PROCESS ADFs: Total ADFs: {}, Total Strings: {}'.format(len(adf_done), scount))
 
@@ -487,37 +500,38 @@ class VfsStructure(VfsBase):
                 rtpc_done.add(node.vhash)
                 indexes.append(idx)
 
-        q = multiprocessing.Queue()
-
-        if os.name != 'nt':
-            nprocs = max(1, multiprocessing.cpu_count() // 2)  # assuming hyperthreading exists and slows down processing
-
-            indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
-
-            procs = []
-            for idxs in indexes2:
-                self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-                p = multiprocessing.Process(target=self.find_vpath_rtpc_core, args=(q, idxs,))
-                self.logger.log('Process: {}: Start'.format(p))
-                p.start()
-                procs.append(p)
-        else:
-            procs = [None]
-            self.find_vpath_rtpc_core(q, indexes)
-
         scount = 0
-        for i in range(len(procs)):
-            self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
-            vpath_map_work = q.get()
-            scount += len(vpath_map_work.nodes)
-            vpath_map.merge(vpath_map_work)
-            self.logger.log('Process Done {} of {}'.format(i+1, len(procs)))
+        if len(indexes) > 0:
+            q = multiprocessing.Queue()
 
-        for p in procs:
-            if p is not None:
-                self.logger.log('Process: {}: Joining'.format(p))
-                p.join()
-                self.logger.log('Process: {}: Joined'.format(p))
+            if os.name != 'nt':
+                nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 2))  # assuming hyperthreading exists and slows down processing
+
+                indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
+
+                procs = []
+                for idxs in indexes2:
+                    self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
+                    p = multiprocessing.Process(target=self.find_vpath_rtpc_core, args=(q, idxs,))
+                    self.logger.log('Process: {}: Start'.format(p))
+                    p.start()
+                    procs.append(p)
+            else:
+                procs = [None]
+                self.find_vpath_rtpc_core(q, indexes)
+
+            for i in range(len(procs)):
+                self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
+                vpath_map_work = q.get()
+                scount += len(vpath_map_work.nodes)
+                vpath_map.merge(vpath_map_work)
+                self.logger.log('Process Done {} of {}'.format(i+1, len(procs)))
+
+            for p in procs:
+                if p is not None:
+                    self.logger.log('Process: {}: Joining'.format(p))
+                    p.join()
+                    self.logger.log('Process: {}: Joined'.format(p))
 
         self.logger.log('PROCESS RTPCs: Total RTPCs: {}, Total Strings: {}'.format(len(rtpc_done), scount))
 

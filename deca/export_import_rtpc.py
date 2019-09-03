@@ -4,7 +4,7 @@ from typing import List
 from .vfs_db import VfsStructure, VfsNode
 from .errors import EDecaFileExists
 from .ff_rtpc import Rtpc, PropName, RtpcNode
-from .ff_adf_amg_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
+from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 
 '''
 0xd31ab684 part name
@@ -47,7 +47,8 @@ def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, 
         rtpc_modelc_vhash = rtpc.prop_map[0xa74f2259].data
         rtpc_model_vpath = list(vfs.map_hash_to_vpath[rtpc_modelc_vhash])[0]
     elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
-        rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
+        if 0x0f94740b in rtpc.prop_map:
+            rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
     elif rtpc_class in {b'CCharacter'}:
         if 0xe8129fe6 in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xe8129fe6].data

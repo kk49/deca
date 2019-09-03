@@ -21,6 +21,9 @@ class GameInfo:
         with open(filename, 'w') as f:
             json.dump(settings, f, indent=2)
 
+    def unarchived_files(self):
+        return []
+
     def archive_path(self):
         raise NotImplementedError()
 
@@ -43,6 +46,10 @@ class GameInfo:
 class GameInfoGZ(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'gz')
+
+    def unarchived_files(self):
+        files = [os.path.join(self.game_dir, 'Shaders_F.shader_bundle')]
+        return files
 
     def archive_path(self):
         archive_paths = []

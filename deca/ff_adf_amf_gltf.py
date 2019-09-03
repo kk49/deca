@@ -175,6 +175,7 @@ class Deca3dMeshc:
                 hrmesh_node = vfs.map_vpath_to_vfsnodes[hrmesh_vpath][0]
             elif hrmesh_vpath2 is not None and hrmesh_vpath2 in vfs.map_vpath_to_vfsnodes:
                 hrmesh_node = vfs.map_vpath_to_vfsnodes[hrmesh_vpath2][0]
+
             if hrmesh_node is not None:
                 hrmesh_adf = adf_node_read(vfs, hrmesh_node)
                 assert len(hrmesh_adf.table_instance) == 1
@@ -402,16 +403,7 @@ class Deca3dModelc:
                     gltf_material = pyg.Material()
                     gltf_material.name = material.name.decode('utf-8')
 
-                    mat_sg = {}
-                    tid = textures[0]
-                    if tid is not None:
-                        mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
-                    tid = textures[2]
-                    if tid is not None:
-                        mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
-
-                    gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
-
+                    # normal bump map
                     tid = textures[1]
                     if tid is not None:
                         gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
@@ -423,6 +415,32 @@ class Deca3dModelc:
                             gltf_material.emissiveTexture = pyg.MaterialTexture(index=tid)
                     else:
                         gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
+
+                    if True:
+                        mat_sg = {}
+                        tid = textures[0]
+                        if tid is not None:
+                            mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                        tid = textures[2]
+                        if tid is not None:
+                            mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+
+                        gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
+                    else:
+                        mat_mr = pyg.PbrMetallicRoughness()
+
+                        tid = textures[0]
+                        if tid is not None:
+                            mat_mr.baseColorTexture = pyg.MaterialTexture(index=tid)
+
+                        # tid = textures[2]
+                        # if tid is not None:
+                        #     mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
+
+                        mat_mr.roughnessFactor = 0.0
+                        mat_mr.metallicFactor = 0.0
+
+                        gltf_material.pbrMetallicRoughness = mat_mr
 
                     # FOR TESTING, need to figure out how to use colormask with gltf
                     # if material.attributes['UseColorMask']:
@@ -496,6 +514,7 @@ class DecaGltf:
         self.gltf = pyg.GLTF2()
         self.gltf.asset.version = "2.0"
         self.gltf.asset.generator = "DECA extractor"
+        self.gltf.extensionsUsed.append('KHR_materials_pbrSpecularGlossiness')
         self.d_stack = []
         self.d_scene = DecaGltfScene(self, name='Scene0')
 

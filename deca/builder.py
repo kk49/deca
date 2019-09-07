@@ -7,6 +7,7 @@ from deca.file import ArchiveFile
 import os
 import shutil
 import re
+import numpy as np
 from pprint import pprint, pformat
 from copy import deepcopy
 
@@ -34,7 +35,7 @@ class Builder:
                 vpath = entry_old.vpath
 
                 make_symlink = False
-                if entry_old.vpath in src_map:
+                if vpath in src_map:
                     src_files[i] = src_map[vpath]
                     sz = os.stat(src_files[i]).st_size
                     make_symlink = True
@@ -45,11 +46,23 @@ class Builder:
                     entry_new.offset = 0
                     entry_new.length = sz
                 else:
+                    # IMPORTANT SARCS apparently don't want data to cross 32MB boundary (maybe small boundary?)
+                    max_block_size = 32 * 1024 * 1024
+                    if sz > max_block_size:
+                        raise NotImplementedError('Excessive file size: {}'.format(vpath))
+
+                    block_pos_diff = \
+                        np.floor((data_write_pos + sz) / max_block_size) - np.floor(data_write_pos / max_block_size)
+
+                    if block_pos_diff > 0:
+                        # boundary crossed
+                        data_write_pos = ((data_write_pos + max_block_size - 1) // max_block_size) * max_block_size
+
                     entry_new.offset = data_write_pos
                     entry_new.length = sz
                     data_write_pos = data_write_pos + sz
                     align = 4
-                    data_write_pos = (data_write_pos + align - 1) // align * align
+                    data_write_pos = ((data_write_pos + align - 1) // align) * align
 
             # extract existing file
             fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))

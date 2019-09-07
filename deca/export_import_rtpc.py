@@ -13,7 +13,13 @@ b'CRigidObject'
 '''
 
 
-def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, world_matrix=None, material_properties=None):
+def rtpc_export_node_recurse(
+        rtpc: RtpcNode,
+        gltf: DecaGltf,
+        vfs: VfsStructure,
+        world_matrix=None,
+        material_properties=None,
+        skeleton_raw_path=None):
     rtpc_class = b''
     if PropName.CLASS_NAME.value in rtpc.prop_map:
         rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data
@@ -38,6 +44,9 @@ def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, 
     if 0x98796658 in rtpc.prop_map:
         material_properties['color_mask_b'] = rtpc.prop_map[0x98796658].data
 
+    if 0x26fa86fe in rtpc.prop_map:
+        skeleton_raw_path = rtpc.prop_map[0x26fa86fe].data
+
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data
         rtpc_model_vpath = list(vfs.map_hash_to_vpath[rtpc_modelc_vhash])[0]
@@ -49,6 +58,9 @@ def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, 
     elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
         if 0x0f94740b in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
+    elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
+            if 0x0f94740b in rtpc.prop_map:
+                rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
     elif rtpc_class in {b'CCharacter'}:
         if 0xe8129fe6 in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xe8129fe6].data
@@ -58,10 +70,15 @@ def rtpc_export_node_recurse(rtpc: RtpcNode, gltf: DecaGltf, vfs: VfsStructure, 
             rtpc_model_vpath = rtpc.prop_map[0xf9dcf6ab].data
 
     if rtpc_model_vpath is not None:
-        gltf.export_modelc(rtpc_model_vpath, world_matrix, material_properties=material_properties)
+        gltf.export_modelc(
+            rtpc_model_vpath, world_matrix,
+            material_properties=material_properties,
+            skeleton_raw_path=skeleton_raw_path)
 
     for child in rtpc.child_table:
-        rtpc_export_node_recurse(child, gltf, vfs, world_matrix=world_matrix, material_properties=material_properties)
+        rtpc_export_node_recurse(
+            child, gltf, vfs,
+            world_matrix=world_matrix, material_properties=material_properties, skeleton_raw_path=skeleton_raw_path)
 
 
 def rtpc_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):

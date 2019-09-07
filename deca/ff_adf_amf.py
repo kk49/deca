@@ -655,11 +655,16 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     finfo_in = field_format_info[sattr_in.format[1]]
                     preconvert_scale(data_in_mem[fidx], data_in[fidx], sattr_in, False, finfo_in.converter)
 
+                data_out_mem = np.frombuffer(data_in_mem.tobytes(), dtype=dtype_out_mem).copy()
                 data_out = np.zeros(data_in.shape, dtype=dtype_out)
-                data_out_mem = np.frombuffer(data_in_mem.tobytes(), dtype=dtype_out_mem)
                 for idx, sattr_out in enumerate(attributes_out):
                     fidx = 'f{}'.format(idx)
                     finfo_out = field_format_info[sattr_out.format[1]]
+
+                    # update bone indexs
+                    if mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
+                        data_out_mem[fidx][:, :] = np.array(mesh.boneIndexLookup)[data_out_mem[fidx]]
+
                     preconvert_scale(data_out[fidx], data_out_mem[fidx], sattr_out, True, finfo_out.converter)
 
                 # store updated stream

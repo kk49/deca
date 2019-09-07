@@ -14,6 +14,7 @@ from deca.gui.viewer_adf import DataViewerAdf
 from deca.gui.viewer_rtpc import DataViewerRtpc
 from deca.gui.viewer_image import DataViewerImage
 from deca.gui.viewer_raw import DataViewerRaw
+from deca.gui.viewer_info import DataViewerInfo
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
 from deca.gui.viewer_obc import DataViewerObc
@@ -515,6 +516,7 @@ class DataViewWidget(QWidget):
         QWidget.__init__(self)
         self.vfs = None
 
+        self.tab_info = DataViewerInfo()
         self.tab_raw = DataViewerRaw()
         self.tab_text = DataViewerText()
         self.tab_sarc = DataViewerSarc()
@@ -524,6 +526,7 @@ class DataViewWidget(QWidget):
         self.tab_obc = DataViewerObc()
 
         self.tab_widget = QTabWidget()
+        self.tab_info_index = self.tab_widget.addTab(self.tab_info, 'Info')
         self.tab_raw_index = self.tab_widget.addTab(self.tab_raw, 'Raw/Hex')
         self.tab_text_index = self.tab_widget.addTab(self.tab_text, 'Text')
         self.tab_sarc_index = self.tab_widget.addTab(self.tab_sarc, 'SARC')
@@ -548,6 +551,9 @@ class DataViewWidget(QWidget):
 
     def vnode_2click_selected(self, vnode: VfsNode):
         print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))
+
+        self.tab_widget.setTabEnabled(self.tab_info_index, True)
+        self.tab_info.vnode_process(self.vfs, vnode)
 
         self.tab_widget.setTabEnabled(self.tab_raw_index, True)
         self.tab_raw.vnode_process(self.vfs, vnode)
@@ -584,7 +590,7 @@ class DataViewWidget(QWidget):
             self.tab_obc.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_obc_index)
         else:
-            self.tab_widget.setCurrentIndex(self.tab_raw_index)
+            self.tab_widget.setCurrentIndex(self.tab_info_index)
 
 
 class MainWidget(QWidget):

@@ -234,7 +234,10 @@ prim_type_names = {
 }
 
 
-def dump_type(type_id, type_map, offset=0):
+def dump_type(type_id, type_map, offset=0, displayed_types=None):
+    if displayed_types is None:
+        displayed_types = []
+
     if type_id in prim_type_names:
         return '{}PrimType: {}\n'.format(' ' * offset, prim_type_names[type_id])
 
@@ -244,21 +247,26 @@ def dump_type(type_id, type_map, offset=0):
     type_def = type_map[type_id]
 
     space = ' ' * offset
+
+    if type_id in displayed_types:
+        return space + 'Recursive use of {} type 0x{:08x}\n'.format(MetaType(type_def.metatype).name, type_id)
+
     sbuf = space + '{}\n'.format(MetaType(type_def.metatype).name)
+
     if type_def.metatype == 0:  # Primative
         pass
     elif type_def.metatype == 1:  # Structure
         for m in type_def.members:
             sbuf = sbuf + '{}{} o:{}({:08x})[{}] s:{} t:{:08x} dt:{:08x} dv:{:016x}\n'.format(' ' * (offset + 2), m.name.decode('utf-8'), m.offset, m.offset, m.bit_offset, m.size, m.type_hash, m.default_type, m.default_value)
-            sbuf = sbuf + dump_type(m.type_hash, type_map, offset + 4)
+            sbuf = sbuf + dump_type(m.type_hash, type_map, offset + 4, displayed_types=displayed_types + [type_id])
     elif type_def.metatype == 2:  # Pointer
         pass
     elif type_def.metatype == 3:  # Array
         sbuf = sbuf + '{}Length: {}\n'.format(' ' * (offset + 2), type_def.element_length)
-        sbuf = sbuf + dump_type(type_def.element_type_hash, type_map, offset+2)
+        sbuf = sbuf + dump_type(type_def.element_type_hash, type_map, offset+2, displayed_types=displayed_types + [type_id])
     elif type_def.metatype == 4:  # Inline Array
         sbuf = sbuf + '{}Length: {}\n'.format(' ' * (offset + 2), type_def.element_length)
-        sbuf = sbuf + dump_type(type_def.element_type_hash, type_map, offset+2)
+        sbuf = sbuf + dump_type(type_def.element_type_hash, type_map, offset+2, displayed_types=displayed_types + [type_id])
     elif type_def.metatype == 7:  # BitField
         pass
     elif type_def.metatype == 8:  # Enumeration
@@ -267,6 +275,9 @@ def dump_type(type_id, type_map, offset=0):
         pass
     else:
         raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
+
+    print(sbuf)
+
     return sbuf
 
 

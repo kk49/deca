@@ -1,7 +1,7 @@
 import sys
 import os
 from deca.file import ArchiveFile
-from deca.ff_adf import load_adf
+from deca.ff_adf import Adf
 
 
 if len(sys.argv) < 2:
@@ -12,16 +12,14 @@ if len(sys.argv) < 2:
     in_file = '/home/krys/prj/work/gzb/extracted/gdc/global.gdcc'
     in_file = '/home/krys/prj/work/gz/extracted/environment/base.environc'
     in_file = '/home/krys/prj/work/gz/extracted/graphs/car_cabinlight_logic.graphc'
+    in_file = '/home/krys/prj/work/gz_saves/76561198106670711.015/savegame'
 else:
     in_file = sys.argv[1]
 
 file_sz = os.stat(in_file).st_size
 
-
+obj = Adf()
 with ArchiveFile(open(in_file, 'rb')) as f:
-    buffer = f.read(file_sz)
-    # dump_block(header, 0x10)
-
-obj = load_adf(buffer)
+    obj.deserialize(f)
 
 print(obj.dump_to_string())

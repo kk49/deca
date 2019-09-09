@@ -13,7 +13,7 @@ from deca.errors import EDecaFileExists
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry
+from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_node_read
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
@@ -187,7 +187,8 @@ class VfsStructure(VfsBase):
                 idx = idx + 1
             self.logger.log('Expand Archives Phase {}: End'.format(phase_id))
 
-        self.find_vpath_adf(self.possible_vpath_map)
+        self.find_vpath_adf(self.possible_vpath_map, do_adfb=False)
+        self.find_vpath_adf(self.possible_vpath_map, do_adfb=True)
         self.find_vpath_rtpc(self.possible_vpath_map)
         self.find_vpath_json(self.possible_vpath_map)
         self.find_vpath_exe(self.possible_vpath_map)
@@ -210,12 +211,14 @@ class VfsStructure(VfsBase):
 
         for k, vs in self.adf_missing_types.items():
             for v in vs:
-                vp = self.map_hash_to_vpath.get(v, b'')
-                self.logger.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp.decode('utf-8')))
+                vps = self.map_hash_to_vpath.get(v, {})
+                for vp in vps:
+                    self.logger.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp))
 
         for vid in self.hash_map_conflict:
-            for vp in self.map_hash_to_vpath[vid]:
-                self.logger.log('CONFLICT: {:08X} {}'.format(vid, vp))
+            for vps in self.map_hash_to_vpath[vid]:
+                for vp in vps:
+                    self.logger.log('CONFLICT: {:08X} {}'.format(vid, vp))
 
     def process_vpaths(self):
         self.logger.log('process_vpaths: Input count {}'.format(len(self.possible_vpath_map.nodes)))
@@ -347,13 +350,18 @@ class VfsStructure(VfsBase):
         #             lst.append(node)
         #         self.map_vpath_to_vfsnodes[node.vpath] = lst
 
-    def find_vpath_adf(self, vpath_map):
-        self.logger.log('PROCESS ADFs: find strings, propose terrain patches')
+    def find_vpath_adf(self, vpath_map, do_adfb=False):
+        desired_adf_files = FTYPE_ADF
+        if do_adfb:
+            desired_adf_files = FTYPE_ADF_BARE
+
+        self.logger.log('PROCESS ADFs: find strings, propose terrain patches. FTYPE = {}'.format(desired_adf_files))
+
         indexes = []
         adf_done = set()
         for idx in range(len(self.table_vfsnode)):
             node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_ADF and node.vhash not in adf_done:
+            if node.is_valid() and node.ftype == desired_adf_files and node.vhash not in adf_done:
                 adf_done.add(node.vhash)
                 indexes.append(idx)
 
@@ -370,17 +378,17 @@ class VfsStructure(VfsBase):
                 procs = []
                 for idxs in indexes2:
                     self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-                    p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs,))
+                    p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs, desired_adf_files))
                     self.logger.log('Process: {}: Start'.format(p))
                     p.start()
                     procs.append(p)
             else:
                 procs = [None]
-                self.find_vpath_adf_core(q, indexes)
+                self.find_vpath_adf_core(q, indexes, desired_adf_files)
 
             for i in range(len(procs)):
                 self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
-                vpath_map_work, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage = q.get()
+                vpath_map_work, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage, map_typedefs = q.get()
                 scount += len(vpath_map_work.nodes)
 
                 vpath_map.merge(vpath_map_work)
@@ -397,6 +405,8 @@ class VfsStructure(VfsBase):
                 for k, v in map_adftype_usage.items():
                     self.map_adftype_usage[k] = self.map_adftype_usage.get(k, set()).union(v)
 
+                self.adf_db.typedefs_add(map_typedefs)
+
                 self.logger.log('Process Done {} of {}'.format(i + 1, len(procs)))
 
             for p in procs:
@@ -407,20 +417,19 @@ class VfsStructure(VfsBase):
 
         self.logger.log('PROCESS ADFs: Total ADFs: {}, Total Strings: {}'.format(len(adf_done), scount))
 
-    def find_vpath_adf_core(self, q, indexs):
+    def find_vpath_adf_core(self, q, indexs, desired_adf_files):
         vpath_map = VfsPathMap(self.logger)
         adf_missing_types = {}
         map_name_usage = {}
         map_vhash_usage = {}
         map_adftype_usage = {}
+        map_typedefs = {}
 
         for idx in indexs:
             node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_ADF:
-                with self.file_obj_from(node) as f:
-                    buffer = f.read(node.size_u)
+            if node.is_valid() and node.ftype == desired_adf_files:
                 try:
-                    adf = self.adf_db.load_adf(buffer)
+                    adf = adf_node_read(self, node)
                     for sh in adf.table_stringhash:
                         vpath_map.propose(sh.value, [FTYPE_ADF, node])
                         rp = remove_prefix_if_present(b'intermediate/', sh.value)
@@ -482,13 +491,15 @@ class VfsStructure(VfsBase):
                         ev = map_adftype_usage.get(adf_type_hash, set())
                         ev.add(node.uid)
                         map_adftype_usage[adf_type_hash] = ev
+                        if ientry.type_hash not in map_typedefs:
+                            map_typedefs[ientry.type_hash] = ientry
 
                 except AdfTypeMissing as ae:
                     adf_missing_types[ae.vhash] = adf_missing_types.get(ae.vhash, []) + [node.vhash]
                     print('Missing Type {:08x} in {:08X} {} {}'.format(
                         ae.vhash, node.vhash, node.vpath, node.pvpath))
 
-        q.put([vpath_map, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage])
+        q.put([vpath_map, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage, map_typedefs])
 
     def find_vpath_rtpc(self, vpath_map):
         self.logger.log('PROCESS RTPCs: look for hashable strings in RTPC files')
@@ -672,6 +683,7 @@ class VfsStructure(VfsBase):
     def find_vpath_guess(self, vpath_map):
         self.logger.log('STRINGS BY GUESSING: ...')
         guess_strings = {}
+        guess_strings['gdc/global.gdcc'] = FTYPE_ADF
         guess_strings['textures/ui/world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
         for res_i in range(8):
             guess_strings['settings/hp_settings/reserve_{}.bin'.format(res_i)] = FTYPE_RTPC

@@ -3,7 +3,9 @@ from deca.ff_avtx import Ddsc
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.file import ArchiveFile
 from deca.ff_types import *
+from deca.ff_adf import adf_node_read
 from deca.ff_adf_amf import AABB
+from deca.ff_adf_amf_gltf import Deca3dMatrix
 from PIL import Image
 import numpy as np
 import os
@@ -14,8 +16,124 @@ import shutil
 import re
 
 
-class ToolMakeWebMap:
+dst_x0 = 128
+dst_y0 = -128
+src_to_dst_x_scale = 128 / (16 * 1024)  # 180.0/(16*1024)
+src_to_dst_y_scale = -128 / (16 * 1024)  # -90.0/(16*1024)
 
+
+class RtpcLootVisitor:
+    def __init__(self, tr):
+        self.tr = tr
+        self.regions = []
+        self.points = {
+            'CLootCrateSpawnPoint': [],
+            'CLootCrateSpawnPointGroup': [],
+            'CPlayerSpawnPoint': [],
+            'CCollectable': [],
+            'CBookMark': [],
+            'CPOI': [],
+            'CPOI.nest_marker_poi': [],
+        }
+
+    def process(self, rtpc):
+        if PropName.CLASS_NAME.value in rtpc.prop_map:
+            rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data.decode('utf-8')
+
+            if rtpc_class in {'CLootCrateSpawnPoint', 'CLootCrateSpawnPointGroup', 'CBookMark', 'CPOI', 'CCollectable',
+                              'CPlayerSpawnPoint'}:
+                self.process_point(rtpc),
+            elif rtpc_class == 'CRegion':
+                self.process_CRegion(rtpc)
+
+    def process_point(self, rtpc):
+        rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data.decode('utf-8')
+        ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[0x6ca6d4b9].data)
+        x = ref_matrix.data[0, 3]
+        y = ref_matrix.data[2, 3]
+        coords = [
+            x * src_to_dst_x_scale + dst_x0,
+            y * src_to_dst_y_scale + dst_y0,
+        ]
+
+        obj = {
+            'type': 'Feature',
+            'properties': {
+                'type': rtpc_class,
+            },
+            'geometry': {
+                'type': 'Point',
+                'coordinates': coords,
+            },
+        }
+
+        comment = ''
+        if PropName.CLASS_COMMENT in rtpc.prop_map:
+            comment = rtpc.prop_map[PropName.CLASS_COMMENT].data.decode('utf-8')
+            obj['properties']['comment'] = comment
+
+        if PropName.INSTANCE_UID in rtpc.prop_map:
+            obj_id = rtpc.prop_map[PropName.INSTANCE_UID].data
+            obj['properties']['uid'] = obj_id
+            obj['properties']['uid_str'] = '0x{:012X}'.format(obj_id)
+
+        if PropName.CPOI_NAME in rtpc.prop_map:
+            cpoi_name = rtpc.prop_map.get(PropName.CPOI_NAME, RtpcProperty()).data.decode('utf-8')
+            cpoi_name_tr = self.tr.get(cpoi_name, cpoi_name)
+            obj['properties']['poi_name'] = cpoi_name
+            obj['properties']['poi_name_tr'] = cpoi_name_tr
+
+        if PropName.CPOI_DESC in rtpc.prop_map:
+            cpoi_desc = rtpc.prop_map.get(PropName.CPOI_DESC, RtpcProperty()).data.decode('utf-8')
+            cpoi_desc_tr = self.tr.get(cpoi_desc, cpoi_desc)
+            obj['properties']['poi_desc'] = cpoi_desc
+            obj['properties']['poi_desc_tr'] = cpoi_desc_tr
+
+        if PropName.BOOKMARK_NAME in rtpc.prop_map:
+            bookmark_name = rtpc.prop_map[PropName.BOOKMARK_NAME].data.decode('utf-8')
+            obj['properties']['bookmark_name'] = bookmark_name
+
+        if 0x34beec18 in rtpc.prop_map:
+            loot_class = rtpc.prop_map[0x34beec18].data.decode('utf-8')
+            obj['properties']['loot_class'] = loot_class
+
+        name = 'CPOI.{}'.format(comment)
+        if name in self.points:
+            self.points[name].append(obj)
+        else:
+            self.points[rtpc_class].append(obj)
+
+    def process_CRegion(self, rtpc):
+        obj_type = rtpc.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
+        obj_id = rtpc.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
+        comment = rtpc.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
+
+        ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[0x6ca6d4b9].data).data
+        border = np.array(rtpc.prop_map[PropName.CREGION_BORDER].data).reshape((-1, 4)).transpose()
+        border[3, :] = 1.0
+        border = np.matmul(ref_matrix, border)
+        border = border.transpose()
+
+        coords = border * np.array([src_to_dst_x_scale, 0, src_to_dst_y_scale, 0]) + np.array([dst_x0, 0, dst_y0, 0])
+        coords = [list(v) for v in coords[:, [0, 2]]]
+
+        obj = {
+            'type': 'Feature',
+            'properties': {
+                'type': obj_type,
+                'uid': obj_id,
+                'uid_str': '0x{:012X}'.format(obj_id),
+                'comment': comment,
+            },
+            'geometry': {
+                'type': 'Polygon',
+                'coordinates': [coords]
+            },
+        }
+        self.regions.append(obj)
+
+
+class ToolMakeWebMap:
     def __init__(self, vfs_config):
         if isinstance(vfs_config, str):
             self.vfs = vfs_structure_open(vfs_config)
@@ -287,205 +405,14 @@ class ToolMakeWebMap:
             self.tileset_make(img, os.path.join(wdir, 'map', 'z0', '{}'.format(tileo[1])))
 
         # load translation
-        tr = {}
         vnode = self.vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
         with self.vfs.file_obj_from(vnode, 'rb') as f:
             tr = self.process_translation_adf(f, vnode.size_u)
 
-        # extract geometric features
-        dst_x0 = 128
-        dst_y0 = -128
-
-        src_to_dst_x_scale = 128 / (16*1024)  # 180.0/(16*1024)
-        src_to_dst_y_scale = -128 / (16*1024)  # -90.0/(16*1024)
-
-        regions = []
-        global_collectables = []
-        pois = []
-
-        vnode = self.vfs.map_vpath_to_vfsnodes[b'global/global.blo'][0]
-        with self.vfs.file_obj_from(vnode, 'rb') as f:
-            rtpc = Rtpc()
-            rtpc.deserialize(f)
-        chs = [rtpc.root_node]
-        while len(chs) > 0:
-            ch: RtpcNode = chs.pop(0)
-
-            for c in ch.child_table:
-                chs.append(c)
-
-            # if k_class_name in ch.prop_map and ch.prop_map[k_class_name].data == b'CRegion':
-            if PropName.CLASS_NAME in ch.prop_map:
-                obj_type = ch.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
-                obj_id = ch.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
-                comment = ch.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
-                if obj_type == 'CRegion':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
-                    border = ch.prop_map[PropName.CREGION_BORDER].data
-                    if len(border) % 4 != 0:
-                        raise Exception('Unexpected')
-
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = -7016.08642578125
-                        src_y0 = -1591.216064453125
-
-                    coords = []
-                    for i in range(len(border) // 4):
-                        x = (border[4*i + 0] + src_x0) * src_to_dst_x_scale + dst_x0
-                        y = (border[4*i + 2] + src_y0) * src_to_dst_y_scale + dst_y0
-                        coords.append([x, y])
-
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                        },
-                        'geometry': {
-                            'type': 'Polygon',
-                            'coordinates': [coords]
-                        },
-                    }
-                    regions.append(obj)
-
-                elif obj_type == 'CCollectable':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
-
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = 0
-                        src_y0 = 0
-
-                    x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
-                    y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
-                    coords = [x, y]
-
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                        },
-                        'geometry': {
-                            'type': 'Point',
-                            'coordinates': coords
-                        },
-                    }
-                    global_collectables.append(obj)
-
-                elif obj_type == 'CPOI':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
-                    cpoi_name = ch.prop_map.get(PropName.CPOI_NAME, RtpcProperty()).data.decode('utf-8')
-                    cpoi_desc = ch.prop_map.get(PropName.CPOI_DESC, RtpcProperty()).data.decode('utf-8')
-                    cpoi_name_tr = tr.get(cpoi_name, cpoi_name)
-                    cpoi_desc_tr = tr.get(cpoi_desc, cpoi_desc)
-
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = 0
-                        src_y0 = 0
-
-                    x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
-                    y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
-                    coords = [x, y]
-
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                            'poi_name': cpoi_name,
-                            'poi_desc': cpoi_desc,
-                            'poi_name_tr': cpoi_name_tr,
-                            'poi_desc_tr': cpoi_desc_tr,
-                        },
-                        'geometry': {
-                            'type': 'Point',
-                            'coordinates': coords
-                        },
-                    }
-                    pois.append(obj)
-
-        # LOAD from 'global/bookmarks_gen.blo
-        bookmarks = []
-        vnode = self.vfs.map_vpath_to_vfsnodes[b'global/bookmarks_gen.blo'][0]
-        with self.vfs.file_obj_from(vnode, 'rb') as f:
-            rtpc = Rtpc()
-            rtpc.deserialize(f)
-        chs = [rtpc.root_node]
-        while len(chs) > 0:
-            ch: RtpcNode = chs.pop(0)
-
-            for c in ch.child_table:
-                chs.append(c)
-
-            # if k_class_name in ch.prop_map and ch.prop_map[k_class_name].data == b'CRegion':
-            if PropName.CLASS_NAME in ch.prop_map:
-                obj_type = ch.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
-                obj_id = ch.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
-                comment = ch.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
-                bookmark_name = ch.prop_map.get(PropName.BOOKMARK_NAME, RtpcProperty()).data.decode('utf-8')
-                if obj_type == 'CBookMark':
-                    rotpos_trans = ch.prop_map.get(PropName.ROTPOS_TRANSFORM, RtpcProperty()).data
-
-                    if rotpos_trans is not None:
-                        src_x0 = rotpos_trans[12]
-                        src_y0 = rotpos_trans[14]
-                    else:
-                        print('USING DEFAULT OFFSETS')
-                        src_x0 = 0
-                        src_y0 = 0
-
-                    x = (0 + src_x0) * src_to_dst_x_scale + dst_x0
-                    y = (0 + src_y0) * src_to_dst_y_scale + dst_y0
-                    coords = [x, y]
-
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': obj_type,
-                            'uid': obj_id,
-                            'uid_str': '0x{:012X}'.format(obj_id),
-                            'comment': comment,
-                            'bookmark_name': bookmark_name,
-                        },
-                        'geometry': {
-                            'type': 'Point',
-                            'coordinates': coords
-                        },
-                    }
-                    bookmarks.append(obj)
-
         # LOAD from global/collection.collectionc
-        vnodes = self.vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc']
-        for i in range(len(vnodes)):
-            vnode = vnodes[i]
-            with self.vfs.file_obj_from(vnode, 'rb') as f:
-                buffer = f.read(vnode.size_u)
-                # todo dump of different vnodes, one in gdcc is stripped
-                # with open('d{}.dat'.format(i), 'wb') as fo:
-                #     fo.write(buffer)
-        vnode = vnodes[1]
-        with self.vfs.file_obj_from(vnode, 'rb') as f:
-            buffer = f.read(vnode.size_u)
-            adf = self.vfs.adf_db.load_adf(buffer)
-
+        # todo dump of different vnodes, one in gdcc is stripped
+        vnode = self.vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
+        adf = adf_node_read(self.vfs, vnode)
         collectables = []
         for v in adf.table_instance_values[0]['Collectibles']:
             obj_id = v['ID']
@@ -522,11 +449,12 @@ class ToolMakeWebMap:
             collectables.append(obj)
 
         # get all mdic AABBs
+        print('PROCESSING: mdics')
         mdic_expr = re.compile(rb'^.*mdic$')
-
         mdics = []
         for fn, vnodes in self.vfs.map_vpath_to_vfsnodes.items():
             if mdic_expr.match(fn) and len(vnodes) > 0:
+                print('PROCESSING: {}'.format(fn))
                 vnode = vnodes[0]
                 with self.vfs.file_obj_from(vnode, 'rb') as f:
                     buffer = f.read(vnode.size_u)
@@ -560,17 +488,41 @@ class ToolMakeWebMap:
                     }
                     mdics.append(obj)
 
+        print('PROCESSING: blo(s)')
+        visitor = RtpcLootVisitor(tr=tr)
+        blo_expr = re.compile(rb'^.*blo$')
+        for fn, vnodes in self.vfs.map_vpath_to_vfsnodes.items():
+            if blo_expr.match(fn) and len(vnodes) > 0:
+                print('PROCESSING: {}'.format(fn))
+                vnode = vnodes[0]
+                with self.vfs.file_obj_from(vnode, 'rb') as f:
+                    rtpc = Rtpc()
+                    rtpc.deserialize(f)
+                rtpc.visit(visitor)
+
+        # results from found rtpc records
+        print('Region: count = {}'.format(len(visitor.regions)))
+        print('Collectables: count = {}'.format(len(collectables)))
+        print('MDICs: count = {}'.format(len(mdics)))
+        for k, v in visitor.points.items():
+            print('{}: count = {}'.format(k, len(v)))
+
+        # write results
         dpath = os.path.join(wdir, 'map', 'z0')
         os.makedirs(dpath, exist_ok=True)
 
         fpath = os.path.join(dpath, 'data_full.js')
         with open(fpath, 'w') as f:
-            f.write('var region_data = {};\n'.format(json.dumps(regions, indent=4)))
-            f.write('var global_collectable_data = {};\n'.format(json.dumps(global_collectables, indent=4)))
-            f.write('var poi_data = {};\n'.format(json.dumps(pois, indent=4)))
-            f.write('var bookmark_data = {};\n'.format(json.dumps(bookmarks, indent=4)))
+            f.write('var region_data = {};\n'.format(json.dumps(visitor.regions, indent=4)))
             f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
             f.write('var mdic_data = {};\n'.format(json.dumps(mdics, indent=4)))
+            f.write('var c_collectable_data = {};\n'.format(json.dumps(visitor.points['CCollectable'], indent=4)))
+            f.write('var c_book_mark_data = {};\n'.format(json.dumps(visitor.points['CBookMark'], indent=4)))
+            f.write('var c_loot_crate_spawn_point_data = {};\n'.format(json.dumps(visitor.points['CLootCrateSpawnPoint'], indent=4)))
+            f.write('var c_loot_crate_spawn_point_group_data = {};\n'.format(json.dumps(visitor.points['CLootCrateSpawnPointGroup'], indent=4)))
+            f.write('var c_player_spawn_point_data = {};\n'.format(json.dumps(visitor.points['CPlayerSpawnPoint'], indent=4)))
+            f.write('var c_poi = {};\n'.format(json.dumps(visitor.points['CPOI'], indent=4)))
+            f.write('var c_poi_nest_marker_poi = {};\n'.format(json.dumps(visitor.points['CPOI.nest_marker_poi'], indent=4)))
 
         fpath = os.path.join(dpath, 'data.js')
         with open(fpath, 'w') as f:
@@ -597,7 +549,8 @@ class ToolMakeWebMap:
 
 
 def main():
-    tool = ToolMakeWebMap('../work/gz/project.json')
+    tool = ToolMakeWebMap('../../../work/gz/project.json')
+    # tool = ToolMakeWebMap('../work/gz/project.json')
     tool.make_web_map(tool.vfs.working_dir, False)
 
 

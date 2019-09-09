@@ -15,6 +15,13 @@
     <script src="https://unpkg.com/pouchdb@^5.2.0/dist/pouchdb.js"></script>
 	<script src="https://unpkg.com/leaflet.tilelayer.pouchdbcached@latest/L.TileLayer.PouchDBCached.js"></script>
     <script src="lib/Leaflet.MousePosition/src/L.Control.MousePosition.js"></script>
+
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+
     <script src="data_full.js"></script>
 
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
@@ -166,6 +173,58 @@
     function onPointToLayer(feature, latlng) {
         if (feature.properties && feature.properties.type) {
             var ft = feature.properties.type
+            if (ft == 'CPOI') {
+                return L.circleMarker(latlng,
+                    {
+                        radius: 8,
+                        color: "#FF00FF",
+                        weight: 1,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: "#FF00FF",
+                        fillOpacity: 0.5
+                    }
+                );
+            }
+            if(ft == 'CLootCrateSpawnPoint') {
+                return L.circleMarker(latlng,
+                    {
+                        radius: 2,
+                        color: "#00FF00",
+                        weight: 1,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: "#00FF00",
+                        fillOpacity: 0.5
+                    }
+                );
+            }
+            if(ft == 'CLootCrateSpawnPointGroup') {
+                return L.circleMarker(latlng,
+                    {
+                        radius: 2,
+                        color: "#FF0000",
+                        weight: 1,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: "#FF0000",
+                        fillOpacity: 0.5
+                    }
+                );
+            }
+            if(ft == 'CPlayerSpawnPoint') {
+                return L.circleMarker(latlng,
+                    {
+                        radius: 8,
+                        color: "#0000FF",
+                        weight: 1,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: "#0000FF",
+                        fillOpacity: 0.5
+                    }
+                );
+            }
             if (ft == 'CCollectable') {
                 return L.circleMarker(latlng,
                     {
@@ -183,11 +242,11 @@
                 return L.circleMarker(latlng,
                     {
                         radius: 8,
-                        color: "#0000FF",
+                        color: "#00FFFF",
                         weight: 1,
                         opacity: 1,
                         fill: true,
-                        fillColor: "#0000FF",
+                        fillColor: "#00FFFF",
                         fillOpacity: 0.5
                     }
                 );
@@ -218,10 +277,6 @@
                         fillOpacity: 0.5
                     }
                 );
-            }
-
-            if (ft == 'CPOI') {
-                return L.marker(latlng);
             }
         }
     }
@@ -262,11 +317,15 @@
         ['flee_reserve_0', false, 1, 'flee reserve 0 from GZ', 'tile_bitmap_flee_reserve_0', './{id}/{z}/{x}/{y}.png', 1, 0.5],
 
         ['CRegions', false, 2, 'CRegion from GZ', '', region_data, 0, 1.0],
-        ['CCollectables', false, 2, 'CCollectable from GZ', '', global_collectable_data, 0, 1.0],
-        ['CPOIs', false, 2, 'CPOIs from GZ', '', poi_data, 0, 1.0],
-        ['CBookmarks', false, 2, 'CBookmarks from GZ', '', bookmark_data, 0, 1.0],
-        ['Collection.collectionc', false, 2, 'Collection.collectionc from GZ', '', collectable_data, 0, 1.0],
         ['Mdics', false, 2, 'mdics from GZ', '', mdic_data, 0, 1.0],
+        ['Collection.collectionc', false, 2, 'Collection.collectionc from GZ', '', collectable_data, 0, 1.0],
+        ['CCollectables', false, 2, 'CCollectable from GZ', '', c_collectable_data, 0, 1.0],
+        ['CPOIs', false, 2, 'CPOIs from GZ', '', c_poi, 0, 1.0],
+        ['CBookmarks', false, 2, 'CBookmarks from GZ', '', c_book_mark_data, 0, 1.0],
+        ['CLootCrateSpawnPoint', false, 2, 'CLootCrateSpawnPoint from GZ', '', c_loot_crate_spawn_point_data, 0, 1.0],
+        ['CLootCrateSpawnPointGroup', false, 2, 'CLootCrateSpawnPointGroup from GZ', '', c_loot_crate_spawn_point_group_data, 0, 1.0],
+        ['CPlayerSpawnPoint', false, 2, 'CPlayerSpawnPoint from GZ', '', c_player_spawn_point_data, 0, 1.0],
+        ['Relay Beacons', false, 2, 'Relay Beacons from GZ', '', c_poi_nest_marker_poi, 0, 1.0],
     ];
 
     var baseMaps = {}
@@ -310,8 +369,12 @@
             }
         }
         if (tl[2] == 2) {
-            var layer = L.geoJSON(tl[5], {attribution: tl[3], style: onStyle, pointToLayer: onPointToLayer, onEachFeature: onEachFeature})
-            overlayMaps[tl[0]] = layer
+            var markers = L.markerClusterGroup({
+                maxClusterRadius: 32
+            });
+            var layer = L.geoJSON(tl[5], {attribution: tl[3], style: onStyle, pointToLayer: onPointToLayer, onEachFeature: onEachFeature});
+            markers.addLayer(layer);
+            overlayMaps[tl[0]] = markers;
         }
 
         if (tl[1]) {

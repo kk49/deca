@@ -261,5 +261,14 @@ class Rtpc:
 
         return self
 
+    def visit(self, visitor, node=None):
+        if node is None:
+            node = self.root_node
+
+        visitor.process(node)
+
+        for child in node.child_table:
+            self.visit(visitor, node=child)
+
     def dump_to_string(self):
         return self.root_node.dump_to_string()

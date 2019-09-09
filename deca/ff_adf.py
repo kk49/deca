@@ -3,6 +3,7 @@ import io
 import os
 import enum
 import pickle
+from typing import List, Dict
 from io import BytesIO
 from deca.errors import *
 from deca.file import ArchiveFile, SubsetFile
@@ -19,9 +20,9 @@ from deca.ff_types import FTYPE_ADF_BARE
 
 
 class AdfTypeMissing(Exception):
-    def __init__(self, hashid, *args, **kwargs):
+    def __init__(self, vhash, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
-        self.hashid = hashid
+        self.vhash = vhash
 
 
 class GdcArchiveEntry:
@@ -723,8 +724,8 @@ class Adf:
         self.table_stringhash = []
         self.map_stringhash = {}
 
-        self.table_typedef = []
-        self.map_typedef = {}
+        self.table_typedef: List[TypeDef] = []
+        self.map_typedef: Dict[int, TypeDef] = {}
         self.extended_map_typedef = {}
 
         self.table_instance = []
@@ -919,6 +920,11 @@ class AdfDatabase:
         with open(os.path.join(self.db_dir, 'map_type.pickle'), 'wb') as fw:
             pickle.dump(self.map_type_def, fw)
 
+    def typedefs_add(self, map_typedefs):
+        for k, v in map_typedefs.items():
+            if k not in self.map_type_def:
+                self.map_type_def[k] = v
+
     def load_adf(self, buffer):
         with ArchiveFile(io.BytesIO(buffer)) as fp:
             obj = Adf()
@@ -930,7 +936,7 @@ class AdfDatabase:
 
     def load_adf_bare(self, buffer, adf_type, offset, size):
         if adf_type not in self.map_type_def:
-            return None
+            raise AdfTypeMissing(adf_type)
 
         try:
             obj = Adf()

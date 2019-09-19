@@ -134,6 +134,8 @@ class AmfStreamAttribute(AmfClass):
         self.streamOffset = None
         self.streamStride = None
         self.packingData = None
+        self.min = None
+        self.max = None
 
         if adf is not None and value_raw is not None:
             self.parse(adf, value_raw)
@@ -663,9 +665,23 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
 
                     # update bone indexs
                     if mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
-                        data_out_mem[fidx][:, :] = np.array(mesh.boneIndexLookup)[data_out_mem[fidx]]
+                        arr_map = np.array(mesh.boneIndexLookup)
+                        data_out_mem[fidx][:, :] = arr_map[data_out_mem[fidx]]
 
                     preconvert_scale(data_out[fidx], data_out_mem[fidx], sattr_out, True, finfo_out.converter)
+
+                    # Normals should be unit length
+                    if sattr_out.usage[1] == b'AmfUsage_Normal' or sattr_out.usage[1] == b'AmfUsage_Tangent':
+                        norm = np.linalg.norm(data_out[fidx][:, 0:3], axis=1)
+                        norm[norm == 0] = 1.0
+                        data_out[fidx][:, 0:3] = data_out[fidx][:, 0:3] / norm[:, np.newaxis]
+                        data_out[fidx][np.isnan(norm), 0:3] = 0
+                        data_out[fidx][np.isnan(norm), 0] = 1
+                        if np.any(np.isnan(norm)):
+                            print('WARNING: Found nan in data: {}'.format(sattr_out.usage[1]))
+
+                    sattr_out.min = np.min(data_out[fidx], axis=0)
+                    sattr_out.max = np.max(data_out[fidx], axis=0)
 
                 # store updated stream
                 vs_info[4] = bytes(data_out.data)

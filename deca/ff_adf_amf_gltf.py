@@ -5,6 +5,7 @@ from deca.ff_avtx import image_load
 from deca.ff_adf import *
 from deca.ff_adf_amf import *
 import pygltflib as pyg
+import scipy.spatial.transform as sst
 
 
 def _get_or_none(index, list_data):
@@ -59,7 +60,7 @@ class Deca3dMatrix:
 
 
 class Deca3dDatabase:
-    def __init__(self, vfs, resource_prefix_abs, resource_prefix_uri):
+    def __init__(self, vfs, resource_prefix_abs, resource_prefix_uri, flat_file_layout):
         self.vfs = vfs
         self.resource_prefix_abs = resource_prefix_abs
         self.resource_prefix_uri = resource_prefix_uri
@@ -67,6 +68,7 @@ class Deca3dDatabase:
         self.map_vpath_to_meshc = {}
         self.map_vpath_to_modelc = {}
         self.map_vpath_to_hk_skeleton = {}
+        self.flat_file_layout = flat_file_layout
 
     def gltf_add_texture(self, gltf, vpath):
         item = self.map_vpath_to_texture.get(vpath, Deca3dTexture(vpath))
@@ -112,6 +114,8 @@ class Deca3dTexture:
                 texture_node = vfs.map_vpath_to_vfsnodes.get(self.vpath, [])
                 if len(texture_node) > 0:
                     texture_fn = self.vpath.decode('utf-8') + '.png'
+                    if db.flat_file_layout:
+                        texture_fn = texture_fn.replace('/', '_')
                     texture_fn_uri = os.path.join(db.resource_prefix_uri, texture_fn)
                     texture_fn_absolute = os.path.join(db.resource_prefix_abs, texture_fn)
 
@@ -200,6 +204,8 @@ class Deca3dMeshc:
 
             for index, buffer in enumerate(mesh_buffers.indexBuffers):
                 fn = self.vpath.decode('utf-8') + '.buffer_index_{:03}.bin'.format(index)
+                if db.flat_file_layout:
+                    fn = fn.replace('/', '_')
                 fn_uri = os.path.join(db.resource_prefix_uri, fn)
                 fn_abs = os.path.join(db.resource_prefix_abs, fn)
                 if not os.path.isfile(fn_abs):
@@ -212,6 +218,8 @@ class Deca3dMeshc:
 
             for index, buffer in enumerate(mesh_buffers.vertexBuffers):
                 fn = self.vpath.decode('utf-8') + '.buffer_vertex_{:03}.bin'.format(index)
+                if db.flat_file_layout:
+                    fn = fn.replace('/', '_')
                 fn_uri = os.path.join(db.resource_prefix_uri, fn)
                 fn_abs = os.path.join(db.resource_prefix_abs, fn)
                 if not os.path.isfile(fn_abs):
@@ -312,8 +320,8 @@ class Deca3dMeshc:
                             raise NotImplementedError('Unknown Stream Format: {}'.format(stream_attr.format[1]))
 
                         if stream_attr.usage[1] == b'AmfUsage_Position':
-                            accessor.min = mesh_header.boundingBox.min
-                            accessor.max = mesh_header.boundingBox.max
+                            accessor.min = list(stream_attr.min.astype(dtype=np.double))
+                            accessor.max = list(stream_attr.max.astype(dtype=np.double))
 
                         # add accessor
                         accessors_stream_idx = len(gltf.accessors)
@@ -426,7 +434,7 @@ class Deca3dModelc:
                     else:
                         gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
 
-                    if True:
+                    if False:
                         mat_sg = {}
                         tid = textures[0]
                         if tid is not None:
@@ -447,7 +455,7 @@ class Deca3dModelc:
                         # if tid is not None:
                         #     mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
 
-                        mat_mr.roughnessFactor = 0.0
+                        mat_mr.roughnessFactor = 1.0
                         mat_mr.metallicFactor = 0.0
 
                         gltf_material.pbrMetallicRoughness = mat_mr
@@ -497,7 +505,11 @@ class Deca3dHkSkeleton:
             vpath = self.vpath
             vpath = os.path.splitext(vpath)
             vpath = vpath[0] + b'.bsk'
-            ppath_skel_raw = os.path.join(db.resource_prefix_abs, vpath.decode('utf-8'))
+            fn = vpath.decode('utf-8')
+            if db.flat_file_layout:
+                fn = fn.replace('/', '_')
+            ppath_skel_uri = os.path.join(db.resource_prefix_uri, fn)
+            ppath_skel_raw = os.path.join(db.resource_prefix_abs, fn)
             ppath_skel_xml = ppath_skel_raw + '.xml'
 
             if not os.path.isfile(ppath_skel_raw):
@@ -508,11 +520,13 @@ class Deca3dHkSkeleton:
                 with ArchiveFile(vfs.file_obj_from(vnode)) as f:
                     buffer = buffer_read(f)
 
+                dir_path = os.path.dirname(ppath_skel_raw)
+                os.makedirs(dir_path, exist_ok=True)
                 with open(ppath_skel_raw, 'wb') as f:
                     f.write(buffer)
 
             if not os.path.isfile(ppath_skel_xml):
-                os.system('./3rd_party/HavokLib/_bin2xml/HavokBin2XML {} {}'.format(ppath_skel_raw, ppath_skel_xml))
+                os.system('./extern/HavokLib/build/_bin2xml/bin2xml {} {}'.format(ppath_skel_raw, ppath_skel_xml))
 
             if not os.path.isfile(ppath_skel_xml):
                 raise EDecaFileMissing('Not Mapped: {}'.format(ppath_skel_xml))
@@ -551,9 +565,13 @@ class Deca3dHkSkeleton:
             bones = [[v0[0], v0[1], v1, (v2[0:3], v2[3:7], v2[7:10])] for v0, v1, v2 in zip(bone_info, parents, poses)]
 
             bone_nodes = []
+            bone_inv_matrix = []
             for bi, bone in enumerate(bones):
+                name = bone[0]
                 pidx = bone[2]
-
+                translate = bone[3][0]
+                rotate = bone[3][1]
+                scale = bone[3][2]
                 bnode = pyg.Node()
                 bnode_idx = len(gltf.nodes)
                 gltf.nodes.append(bnode)
@@ -561,18 +579,73 @@ class Deca3dHkSkeleton:
                 if pidx < 0:
                     self.scene.nodes.append(bnode_idx)
                 bone_nodes.append([bnode_idx, bnode])
-                bnode.name = bone[0]
-                bnode.translation = list(bone[3][0])
-                bnode.rotation = list(bone[3][1])
-                bnode.scale = list(bone[3][2])
+                bnode.name = name
+                bnode.translation = list(translate)
+                bnode.rotation = list(rotate)
+                bnode.scale = list(scale)
                 if 0 <= pidx < len(bone_nodes):
                     bone_nodes[pidx][1].children.append(bnode_idx)
 
+                m_translate = np.eye(4)
+                m_rotate = np.eye(4)
+                m_scale = np.eye(4)
+
+                m_translate[0:3, 3] = translate
+                m_rotate[0:3, 0:3] = sst.Rotation(rotate).as_dcm()
+                m_scale[0, 0] = scale[0]
+                m_scale[1, 1] = scale[1]
+                m_scale[2, 2] = scale[2]
+
+                b_matrix = m_translate @ m_rotate @ m_scale
+                if 0 <= pidx < len(bone_nodes):
+                    imatrix_parent = bone_inv_matrix[pidx]
+                else:
+                    imatrix_parent = np.eye(4)
+                imatrix = np.linalg.inv(b_matrix) @ imatrix_parent
+                bone_inv_matrix.append(imatrix)
+
+            # write ibm matricies
+            fn = ppath_skel_raw + '.ibm.dat'
+            with open(fn, 'wb') as f:
+                for mat in bone_inv_matrix:
+                    mat2 = mat.astype(dtype=np.float32)
+                    mat2 = mat2.transpose()
+                    mat2_bytes = mat2.tobytes()
+                    f.write(mat2_bytes)
+                    print(mat2)
+
+            # setup accessor
+            buffer = pyg.Buffer()
+            buffer.uri = ppath_skel_uri + '.ibm.dat'
+            buffer.byteLength = 16 * 4 * len(bone_inv_matrix)
+            buffer_idx = len(gltf.buffers)
+            gltf.buffers.append(buffer)
+
+            buffer_view = pyg.BufferView()
+            buffer_view.buffer = buffer_idx
+            buffer_view.byteOffset = 0
+            # buffer_view.byteStride = 16 * 4
+            buffer_view.byteLength = 16 * 4 * len(bone_inv_matrix)
+            buffer_view_idx = len(gltf.bufferViews)
+            gltf.bufferViews.append(buffer_view)
+
+            accessor = pyg.Accessor()
+            accessor.bufferView = buffer_view_idx
+            accessor.byteOffset = 0
+            accessor.count = len(bone_inv_matrix)
+            accessor.type = "MAT4"
+            accessor.componentType = pyg.FLOAT
+
+            accessor_idx = len(gltf.accessors)
+            gltf.accessors.append(accessor)
+
+            # create skin
             skin = pyg.Skin()
             skin_joints = [bone_info[0] for bone_info in bone_nodes]
             skin.name = os.path.basename(self.vpath.decode('utf-8')) + ".armature"
             skin.skeleton = skin_joints[0]
             skin.joints = skin_joints
+            skin.inverseBindMatrices = accessor_idx
             skin_idx = len(gltf.skins)
             gltf.skins.append(skin)
 
@@ -614,11 +687,12 @@ class DecaGltfNode:
 
 
 class DecaGltf:
-    def __init__(self, vfs, export_path, filename, lod=0, save_to_one_dir=False):
+    def __init__(self, vfs, export_path, filename, lod=0, save_to_one_dir=False, flat_file_layout=False):
         self.vfs = vfs
         self.filename = filename
         self.lod = lod
         self.save_to_one_dir = save_to_one_dir
+        self.flat_file_layout = flat_file_layout
         self.gltf = pyg.GLTF2()
         self.gltf.asset.version = "2.0"
         self.gltf.asset.generator = "DECA extractor"
@@ -640,7 +714,7 @@ class DecaGltf:
                 dirs = os.path.dirname(dirs)
         os.makedirs(os.path.dirname(self.export_path), exist_ok=True)
 
-        self.db = Deca3dDatabase(self.vfs, self.resource_prefix_abs, self.resource_prefix_uri)
+        self.db = Deca3dDatabase(self.vfs, self.resource_prefix_abs, self.resource_prefix_uri, self.flat_file_layout)
 
     def gltf_save(self):
         assert self.gltf is not None
@@ -694,9 +768,8 @@ class DecaGltf:
         self.vfs.logger.log('export_modelc: Started')
         # setup skeleton
         skeleton = None
-        # TODO get back to skeleton stuff
-        # if skeleton_raw_path is not None:
-        #     skeleton = self.db.gltf_add_hk_skeleton(self.gltf, skeleton_raw_path, self.d_scene.scene)
+        if skeleton_raw_path is not None:
+            skeleton = self.db.gltf_add_hk_skeleton(self.gltf, skeleton_raw_path, self.d_scene.scene)
 
         # setup materials
         meshes_all = self.db.gltf_add_modelc(
@@ -707,8 +780,8 @@ class DecaGltf:
                 submeshes = mesh_info[0]
 
                 skin_idx = None
-                # if mesh_info[1] and skeleton is not None:
-                #     skin_idx = skeleton[0]
+                if mesh_info[1] and skeleton is not None:
+                    skin_idx = skeleton[0]
 
                 for submesh in submeshes:
                     with DecaGltfNode(self) as mesh_node:

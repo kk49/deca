@@ -1,0 +1,3 @@
+[submodule "extern/HavokLib"]
+	path = extern/HavokLib
+	url = git@github.com:kk49/HavokLib.git

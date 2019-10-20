@@ -6,7 +6,7 @@ from PySide2.QtCore import Qt, QPoint, QRectF, Signal
 from PySide2.QtGui import QImage, QPixmap, QBrush, QColor
 from PySide2.QtWidgets import \
     QGraphicsView, QSizePolicy, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QGraphicsScene, QGraphicsPixmapItem, \
-    QFrame, QWidget, QToolButton, QLineEdit
+    QFrame, QWidget, QToolButton, QLineEdit, QCheckBox
 from deca.ff_types import *
 from deca.file import ArchiveFile
 
@@ -132,7 +132,6 @@ class DataViewerImage(DataViewer):
         DataViewer.__init__(self)
 
         self.ddsc = None
-        self.opaque = False
 
         self.image_display = PhotoViewer(self)
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -147,32 +146,62 @@ class DataViewerImage(DataViewer):
         self.select_dropdown.setSizePolicy(size)
         self.select_dropdown.currentIndexChanged.connect(self.select_dropdown_current_index_changed)
 
-        self.bttn_opaque = QPushButton(self)
+        self.checkbox_opaque = QCheckBox(self)
+        self.checkbox_opaque.setText('Opaque')
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        self.bttn_opaque.setSizePolicy(size)
-        self.bttn_opaque.clicked.connect(self.opaque_clicked)
+        self.checkbox_opaque.setSizePolicy(size)
+        self.checkbox_opaque.setChecked(True)
+        self.checkbox_opaque.clicked.connect(self.color_control_clicked)
+
+        self.checkbox_show_r = QCheckBox(self)
+        self.checkbox_show_r.setText('Red')
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.checkbox_show_r.setSizePolicy(size)
+        self.checkbox_show_r.setChecked(True)
+        self.checkbox_show_r.clicked.connect(self.color_control_clicked)
+
+        self.checkbox_show_g = QCheckBox(self)
+        self.checkbox_show_g.setText('Green')
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.checkbox_show_g.setSizePolicy(size)
+        self.checkbox_show_g.setChecked(True)
+        self.checkbox_show_g.clicked.connect(self.color_control_clicked)
+
+        self.checkbox_show_b = QCheckBox(self)
+        self.checkbox_show_b.setText('Blue')
+        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.checkbox_show_b.setSizePolicy(size)
+        self.checkbox_show_b.setChecked(True)
+        self.checkbox_show_b.clicked.connect(self.color_control_clicked)
+
+        self.color_layout = QHBoxLayout()
+        self.color_layout.addWidget(self.checkbox_opaque)
+        self.color_layout.addWidget(self.checkbox_show_r)
+        self.color_layout.addWidget(self.checkbox_show_g)
+        self.color_layout.addWidget(self.checkbox_show_b)
 
         self.main_layout = QVBoxLayout()
         self.main_layout.addWidget(self.image_display)
         self.main_layout.addWidget(self.select_dropdown)
-        self.main_layout.addWidget(self.bttn_opaque)
+        self.main_layout.addLayout(self.color_layout)
         self.setLayout(self.main_layout)
 
         self.update_image()
 
     def update_image(self):
-        if self.opaque:
-            self.bttn_opaque.setText('TURN OPAQUE OFF')
-        else:
-            self.bttn_opaque.setText('TURN OPAQUE ON')
-
         v = self.select_dropdown.currentIndex()
         if self.ddsc is not None and 0 <= v < len(self.ddsc.mips):
             npimp = self.ddsc.mips[v].data
             if npimp is not None:
-                if self.opaque and npimp.shape[2] == 4:
-                    npimp = npimp.copy()
-                    npimp[:, :, 3] = 0x255
+                npimp = npimp.copy()
+                if self.checkbox_opaque.isChecked() and npimp.shape[2] == 4:
+                    npimp[:, :, 3] = 0xFF
+                if not self.checkbox_show_r.isChecked():
+                    npimp[:, :, 0] = 0
+                if not self.checkbox_show_g.isChecked():
+                    npimp[:, :, 1] = 0
+                if not self.checkbox_show_b.isChecked():
+                    npimp[:, :, 2] = 0
 
                 if npimp.shape[2] == 3:
                     frmt = QImage.Format_RGB888
@@ -188,8 +217,7 @@ class DataViewerImage(DataViewer):
     def select_dropdown_current_index_changed(self, v):
         self.update_image()
 
-    def opaque_clicked(self, checked):
-        self.opaque = not self.opaque
+    def color_control_clicked(self, checked):
         self.update_image()
 
     def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):

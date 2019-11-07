@@ -237,7 +237,7 @@ class AmfBuffer(AmfClass):
     def parse(self, adf: Adf, value_raw: AdfValue):
         value = value_raw.value
         self.data = value['Data'].value
-        self.createSrv = value['CreateSRV'].value
+        self.createSrv = value.get('CreateSRV', AdfValue(None, None, None)).value
 
 
 class AmfMeshBuffers(AmfClass):
@@ -664,7 +664,7 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     finfo_out = field_format_info[sattr_out.format[1]]
 
                     # update bone indexs
-                    if mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
+                    if mesh.meshProperties is not None and mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
                         arr_map = np.array(mesh.boneIndexLookup)
                         data_out_mem[fidx][:, :] = arr_map[data_out_mem[fidx]]
 

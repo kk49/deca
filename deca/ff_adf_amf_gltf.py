@@ -173,7 +173,8 @@ class Deca3dMeshc:
             mesh_adf = adf_node_read(vfs, vfs.map_vpath_to_vfsnodes[self.vpath][0])
             assert len(mesh_adf.table_instance) == 2
             assert mesh_adf.table_instance[0].type_hash == 0xea60065d
-            assert mesh_adf.table_instance[1].type_hash == 0x67b3a453
+            # 0x67b3a453 - GenZ, 0xe6834477 - theHunter
+            assert mesh_adf.table_instance[1].type_hash in {0x67b3a453, 0xe6834477}
             mesh_header = AmfMeshHeader(mesh_adf, mesh_adf.table_instance_full_values[0])
             mesh_buffers = AmfMeshBuffers(mesh_adf, mesh_adf.table_instance_full_values[1])
 
@@ -331,7 +332,7 @@ class Deca3dMeshc:
                         asl.append(accessors_stream_idx)
                         accessors_stream_map[stream_attr.usage[1]] = asl
 
-                    do_skin = mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and len(mesh.boneIndexLookup) > 0
+                    do_skin = mesh.meshProperties is not None and mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and len(mesh.boneIndexLookup) > 0
 
                     submeshes = []
                     submesh: AmfSubMesh

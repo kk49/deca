@@ -44,8 +44,8 @@ def rtpc_export_node_recurse(
     if 0x98796658 in rtpc.prop_map:
         material_properties['color_mask_b'] = rtpc.prop_map[0x98796658].data
 
-    if 0x26fa86fe in rtpc.prop_map:
-        skeleton_raw_path = rtpc.prop_map[0x26fa86fe].data
+    # if 0x26fa86fe in rtpc.prop_map:
+    #     skeleton_raw_path = rtpc.prop_map[0x26fa86fe].data
 
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data

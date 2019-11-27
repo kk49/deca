@@ -410,7 +410,10 @@ def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_ove
             if not allow_overwrite and os.path.isfile(ofile_img):
                 existing_files.append(ofile_img)
             else:
-                npimp = ddsc.mips[0].pil_image()
+                for i in range(len(ddsc.mips)):
+                    if ddsc.mips[i].data is not None:
+                        npimp = ddsc.mips[i].pil_image()
+                        break
                 npimp.save(ofile_img)
 
             # export dds with all mip levels

@@ -347,7 +347,7 @@ class ToolMakeWebMap:
         tile_overlays = []
 
         for crit in ['dreadnought', 'harvester', 'hunter', 'scout', 'skirmisher']:
-            for ctype, color in zip(['a', 'b', 'c'], [[255, 0, 0, 255],[0, 255, 0, 255],[0, 0, 255, 255]]):
+            for ctype, color in zip(['a', 'b', 'c', 'd'], [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255], [255, 0, 255, 255]]):
                 tile_overlays.append([
                     'settings/hp_settings/hp_ai_textures/spawn_maps/spawn_{}_{}.bmp_datac'.format(crit, ctype).encode('ascii'),
                     'tile_spawn_{}_{}'.format(crit, ctype),

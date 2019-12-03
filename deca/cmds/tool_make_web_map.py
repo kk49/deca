@@ -6,11 +6,11 @@ from deca.ff_types import *
 from deca.ff_adf import adf_node_read
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
+from deca.digest import process_translation_adf
 from PIL import Image
 import numpy as np
 import os
 import json
-import io
 import matplotlib.pyplot as plt
 import shutil
 import re
@@ -139,30 +139,6 @@ class ToolMakeWebMap:
             self.vfs = vfs_structure_open(vfs_config)
         else:
             self.vfs = vfs_config
-
-    def process_translation_adf(self, f, sz):
-        buffer = f.read(sz)
-        adf = self.vfs.adf_db.load_adf(buffer)
-
-        txt_buffer = adf.table_instance_values[0]['Text']
-        txt_buffer = [(t + 256) % 256 for t in txt_buffer]
-        txt_buffer = bytearray(txt_buffer)
-
-        tr = {}
-        with ArchiveFile(io.BytesIO(txt_buffer)) as tf:
-            for prs in adf.table_instance_values[0]['SortedPairs']:
-                tf.seek(prs['TextOffset'])
-                text = tf.read_strz().decode('utf-8')
-                tf.seek(prs['NameOffset'])
-                name = tf.read_strz().decode('utf-8')
-                tr[name] = text
-
-        if os.path.exists(os.path.join('scratch', 'gz')):
-            with open(os.path.join('scratch', 'gz', 'text_debug.txt'), 'w') as dt:
-                for k, v in tr.items():
-                    dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>')))
-
-        return tr
 
     def tileset_make(self, img, tile_path, tile_size=256, max_zoom=-1):
         # save full image, mainly for debugging
@@ -407,7 +383,7 @@ class ToolMakeWebMap:
         # load translation
         vnode = self.vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
         with self.vfs.file_obj_from(vnode, 'rb') as f:
-            tr = self.process_translation_adf(f, vnode.size_u)
+            tr = process_translation_adf(self.vfs, f, vnode.size_u)
 
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped

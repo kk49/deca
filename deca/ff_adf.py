@@ -534,22 +534,18 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 vpath = gdf.read_strz()
                 vhash = hash_little(vpath)
 
-                gdf.seek(e1[0])
-
                 if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
                     # TODO this follows the data structure for an array of some type, 0xD74CC4CB is probably it's hash
+                    gdf.seek(e1[0])
                     header2 = gdf.read_u32(4)
                     actual_offset = header2[0]
                     actual_size = header2[2]
                     adf_type_hash = None
                 else:  # TODO current guess is that it is a bare ADF instance
-                    header2 = gdf.read_u32(8)
                     actual_offset = e1[0]
-                    actual_size = string_offset - actual_offset
+                    actual_size = None
                     adf_type_hash = ftype_hash
 
-                gdf.seek(actual_offset)
-                buf = gdf.read(actual_size)
                 entry = GdcArchiveEntry(
                     index=idx,
                     offset=actual_offset,

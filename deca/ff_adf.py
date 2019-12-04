@@ -768,11 +768,16 @@ class Adf:
 
         sbuf = sbuf + '\n--------instances\n'
         for info, v, fv in zip(self.table_instance, self.table_instance_values, self.table_instance_full_values):
-            sbuf = sbuf + 'instances\t{:08x}\t{:08x}\t{}\t{}\t{}\t{:08x}-{:08x}\n'.format(
+            end_str = '{:08x}-???'.format(info.offset)
+            if info.size is not None:
+                end_str = '{:08x}-{:08x}'.format(info.offset, info.offset + info.size)
+
+            sbuf = sbuf + 'instances\t{:08x}\t{:08x}\t{}\t{}\t{}\t{}\n'.format(
                 info.name_hash,
                 info.type_hash,
                 info.name.decode('utf-8'),
-                info.offset, info.size, info.offset, info.offset + info.size)
+                info.offset, info.size,
+                end_str)
 
             # sbuf = sbuf + pformat(v, width=1024) + '\n'
             sbuf = sbuf + adf_format(fv, self.extended_map_typedef) + '\n'

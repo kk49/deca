@@ -17,6 +17,9 @@ with vfs.file_obj_from(vnode, 'rb') as f:
 vnode = vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
 adf = adf_node_read(vfs, vnode)
 
+# todo use settings/hp_settings/codex_data.bin instead
+# todo add to digest?
+
 collectable_info = [
     (re.compile(r'collectable_dalahast_(.*)'), 'collectable_dalahast_{}',  'collectable_dalahast_{}_desc', True),
     (re.compile(r'collectable_gnome_(.*)'), 'collectable_gnome_{}',  'collectable_gnome_{}_desc', True),

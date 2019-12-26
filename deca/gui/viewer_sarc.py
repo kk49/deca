@@ -22,7 +22,7 @@ class DataViewerSarc(DataViewer):
 
     def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
         sarc_file = FileSarc()
-        sarc_file.deserialize(vfs.file_obj_from(vnode))
+        sarc_file.header_deserialize(vfs.file_obj_from(vnode))
         sbuf = sarc_file.dump_str()
         self.text_box.setText(sbuf)
 

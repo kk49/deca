@@ -19,7 +19,7 @@ from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
 from deca.gui.viewer_obc import DataViewerObc
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
-from deca.export_import import extract_raw, extract_processed
+from deca.export_import import extract_raw, extract_processed, extract_contents
 
 import PySide2
 from PySide2.QtCore import \
@@ -683,6 +683,10 @@ class MainWidget(QWidget):
         self.chkbx_export_raw.setText('Export Raw Files')
         self.chkbx_export_raw.setChecked(False)
 
+        self.chkbx_export_contents = QCheckBox()
+        self.chkbx_export_contents.setText('Export Contents of File')
+        self.chkbx_export_contents.setChecked(False)
+
         self.chkbx_export_text = QCheckBox()
         self.chkbx_export_text.setText('Export As Text')
         self.chkbx_export_text.setChecked(False)
@@ -697,6 +701,7 @@ class MainWidget(QWidget):
 
         export_layout = QHBoxLayout()
         export_layout.addWidget(self.chkbx_export_raw)
+        export_layout.addWidget(self.chkbx_export_contents)
         export_layout.addWidget(self.chkbx_export_processed)
         export_layout.addWidget(self.chkbx_export_text)
         export_layout.addWidget(self.chkbx_export_save_to_one_dir)
@@ -804,13 +809,14 @@ class MainWidget(QWidget):
         #     self.bt_extract.setText('EXTRACT: {}'.format(vnode.vpath))
         #     self.bt_extract.setEnabled(True)
 
-    def bt_extract_clicked(self, checked):
+    def extract(self, eid, extract_dir):
         if self.current_vpaths is not None and len(self.current_vpaths) > 0:
             try:
-                extract_dir = self.vfs.working_dir + 'extracted/'
-
                 if self.chkbx_export_raw.isChecked():
                     extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
+
+                if self.chkbx_export_contents.isChecked():
+                    extract_contents(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
 
                 save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
                 save_to_text = self.chkbx_export_text.isChecked()
@@ -822,27 +828,13 @@ class MainWidget(QWidget):
                     save_to_text=save_to_text,
                     save_to_one_dir=save_to_one_dir)
             except EDecaFileExists as exce:
-                self.error_dialog('Extraction Canceled: File Exists: {}'.format(exce.args))
+                self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
+
+    def bt_extract_clicked(self, checked):
+        self.extract('Extraction', self.vfs.working_dir + 'extracted/')
 
     def bt_prep_mod_clicked(self, checked):
-        if self.current_vpaths is not None and len(self.current_vpaths) > 0:
-            try:
-                extract_dir = self.vfs.working_dir + 'mod/'
-
-                if self.chkbx_export_raw.isChecked():
-                    extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
-
-                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
-                save_to_text = self.chkbx_export_text.isChecked()
-                save_to_processed = self.chkbx_export_processed.isChecked()
-
-                extract_processed(
-                    self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
-                    save_to_processed=save_to_processed,
-                    save_to_text=save_to_text,
-                    save_to_one_dir=save_to_one_dir)
-            except EDecaFileExists as exce:
-                self.error_dialog('Mod Prep Canceled: File Exists: {}'.format(exce.args))
+        self.extract('Mod Prep', self.vfs.working_dir + 'mod/')
 
     def bt_mod_build_clicked(self, checked):
         try:

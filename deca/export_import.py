@@ -8,6 +8,7 @@ from .vfs_db import VfsStructure, VfsNode
 from .export_import_adf import adf_export
 from .export_import_rtpc import rtpc_export
 from .ff_avtx import Ddsc, image_export
+from .ff_sarc import FileSarc
 
 
 NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
@@ -37,7 +38,6 @@ def extract_node_raw(
         vfs: VfsStructure,
         node: VfsNode,
         extract_dir: str,
-        do_sha1sum,
         allow_overwrite):
     if node.is_valid():
         if node.offset is not None:
@@ -67,15 +67,6 @@ def extract_node_raw(
                     with ArchiveFile(open(ofile, 'wb')) as fo:
                         fo.write(buf)
 
-                # TODO
-                # if do_sha1sum:
-                #     # path, file = os.path.split(ofile)
-                #     # sfile = os.path.join(path, '.' + file)
-                #     sfile = ofile + '.deca_sha1sum'
-                #     hsha = sha1(buf).hexdigest()
-                #     vfs.logger.log('SHA1SUM {} {}'.format(hsha, sfile))
-                #     with open(sfile, 'w') as fo:
-                #         fo.write(hsha)
             return ofile
 
     return None
@@ -86,7 +77,6 @@ def extract_raw(
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
-        do_sha1sum=False,
         allow_overwrite=False):
     vs = expand_vpaths(vfs, vnodes, mask)
     for i, v in enumerate(vs):
@@ -107,7 +97,56 @@ def extract_raw(
 
         if vnode is not None:
             try:
-                extract_node_raw(vfs, vnode, extract_dir, do_sha1sum, allow_overwrite)
+                extract_node_raw(vfs, vnode, extract_dir, allow_overwrite)
+            except EDecaFileExists as e:
+                vfs.logger.log(
+                    'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+
+
+def extract_contents(
+        vfs: VfsStructure,
+        vnodes: List[NodeListElement],
+        mask: bytes,
+        extract_dir: str,
+        allow_overwrite=False):
+    vs = expand_vpaths(vfs, vnodes, mask)
+    for i, v in enumerate(vs):
+        vnode = None
+        id = None
+        if isinstance(v, bytes):
+            id = v
+        elif isinstance(v, VfsNode):
+            vnode = v
+        else:
+            raise NotImplementedError('extract_raw: Could not extract {}'.format(v))
+
+        if id is not None:
+            if id in vfs.map_vpath_to_vfsnodes:
+                vnode = vfs.map_vpath_to_vfsnodes[id][0]
+            else:
+                raise EDecaFileMissing('extract_raw: Missing {}'.format(id.decode('utf-8')))
+
+        if vnode is not None:
+            try:
+                if vnode.ftype == FTYPE_SARC:
+                    sarc = FileSarc()
+                    with vfs.file_obj_from(vnode) as f:
+                        sarc.header_deserialize(f)
+                        # extract_node_raw(vfs, vnode, extract_dir, allow_overwrite)
+                    entry_vpaths = [v.vpath for v in sarc.entries]
+                    entry_is_symlinks = [v.offset == 0 for v in sarc.entries]
+
+                    extract_raw(vfs, entry_vpaths, b'^.*$', extract_dir, allow_overwrite)
+
+                    file_list_name = os.path.join(extract_dir, vnode.vpath.decode('utf-8') + '.DECA.FILE_LIST.txt')
+
+                    with open(file_list_name, 'w') as f:
+                        for vp, isym in zip(entry_vpaths, entry_is_symlinks):
+                            op = 'sarc.add'
+                            if isym:
+                                op = 'sarc.symlink'
+                            f.write('{}({})\n'.format(op, vp.decode('utf-8')))
+
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
@@ -118,7 +157,6 @@ def extract_processed(
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
-        do_sha1sum=False,
         allow_overwrite=False,
         save_to_processed=False,
         save_to_text=False,

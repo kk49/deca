@@ -135,7 +135,7 @@ class VfsStructure(VfsBase):
                         node.processed = True
                         any_change = True
                         sarc_file = FileSarc()
-                        sarc_file.deserialize(self.file_obj_from(node))
+                        sarc_file.header_deserialize(self.file_obj_from(node))
 
                         for se in sarc_file.entries:
                             se: EntrySarc = se
@@ -145,7 +145,7 @@ class VfsStructure(VfsBase):
                             cnode = VfsNode(
                                 vhash=se.vhash, pid=node.uid, level=node.level + 1, index=se.index,
                                 offset=offset, size_c=se.length, size_u=se.length, vpath=se.vpath,
-                                sarc_type=se.unk_file_type_hash)
+                                sarc_type=se.file_extention_hash)
 
                             self.node_add(cnode)
                             self.possible_vpath_map.propose(cnode.vpath, [FTYPE_SARC, node], vnode=cnode)

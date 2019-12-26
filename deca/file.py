@@ -159,7 +159,7 @@ class ArchiveFile:
     def write_c8(self, v):
         return self.write_base('c', 1, v)
 
-    def write_strl(self, v):
+    def write_strl(self, v, n=None):
         return self.write_base('c', 1, v)
 
     def write_s8(self, v):

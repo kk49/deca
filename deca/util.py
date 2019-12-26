@@ -47,6 +47,9 @@ def remove_prefix_if_present(prefix, s):
         return None
 
 
+def align_to(v, boundry):
+    return ((v + boundry - 1) // boundry) * boundry
+
 
 '''
 JENKINS HASH code from 

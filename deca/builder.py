@@ -4,6 +4,7 @@ from deca.ff_sarc import FileSarc, EntrySarc
 from deca.ff_avtx import image_import
 from deca.errors import *
 from deca.file import ArchiveFile
+from deca.util import align_to
 import os
 import shutil
 import re
@@ -21,87 +22,42 @@ class Builder:
             print('BUILD SARC {}'.format(vnode.vpath))
 
             # parse existing file
-            sarc_old = FileSarc()
-            f = vfs.file_obj_from(vnode)
-            sarc_old.deserialize(f)
+            sarc_file = FileSarc()
+            with vfs.file_obj_from(vnode) as f:
+                sarc_file.header_deserialize(f)
 
-            sarc_new = deepcopy(sarc_old)
-
-            data_write_pos = sarc_old.dir_block_len + 16  # 16 is the basic header length 4,b'SARC', 3, dir_block_len
-            src_files = [None] * len(sarc_old.entries)
-            for i in range(len(sarc_old.entries)):
-                entry_old: EntrySarc = sarc_old.entries[i]
-                entry_new: EntrySarc = sarc_new.entries[i]
-                vpath = entry_old.vpath
-
-                make_symlink = False
-                if vpath in src_map:
-                    src_files[i] = src_map[vpath]
-                    sz = os.stat(src_files[i]).st_size
-                    make_symlink = True
-                else:
-                    sz = entry_old.length
-
-                if entry_old.offset == 0 or make_symlink:
-                    entry_new.offset = 0
-                    entry_new.length = sz
-                else:
-                    # IMPORTANT SARCS apparently don't want data to cross 32MB boundary (maybe small boundary?)
-                    max_block_size = 32 * 1024 * 1024
-                    if sz > max_block_size:
-                        raise NotImplementedError('Excessive file size: {}'.format(vpath))
-
-                    block_pos_diff = \
-                        np.floor((data_write_pos + sz) / max_block_size) - np.floor(data_write_pos / max_block_size)
-
-                    if block_pos_diff > 0:
-                        # boundary crossed
-                        data_write_pos = ((data_write_pos + max_block_size - 1) // max_block_size) * max_block_size
-
-                    entry_new.offset = data_write_pos
-                    entry_new.length = sz
-                    data_write_pos = data_write_pos + sz
-                    align = 4
-                    data_write_pos = ((data_write_pos + align - 1) // align) * align
+            src_files = [None] * len(sarc_file.entries)
+            entry: EntrySarc
+            for i, entry in enumerate(sarc_file.entries):
+                if entry.vpath in src_map:
+                    src_files[i] = src_map[entry.vpath]
+                    entry.length = os.stat(src_files[i]).st_size
 
             # extract existing file
             fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))
-            # fn = vfs.extract_node(vnode, dst_path, do_sha1sum=False, allow_overwrite=True)
-
-            # modify extracted existing file by overwriting offset to file entry to zero, telling the engine that it is
-            # a symbolic link, and should be loaded elsewhere, preferably directly
             pt, fn = os.path.split(fn_dst)
             os.makedirs(pt, exist_ok=True)
+
             with ArchiveFile(open(fn_dst, 'wb')) as fso:
-                with ArchiveFile(vfs.file_obj_from(vnode, 'rb')) as fsi:
-                    buf = fsi.read(sarc_old.dir_block_len + 16)
-                    fso.write(buf)
+                sarc_file.header_serialize(fso)
 
-                    for i in range(len(sarc_old.entries)):
-                        entry_old: EntrySarc = sarc_old.entries[i]
-                        entry_new: EntrySarc = sarc_new.entries[i]
+                for i, entry in enumerate(sarc_file.entries):
+                    buf = None
+                    if entry.is_symlink:
+                        print('  SYMLINK {}'.format(entry.vpath))
+                    elif src_files[i] is not None:
+                        print('  INSERTING {} src file to new file'.format(entry.vpath))
+                        with open(src_files[i], 'rb') as f:
+                            buf = f.read(entry.length)
+                    else:
+                        print('  COPYING {} from old file to new file'.format(entry.vpath))
+                        vn = vfs.map_vpath_to_vfsnodes[entry.vpath][0]
+                        with vfs.file_obj_from(vn) as fsi:
+                            buf = fsi.read(entry.length)
 
-                        fso.seek(entry_new.META_entry_offset_ptr)
-                        fso.write_u32(entry_new.offset)
-                        fso.seek(entry_new.META_entry_size_ptr)
-                        fso.write_u32(entry_new.length)
-
-                        buf = None
-
-                        if entry_new.offset == 0:
-                            print('  SYMLINK {}'.format(entry_old.vpath))
-                        elif src_files[i] is not None:
-                            print('  INSERTING {} src file to new file'.format(entry_old.vpath))
-                            with open(src_files[i], 'rb') as f:
-                                buf = f.read(entry_new.length)
-                        else:
-                            print('  COPYING {} from old file to new file'.format(entry_old.vpath))
-                            fsi.seek(entry_old.offset)
-                            buf = fsi.read(entry_old.length)
-
-                        if buf is not None:
-                            fso.seek(entry_new.offset)
-                            fso.write(buf)
+                    if buf is not None:
+                        fso.seek(entry.offset)
+                        fso.write(buf)
 
             return fn_dst
         else:
@@ -128,6 +84,10 @@ class Builder:
                 file, ext = os.path.splitext(cpath)
                 if ext == '.deca_sha1sum':
                     pass
+                if cpath.endswith('.DECA.FILE_LIST.txt'):
+                    vpath = cpath[len(src_path):-len('.DECA.FILE_LIST.txt')].encode('ascii')
+                    vpath = vpath.replace(b'\\', b'/')
+                    src_files.append([vpath, cpath])
                 else:
                     vpath = cpath[len(src_path):].encode('ascii')
                     vpath = vpath.replace(b'\\', b'/')
@@ -146,6 +106,8 @@ class Builder:
 
             if fpath.find('REFERENCE_ONLY') >= 0:
                 pass  # DO NOT USE THESE FILES
+            elif fpath.find('DECA') >= 0:
+                pass  # BUILD instruction file do not copy
             elif re.match(r'^.*\.ddsc$', fpath) or re.match(r'^.*\.hmddsc$', fpath) or re.match(r'^.*\.atx?$', fpath):
                 pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
             elif fpath.endswith('.ddsc.dds'):

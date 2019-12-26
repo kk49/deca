@@ -35,11 +35,11 @@ class EntrySarc:
         # prepare data that will be written, vpath should be a multiple of 4 in length
         vpath = self.vpath + b'\00' * (((len(self.vpath) + 3) // 4 * 4) - len(self.vpath))
         f.write_u32(len(vpath))
-        f.write_strl(vpath)
+        f.write(vpath)
 
         f.write_u32(self.offset)
 
-        f.write_length(self.length)
+        f.write_u32(self.length)
 
     def deserialize_v3(self, f):
         self.META_entry_ptr = f.tell()
@@ -139,7 +139,8 @@ class FileSarc:
             dir_block_len = 0
             entry: EntrySarc
             for entry in self.entries:
-                dir_block_len += 12 + align_to(len(entry.vpath), 8)
+                dir_block_len += 12 + align_to(len(entry.vpath), 4)
+            dir_block_len = align_to(dir_block_len, 16)
 
         elif self.ver2 == 3:
             # calculate dir block length
@@ -157,8 +158,9 @@ class FileSarc:
         else:
             raise NotImplementedError('FileSarc.header_serialize: self.ver2 == {}'.format(self.ver2))
 
+        data_write_pos = 16 + dir_block_len
+
         # determine offsets for files in sarc
-        data_write_pos = 16 + align_to(dir_block_len, 16)
         for entry in self.entries:
             sz = entry.length
             entry.offset = 0
@@ -191,7 +193,7 @@ class FileSarc:
                 entry.serialize_v2(f)
 
             # fill with zeros to data offset position
-            # f.write(b'\00' * (data_write_pos - f.tell()))
+            f.write(b'\00' * (data_write_pos - f.tell()))
 
         elif self.ver2 == 3:
             f.write_u32(4)              # Version == 4 for supported sarc files
@@ -205,7 +207,7 @@ class FileSarc:
                 entry.serialize_v3(f)
 
             # fill with zeros to data offset position
-            # f.write(b'\00' * (data_write_pos - f.tell()))
+            f.write(b'\00' * (data_write_pos - f.tell()))
 
         else:
             raise NotImplementedError('FileSarc.header_serialize: self.ver2 == {}'.format(self.ver2))

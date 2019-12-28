@@ -5,3 +5,4 @@ Pillow==6.2.1
 PySide2==5.11.2
 XlsxWriter==1.1.5
 pygltflib==1.11.7
+openpyxl==3.0.2

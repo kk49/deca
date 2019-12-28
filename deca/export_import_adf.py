@@ -81,6 +81,8 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsStructure, vnode: VfsNode, export_path, a
 
     book.close()
 
+    return fn
+
 
 def adf_export_amf_model_0xf7c20a69(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))

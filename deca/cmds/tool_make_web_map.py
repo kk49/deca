@@ -1,5 +1,5 @@
 from deca.vfs_db import vfs_structure_open
-from deca.ff_avtx import Ddsc
+from deca.ff_avtx import Ddsc, image_export
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.file import ArchiveFile
 from deca.ff_types import *
@@ -7,12 +7,14 @@ from deca.ff_adf import adf_node_read
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf
+from deca.export_import_adf import adf_export_xlsx_0x0b73315d
 from PIL import Image
 import numpy as np
 import os
 import json
 import matplotlib.pyplot as plt
 import shutil
+import openpyxl
 import re
 
 
@@ -50,7 +52,9 @@ class RtpcLootVisitor:
         rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data.decode('utf-8')
         ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[0x6ca6d4b9].data)
         x = ref_matrix.data[0, 3]
+        z = ref_matrix.data[1, 3]
         y = ref_matrix.data[2, 3]
+        position = [x, z, y]
         coords = [
             x * src_to_dst_x_scale + dst_x0,
             y * src_to_dst_y_scale + dst_y0,
@@ -60,6 +64,7 @@ class RtpcLootVisitor:
             'type': 'Feature',
             'properties': {
                 'type': rtpc_class,
+                'position': position,
             },
             'geometry': {
                 'type': 'Point',
@@ -189,6 +194,13 @@ class ToolMakeWebMap:
 
     def make_web_map(self, wdir, copy_support_files):
         force_topo_tiles = False
+
+        # write results
+        dpath = os.path.join(wdir, 'map', 'z0')
+        os.makedirs(dpath, exist_ok=True)
+
+        export_path = os.path.join(dpath, 'export')
+        os.makedirs(export_path, exist_ok=True)
 
         # BUILD topo map
         topo_dst_path = wdir + 'map/z0/tile_t'
@@ -357,7 +369,12 @@ class ToolMakeWebMap:
                     buffer = f.read(vnode.size_u)
                     bmp_adf = self.vfs.adf_db.load_adf(buffer)
                 else:
-                    buffer = f.read(vnode.offset + vnode.size_u)
+                    buffer = b''
+                    while True:
+                        v = f.read(16 * 1024 * 1024)
+                        if len(v) == 0:
+                            break
+                        buffer = buffer + v
                     bmp_adf = self.vfs.adf_db.load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
 
             bitfield = bmp_adf.table_instance_values[0]['Layers'][0]['Bitfield']
@@ -385,6 +402,26 @@ class ToolMakeWebMap:
         with self.vfs.file_obj_from(vnode, 'rb') as f:
             tr = process_translation_adf(self.vfs, f, vnode.size_u)
 
+        # load collectable codex
+        vnode = self.vfs.map_vpath_to_vfsnodes[b'settings/hp_settings/codex_data.bin'][0]
+        codex_fn = adf_export_xlsx_0x0b73315d(self.vfs, vnode, export_path=export_path, allow_overwrite=True)
+        codex_wb = openpyxl.load_workbook(filename=codex_fn)
+        for col in codex_wb['Collectables'].columns:
+            c = [v.value for v in col]
+            if c[0] == 'id':
+                codex_id = c[1:]
+            elif c[0] == 'name':
+                codex_name = c[1:]
+            elif c[0] == 'description':
+                codex_desc = c[1:]
+            elif c[0] == 'icon':
+                codex_icon = c[1:]
+
+        codex = {}
+        for cid, name, desc, icon in zip(codex_id, codex_name, codex_desc, codex_icon):
+            if cid is not None:
+                codex[cid] = (name, desc, icon)
+
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped
         vnode = self.vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
@@ -393,13 +430,8 @@ class ToolMakeWebMap:
         for v in adf.table_instance_values[0]['Collectibles']:
             obj_id = v['ID']
             cid = v['Name'].decode('utf-8')
-            name = cid
-            if name in tr:
-                name = tr[name]
-            else:
-                name = name + "_name"
-                name = tr.get(name, name)
-            desc = cid + '_desc'
+            name, desc, icon = codex.get(cid, (cid, cid + '_desc', None))
+            name = tr.get(name, name)
             desc = tr.get(desc, desc)
             position = v['Position']
             x = (position[0]) * src_to_dst_x_scale + dst_x0
@@ -456,6 +488,7 @@ class ToolMakeWebMap:
                             'uid': vnode.vhash,
                             'uid_str': vnode.vpath.decode('utf-8'),
                             'comment': '',
+                            'position': [aabb.min.tolist(), aabb.max.tolist()],
                         },
                         'geometry': {
                             'type': 'Polygon',
@@ -483,9 +516,6 @@ class ToolMakeWebMap:
         for k, v in visitor.points.items():
             print('{}: count = {}'.format(k, len(v)))
 
-        # write results
-        dpath = os.path.join(wdir, 'map', 'z0')
-        os.makedirs(dpath, exist_ok=True)
 
         fpath = os.path.join(dpath, 'data_full.js')
         with open(fpath, 'w') as f:

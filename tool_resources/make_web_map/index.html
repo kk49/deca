@@ -85,7 +85,18 @@
                 s = s + "<br>cmt: " + feature.properties.comment;
             }
             if (feature.properties && feature.properties.position) {
-                s = s + "<br>pos: " + feature.properties.position[0].toFixed(1) + ", " + feature.properties.position[2].toFixed(1);
+                p = feature.properties.position;
+                if (p.length == 2)
+                {
+                    mn = p[0];
+                    mx = p[1];
+                    s = s + "<br>pos: (" + mn[0].toFixed(1) + ", " + mn[1].toFixed(1) + ", " + mn[2].toFixed(1) + ") -> (";
+                    s = s + mx[0].toFixed(1) + ", " + mx[1].toFixed(1) + ", " + mx[2].toFixed(1) + ")";
+                }
+                else if (p.length == 3)
+                {
+                    s = s + "<br>pos: " + p[0].toFixed(1) + ", " + p[1].toFixed(1) + ", " + p[2].toFixed(1);
+                }
             }
 
             layer.bindPopup(s)

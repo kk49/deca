@@ -54,7 +54,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.remap_pid = None
         self.remap_type = None
         self.remap_hash = None
-        self.column_ids = ["Index", "PIDX", "Type", "Hash", "SARC_Type", "ADF_type", "Size_U", "Size_C", "Path"]
+        self.column_ids = ["Index", "PIDX", "Type", "Hash", "EXT_hash", "ADF_type", "Size_U", "Size_C", "Path"]
 
     def vfs_set(self, vfs):
         self.beginResetModel()
@@ -350,7 +350,7 @@ class VfsDirModel(QAbstractItemModel):
 
     def headerData(self, section, orientation, role):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ("Path", "Index", "Type", "Hash", "SARC_Type", "ADF_Type", "Size_U", "Size_C", "Used_Depth")[section]
+            return ("Path", "Index", "Type", "Hash", "EXT_Hash", "ADF_Type", "Size_U", "Size_C", "Used_Depth")[section]
         else:
             return None
 

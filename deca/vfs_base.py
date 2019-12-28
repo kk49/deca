@@ -99,11 +99,11 @@ class VfsNode:
             self, uid=None, ftype=None, compressed=False,
             vhash=None, pvpath=None, vpath=None, pid=None, level=0, index=None, offset=None,
             size_c=None, size_u=None, processed=False, used_at_runtime_depth=None,
-            adf_type=None, sarc_type=None):
+            adf_type=None, sarc_ext_hash=None):
         self.uid = uid
         self.ftype = ftype
         self.adf_type = adf_type
-        self.sarc_type = sarc_type
+        self.sarc_type = sarc_ext_hash
         self.is_compressed = compressed
         self.vpath = vpath
         self.vhash = vhash

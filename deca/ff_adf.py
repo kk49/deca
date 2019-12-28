@@ -48,8 +48,12 @@ class GdcArchiveEntry:
         if self.adf_type_hash is not None:
             str_adfhash = ' adf:{:08x}'.format(self.adf_type_hash)
 
-        return 'i:{:4d} o:{:9d} s:{:9d}{}{}{} vp:{}'.format(
-            self.index, self.offset, self.size, str_vhash, str_fthash, str_adfhash, self.vpath.decode('utf-8'))
+        str_size = 's:None'
+        if self.size is not None:
+            str_size = 's:{:9d}'.format(self.size)
+
+        return 'i:{:4d} o:{:9d} {}{}{}{} vp:{}'.format(
+            self.index, self.offset, str_size, str_vhash, str_fthash, str_adfhash, self.vpath.decode('utf-8'))
 
 
 class StringHash:

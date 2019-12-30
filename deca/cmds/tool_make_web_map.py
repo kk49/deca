@@ -406,6 +406,10 @@ class ToolMakeWebMap:
         vnode = self.vfs.map_vpath_to_vfsnodes[b'settings/hp_settings/codex_data.bin'][0]
         codex_fn = adf_export_xlsx_0x0b73315d(self.vfs, vnode, export_path=export_path, allow_overwrite=True)
         codex_wb = openpyxl.load_workbook(filename=codex_fn)
+        codex_id = []
+        codex_name = []
+        codex_desc = []
+        codex_icon = []
         for col in codex_wb['Collectables'].columns:
             c = [v.value for v in col]
             if c[0] == 'id':

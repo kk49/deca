@@ -406,7 +406,7 @@ def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_ove
             ofile = ofile + '.ddsc'
 
             # export to reference png file
-            ofile_img = ofile + '.REFERENCE_ONLY.png'
+            ofile_img = ofile + '.DECA.REFERENCE.png'
             if not allow_overwrite and os.path.isfile(ofile_img):
                 existing_files.append(ofile_img)
             else:

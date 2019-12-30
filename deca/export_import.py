@@ -141,11 +141,12 @@ def extract_contents(
                     file_list_name = os.path.join(extract_dir, vnode.vpath.decode('utf-8') + '.DECA.FILE_LIST.txt')
 
                     with open(file_list_name, 'w') as f:
+                        f.write('sarc.clear();')
                         for vp, isym in zip(entry_vpaths, entry_is_symlinks):
                             op = 'sarc.add'
                             if isym:
                                 op = 'sarc.symlink'
-                            f.write('{}({})\n'.format(op, vp.decode('utf-8')))
+                            f.write('{}("{}");\n'.format(op, vp.decode('utf-8')))
 
             except EDecaFileExists as e:
                 vfs.logger.log(

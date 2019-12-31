@@ -888,6 +888,7 @@ class AdfDatabase:
         self.db_dir = db_dir
         self.map_type_def = {}
         self.map_type_filename = {}
+        self.map_hash_string = {}
 
     def extract_types_from_exe(self, exepath):
         self.map_type_def = {}
@@ -920,10 +921,17 @@ class AdfDatabase:
                     self.map_type_filename[k] = ts
                     self.map_type_def[k] = v
 
+                for k, v in adf.map_stringhash.items():
+                    s = self.map_hash_string.get(k, set())
+                    s.add(v)
+                    self.map_hash_string[k] = s
+
         with open(os.path.join(self.db_dir, 'map_type_filename.pickle'), 'wb') as fw:
             pickle.dump(self.map_type_filename, fw)
         with open(os.path.join(self.db_dir, 'map_type.pickle'), 'wb') as fw:
             pickle.dump(self.map_type_def, fw)
+        # with open(os.path.join(self.db_dir, 'map_hash_string.pickle'), 'wb') as fw:
+        #     pickle.dump(self.map_hash_string, fw)
 
     def typedefs_add(self, map_typedefs):
         for k, v in map_typedefs.items():

@@ -18,94 +18,125 @@ class Builder:
     def __init__(self):
         pass
 
-    def build_node(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsBase, src_map):
-        if vnode.ftype == FTYPE_SARC:
-            print('BUILD SARC {}'.format(vnode.vpath))
+    def build_node_sarc(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsBase, vpath_complete_map):
+        assert(vnode.ftype == FTYPE_SARC)
 
-            # parse existing file
-            sarc_file = FileSarc()
-            with vfs.file_obj_from(vnode) as f:
-                sarc_file.header_deserialize(f)
+        vpath = vnode.vpath
+        print('BUILD SARC {}'.format(vnode.vpath))
 
-            if src_path is not None:
-                if src_path.find('DECA.FILE_LIST') >= 0:
-                    with open(src_path, 'r') as f:
-                        src_lines = f.readlines()
-                    callex = re.compile(r'^([A-Za-z]*[.A-Za-z]*)\(([^\)]*)\);$')
-                    for src_idx, src_line in enumerate(src_lines):
-                        src_context = f'{src_path}:{src_idx+1}'
-                        mr = callex.match(src_line)
-                        if mr is not None:
-                            cmd = mr.group(1)
-                            param = mr.group(2)
-                        else:
-                            raise EDecaBuildError('BUILD ERROR: {}: Parser error in command "{}"'.format(src_context, src_line))
+        # parse existing file
+        sarc_file = FileSarc()
+        with vfs.file_obj_from(vnode) as f:
+            sarc_file.header_deserialize(f)
 
-                        mr = re.match(r'^"([^"]*)"$', param)
-                        vpath = None
-                        if mr is not None:
-                            vpath = mr.group(1).encode('ascii')
-
-                        if cmd == 'sarc.clear':
-                            sarc_file.entries.clear()
-                        elif cmd in {'sarc.add', 'sarc.symlink'}:
-                            # Check to make sure entry does not exist
-                            for entry in sarc_file.entries:
-                                if entry.vpath == vpath:
-                                    raise EDecaBuildError(
-                                        'BUILD ERROR: {}: Tried to re-add vpath'.format(src_context, vpath.decode('UTF-8')))
-
-                            # Add to end
-                            entry = EntrySarc(vpath=vpath)
-                            entry.is_symlink = cmd == 'sarc.symlink'
-                            entry.length = vfs.map_vpath_to_vfsnodes[vpath][0].size_u
-                            sarc_file.entries.append(entry)
-                        # elif cmd == 'sarc.remove':
-                        #     pass
-                        else:
-                            raise EDecaBuildError('BUILD ERROR: {}: Unhandled command: {}'.format(src_context, cmd))
-
-                else:
-                    raise EDecaBuildError('BUILD ERROR: Unhandled src file for SARC file: {}'.format(src_path))
-
-            src_files: List[Union[None, str]] = [None] * len(sarc_file.entries)
-            entry: EntrySarc
-            for i, entry in enumerate(sarc_file.entries):
-                if entry.vpath in src_map:
-                    src_file = src_map[entry.vpath]
-                    src_files[i] = src_file
-                    entry.length = os.stat(src_file).st_size
-
-            # extract existing file
-            fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))
-            pt, fn = os.path.split(fn_dst)
-            os.makedirs(pt, exist_ok=True)
-
-            with ArchiveFile(open(fn_dst, 'wb')) as fso:
-                sarc_file.header_serialize(fso)
-
-                for i, entry in enumerate(sarc_file.entries):
-                    buf = None
-                    src_file = src_files[i]
-                    if entry.is_symlink:
-                        print('  SYMLINK {}'.format(entry.vpath))
-                    elif src_file is not None:
-                        print('  INSERTING {} src file to new file'.format(entry.vpath))
-                        with open(src_file, 'rb') as f:
-                            buf = f.read(entry.length)
+        if src_path is not None:
+            if src_path.find('DECA.FILE_LIST') >= 0:
+                with open(src_path, 'r') as f:
+                    src_lines = f.readlines()
+                callex = re.compile(r'^([A-Za-z]*[.A-Za-z]*)\(([^\)]*)\);$')
+                for src_idx, src_line in enumerate(src_lines):
+                    src_context = f'{src_path}:{src_idx + 1}'
+                    mr = callex.match(src_line)
+                    if mr is not None:
+                        cmd = mr.group(1)
+                        param = mr.group(2)
                     else:
-                        print('  COPYING {} from old file to new file'.format(entry.vpath))
-                        vn = vfs.map_vpath_to_vfsnodes[entry.vpath][0]
-                        with vfs.file_obj_from(vn) as fsi:
-                            buf = fsi.read(entry.length)
+                        raise EDecaBuildError(
+                            'BUILD ERROR: {}: Parser error in command "{}"'.format(src_context, src_line))
 
-                    if buf is not None:
-                        fso.seek(entry.offset)
-                        fso.write(buf)
+                    mr = re.match(r'^"([^"]*)"$', param)
+                    vpath = None
+                    if mr is not None:
+                        vpath = mr.group(1).encode('ascii')
 
-            return fn_dst
+                    if cmd == 'sarc.clear':
+                        sarc_file.entries.clear()
+                    elif cmd in {'sarc.add', 'sarc.symlink'}:
+                        # Check to make sure entry does not exist
+                        for entry in sarc_file.entries:
+                            if entry.vpath == vpath:
+                                raise EDecaBuildError(
+                                    'BUILD ERROR: {}: Tried to re-add vpath'.format(src_context, vpath.decode('UTF-8')))
+
+                        # Add to end
+                        entry = EntrySarc(vpath=vpath)
+                        entry.is_symlink = cmd == 'sarc.symlink'
+                        entry.length = vfs.map_vpath_to_vfsnodes[vpath][0].size_u
+                        sarc_file.entries.append(entry)
+                    # elif cmd == 'sarc.remove':
+                    #     pass
+                    else:
+                        raise EDecaBuildError('BUILD ERROR: {}: Unhandled command: {}'.format(src_context, cmd))
+
+            else:
+                raise EDecaBuildError('BUILD ERROR: Unhandled src file for SARC file: {}'.format(src_path))
+
+        src_files: List[Union[None, str]] = [None] * len(sarc_file.entries)
+        entry: EntrySarc
+        for i, entry in enumerate(sarc_file.entries):
+            if entry.vpath in vpath_complete_map:
+                src_file = vpath_complete_map[entry.vpath]
+                src_files[i] = src_file
+                entry.length = os.stat(src_file).st_size
+
+        # extract existing file
+        fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))
+        pt, fn = os.path.split(fn_dst)
+        os.makedirs(pt, exist_ok=True)
+
+        with ArchiveFile(open(fn_dst, 'wb')) as fso:
+            sarc_file.header_serialize(fso)
+
+            for i, entry in enumerate(sarc_file.entries):
+                buf = None
+                src_file = src_files[i]
+                if entry.is_symlink:
+                    print('  SYMLINK {}'.format(entry.vpath))
+                elif src_file is not None:
+                    print('  INSERTING {} src file to new file'.format(entry.vpath))
+                    with open(src_file, 'rb') as f:
+                        buf = f.read(entry.length)
+                else:
+                    print('  COPYING {} from old file to new file'.format(entry.vpath))
+                    vn = vfs.map_vpath_to_vfsnodes[entry.vpath][0]
+                    with vfs.file_obj_from(vn) as fsi:
+                        buf = fsi.read(entry.length)
+
+                if buf is not None:
+                    fso.seek(entry.offset)
+                    fso.write(buf)
+
+        vpath_complete_map[vpath] = fn_dst
+
+    def build_node(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsBase, vpath_complete_map):
+        vpath = vnode.vpath
+
+        if vnode.ftype == FTYPE_SARC:
+            self.build_node_sarc(dst_path, src_path, vnode, vfs, vpath_complete_map)
+        elif src_path is None:
+            pass  # no source path,
+        elif src_path.find('DECA') >= 0:
+            pass  # BUILD file(s) do not copy
+        elif re.match(r'^.*\.ddsc$', src_path) or re.match(r'^.*\.hmddsc$', src_path) or re.match(r'^.*\.atx?$', src_path):
+            pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
+        elif src_path.endswith('.ddsc.dds'):
+            # Build texture
+            vpath = vpath[0:-4]
+            vnode = vfs.map_vpath_to_vfsnodes[vpath][0]
+
+            # make ddsc.dds into ddsc and avtxs
+            compiled_files = image_import(vfs, vnode, src_path, dst_path)
+            for cfile in compiled_files:
+                vpath = cfile[0]
+                dst = cfile[1]
+                vpath_complete_map[vpath] = dst
         else:
-            raise EDecaBuildError('Cannot build {} : {}'.format(vnode.ftype, vnode.vpath))
+            # copy from source
+            dst = os.path.join(dst_path, vpath.decode('utf-8'))
+            dst_dir = os.path.dirname(dst)
+            os.makedirs(dst_dir, exist_ok=True)
+            shutil.copy2(src_path, dst)
+            vpath_complete_map[vpath] = dst
 
     def build_dir(self, vfs: VfsBase, src_path: str, dst_path: str):
         # find all changed src files
@@ -189,39 +220,14 @@ class Builder:
 
                     fpath = src_files.get(vpath, None)
 
-                    # print('vpath: {}, src: {}'.format(vpath, fpath))
+                    vnodes = vfs.map_vpath_to_vfsnodes[vpath]
+                    self.build_node(
+                        dst_path=dst_path,
+                        src_path=fpath,
+                        vnode=vnodes[0],
+                        vfs=vfs,
+                        vpath_complete_map=vpaths_completed)
 
-                    if fpath is None or fpath.find('DECA.FILE_LIST') >= 0:
-                        vnodes = vfs.map_vpath_to_vfsnodes[vpath]
-                        dst = self.build_node(
-                            dst_path=dst_path,
-                            src_path=fpath,
-                            vnode=vnodes[0],
-                            vfs=vfs,
-                            src_map=vpaths_completed)
-                        vpaths_completed[vpath] = dst
-                    elif fpath.find('DECA') >= 0:
-                        pass  # BUILD file(s) do not copy
-                    elif re.match(r'^.*\.ddsc$', fpath) or re.match(r'^.*\.hmddsc$', fpath) or re.match(r'^.*\.atx?$', fpath):
-                        pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
-                    elif fpath.endswith('.ddsc.dds'):
-                        # Build texture
-                        vpath = vpath[0:-4]
-                        vnode = vfs.map_vpath_to_vfsnodes[vpath][0]
-
-                        # make ddsc.dds into ddsc and avtxs
-                        compiled_files = image_import(vfs, vnode, fpath, dst_path)
-                        for cfile in compiled_files:
-                            vpath = cfile[0]
-                            dst = cfile[1]
-                            vpaths_completed[vpath] = dst
-                    else:
-                        # copy from source
-                        dst = os.path.join(dst_path, vpath.decode('utf-8'))
-                        dst_dir = os.path.dirname(dst)
-                        os.makedirs(dst_dir, exist_ok=True)
-                        shutil.copy2(fpath, dst)
-                        vpaths_completed[vpath] = dst
 
             if not any_change and len(depends) > 0:
                 print('BUILD FAILED: Infinite loop:')

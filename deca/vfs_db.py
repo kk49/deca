@@ -574,8 +574,9 @@ class VfsStructure(VfsBase):
                         if p.type == deca.ff_rtpc.PropType.type_str.value:
                             s = p.data
                             vpath_map.propose(s, [FTYPE_RTPC, node])
+
                             fn, ext = os.path.splitext(s)
-                            if ext == b'.tga':
+                            if ext in {b'.tga', b'.dds'}:
                                 vpath_map.propose(fn + b'.ddsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
                             elif ext == b'.skeleton':
                                 vpath_map.propose(fn + b'.bsk', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0])
@@ -585,10 +586,15 @@ class VfsStructure(VfsBase):
                             elif ext == b'.al':
                                 vpath_map.propose(fn + b'.afsmb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
                                 vpath_map.propose(fn + b'.asb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
-                            elif ext == b'.mdp':
-                                vpath_map.propose(fn + b'.mdpc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
-                            elif ext == b'.mtune':
-                                vpath_map.propose(fn + b'.mtunec', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
+                            elif ext == b'.model_xml':
+                                vpath_map.propose(fn + b'.model_xmlc', [FTYPE_RTPC, node])
+                                vpath_map.propose(fn + b'.model.xml', [FTYPE_RTPC, node])
+                                vpath_map.propose(fn + b'.model.xmlc', [FTYPE_RTPC, node])
+                                vpath_map.propose(fn + b'.xml', [FTYPE_RTPC, node])
+                                vpath_map.propose(fn + b'.xmlc', [FTYPE_RTPC, node])
+                                vpath_map.propose(fn + b'.modelc', [FTYPE_RTPC, node])
+                            elif len(ext) > 0:
+                                vpath_map.propose(s + b'c', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
 
                             '''
                             animations/skeletons/characters/machines/skirmisher_secondary_motion.skeleton -> bsk tag0

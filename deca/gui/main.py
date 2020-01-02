@@ -882,26 +882,34 @@ class MainWindow(QMainWindow):
 
         # Menu
         self.menu = self.menuBar()
-        self.file_menu = self.menu.addMenu('File')
-        self.edit_menu = self.menu.addMenu('Edit')
-        self.tools_menu = self.menu.addMenu('Tools')
+        self.file_menu = self.menu.addMenu('&File')
+        self.edit_menu = self.menu.addMenu('&Edit')
+        self.tools_menu = self.menu.addMenu('&Tools')
 
         self.action_project_new = QAction("&New Project...")
         self.action_project_new.triggered.connect(self.project_new)
+        self.file_menu.addAction(self.action_project_new)
 
         self.action_project_open = QAction("&Open Project...")
         self.action_project_open.triggered.connect(self.project_open)
+        self.file_menu.addAction(self.action_project_open)
+
+        self.action_external_add = QAction("&Add External...")
+        self.action_external_add.triggered.connect(self.external_add)
+        self.action_external_add.setEnabled(False)
+        self.file_menu.addAction(self.action_external_add)
+
+        # self.action_external_manage = QAction("Manage &Externals...")
+        # self.action_external_manage.triggered.connect(self.external_manage)
+        # self.file_menu.addAction(self.action_external_manage)
 
         self.action_exit = QAction("E&xit", self)
         self.action_exit.setShortcut("Ctrl+Q")
         self.action_exit.triggered.connect(self.exit_app)
+        self.file_menu.addAction(self.action_exit)
 
         self.action_make_web_map = QAction("Make &Web Map")
         self.action_make_web_map.triggered.connect(self.tool_make_web_map)
-
-        self.file_menu.addAction(self.action_project_new)
-        self.file_menu.addAction(self.action_project_open)
-        self.file_menu.addAction(self.action_exit)
         self.tools_menu.addAction(self.action_make_web_map)
 
         # Status Bar
@@ -936,6 +944,7 @@ class MainWindow(QMainWindow):
         self.status.showMessage(
             "Data loaded and plotted: {}".format('hash_map_missing: {}'.format(len(vfs.hash_map_missing))))
         self.main_widget.vfs_set(vfs)
+        self.action_external_add.setEnabled(True)
 
     @Slot()
     def project_new(self, checked):
@@ -984,6 +993,16 @@ class MainWindow(QMainWindow):
             # working_dir = './work/hp/project.json'
             vfs = vfs_structure_open(project_file)  # , logger=self.logger)
             self.vfs_set(vfs)
+        else:
+            self.logger.log('Cannot Open {}'.format(filename))
+
+    @Slot()
+    def external_add(self, checked):
+        filename = QFileDialog.getOpenFileName(self, 'Open External File ...', '.', 'Any File (*)')
+        if filename is not None and len(filename[0]) > 0:
+            filename = filename[0]
+            self.vfs.external_file_add(filename)
+            self.main_widget.vfs_set(self.vfs)
         else:
             self.logger.log('Cannot Open {}'.format(filename))
 

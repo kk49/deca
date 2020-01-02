@@ -151,6 +151,8 @@ def adf_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_over
 
                 s = adf.dump_to_string()
 
+                fn_dir = os.path.dirname(fn)
+                os.makedirs(fn_dir, exist_ok=True)
                 with open(fn, 'wt') as f:
                     f.write(s)
 

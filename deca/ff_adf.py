@@ -281,7 +281,7 @@ def dump_type(type_id, type_map, offset=0, displayed_types=None):
     else:
         raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
 
-    print(sbuf)
+    # print(sbuf)
 
     return sbuf
 

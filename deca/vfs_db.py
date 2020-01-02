@@ -33,6 +33,7 @@ class VfsStructure(VfsBase):
     def __init__(self, game_info: GameInfo, working_dir, logger):
         VfsBase.__init__(self, game_info, working_dir, logger)
         self.adf_db = None
+        self.external_files = set()
 
     def prepare_adf_db(self, debug=False):
         save_dir = os.path.join(self.working_dir, 'adf_types')
@@ -220,6 +221,27 @@ class VfsStructure(VfsBase):
                 for vp in vps:
                     self.logger.log('CONFLICT: {:08X} {}'.format(vid, vp))
 
+    def node_update_vpath_mapping(self, vnode):
+        vid = vnode.vhash
+        if vnode.vpath is None:
+            self.hash_map_missing.add(vid)
+        else:
+            self.hash_map_present.add(vid)
+            vpath = vnode.vpath
+            if vid in self.map_hash_to_vpath:
+                self.map_hash_to_vpath[vid].add(vpath)
+                if len(self.map_hash_to_vpath[vid]) > 1:
+                    self.hash_map_conflict.add(vid)
+            else:
+                self.map_hash_to_vpath[vid] = {vpath}
+
+            vl = self.map_vpath_to_vfsnodes.get(vpath, [])
+            if vnode.offset is None:
+                vl = vl + [vnode]
+            else:
+                vl = [vnode] + vl
+            self.map_vpath_to_vfsnodes[vpath] = vl
+
     def process_vpaths(self):
         self.logger.log('process_vpaths: Input count {}'.format(len(self.possible_vpath_map.nodes)))
 
@@ -259,33 +281,15 @@ class VfsStructure(VfsBase):
             vnode: VfsNode = vnode
             if vnode.is_valid():
                 if vnode.vhash is not None:
-                    vid = vnode.vhash
-                    if vnode.vpath is None:
-                        self.hash_map_missing.add(vid)
-                    else:
-                        self.hash_map_present.add(vid)
-                        vpath = vnode.vpath
-                        if vid in self.map_hash_to_vpath:
-                            self.map_hash_to_vpath[vid].add(vpath)
-                            if len(self.map_hash_to_vpath[vid]) > 1:
-                                self.hash_map_conflict.add(vid)
-                        else:
-                            self.map_hash_to_vpath[vid] = {vpath}
+                    self.node_update_vpath_mapping(vnode)
 
-                        vl = self.map_vpath_to_vfsnodes.get(vpath, [])
-                        if vnode.offset is None:
-                            vl = vl + [vnode]
-                        else:
-                            vl = [vnode] + vl
-                        self.map_vpath_to_vfsnodes[vpath] = vl
-
-                        # tag atx file type since they have no header info
-                        if vnode.ftype is None:
-                            file, ext = os.path.splitext(vnode.vpath)
-                            if ext[0:4] == b'.atx':
-                                vnode.ftype = FTYPE_ATX
-                            elif ext == b'.hmddsc':
-                                vnode.ftype = FTYPE_HMDDSC
+                    # tag atx file type since they have no header info
+                    if vnode.ftype is None:
+                        file, ext = os.path.splitext(vnode.vpath)
+                        if ext[0:4] == b'.atx':
+                            vnode.ftype = FTYPE_ATX
+                        elif ext == b'.hmddsc':
+                            vnode.ftype = FTYPE_HMDDSC
 
         found_vpaths = list(found_vpaths)
         found_vpaths.sort()
@@ -775,6 +779,28 @@ class VfsStructure(VfsBase):
                 vpath_map.propose(fn, ['ASSOC', None], possible_ftypes=v)
 
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
+
+    def external_file_add(self, filename):
+        if not hasattr(self, 'external_files'):
+            self.external_files = set()
+
+        if filename not in self.external_files and os.path.isfile(filename):
+            with open(filename, 'rb') as f:
+                ftype, fsize = determine_file_type_and_size(f, os.stat(filename).st_size)
+
+            vpath = ('__EXTERNAL_FILES__' + filename).encode('ascii')
+            vhash = deca.hash_jenkins.hash_little(vpath)
+            vnode = VfsNode(
+                vhash=vhash, vpath=vpath, pvpath=filename, ftype=ftype,
+                size_u=fsize, size_c=fsize, offset=0)
+            self.node_add(vnode)
+            self.node_update_vpath_mapping(vnode)
+
+            self.external_files.add(filename)
+
+            self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))
+        else:
+            self.logger.log('FAILED TO OPEN:  {}'.format(filename))
 
 
 def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):

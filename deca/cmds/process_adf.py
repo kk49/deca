@@ -12,7 +12,6 @@ if len(sys.argv) < 2:
     in_file = '/home/krys/prj/work/gzb/extracted/gdc/global.gdcc'
     in_file = '/home/krys/prj/work/gz/extracted/environment/base.environc'
     in_file = '/home/krys/prj/work/gz/extracted/graphs/car_cabinlight_logic.graphc'
-    in_file = '/home/krys/prj/work/gz_saves/76561198106670711.015/savegame'
 else:
     in_file = sys.argv[1]
 

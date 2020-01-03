@@ -503,7 +503,8 @@ def image_import(vfs, node, ifile: str, opath: str):
 
         for vpath_out in out_vpaths:
             fout_name = os.path.join(opath, vpath_out.decode('utf-8'))
-
+            dst_dir = os.path.dirname(fout_name)
+            os.makedirs(dst_dir, exist_ok=True)
             with open(fout_name, 'wb') as file_out:
                 if vpath_out.endswith(b'.ddsc'):
                     file_out.write(ddsc.header_buffer)

@@ -121,7 +121,6 @@ class Builder:
             pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
         elif src_path.endswith('.ddsc.dds'):
             # Build texture
-            vpath = vpath[0:-4]
             vnode = vfs.map_vpath_to_vfsnodes[vpath][0]
 
             # make ddsc.dds into ddsc and avtxs

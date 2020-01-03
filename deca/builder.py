@@ -162,16 +162,19 @@ class Builder:
                     vpath = cpath[len(src_path):-len('.DECA.FILE_LIST.txt')].encode('ascii')
                     vpath = vpath.replace(b'\\', b'/')
                     src_files[vpath] = cpath
+                    print('DEPEND: DECA.FILE_LIST.txt: {} = {}'.format(vpath, cpath)
                 elif cpath.endswith('.ddsc.dds'):
                     vpath = cpath[len(src_path):-len('.dds')].encode('ascii')
                     vpath = vpath.replace(b'\\', b'/')
                     src_files[vpath] = cpath
+                    print('DEPEND: ddsc.dds: {} = {}'.format(vpath, cpath)
                 elif cpath.find('DECA') >= 0:  # ignore other deca files
                     pass
                 else:
                     vpath = cpath[len(src_path):].encode('ascii')
                     vpath = vpath.replace(b'\\', b'/')
                     src_files[vpath] = cpath
+                    print('DEPEND: default: {} = {}'.format(vpath, cpath)   
 
         # calculate dependencies
         pack_list = list(src_files.keys())

@@ -284,7 +284,7 @@ class VfsStructure(VfsBase):
                     self.node_update_vpath_mapping(vnode)
 
                     # tag atx file type since they have no header info
-                    if vnode.ftype is None:
+                    if vnode.ftype is None and vnode.vpath is not None:
                         file, ext = os.path.splitext(vnode.vpath)
                         if ext[0:4] == b'.atx':
                             vnode.ftype = FTYPE_ATX

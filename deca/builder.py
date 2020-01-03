@@ -163,6 +163,10 @@ class Builder:
                     vpath = cpath[len(src_path):-len('.DECA.FILE_LIST.txt')].encode('ascii')
                     vpath = vpath.replace(b'\\', b'/')
                     src_files[vpath] = cpath
+                elif cpath.endswith('.ddsc.dds'):
+                    vpath = cpath[len(src_path):-len('.ddsc.dds')].encode('ascii')
+                    vpath = vpath.replace(b'\\', b'/')
+                    src_files[vpath] = cpath
                 elif cpath.find('DECA') >= 0:  # ignore other deca files
                     pass
                 else:

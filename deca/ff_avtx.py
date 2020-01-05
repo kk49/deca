@@ -385,7 +385,7 @@ def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_ove
                 ofiledir = os.path.dirname(ofile)
                 os.makedirs(ofiledir, exist_ok=True)
 
-                if not allow_overwrite  and os.path.isfile(ofile):
+                if not allow_overwrite and os.path.isfile(ofile):
                     existing_files.append(ofile)
                 else:
                     with open(ofile, 'wb') as fo:
@@ -492,8 +492,10 @@ def image_import(vfs, node, ifile: str, opath: str):
 
     compiled_files = []
     if ddsc is not None:
-        with open(ifile, 'rb') as file_in:
-            dsc_header = file_in.read(37 * 4 - 5 * 4)  # skip dds header
+        with ArchiveFile(open(ifile, 'rb')) as file_in:
+            # dsc_header = file_in.read(37 * 4 - 5 * 4)  # skip dds header
+            dsc_header = Ddsc()
+            dsc_header.load_dds_new(file_in, True)
             for mip in ddsc.mips:
                 buffer = file_in.read(len(mip.raw_data))
                 mip.raw_data = buffer

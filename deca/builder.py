@@ -226,13 +226,17 @@ class Builder:
 
                     fpath = src_files.get(vpath, None)
 
-                    vnodes = vfs.map_vpath_to_vfsnodes[vpath]
-                    self.build_node(
-                        dst_path=dst_path,
-                        src_path=fpath,
-                        vnode=vnodes[0],
-                        vfs=vfs,
-                        vpath_complete_map=vpaths_completed)
+                    if vpath not in vfs.map_vpath_to_vfsnodes:
+                        raise EDecaBuildError('MISSING VPATH when building vpath={} using fpath='.format(
+                            vpath, fpath))
+                    else:
+                        vnodes = vfs.map_vpath_to_vfsnodes[vpath]
+                        self.build_node(
+                            dst_path=dst_path,
+                            src_path=fpath,
+                            vnode=vnodes[0],
+                            vfs=vfs,
+                            vpath_complete_map=vpaths_completed)
 
 
             if not any_change and len(depends) > 0:

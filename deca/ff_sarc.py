@@ -152,7 +152,7 @@ class FileSarc:
 
             # vpath_string = vpath_string + b'\00'
 
-            dir_block_len = len(vpath_string) + 20 * len(self.entries)
+            dir_block_len = 4 + len(vpath_string) + 20 * len(self.entries)
             dir_block_len = align_to(dir_block_len, 16)
 
         else:

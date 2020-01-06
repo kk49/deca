@@ -874,7 +874,9 @@ class Adf:
                 # try:
                 buf = fp.read(ins.size)
                 with ArchiveFile(io.BytesIO(buf)) as f:
-                    v = read_instance(f, ins.type_hash, self.extended_map_typedef, self.map_stringhash, ins.offset, found_strings=self.found_strings)
+                    v = read_instance(
+                        f, ins.type_hash, self.extended_map_typedef, self.map_stringhash, ins.offset,
+                        found_strings=self.found_strings)
                     self.table_instance_full_values[i] = v
                     self.table_instance_values[i] = adf_value_extract(v)
                 # except AdfTypeMissing as ae:

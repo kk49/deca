@@ -791,7 +791,9 @@ class VfsStructure(VfsBase):
             with open(filename, 'rb') as f:
                 ftype, fsize = determine_file_type_and_size(f, os.stat(filename).st_size)
 
-            vpath = ('__EXTERNAL_FILES__' + filename).encode('ascii')
+            vpath = filename.replace(':', '/')
+            vpath = vpath.replace('\\', '/')
+            vpath = ('__EXTERNAL_FILES__' + vpath).encode('ascii')
             vhash = deca.hash_jenkins.hash_little(vpath)
             vnode = VfsNode(
                 vhash=vhash, vpath=vpath, pvpath=filename, ftype=ftype,

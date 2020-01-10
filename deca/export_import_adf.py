@@ -23,7 +23,7 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsStructure, vnode: VfsNode, export_path, a
     ofile = generate_export_file_path(vfs, export_path, vnode)
     fn = ofile + '.xlsx'
 
-    adf = adf_node_read(vfs, vnode)
+    adf = adf_read_node(vfs, vnode)
 
     if not allow_overwrite and os.path.exists(fn):
         raise EDecaFileExists(fn)
@@ -101,7 +101,7 @@ def adf_export_mdic_0xb5b062f1(vfs: VfsStructure, vnode: VfsNode, export_path, a
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
     with gltf.scene():
-        adf = adf_node_read(vfs, vnode)
+        adf = adf_read_node(vfs, vnode)
         mdic = adf.table_instance_values[0]
         models = [list(vfs.map_hash_to_vpath.get(m, [None]))[0] for m in mdic['Models']]
         instances = mdic['Instances']
@@ -124,7 +124,7 @@ def adf_export_mdic_0xb5b062f1(vfs: VfsStructure, vnode: VfsNode, export_path, a
 
 
 def adf_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
-    adf = adf_node_read(vfs, vnode)
+    adf = adf_read_node(vfs, vnode)
     if adf is not None:
         if len(adf.table_instance) == 1:
             if adf.table_instance[0].type_hash == 0x0B73315D:
@@ -142,7 +142,7 @@ def adf_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_over
                 adf_export_node(vfs, vnode, export_path, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
 
             if save_to_text:
-                adf = adf_node_read(vfs, vnode)
+                adf = adf_read_node(vfs, vnode)
 
                 fn = os.path.join(export_path, vnode.vpath.decode('utf-8')) + '.txt'
 

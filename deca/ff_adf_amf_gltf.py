@@ -170,7 +170,7 @@ class Deca3dMeshc:
     def add_to_gltf(self, vfs, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.meshes is None:
             vfs.logger.log('Setup Meshc: {}'.format(self.vpath))
-            mesh_adf = adf_node_read(vfs, vfs.map_vpath_to_vfsnodes[self.vpath][0])
+            mesh_adf = adf_read_node(vfs, vfs.map_vpath_to_vfsnodes[self.vpath][0])
             assert len(mesh_adf.table_instance) == 2
             assert mesh_adf.table_instance[0].type_hash == 0xea60065d
             # 0x67b3a453 - GenZ, 0xe6834477 - theHunter
@@ -187,7 +187,7 @@ class Deca3dMeshc:
                 hrmesh_node = vfs.map_vpath_to_vfsnodes[hrmesh_vpath2][0]
 
             if hrmesh_node is not None:
-                hrmesh_adf = adf_node_read(vfs, hrmesh_node)
+                hrmesh_adf = adf_read_node(vfs, hrmesh_node)
                 assert len(hrmesh_adf.table_instance) == 1
                 assert hrmesh_adf.table_instance[0].type_hash == 0x67b3a453
                 hrmesh_buffers = AmfMeshBuffers(hrmesh_adf, hrmesh_adf.table_instance_full_values[0])
@@ -400,7 +400,7 @@ class Deca3dModelc:
                 raise EDecaFileMissing('No Nodes: {}'.format(self.vpath))
 
             node = node[0]
-            model_adf = adf_node_read(vfs, node)
+            model_adf = adf_read_node(vfs, node)
             model = AmfModel(model_adf, model_adf.table_instance_full_values[0])
 
             material_map = {}

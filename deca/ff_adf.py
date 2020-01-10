@@ -1005,7 +1005,7 @@ def buffer_read(f):
     return buffer
 
 
-def adf_node_read(vfs, node):
+def adf_read_node(vfs, node):
     with ArchiveFile(vfs.file_obj_from(node)) as f:
         buffer = buffer_read(f)
     if node.ftype == FTYPE_ADF_BARE:

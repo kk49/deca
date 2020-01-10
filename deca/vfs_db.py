@@ -2,10 +2,12 @@ import os
 import pickle
 import io
 import multiprocessing
+import queue
 import re
 import json
 import csv
 import time
+import sqlite3
 
 from deca.file import ArchiveFile
 from deca.vfs_base import VfsBase, VfsNode, VfsPathNode, VfsPathMap
@@ -14,7 +16,7 @@ from deca.errors import EDecaFileExists
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_node_read
+from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_read_node
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
@@ -29,6 +31,192 @@ def game_file_to_sortable_string(v):
         return 'game{:08}'.format(int(v[4:]))
     else:
         return v
+
+
+class MultiProcessResults:
+    def __init__(self, logger):
+        self.logger = logger
+        self.vpath_map = VfsPathMap(self.logger)
+        self.adf_missing_types = {}
+        self.map_name_usage = {}
+        self.map_vhash_usage = {}
+        self.map_adftype_usage = {}
+        self.map_typedefs = {}
+
+    def clear(self):
+        self.vpath_map = VfsPathMap(self.logger)
+        self.adf_missing_types = {}
+        self.map_name_usage = {}
+        self.map_vhash_usage = {}
+        self.map_adftype_usage = {}
+        self.map_typedefs = {}
+
+
+class MultiProcessVfsBase:
+    def __init__(self, name, q_in: multiprocessing.Queue, q_out: multiprocessing.Queue):
+        self.name = name
+        self.q_in = q_in
+        self.q_out = q_out
+
+        self.vfs: VfsBase = None
+
+        self.results = MultiProcessResults(self)
+
+        self.commands = {
+            'load_vfs': self.command_load_vfs,
+            'results_clear': self.command_results_clear,
+            'results_send': self.command_results_send,
+            'adf_initial_search': self.command_process_adf_initial,
+        }
+
+    def send(self, cmd, *params):
+        self.q_out.put_nowait((self.name, cmd, params, ))
+
+    def log(self, msg):
+        self.send('log', msg)
+
+    def command_load_vfs(self, vfs_filename):
+        with open(vfs_filename, 'rb') as f:
+            data = pickle.load(f)
+
+        if isinstance(data, list):
+            # version = data[0]
+            self.vfs = data[1]
+        else:
+            # version = 1
+            self.vfs = data
+
+        self.vfs.logger_set(self)
+        self.log('MultiProcessVfsBase.command_load_vfs: END')
+
+    def command_results_clear(self):
+        self.results.clear()
+
+    def command_results_send(self):
+        self.log('MultiProcessVfsBase.command_results_send: BEGIN')
+        self.send('results', self.results)
+        self.log('MultiProcessVfsBase.command_results_send: END')
+
+    def process_nodes(self, indexs, method):
+        nindexs = len(indexs)
+        for i, index in enumerate(indexs):
+            self.send('status', i, nindexs)
+            node = self.vfs.table_vfsnode[index]
+            method(node)
+
+    def node_process_adf_initial(self, node):
+        vpath_map = self.results.vpath_map
+        adf_missing_types = self.results.adf_missing_types
+        map_name_usage = self.results.map_name_usage
+        map_vhash_usage = self.results.map_vhash_usage
+        map_adftype_usage = self.results.map_adftype_usage
+        map_typedefs = self.results.map_typedefs
+
+        if node.is_valid():
+            try:
+                adf = adf_read_node(self.vfs, node)
+                for sh in adf.table_stringhash:
+                    vpath_map.propose(sh.value, [FTYPE_ADF, node])
+                    rp = remove_prefix_if_present(b'intermediate/', sh.value)
+                    if rp is not None:
+                        vpath_map.propose(rp, [FTYPE_ADF, node])
+
+                for sh in adf.found_strings:
+                    vpath_map.propose(sh, [FTYPE_ADF, node])
+                    rp = remove_prefix_if_present(b'intermediate/', sh)
+                    if rp is not None:
+                        vpath_map.propose(rp, [FTYPE_ADF, node])
+
+                for sh in adf.table_name:
+                    s = sh[1]
+                    st = map_name_usage.get(s, set())
+                    st.add(node)
+                    map_name_usage[s] = st
+
+                for sh in adf.table_stringhash:
+                    s = sh.value
+                    st = map_vhash_usage.get(s, set())
+                    st.add(node)
+                    map_vhash_usage[s] = st
+
+                if len(adf.table_instance_values) > 0 and \
+                        adf.table_instance_values[0] is not None and \
+                        isinstance(adf.table_instance_values[0], dict):
+                    obj0 = adf.table_instance_values[0]
+
+                    fns = []
+                    # self name patch files
+                    if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
+                        for world in self.vfs.worlds:
+                            fn = world + 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+                                obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
+                            fns.append(fn)
+                        fn = 'terrain/jc3/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+                            obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
+                        fns.append(fn)
+
+                    # self name environc files
+                    if adf.table_instance[0].name == b'environ':
+                        fn = 'environment/weather/{}.environc'.format(obj0['Name'].decode('utf-8'))
+                        fns.append(fn)
+                        fn = 'environment/{}.environc'.format(obj0['Name'].decode('utf-8'))
+                        fns.append(fn)
+
+                    found_any = False
+                    for fn in fns:
+                        if node.vhash == hash_little(fn):
+                            vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=FTYPE_ADF)
+                            found_any = True
+
+                    if len(fns) > 0 and not found_any:
+                        self.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.vhash, fns[0]))
+
+                for ientry in adf.table_typedef:
+                    adf_type_hash = ientry.type_hash
+                    ev = map_adftype_usage.get(adf_type_hash, set())
+                    ev.add(node.uid)
+                    map_adftype_usage[adf_type_hash] = ev
+                    if ientry.type_hash not in map_typedefs:
+                        map_typedefs[ientry.type_hash] = ientry
+
+            except AdfTypeMissing as ae:
+                adf_missing_types[ae.vhash] = adf_missing_types.get(ae.vhash, []) + [node.vhash]
+                print('Missing Type {:08x} in {:08X} {} {}'.format(
+                    ae.vhash, node.vhash, node.vpath, node.pvpath))
+
+    def command_process_adf_initial(self, indexs):
+        self.process_nodes(indexs, self.node_process_adf_initial)
+
+    def run(self):
+        keep_running = True
+        while keep_running:
+            try:
+                cmd = self.q_in.get(block=True, timeout=10.0)
+                params = cmd[1]
+                cmd = cmd[0]
+
+                self.log('Processing Command "{}"'.format(cmd))
+
+                if cmd is not None:
+                    if cmd == 'exit':
+                        keep_running = False
+                    else:
+                        command = self.commands.get(cmd, None)
+                        if command is None:
+                            raise NotImplementedError(f'Command not implemented: {cmd}')
+                        command(*params)
+
+            except queue.Empty:
+                pass
+            except Exception as e:
+                print('Exception: {}'.format(e))
+
+        self.send('done')
+
+
+def run_mp_vfs_base(name, q_in, q_out):
+    p = MultiProcessVfsBase(name, q_in, q_out)
+    p.run()
 
 
 class VfsStructure(VfsBase):
@@ -206,141 +394,103 @@ class VfsStructure(VfsBase):
                 indexs.append(idx)
         return indexs, done_set
 
-    def find_vpath_adf_core(self, q, indexs, desired_adf_files):
-        vpath_map = VfsPathMap(self.logger)
-        adf_missing_types = {}
-        map_name_usage = {}
-        map_vhash_usage = {}
-        map_adftype_usage = {}
-        map_typedefs = {}
-
-        for idx in indexs:
-            node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == desired_adf_files:
-                try:
-                    adf = adf_node_read(self, node)
-                    for sh in adf.table_stringhash:
-                        vpath_map.propose(sh.value, [FTYPE_ADF, node])
-                        rp = remove_prefix_if_present(b'intermediate/', sh.value)
-                        if rp is not None:
-                            vpath_map.propose(rp, [FTYPE_ADF, node])
-
-                    for sh in adf.found_strings:
-                        vpath_map.propose(sh, [FTYPE_ADF, node])
-                        rp = remove_prefix_if_present(b'intermediate/', sh)
-                        if rp is not None:
-                            vpath_map.propose(rp, [FTYPE_ADF, node])
-
-                    for sh in adf.table_name:
-                        s = sh[1]
-                        st = map_name_usage.get(s, set())
-                        st.add(node)
-                        map_name_usage[s] = st
-
-                    for sh in adf.table_stringhash:
-                        s = sh.value
-                        st = map_vhash_usage.get(s, set())
-                        st.add(node)
-                        map_vhash_usage[s] = st
-
-                    if len(adf.table_instance_values) > 0 and \
-                            adf.table_instance_values[0] is not None and \
-                            isinstance(adf.table_instance_values[0], dict):
-                        obj0 = adf.table_instance_values[0]
-
-                        fns = []
-                        # self name patch files
-                        if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
-                            for world in self.worlds:
-                                fn = world + 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
-                                    obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
-                                fns.append(fn)
-                            fn = 'terrain/jc3/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
-                                obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
-                            fns.append(fn)
-
-                        # self name environc files
-                        if adf.table_instance[0].name == b'environ':
-                            fn = 'environment/weather/{}.environc'.format(obj0['Name'].decode('utf-8'))
-                            fns.append(fn)
-                            fn = 'environment/{}.environc'.format(obj0['Name'].decode('utf-8'))
-                            fns.append(fn)
-
-                        found_any = False
-                        for fn in fns:
-                            if node.vhash == hash_little(fn):
-                                vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=FTYPE_ADF)
-                                found_any = True
-
-                        if len(fns) > 0 and not found_any:
-                            self.logger.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.vhash, fns[0]))
-
-                    for ientry in adf.table_typedef:
-                        adf_type_hash = ientry.type_hash
-                        ev = map_adftype_usage.get(adf_type_hash, set())
-                        ev.add(node.uid)
-                        map_adftype_usage[adf_type_hash] = ev
-                        if ientry.type_hash not in map_typedefs:
-                            map_typedefs[ientry.type_hash] = ientry
-
-                except AdfTypeMissing as ae:
-                    adf_missing_types[ae.vhash] = adf_missing_types.get(ae.vhash, []) + [node.vhash]
-                    print('Missing Type {:08x} in {:08X} {} {}'.format(
-                        ae.vhash, node.vhash, node.vpath, node.pvpath))
-
-        q.put([vpath_map, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage, map_typedefs])
-
     def find_vpath_adf(self, vpath_map, do_adfb=False):
-        desired_adf_files = FTYPE_ADF
+        ftype = FTYPE_ADF
         if do_adfb:
-            desired_adf_files = FTYPE_ADF_BARE
+            ftype = FTYPE_ADF_BARE
 
-        self.logger.log('PROCESS ADFs: find strings, propose terrain patches. FTYPE = {}'.format(desired_adf_files))
+        self.logger.log('PROCESS ADFs: find strings, propose terrain patches. FTYPE = {}'.format(ftype))
 
-        indexes, adf_done = self.get_vnode_indexs_from_ftype(desired_adf_files)
+        indexes, adf_done = self.get_vnode_indexs_from_ftype(ftype)
         scount = 0
 
         if len(indexes) > 0:
-            q = multiprocessing.Queue()
+            q_results = multiprocessing.Queue()
 
-            if os.name != 'nt':
-                nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 2))   # assuming hyperthreading exists and slows down processing
+            nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 2))   # assuming hyperthreading exists and slows down processing
+            nprocs = multiprocessing.cpu_count()
 
-                indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
+            indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
 
-                procs = []
-                for idxs in indexes2:
-                    self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-                    p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs, desired_adf_files))
-                    self.logger.log('Process: {}: Start'.format(p))
-                    p.start()
-                    procs.append(p)
-            else:
-                procs = [None]
-                self.find_vpath_adf_core(q, indexes, desired_adf_files)
+            procs = []
+            q_commands = []
+            names = []
+            for i, idxs in enumerate(indexes2):
+                self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
+                q_command = multiprocessing.Queue()
+                q_commands.append(q_command)
+                name = 'process_{}'.format(i)
+                names.append(name)
+                p = multiprocessing.Process(target=run_mp_vfs_base, args=(name, q_command, q_results))
+                self.logger.log('Process: {}: Start'.format(p))
+                p.start()
 
-            for i in range(len(procs)):
-                self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
-                vpath_map_work, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage, map_typedefs = q.get()
-                scount += len(vpath_map_work.nodes)
+                q_command.put(['load_vfs', ['/home/krys/prj/work/gz/vfs_phase_1.pickle'], ])
+                q_command.put(['results_clear', [], ])
+                q_command.put(['adf_initial_search', [idxs], ])
+                q_command.put(['results_send', [], ])
+                q_command.put(['exit', [], ])
+                procs.append(p)
 
-                vpath_map.merge(vpath_map_work)
+            last_update = None
+            start_time = time.time()
+            status = {}
+            proc_running = len(procs)
+            while proc_running > 0:
+                ctime = time.time()
+                if last_update is None or (last_update + self.progress_update_time_sec) < ctime:
+                    last_update = ctime
+                    n_done = 0
+                    n_total = 0
+                    for k, v in status.items():
+                        n_done += v[0]
+                        n_total += v[1]
+                    perc = 0
+                    if n_total > 0:
+                        perc = n_done / n_total
+                    self.logger.log('Processing {}: {} of {} done ({:3.1f}%) elapsed {:5.1f} seconds'.format(
+                        ftype, n_done, n_total, perc * 100.0, ctime - start_time))
 
-                for k, v in adf_missing_types.items():
-                    self.adf_missing_types[k] = self.adf_missing_types.get(k, []) + v
+                try:
+                    msg = q_results.get(block=False, timeout=1)
+                    proc_name = msg[0]
+                    proc_cmd = msg[1]
+                    proc_params = msg[2]
 
-                for k, v in map_name_usage.items():
-                    self.map_name_usage[k] = self.map_name_usage.get(k, set()).union(v)
+                    if proc_cmd not in {'log', 'status'}:
+                        self.logger.log('Manager: received msg {}:{}'.format(proc_name, proc_cmd))
 
-                for k, v in map_vhash_usage.items():
-                    self.map_vhash_usage[k] = self.map_vhash_usage.get(k, set()).union(v)
+                    if proc_cmd == 'log':
+                        self.logger.log('{}: {}'.format(proc_name, proc_params[0]))
+                    elif proc_cmd == 'done':
+                        proc_running -= 1
+                    elif proc_cmd == 'status':
+                        status[proc_name] = proc_params
+                    elif proc_cmd == 'results':
+                        results: MultiProcessResults = proc_params[0]
+                        scount += len(results.vpath_map.nodes)
 
-                for k, v in map_adftype_usage.items():
-                    self.map_adftype_usage[k] = self.map_adftype_usage.get(k, set()).union(v)
+                        vpath_map.merge(results.vpath_map)
 
-                self.adf_db.typedefs_add(map_typedefs)
+                        for k, v in results.adf_missing_types.items():
+                            self.adf_missing_types[k] = self.adf_missing_types.get(k, []) + v
 
-                self.logger.log('Process Done {} of {}'.format(i + 1, len(procs)))
+                        for k, v in results.map_name_usage.items():
+                            self.map_name_usage[k] = self.map_name_usage.get(k, set()).union(v)
+
+                        for k, v in results.map_vhash_usage.items():
+                            self.map_vhash_usage[k] = self.map_vhash_usage.get(k, set()).union(v)
+
+                        for k, v in results.map_adftype_usage.items():
+                            self.map_adftype_usage[k] = self.map_adftype_usage.get(k, set()).union(v)
+
+                        self.adf_db.typedefs_add(results.map_typedefs)
+
+                        self.logger.log('Process Done {}'.format(proc_name))
+                    else:
+                        print(msg)
+                except queue.Empty:
+                    pass
 
             for p in procs:
                 if p is not None:
@@ -853,6 +1003,8 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
 
     version = 0
     vfs = None
+    phase_0_cache_file = working_dir + 'vfs_phase_0.pickle'
+    phase_1_cache_file = working_dir + 'vfs_phase_1.pickle'
     cache_file = working_dir + 'vfs_cache.pickle'
     if os.path.isfile(cache_file):
         logger.log('LOADING: {} : {}'.format(game_info.game_dir, working_dir))
@@ -878,10 +1030,26 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
         vfs = VfsStructure(game_info, working_dir, logger)
 
         # parse exe
-        vfs.prepare_adf_db(debug=debug)
+        if os.path.isfile(phase_0_cache_file):
+            with open(phase_0_cache_file, 'rb') as f:
+                data = pickle.load(f)
+                vfs = data[1]
+        else:
+            vfs.prepare_adf_db(debug=debug)
+            with open(phase_0_cache_file, 'wb') as f:
+                data = [version, vfs]
+                pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         # parse archive files
-        vfs.load_from_archives(debug=debug, ver=game_info.archive_version)
+        if os.path.isfile(phase_1_cache_file):
+            with open(phase_1_cache_file, 'rb') as f:
+                data = pickle.load(f)
+                vfs = data[1]
+        else:
+            vfs.load_from_archives(debug=debug, ver=game_info.archive_version)
+            with open(phase_1_cache_file, 'wb') as f:
+                data = [version, vfs]
+                pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         # search for vpaths
         vfs.search_for_vpaths()

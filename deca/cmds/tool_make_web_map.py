@@ -3,7 +3,7 @@ from deca.ff_avtx import Ddsc, image_export
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.file import ArchiveFile
 from deca.ff_types import *
-from deca.ff_adf import adf_node_read
+from deca.ff_adf import adf_read_node
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf
@@ -429,7 +429,7 @@ class ToolMakeWebMap:
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped
         vnode = self.vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
-        adf = adf_node_read(self.vfs, vnode)
+        adf = adf_read_node(self.vfs, vnode)
         collectables = []
         for v in adf.table_instance_values[0]['Collectibles']:
             obj_id = v['ID']

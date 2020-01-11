@@ -21,6 +21,7 @@ from deca.ff_sarc import FileSarc, EntrySarc
 from deca.util import Logger, remove_prefix_if_present
 from deca.hash_jenkins import hash_little
 from deca.ff_determine import determine_file_type_and_size
+from deca.kaitai.gfx import Gfx
 
 
 def game_file_to_sortable_string(v):
@@ -447,6 +448,41 @@ class VfsStructure(VfsBase):
 
         self.logger.log('PROCESS RTPCs: Total RTPCs: {}, Total Strings: {}'.format(len(rtpc_done), scount))
 
+    def find_vpath_gfx(self, vpath_map):
+        self.logger.log('PROCESS GFXs: look for hashable strings in autodesk ScaleForm files')
+        done_set = set()
+        for idx in range(len(self.table_vfsnode)):
+            node = self.table_vfsnode[idx]
+            if node.is_valid() and node.ftype == FTYPE_GFX and node.vhash not in done_set:
+                with self.file_obj_from(node) as f:
+                    buffer = f.read(node.size_u)
+
+                gfx = Gfx.from_bytes(buffer)
+
+                for tag in gfx.zlib_body.tags:
+                    if Gfx.TagType.gfx_exporter_info == tag.record_header.tag_type:
+                        vpath_map.propose(f'ui/{tag.tag_body.name}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
+                        for i in range(255):
+                            fn = 'ui/{}_i{:x}.ddsc'.format(tag.tag_body.name, i)
+                            vpath_map.propose(fn, [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
+
+                    elif tag.record_header.tag_type in {Gfx.TagType.gfx_define_external_image, Gfx.TagType.gfx_define_external_image2}:
+                        fn = tag.tag_body.file_name
+                        fn = os.path.basename(fn)
+                        fn, ext = os.path.splitext(fn)
+                        vpath_map.propose(f'ui/{fn}.ddsc', [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
+
+                    elif Gfx.TagType.import_assets2 == tag.record_header.tag_type:
+                        fn = tag.tag_body.url
+                        fn = os.path.basename(fn)
+                        fn, ext = os.path.splitext(fn)
+                        vpath_map.propose(f'ui/{tag.tag_body.url}', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
+                        vpath_map.propose(f'ui/{fn}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
+
+                done_set.add(node.vhash)
+
+        self.logger.log('PROCESS GFXs: Total GFX files {}'.format(len(done_set)))
+
     def find_vpath_json(self, vpath_map):
         self.logger.log('PROCESS JSONs: look for hashable strings in json files')
         json_done = set()
@@ -755,6 +791,7 @@ class VfsStructure(VfsBase):
         self.find_vpath_adf(self.possible_vpath_map, do_adfb=False)
         self.find_vpath_adf(self.possible_vpath_map, do_adfb=True)
         self.find_vpath_rtpc(self.possible_vpath_map)
+        self.find_vpath_gfx(self.possible_vpath_map)
         self.find_vpath_json(self.possible_vpath_map)
         self.find_vpath_exe(self.possible_vpath_map)
         self.find_vpath_procmon_dir(self.possible_vpath_map)

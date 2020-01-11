@@ -54,7 +54,9 @@ def determine_file_type_and_size(f, file_size):
     elif b'RTPC' == magic[0:4]:
         ftype = FTYPE_RTPC
     elif b'CFX' == magic[0:3]:
-        ftype = 'CFX'
+        ftype = FTYPE_GFX
+    elif b'GFX' == magic[0:3]:
+        ftype = FTYPE_GFX
     elif b'RIFF' == magic[0:4]:
         ftype = 'RIFF'
     elif b'OggS' == magic[0:4]:

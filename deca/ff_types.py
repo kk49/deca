@@ -19,6 +19,7 @@ FTYPE_PFX = 'pfx'
 FTYPE_LFSB5 = 'lFSB5'
 FTYPE_RBMDL = 'RBMDL'
 FTYPE_GDCBODY = 'gdc'
+FTYPE_GFX = 'gfx'
 
 FTYPE_SYMLINK = 'symlink'
 

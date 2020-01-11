@@ -6595,9 +6595,6 @@ Open Sans Bold
 Open Sans Light
 Open Sans Regular
 font_en.swf
-ui/font_ch.gfx
-ui/font_en.gfx
-ui/font_jp.gfx
  CN Bold
 settings/ui_fonts.bin
 skill_01_03, skill_01_01

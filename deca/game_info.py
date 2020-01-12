@@ -105,6 +105,10 @@ class GameInfoGZ(GameInfo):
                 '.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
                 '.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
+            {
+                '.fmod_sbankc': FTYPE_TXT,
+                '.fmod_bankc': FTYPE_RIFF,
+            },
         ]
 
 
@@ -166,6 +170,10 @@ class GameInfoGZB(GameInfo):
                 '.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
                 '.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
+            {
+                '.fmod_sbankc': FTYPE_TXT,
+                '.fmod_bankc': FTYPE_RIFF,
+            },
         ]
 
 
@@ -216,6 +224,10 @@ class GameInfoTHCOTW(GameInfo):
             {
                 '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
                 '.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
+            },
+            {
+                '.fmod_sbankc': FTYPE_TXT,
+                '.fmod_bankc': FTYPE_RIFF,
             },
         ]
 

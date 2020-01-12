@@ -14,6 +14,28 @@ from .ff_sarc import FileSarc
 NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
+def fsb5c_export_processed(vfs, node, extract_dir, allow_overwrite=False):
+    with vfs.file_obj_from(node, 'rb') as f:
+        buffer = f.read(node.size_u)
+
+    # TODO hack just trim 16 byte header
+    buffer = buffer[16:]
+
+    if node.vpath is None:
+        ofile = extract_dir + '{:08X}.dat.DECA.fsb'.format(node.vhash)
+    else:
+        ofile = extract_dir + '{}.DECA.fsb'.format(node.vpath.decode('utf-8'))
+
+    vfs.logger.log('Exporting {}'.format(ofile))
+
+    ofiledir = os.path.dirname(ofile)
+    os.makedirs(ofiledir, exist_ok=True)
+
+    if allow_overwrite or not os.path.isfile(ofile):
+        with open(ofile, 'wb') as fo:
+            fo.write(buffer)
+
+
 def expand_vpaths(vfs: VfsStructure, vs, mask):
     vos = []
 
@@ -167,6 +189,7 @@ def extract_processed(
     vs_adf = []
     vs_rtpc = []
     vs_images = []
+    vs_fsb5cs = []
     vs_other = []
     for i, v in enumerate(vs):
         vnode = None
@@ -192,6 +215,8 @@ def extract_processed(
                     vs_rtpc.append(vnode)
                 elif vnode.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
                     vs_images.append(vnode)
+                elif vnode.ftype in {FTYPE_FSB5C}:
+                    vs_fsb5cs.append(vnode)
                 else:
                     vs_other.append(vnode)
 
@@ -200,6 +225,23 @@ def extract_processed(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
     if save_to_processed:
+        for vnode in vs_fsb5cs:
+            if vnode.vpath is None:
+                ofile = extract_dir + '{:08X}.dat'.format(vnode.vhash)
+            else:
+                ofile = extract_dir + '{}'.format(vnode.vpath.decode('utf-8'))
+
+            vfs.logger.log('Exporting {}'.format(ofile))
+
+            ofiledir = os.path.dirname(ofile)
+            os.makedirs(ofiledir, exist_ok=True)
+
+            try:
+                fsb5c_export_processed(vfs, vnode, extract_dir, allow_overwrite=allow_overwrite)
+            except EDecaFileExists as e:
+                vfs.logger.log(
+                    'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+
         for vnode in vs_images:
             if vnode.vpath is None:
                 ofile = extract_dir + '{:08X}.dat'.format(vnode.vhash)

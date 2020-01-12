@@ -1,3 +1,4 @@
+import sys
 # Need to constrain U32 to only 32 bits using the & 0xffffffff
 # since Python has no native notion of integers limited to 32 bit
 # http://docs.python.org/library/stdtypes.html#numeric-types-int-float-long-complex
@@ -86,9 +87,5 @@ def hash_little(data, initval=0):
 
 
 if __name__ == "__main__":
-    hashstr = 'Four score and seven years ago'
-    hash, hash2 = hashlittle2(hashstr, 0xdeadbeef, 0xdeadbeef)
-    print('"%s": %x %x' % (hashstr, hash, hash2))
-
-    hash = hash_little(hashstr, 0)
-    print('"%s": %x' % (hashstr, hash))
+    hv = hash_little(sys.argv[1])
+    print('{} = {} , 0x{:08x}'.format(sys.argv[1], hv, hv))

@@ -9,12 +9,16 @@ meta:
     wikidata: Q594447
   license: CC0-1.0
   endian: le
-#  imports:
+  imports:
+    - var_int
 #    - abc_bytecode
+
 doc: |
   First pass at a parser for ScaleForm GFX files.
   https://help.autodesk.com/view/SCLFRM/ENU/?guid=__scaleform_help_flash_support_controltags_html
+
 doc-ref: https://www.adobe.com/content/dam/acom/en/devnet/pdf/swf-file-format-spec.pdf
+
 seq:
   - id: compression
     -orig-id: Signature
@@ -51,17 +55,36 @@ types:
         type: tag
         repeat: until
         repeat-until: _.record_header.tag_type == tag_type::end_of_file
+
   rect:
     seq:
-      - id: b1
-        type: u1
-      - id: skip
-        size: num_bytes
-    instances:
-      num_bits:
-        value: b1 >> 3
-      num_bytes:
-        value: ((num_bits * 4 - 3) + 7) / 8
+      - id: num_bits
+        type: b5
+      - id: x_min_raw
+        # type: var_int(num_bits, true, false)
+        type: b1
+        repeat: expr
+        repeat-expr: num_bits
+      - id: x_max_raw
+        # type: var_int(num_bits, true, false)
+        type: b1
+        repeat: expr
+        repeat-expr: num_bits
+      - id: y_min_raw
+        # type: var_int(num_bits, true, false)
+        type: b1
+        repeat: expr
+        repeat-expr: num_bits
+      - id: y_max_raw
+        # type: var_int(num_bits, true, false)
+        type: b1
+        repeat: expr
+        repeat-expr: num_bits
+#    instances:
+#      x_min:
+#        value: 'x_min_raw.as<bin32>'
+#        value: 'var_int(x_min_raw, num_bits, true, false)'
+
   rgb:
     seq:
       - id: r
@@ -95,6 +118,7 @@ types:
           switch-on: record_header.tag_type
           cases:
             'tag_type::define_sound': define_sound_body
+            'tag_type::define_shape3': define_shape3_body
             'tag_type::do_abc': do_abc_body
             'tag_type::script_limits': script_limits_body
             'tag_type::symbol_class': symbol_class_body
@@ -104,6 +128,7 @@ types:
             'tag_type::gfx_exporter_info': gfx_exporter_info_body
             'tag_type::gfx_define_external_image': gfx_define_external_image_body
             'tag_type::gfx_define_external_image2': gfx_define_external_image2_body
+
   define_sound_body:
     seq:
       - id: id
@@ -139,6 +164,16 @@ types:
       channels:
         0: mono
         1: stereo
+
+  define_shape3_body:
+    seq:
+      - id: shape_id
+        type: u2
+      - id: bounds
+        type: rect
+      - id: shapes
+        size-eos: true
+
   do_abc_body:
     seq:
       - id: flags

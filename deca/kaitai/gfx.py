@@ -141,24 +141,23 @@ class Gfx(KaitaiStruct):
             self._read()
 
         def _read(self):
-            self.b1 = self._io.read_u1()
-            self.skip = self._io.read_bytes(self.num_bytes)
+            self.num_bits = self._io.read_bits_int(5)
+            self.x_min_raw = [None] * (self.num_bits)
+            for i in range(self.num_bits):
+                self.x_min_raw[i] = self._io.read_bits_int(1) != 0
 
-        @property
-        def num_bits(self):
-            if hasattr(self, '_m_num_bits'):
-                return self._m_num_bits if hasattr(self, '_m_num_bits') else None
+            self.x_max_raw = [None] * (self.num_bits)
+            for i in range(self.num_bits):
+                self.x_max_raw[i] = self._io.read_bits_int(1) != 0
 
-            self._m_num_bits = (self.b1 >> 3)
-            return self._m_num_bits if hasattr(self, '_m_num_bits') else None
+            self.y_min_raw = [None] * (self.num_bits)
+            for i in range(self.num_bits):
+                self.y_min_raw[i] = self._io.read_bits_int(1) != 0
 
-        @property
-        def num_bytes(self):
-            if hasattr(self, '_m_num_bytes'):
-                return self._m_num_bytes if hasattr(self, '_m_num_bytes') else None
+            self.y_max_raw = [None] * (self.num_bits)
+            for i in range(self.num_bits):
+                self.y_max_raw[i] = self._io.read_bits_int(1) != 0
 
-            self._m_num_bytes = (((self.num_bits * 4) - 3) + 7) // 8
-            return self._m_num_bytes if hasattr(self, '_m_num_bytes') else None
 
 
     class Tag(KaitaiStruct):
@@ -199,6 +198,10 @@ class Gfx(KaitaiStruct):
                 self._raw_tag_body = self._io.read_bytes(self.record_header.len)
                 io = KaitaiStream(BytesIO(self._raw_tag_body))
                 self.tag_body = self._root.ImportAssets2Body(io, self, self._root)
+            elif _on == self._root.TagType.define_shape3:
+                self._raw_tag_body = self._io.read_bytes(self.record_header.len)
+                io = KaitaiStream(BytesIO(self._raw_tag_body))
+                self.tag_body = self._root.DefineShape3Body(io, self, self._root)
             elif _on == self._root.TagType.do_abc:
                 self._raw_tag_body = self._io.read_bytes(self.record_header.len)
                 io = KaitaiStream(BytesIO(self._raw_tag_body))
@@ -410,6 +413,19 @@ class Gfx(KaitaiStruct):
         def _read(self):
             self.max_recursion_depth = self._io.read_u2le()
             self.script_timeout_seconds = self._io.read_u2le()
+
+
+    class DefineShape3Body(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self._read()
+
+        def _read(self):
+            self.shape_id = self._io.read_u2le()
+            self.bounds = self._root.Rect(self._io, self, self._root)
+            self.shapes = self._io.read_bytes_full()
 
 
 

@@ -20,10 +20,24 @@ from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_read_n
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
-from deca.util import Logger, remove_prefix_if_present
+from deca.util import Logger, remove_prefix_if_present, remove_suffix_if_present
 from deca.hash_jenkins import hash_little
 from deca.ff_determine import determine_file_type_and_size
 from deca.kaitai.gfx import Gfx
+
+
+language_codes = [
+    'chi',  # Chinese
+    'eng',  # English
+    'fre',  # French
+    'ger',  # German
+    'jap',  # Japanese
+    'pol',  # Polish
+    'rus',  # Russian
+    'sch',  # Simplified Chinese
+    'spa',  # Spanish
+    'swe',  # Swedish
+]
 
 
 def game_file_to_sortable_string(v):
@@ -115,11 +129,23 @@ class MultiProcessVfsBase:
         if node.is_valid():
             try:
                 adf = adf_read_node(self.vfs, node)
+
                 for sh in adf.table_stringhash:
                     vpath_map.propose(sh.value, [FTYPE_ADF, node])
                     rp = remove_prefix_if_present(b'intermediate/', sh.value)
                     if rp is not None:
                         vpath_map.propose(rp, [FTYPE_ADF, node])
+
+                    rp = remove_suffix_if_present(b'.stop', sh.value)
+                    if rp is None:
+                        rp = remove_suffix_if_present(b'.play', sh.value)
+
+                    if rp is not None:
+                        # self.logger.log('Found possible wavc file from: {}'.format(sh.value))
+                        for lng in language_codes:
+                            fn = b'sound/dialogue/' + lng.encode('ascii') + b'/' + rp + b'.wavc'
+                            # self.logger.log('  Trying: {}'.format(fn))
+                            vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=[FTYPE_FSB5C])
 
                 for sh in adf.found_strings:
                     vpath_map.propose(sh, [FTYPE_ADF, node])
@@ -772,6 +798,10 @@ class VfsStructure(VfsBase):
         for i in range(255):
             fn = 'textures/ui/load/{}.ddsc'.format(i)
             guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
+
+        for lng in language_codes:
+            fn = 'text/master_{}.stringlookup'.format(lng)
+            guess_strings[fn] = [FTYPE_ADF, FTYPE_ADF_BARE]
 
         for k, v in guess_strings.items():
             fn = k

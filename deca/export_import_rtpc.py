@@ -114,6 +114,9 @@ def rtpc_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_ove
 
                     s = rtpc.dump_to_string()
 
+                    ofiledir = os.path.dirname(fn)
+                    os.makedirs(ofiledir, exist_ok=True)
+
                     with open(fn, 'wt') as fo:
                         fo.write(s)
 

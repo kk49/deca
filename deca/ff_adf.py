@@ -60,12 +60,10 @@ class StringHash:
     def __init__(self):
         self.value = None
         self.value_hash = None
-        self.unknown = None
 
     def deserialize(self, f, nt):
         self.value = f.read_strz()
-        self.value_hash = f.read_u32()
-        self.unknown = f.read_u32()
+        self.value_hash = f.read_u64()
 
 
 class MemberDef:
@@ -290,20 +288,20 @@ def adf_type_id_to_str(type_id, type_map):
     if type_id in prim_type_names:
         return prim_type_names[type_id]
     if type_id == 0xdefe88ed:
-        return 'OPTIONAL'
+        return 'DEFERRED'
 
     type_def = type_map[type_id]
 
     if type_def.metatype == 0:  # Primative
         pass
     elif type_def.metatype == 1:  # Structure
-        return 'Structure'
+        return 'Structure {}'.format(type_def.name.decode('utf-8'))
     elif type_def.metatype == 2:  # Pointer
         return 'Pointer'
     elif type_def.metatype == 3:  # Array
-        return 'Array of {}s'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
+        return 'Array of {}'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
     elif type_def.metatype == 4:  # Inline Array
-        return 'Inline Array of {}s'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
+        return 'Inline Array of {}'.format(adf_type_id_to_str(type_def.element_type_hash, type_map))
     elif type_def.metatype == 7:  # BitField
         return 'Bitfield'
     elif type_def.metatype == 8:  # Enumeration
@@ -477,8 +475,8 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
 
         v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
 
-    # TODO: optional type? this seems to be missing in some cases, i.e. the case of meshc files for CharacterMesh1UVMesh
-    elif type_id == 0xdefe88ed:  # Optional value
+    # TODO: this seems to be missing in some cases, i.e. the case of meshc files for CharacterMesh1UVMesh
+    elif type_id == 0xdefe88ed:  # deferred value
         v0 = f.read_u32(4)
         if v0[0] == 0 or v0[2] == 0:
             v = None
@@ -686,10 +684,14 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 else:
                     vs = 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v)
             elif type_def.size == 6:
-                v0 = f.read_u32()
+                v0 = f.read_u16()
                 v1 = f.read_u16()
-                v = v1 << 32 | v0
-                vs = 'OBJID {} 0x{:016x}'.format(type_def.size, v)
+                v2 = f.read_u16()
+                v = v0 << 32 | v1 << 16 | v2
+                if v in map_stringhash:
+                    vs = map_stringhash[v].value
+                else:
+                    vs = 'OBJID {} 0x{:012x}'.format(type_def.size, v)
             elif type_def.size == 8:
                 v = f.read_u64()
                 vs = 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v)
@@ -762,7 +764,7 @@ class Adf:
         sbuf = sbuf + '\n--------string_hash\n'
         # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
         for v in self.map_stringhash.items():
-            sbuf = sbuf + 'string_hash\t{:08x}\t{}\n'.format(v[0], v[1].value)
+            sbuf = sbuf + 'string_hash\t{:016x}\t{}\n'.format(v[0], v[1].value)
 
         sbuf = sbuf + '\n--------typedefs\n'
         # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'

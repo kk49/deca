@@ -8,6 +8,7 @@ import json
 import csv
 import time
 import sqlite3
+import struct
 
 from deca.file import ArchiveFile
 from deca.vfs_base import VfsBase, VfsNode, VfsPathNode, VfsPathMap
@@ -16,7 +17,7 @@ from deca.errors import EDecaFileExists
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_read_node
+from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_read_node, TypeDef
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
@@ -48,9 +49,8 @@ def game_file_to_sortable_string(v):
 
 
 class MultiProcessResults:
-    def __init__(self, logger):
-        self.logger = logger
-        self.vpath_map = VfsPathMap(self.logger)
+    def __init__(self):
+        self.vpath_map = VfsPathMap()
         self.adf_missing_types = {}
         self.map_name_usage = {}
         self.map_vhash_usage = {}
@@ -58,7 +58,7 @@ class MultiProcessResults:
         self.map_typedefs = {}
 
     def clear(self):
-        self.vpath_map = VfsPathMap(self.logger)
+        self.vpath_map = VfsPathMap()
         self.adf_missing_types = {}
         self.map_name_usage = {}
         self.map_vhash_usage = {}
@@ -74,7 +74,7 @@ class MultiProcessVfsBase:
 
         self.vfs: VfsBase = None
 
-        self.results = MultiProcessResults(self)
+        self.results = MultiProcessResults()
 
         self.commands = {
             'load_vfs': self.command_load_vfs,
@@ -131,10 +131,10 @@ class MultiProcessVfsBase:
                 adf = adf_read_node(self.vfs, node)
 
                 for sh in adf.table_stringhash:
-                    vpath_map.propose(sh.value, [FTYPE_ADF, node])
+                    vpath_map.propose(sh.value, [FTYPE_ADF, node], logger=self)
                     rp = remove_prefix_if_present(b'intermediate/', sh.value)
                     if rp is not None:
-                        vpath_map.propose(rp, [FTYPE_ADF, node])
+                        vpath_map.propose(rp, [FTYPE_ADF, node], logger=self)
 
                     rp = remove_suffix_if_present(b'.stop', sh.value)
                     if rp is None:
@@ -145,13 +145,13 @@ class MultiProcessVfsBase:
                         for lng in language_codes:
                             fn = b'sound/dialogue/' + lng.encode('ascii') + b'/' + rp + b'.wavc'
                             # self.logger.log('  Trying: {}'.format(fn))
-                            vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=[FTYPE_FSB5C])
+                            vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=[FTYPE_FSB5C], logger=self)
 
                 for sh in adf.found_strings:
-                    vpath_map.propose(sh, [FTYPE_ADF, node])
+                    vpath_map.propose(sh, [FTYPE_ADF, node], logger=self)
                     rp = remove_prefix_if_present(b'intermediate/', sh)
                     if rp is not None:
-                        vpath_map.propose(rp, [FTYPE_ADF, node])
+                        vpath_map.propose(rp, [FTYPE_ADF, node], logger=self)
 
                 for sh in adf.table_name:
                     s = sh[1]
@@ -191,7 +191,7 @@ class MultiProcessVfsBase:
                     found_any = False
                     for fn in fns:
                         if node.vhash == hash_little(fn):
-                            vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=FTYPE_ADF)
+                            vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=FTYPE_ADF, logger=self)
                             found_any = True
 
                     if len(fns) > 0 and not found_any:
@@ -370,7 +370,7 @@ class VfsStructure(VfsBase):
                                 sarc_ext_hash=se.file_extention_hash)
 
                             self.node_add(cnode)
-                            self.possible_vpath_map.propose(cnode.vpath, [FTYPE_SARC, node], vnode=cnode)
+                            self.possible_vpath_map.propose(cnode.vpath, [FTYPE_SARC, node], vnode=cnode, logger=self.logger)
 
                     elif node.vhash == deca.hash_jenkins.hash_little(b'gdc/global.gdcc'):
                         # special case starting point for runtime
@@ -403,7 +403,8 @@ class VfsStructure(VfsBase):
                                     offset=entry.offset, size_c=entry.size, size_u=entry.size, vpath=entry.vpath,
                                     ftype=ftype, adf_type=adf_type)
                                 self.node_add(cnode)
-                                self.possible_vpath_map.propose(cnode.vpath, [FTYPE_ADF, node], vnode=cnode)
+                                self.possible_vpath_map.propose(
+                                    cnode.vpath, [FTYPE_ADF, node], vnode=cnode, logger=self.logger)
 
                     else:
                         pass
@@ -433,8 +434,10 @@ class VfsStructure(VfsBase):
         if len(indexes) > 0:
             q_results = multiprocessing.Queue()
 
-            nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 2))   # assuming hyperthreading exists and slows down processing
-            nprocs = multiprocessing.cpu_count()
+            # assuming hyperthreading exists and slows down processing
+            nprocs = min(len(indexes), max(1, 3 * multiprocessing.cpu_count() // 4))
+            # nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 1))
+            # nprocs = multiprocessing.cpu_count()
 
             indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
 
@@ -512,6 +515,11 @@ class VfsStructure(VfsBase):
 
                         self.adf_db.typedefs_add(results.map_typedefs)
 
+                        for k, v in self.adf_db.map_type_def.items():
+                            mv = self.adf_missing_types.pop(k, None)
+                            if mv is not None:
+                                self.logger.log('Found: {}(0x{:08x}) in {}'.format(v.name, k, mv))
+
                         self.logger.log('Process Done {}'.format(proc_name))
                     else:
                         print(msg)
@@ -524,10 +532,13 @@ class VfsStructure(VfsBase):
                     p.join()
                     self.logger.log('Process: {}: Joined'.format(p))
 
+        #TODO update adf database, for future processing
+        self.logger.log('TODO: update adf database')
+
         self.logger.log('PROCESS ADFs: Total ADFs: {}, Total Strings: {}'.format(len(adf_done), scount))
 
     def find_vpath_rtpc_core(self, q, indexs):
-        vpath_map = VfsPathMap(self.logger)
+        vpath_map = VfsPathMap()
         for idx in indexs:
             node = self.table_vfsnode[idx]
             if node.is_valid() and node.ftype == FTYPE_RTPC:
@@ -553,28 +564,28 @@ class VfsStructure(VfsBase):
                     for p in rnode.prop_table:
                         if p.type == deca.ff_rtpc.PropType.type_str.value:
                             s = p.data
-                            vpath_map.propose(s, [FTYPE_RTPC, node])
+                            vpath_map.propose(s, [FTYPE_RTPC, node], logger=self.logger)
 
                             fn, ext = os.path.splitext(s)
                             if ext in {b'.tga', b'.dds'}:
-                                vpath_map.propose(fn + b'.ddsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
+                                vpath_map.propose(fn + b'.ddsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS], logger=self.logger)
                             elif ext == b'.skeleton':
-                                vpath_map.propose(fn + b'.bsk', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0])
+                                vpath_map.propose(fn + b'.bsk', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0], logger=self.logger)
                             elif ext == b'.ragdoll':
-                                vpath_map.propose(fn + b'.brd', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0])
-                                vpath_map.propose(fn + b'.ragdolsettingsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
+                                vpath_map.propose(fn + b'.brd', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0], logger=self.logger)
+                                vpath_map.propose(fn + b'.ragdolsettingsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF], logger=self.logger)
                             elif ext == b'.al':
-                                vpath_map.propose(fn + b'.afsmb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
-                                vpath_map.propose(fn + b'.asb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
+                                vpath_map.propose(fn + b'.afsmb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC], logger=self.logger)
+                                vpath_map.propose(fn + b'.asb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC], logger=self.logger)
                             elif ext == b'.model_xml':
-                                vpath_map.propose(fn + b'.model_xmlc', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.model.xml', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.model.xmlc', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.xml', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.xmlc', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.modelc', [FTYPE_RTPC, node])
+                                vpath_map.propose(fn + b'.model_xmlc', [FTYPE_RTPC, node], logger=self.logger)
+                                vpath_map.propose(fn + b'.model.xml', [FTYPE_RTPC, node], logger=self.logger)
+                                vpath_map.propose(fn + b'.model.xmlc', [FTYPE_RTPC, node], logger=self.logger)
+                                vpath_map.propose(fn + b'.xml', [FTYPE_RTPC, node], logger=self.logger)
+                                vpath_map.propose(fn + b'.xmlc', [FTYPE_RTPC, node], logger=self.logger)
+                                vpath_map.propose(fn + b'.modelc', [FTYPE_RTPC, node], logger=self.logger)
                             elif len(ext) > 0:
-                                vpath_map.propose(s + b'c', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
+                                vpath_map.propose(s + b'c', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF], logger=self.logger)
 
                             '''
                             animations/skeletons/characters/machines/skirmisher_secondary_motion.skeleton -> bsk tag0
@@ -637,23 +648,23 @@ class VfsStructure(VfsBase):
 
                 for tag in gfx.zlib_body.tags:
                     if Gfx.TagType.gfx_exporter_info == tag.record_header.tag_type:
-                        vpath_map.propose(f'ui/{tag.tag_body.name}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
+                        vpath_map.propose(f'ui/{tag.tag_body.name}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX], logger=self.logger)
                         for i in range(255):
                             fn = 'ui/{}_i{:x}.ddsc'.format(tag.tag_body.name, i)
-                            vpath_map.propose(fn, [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
+                            vpath_map.propose(fn, [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS], logger=self.logger)
 
                     elif tag.record_header.tag_type in {Gfx.TagType.gfx_define_external_image, Gfx.TagType.gfx_define_external_image2}:
                         fn = tag.tag_body.file_name
                         fn = os.path.basename(fn)
                         fn, ext = os.path.splitext(fn)
-                        vpath_map.propose(f'ui/{fn}.ddsc', [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
+                        vpath_map.propose(f'ui/{fn}.ddsc', [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS], logger=self.logger)
 
                     elif Gfx.TagType.import_assets2 == tag.record_header.tag_type:
                         fn = tag.tag_body.url
                         fn = os.path.basename(fn)
                         fn, ext = os.path.splitext(fn)
-                        vpath_map.propose(f'ui/{tag.tag_body.url}', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
-                        vpath_map.propose(f'ui/{fn}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
+                        vpath_map.propose(f'ui/{tag.tag_body.url}', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX], logger=self.logger)
+                        vpath_map.propose(f'ui/{fn}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX], logger=self.logger)
 
                 done_set.add(node.vhash)
 
@@ -676,7 +687,7 @@ class VfsStructure(VfsBase):
                 if isinstance(json, dict) and '0' in json and '1' in json:
                     for k, v in json.items():
                         for item in v:
-                            vpath_map.propose(item, [FTYPE_TXT, node])
+                            vpath_map.propose(item, [FTYPE_TXT, node], logger=self.logger)
         self.logger.log('PROCESS JSONs: Total JSON files {}'.format(len(json_done)))
 
     def find_vpath_exe(self, vpath_map):
@@ -689,7 +700,7 @@ class VfsStructure(VfsBase):
             exe_strings = [line[3].strip() for line in exe_strings if len(line) >= 4]
             exe_strings = list(set(exe_strings))
             for s in exe_strings:
-                vpath_map.propose(s, ['EXE', None])
+                vpath_map.propose(s, ['EXE', None], logger=self.logger)
             self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
 
     def find_vpath_procmon_file(self, vpath_map):
@@ -700,7 +711,7 @@ class VfsStructure(VfsBase):
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)
                 for s in custom_strings:
-                    vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
+                    vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True, logger=self.logger)
             self.logger.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_procmon_dir(self, vpath_map):
@@ -726,7 +737,7 @@ class VfsStructure(VfsBase):
                                 custom_strings.add(s)
 
         for s in custom_strings:
-            vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
+            vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True, logger=self.logger)
         self.logger.log('STRINGS FROM HASH FROM PROCMON DIR: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_custom(self, vpath_map):
@@ -737,7 +748,7 @@ class VfsStructure(VfsBase):
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)
                 for s in custom_strings:
-                    vpath_map.propose(s.strip(), ['CUSTOM', None])
+                    vpath_map.propose(s.strip(), ['CUSTOM', None], logger=self.logger)
             self.logger.log('STRINGS FROM CUSTOM: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_guess(self, vpath_map):
@@ -806,7 +817,7 @@ class VfsStructure(VfsBase):
         for k, v in guess_strings.items():
             fn = k
             fn = fn.encode('ascii')
-            vpath_map.propose(fn, ['GUESS', None], possible_ftypes=v)
+            vpath_map.propose(fn, ['GUESS', None], possible_ftypes=v, logger=self.logger)
 
         self.logger.log('STRINGS BY GUESSING: Total {} guesses'.format(len(guess_strings)))
 
@@ -830,7 +841,7 @@ class VfsStructure(VfsBase):
             fn = fn.encode('ascii')
             fh = hash_little(fn)
             if fh in self.hash_present:
-                vpath_map.propose(fn, ['ASSOC', None], possible_ftypes=v)
+                vpath_map.propose(fn, ['ASSOC', None], possible_ftypes=v, logger=self.logger)
 
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
 
@@ -967,9 +978,32 @@ class VfsStructure(VfsBase):
         #             lst.append(node)
         #         self.map_vpath_to_vfsnodes[node.vpath] = lst
 
+    # def find_adf_types_exe_noheader(self):
+    #     exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
+    #
+    #     with open(exe_path, 'rb') as f:
+    #         buffer = f.read(os.stat(exe_path).st_size)
+    #
+    #     for k, v in self.adf_missing_types.items():
+    #         lid = struct.pack('<L', k)
+    #         offset = 0
+    #         while True:
+    #             offset = buffer.find(lid, offset)
+    #             if offset < 0:
+    #                 break
+    #             print('Found {:08X} @ {}'.format(k, offset))
+    #
+    #             t = TypeDef()
+    #             with ArchiveFile(io.BytesIO(buffer)) as f:
+    #                 f.seek(offset - 12)  # rewind to begining of type
+    #                 t.deserialize(f, {})
+    #
+    #             offset += 1
+
     def search_for_vpaths(self):
         self.find_vpath_adf(self.possible_vpath_map, do_adfb=False)
         self.find_vpath_adf(self.possible_vpath_map, do_adfb=True)
+        # self.find_adf_types_exe_noheader()
         self.find_vpath_rtpc(self.possible_vpath_map)
         self.find_vpath_gfx(self.possible_vpath_map)
         self.find_vpath_json(self.possible_vpath_map)
@@ -1089,6 +1123,8 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
         logger.log('CREATING: COMPLETE')
 
     vfs.dump_status()
+
+    # vfs.find_adf_types_exe_noheader()
 
     vfs.working_dir = working_dir
 

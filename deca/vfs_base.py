@@ -19,8 +19,7 @@ class VfsPathNode:
 
 
 class VfsPathMap:
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self, ):
         self.nodes = {}
 
     def merge(self, other):
@@ -41,7 +40,7 @@ class VfsPathMap:
 
             self.nodes[k] = v2
 
-    def propose(self, vpath, src, used_at_runtime=False, vnode=None, possible_ftypes=FTYPE_ANY_TYPE):
+    def propose(self, vpath, src, used_at_runtime=False, vnode=None, possible_ftypes=FTYPE_ANY_TYPE, logger=None):
         """
         Add proposed vpath to map
         :param vpath: string representing vpath
@@ -49,6 +48,7 @@ class VfsPathMap:
         :param used_at_runtime: bool that indicates if this usage is known to be used by the executable gotten from procmon
         :param vnode: include vnode if the vnode was explicitly labeled, like in a sarc
         :param possible_ftypes: Value, or [Value] of file types that are expect to be connected to vpath
+        :param logger: Optional logger to log messages
         :return: VpatjInference object
         """
 
@@ -58,10 +58,12 @@ class VfsPathMap:
             try:
                 vpath.decode('utf-8')
             except UnicodeDecodeError:
-                self.logger.log('propose: BAD STRING NOT UTF-8 {}'.format(vpath))
+                if logger is not None:
+                    logger.log('propose: BAD STRING NOT UTF-8 {}'.format(vpath))
                 return None
         else:
-            self.logger.log('propose: BAD STRING {}'.format(vpath))
+            if logger is not None:
+                logger.log('propose: BAD STRING {}'.format(vpath))
             return None
 
         vpath = vpath.replace(b'\\\\', b'/').replace(b'\\', b'/')
@@ -179,7 +181,7 @@ class VfsBase:
         self.adf_missing_types = {}
 
         # track possible vpaths
-        self.possible_vpath_map = VfsPathMap(self.logger)
+        self.possible_vpath_map = VfsPathMap()
 
         # results from connecting vpaths to vfsnodes
         self.hash_map_present = set()

@@ -100,6 +100,7 @@ class VfsPathMap:
 CREATE TABLE
 """
 
+
 class VfsNode:
     def __init__(
             self, uid=None, ftype=None, compressed=False,

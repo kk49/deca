@@ -406,6 +406,27 @@ class VfsStructure(VfsBase):
                                 self.possible_vpath_map.propose(
                                     cnode.vpath, [FTYPE_ADF, node], vnode=cnode, logger=self.logger)
 
+                    elif node.sarc_type == 0xb4c9109e or (node.vpath is not None and node.vpath.endswith(b'.resourcebundle')):
+                        node.processed = True
+                        any_change = True
+                        with ArchiveFile(self.file_obj_from(node)) as f:
+                            index = 0
+                            while f.tell() < node.size_u:
+                                vhash = f.read_u32()
+                                ext_hash = f.read_u32()
+                                size = f.read_u32()
+                                offset = f.tell()
+                                buffer = f.read(size)
+
+                                cnode = VfsNode(
+                                    vhash=vhash, pid=node.uid, level=node.level + 1, index=index,
+                                    offset=offset, size_c=size, size_u=size,
+                                    sarc_ext_hash=ext_hash)
+
+                                self.node_add(cnode)
+
+                                index += 1
+
                     else:
                         pass
                 idx = idx + 1

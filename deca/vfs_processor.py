@@ -11,7 +11,7 @@ import sqlite3
 import struct
 
 from deca.file import ArchiveFile
-from deca.vfs_base import VfsBase, VfsNode, VfsPathNode, VfsPathMap
+from deca.vfs_db import VfsBase, VfsNode, VfsPathNode, VfsPathMap
 from deca.game_info import GameInfo, game_info_load
 from deca.errors import EDecaFileExists
 from deca.ff_types import *

@@ -1,4 +1,4 @@
-from deca.vfs_base import VfsBase, VfsNode
+from deca.vfs_db import VfsBase, VfsNode
 from deca.ff_types import *
 from deca.ff_sarc import FileSarc, EntrySarc
 from deca.ff_avtx import image_import

@@ -4,7 +4,7 @@ from .ff_adf import *
 from .xlsxwriter_hack import DecaWorkBook
 from .ff_adf_amf import AABB
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
-from .vfs_processor import VfsStructure, VfsNode
+from .vfs_processor import VfsProcessor, VfsNode
 
 
 def generate_export_file_path(vfs, export_path, vnode):
@@ -19,7 +19,7 @@ def generate_export_file_path(vfs, export_path, vnode):
     return ofile
 
 
-def adf_export_xlsx_0x0b73315d(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite):
+def adf_export_xlsx_0x0b73315d(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite):
     ofile = generate_export_file_path(vfs, export_path, vnode)
     fn = ofile + '.xlsx'
 
@@ -84,7 +84,7 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsStructure, vnode: VfsNode, export_path, a
     return fn
 
 
-def adf_export_amf_model_0xf7c20a69(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+def adf_export_amf_model_0xf7c20a69(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
@@ -96,7 +96,7 @@ def adf_export_amf_model_0xf7c20a69(vfs: VfsStructure, vnode: VfsNode, export_pa
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def adf_export_mdic_0xb5b062f1(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+def adf_export_mdic_0xb5b062f1(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
@@ -123,7 +123,7 @@ def adf_export_mdic_0xb5b062f1(vfs: VfsStructure, vnode: VfsNode, export_path, a
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def adf_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+def adf_export_node(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
     adf = adf_read_node(vfs, vnode)
     if adf is not None:
         if len(adf.table_instance) == 1:
@@ -135,7 +135,7 @@ def adf_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwr
                 adf_export_mdic_0xb5b062f1(vfs, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
 
 
-def adf_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
+def adf_export(vfs: VfsProcessor, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
     for vnode in vnodes:
         try:
             if save_to_processed:

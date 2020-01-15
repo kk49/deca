@@ -155,7 +155,7 @@ class VfsNode:
         return ' '.join(info)
 
 
-class VfsBase:
+class VfsDatabase:
     def __init__(self, game_info: GameInfo, working_dir, logger):
         self.game_info = game_info
 

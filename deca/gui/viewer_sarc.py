@@ -20,7 +20,7 @@ class DataViewerSarc(DataViewer):
         self.main_layout.addWidget(self.text_box)
         self.setLayout(self.main_layout)
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+    def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
         sarc_file = FileSarc()
         sarc_file.header_deserialize(vfs.file_obj_from(vnode))
         sbuf = sarc_file.dump_str()

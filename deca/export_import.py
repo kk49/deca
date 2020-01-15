@@ -4,7 +4,7 @@ from typing import List, TypeVar
 from .errors import *
 from .file import *
 from .ff_types import *
-from .vfs_processor import VfsStructure, VfsNode
+from .vfs_processor import VfsProcessor, VfsNode
 from .export_import_adf import adf_export
 from .export_import_rtpc import rtpc_export
 from .ff_avtx import Ddsc, image_export
@@ -36,7 +36,7 @@ def fsb5c_export_processed(vfs, node, extract_dir, allow_overwrite=False):
             fo.write(buffer)
 
 
-def expand_vpaths(vfs: VfsStructure, vs, mask):
+def expand_vpaths(vfs: VfsProcessor, vs, mask):
     vos = []
 
     expr_mask = re.compile(mask)
@@ -57,7 +57,7 @@ def expand_vpaths(vfs: VfsStructure, vs, mask):
 
 
 def extract_node_raw(
-        vfs: VfsStructure,
+        vfs: VfsProcessor,
         node: VfsNode,
         extract_dir: str,
         allow_overwrite):
@@ -95,7 +95,7 @@ def extract_node_raw(
 
 
 def extract_raw(
-        vfs: VfsStructure,
+        vfs: VfsProcessor,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
@@ -126,7 +126,7 @@ def extract_raw(
 
 
 def extract_contents(
-        vfs: VfsStructure,
+        vfs: VfsProcessor,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
@@ -176,7 +176,7 @@ def extract_contents(
 
 
 def extract_processed(
-        vfs: VfsStructure,
+        vfs: VfsProcessor,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,

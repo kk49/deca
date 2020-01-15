@@ -22,7 +22,7 @@ class DataViewerAdf(DataViewer):
         self.main_layout.addWidget(self.text_box)
         self.setLayout(self.main_layout)
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+    def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
         buffer = b''
         with ArchiveFile(vfs.file_obj_from(vnode)) as f:
             while True:

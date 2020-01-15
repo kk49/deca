@@ -5,7 +5,7 @@ import argparse
 import pickle
 from typing import List
 from deca.errors import *
-from deca.vfs_processor import vfs_structure_prep, vfs_structure_open, VfsStructure, VfsNode
+from deca.vfs_processor import vfs_structure_prep, vfs_structure_open, VfsProcessor, VfsNode
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger

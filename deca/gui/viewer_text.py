@@ -20,7 +20,7 @@ class DataViewerText(DataViewer):
         self.main_layout.addWidget(self.text_box)
         self.setLayout(self.main_layout)
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+    def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
         with ArchiveFile(vfs.file_obj_from(vnode)) as f:
             buf = f.read(vnode.size_u)
             self.text_box.setText(buf.decode('utf-8'))

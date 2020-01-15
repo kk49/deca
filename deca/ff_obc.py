@@ -1,13 +1,13 @@
 import struct
 import numpy as np
-from deca.vfs_processor import VfsStructure
+from deca.vfs_processor import VfsProcessor
 
 
 class Obc:
     def __init__(self):
         self.table = None
 
-    def dump_to_string(self, vfs: VfsStructure):
+    def dump_to_string(self, vfs: VfsProcessor):
         s = ''
         if self.table is not None:
             for line in self.table:

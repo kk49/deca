@@ -1,4 +1,4 @@
-from deca.vfs_db import VfsBase, VfsNode
+from deca.vfs_db import VfsDatabase, VfsNode
 from deca.ff_types import *
 from deca.ff_sarc import FileSarc, EntrySarc
 from deca.ff_avtx import image_import
@@ -18,7 +18,7 @@ class Builder:
     def __init__(self):
         pass
 
-    def build_node_sarc(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsBase, vpath_complete_map):
+    def build_node_sarc(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
         assert(vnode.ftype == FTYPE_SARC)
 
         vpath = vnode.vpath
@@ -108,7 +108,7 @@ class Builder:
 
         vpath_complete_map[vpath] = fn_dst
 
-    def build_node(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsBase, vpath_complete_map):
+    def build_node(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
         vpath = vnode.vpath
 
         if vnode.ftype == FTYPE_SARC:
@@ -137,7 +137,7 @@ class Builder:
             shutil.copy2(src_path, dst)
             vpath_complete_map[vpath] = dst
 
-    def build_dir(self, vfs: VfsBase, src_path: str, dst_path: str):
+    def build_dir(self, vfs: VfsDatabase, src_path: str, dst_path: str):
         # find all changed src files
         src_files = {}
 
@@ -251,7 +251,7 @@ class Builder:
         for k, v in vpaths_completed.items():
             print(v)
 
-    def build_src(self, vfs: VfsBase, src_file: str, dst_path: str):
+    def build_src(self, vfs: VfsDatabase, src_file: str, dst_path: str):
         # TODO Eventually process a simple script to update files based on relative addressing to handle other mods and
         #  patches
         pass

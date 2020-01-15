@@ -11,7 +11,7 @@ import sqlite3
 import struct
 
 from deca.file import ArchiveFile
-from deca.vfs_db import VfsBase, VfsNode, VfsPathNode, VfsPathMap
+from deca.vfs_db import VfsDatabase, VfsNode, VfsPathNode, VfsPathMap
 from deca.game_info import GameInfo, game_info_load
 from deca.errors import EDecaFileExists
 from deca.ff_types import *
@@ -72,7 +72,7 @@ class MultiProcessVfsBase:
         self.q_in = q_in
         self.q_out = q_out
 
-        self.vfs: VfsBase = None
+        self.vfs: VfsDatabase = None
 
         self.results = MultiProcessResults()
 
@@ -245,9 +245,9 @@ def run_mp_vfs_base(name, q_in, q_out):
     p.run()
 
 
-class VfsStructure(VfsBase):
+class VfsProcessor(VfsDatabase):
     def __init__(self, game_info: GameInfo, working_dir, logger):
-        VfsBase.__init__(self, game_info, working_dir, logger)
+        VfsDatabase.__init__(self, game_info, working_dir, logger)
         self.adf_db = None
         self.external_files = set()
         self.progress_update_time_sec = 5.0
@@ -1112,7 +1112,7 @@ def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
         game_info.save(os.path.join(working_dir, 'project.json'))
 
         version = 1
-        vfs = VfsStructure(game_info, working_dir, logger)
+        vfs = VfsProcessor(game_info, working_dir, logger)
 
         # parse exe
         if os.path.isfile(phase_0_cache_file):

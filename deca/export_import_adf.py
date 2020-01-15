@@ -4,7 +4,7 @@ from .ff_adf import *
 from .xlsxwriter_hack import DecaWorkBook
 from .ff_adf_amf import AABB
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
-from .vfs_db import VfsStructure, VfsNode
+from .vfs_processor import VfsStructure, VfsNode
 
 
 def generate_export_file_path(vfs, export_path, vnode):

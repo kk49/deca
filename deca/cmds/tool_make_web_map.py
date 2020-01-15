@@ -1,4 +1,4 @@
-from deca.vfs_db import vfs_structure_open
+from deca.vfs_processor import vfs_structure_open
 from deca.ff_avtx import Ddsc, image_export
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.file import ArchiveFile

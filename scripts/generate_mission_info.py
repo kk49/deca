@@ -1,5 +1,5 @@
 import re
-from deca.vfs_db import vfs_structure_open
+from deca.vfs_processor import vfs_structure_open
 from deca.ff_adf import adf_read_node
 from deca.digest import process_translation_adf
 

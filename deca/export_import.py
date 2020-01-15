@@ -4,7 +4,7 @@ from typing import List, TypeVar
 from .errors import *
 from .file import *
 from .ff_types import *
-from .vfs_db import VfsStructure, VfsNode
+from .vfs_processor import VfsStructure, VfsNode
 from .export_import_adf import adf_export
 from .export_import_rtpc import rtpc_export
 from .ff_avtx import Ddsc, image_export

@@ -313,29 +313,82 @@ enums:
     3: free_character
     4: place_object
     5: remove_object
+    6: define_bits
+    7: define_button
+    8: jpeg_tables
     9: set_background_color
+    10: define_font
+    11: define_text
+    12: do_action
+    13: define_font_info
     14: define_sound
+    15: start_sound
+    16: no_operation_16
+    17: define_button_sound
+    18: sound_stream_head
+    19: sound_stream_block
+    20: define_bits_lossless
+    21: define_bits_jpeg2
     22: define_shape2
+    23: define_button_cxform
+    24: protect
+    25: no_operation_25
     26: place_object2
+    27: no_operation_27
     28: remove_object2
+    29: no_operation_29
+    30: no_operation_30
+    31: no_operation_31
     32: define_shape3
+    33: define_text2
+    34: define_button2
+    35: define_bits_jpeg3
+    36: define_bits_lossless2
     37: define_edit_text
+    38: no_operation_38
     39: define_sprite
+    40: name_character
+    41: serial_number
+    42: generator_text
     43: frame_label
+    44: no_operation_44
+    45: sound_stream_head2
     46: define_morph_shape
+    47: no_operation_47
+    48: define_font2
+    49: define_info
+    50: no_operation_50
+    51: generator3
+    52: external_font
+    53: no_operation_53
+    54: no_operation_54
+    55: no_operation_55
     56: export_assets
+    57: import_assets
+    58: protect_debug
+    59: do_init_action
+    60: define_video_stream
+    61: video_frame
+    62: define_font_info2
+    63: no_operation_63
+    64: protect_debug2
     65: script_limits
+    66: set_tab_limit
+    67: define_shape_4
+    68: no_operation_68
     69: file_attributes
     70: place_object3
     71: import_assets2
+    72: no_operation_72
     73: define_font_info3
     74: define_text_info
     75: define_font3
-    76: symbol_class
+    76: symbol_class  # this is not in the spec for scale forms
     77: metadata
     78: define_scaling_grid
     82: do_abc
     83: define_shape5
+    84: define_morph_shape2
     86: define_scene_and_frame_label_data
     1000: gfx_exporter_info  # ExporterInfo
     1001: gfx_define_external_image  # DefineExternalImage

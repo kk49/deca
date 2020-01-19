@@ -9,6 +9,7 @@ from .export_import_adf import adf_export
 from .export_import_rtpc import rtpc_export
 from .ff_avtx import Ddsc, image_export
 from .ff_sarc import FileSarc
+from .util import make_dir_for_file
 
 
 NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
@@ -28,8 +29,7 @@ def fsb5c_export_processed(vfs, node, extract_dir, allow_overwrite=False):
 
     vfs.logger.log('Exporting {}'.format(ofile))
 
-    ofiledir = os.path.dirname(ofile)
-    os.makedirs(ofiledir, exist_ok=True)
+    make_dir_for_file(ofile)
 
     if allow_overwrite or not os.path.isfile(ofile):
         with open(ofile, 'wb') as fo:
@@ -71,8 +71,7 @@ def extract_node_raw(
 
                 vfs.logger.log('Exporting {}'.format(ofile))
 
-                ofiledir = os.path.dirname(ofile)
-                os.makedirs(ofiledir, exist_ok=True)
+                make_dir_for_file(ofile)
 
                 if node.ftype == FTYPE_ADF_BARE:
                     do_export_raw = False
@@ -233,8 +232,7 @@ def extract_processed(
 
             vfs.logger.log('Exporting {}'.format(ofile))
 
-            ofiledir = os.path.dirname(ofile)
-            os.makedirs(ofiledir, exist_ok=True)
+            make_dir_for_file(ofile)
 
             try:
                 fsb5c_export_processed(vfs, vnode, extract_dir, allow_overwrite=allow_overwrite)
@@ -250,8 +248,7 @@ def extract_processed(
 
             vfs.logger.log('Exporting {}'.format(ofile))
 
-            ofiledir = os.path.dirname(ofile)
-            os.makedirs(ofiledir, exist_ok=True)
+            make_dir_for_file(ofile)
 
             try:
                 image_export(vfs, vnode, extract_dir, False, True, allow_overwrite=allow_overwrite)

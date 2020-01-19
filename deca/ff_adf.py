@@ -11,6 +11,7 @@ from deca.util import dump_block
 from pprint import pformat
 from deca.hash_jenkins import hash_little
 from deca.ff_types import FTYPE_ADF_BARE
+from deca.vfs_db import VfsDatabase
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
@@ -888,15 +889,17 @@ class Adf:
 
 
 class AdfDatabase:
-    def __init__(self, db_dir):
-        self.db_dir = db_dir
+    def __init__(self):
         self.map_type_def = {}
-        self.map_type_filename = {}
-        self.map_hash_string = {}
+
+    def load_from_database(self, vfs: VfsDatabase):
+        self.map_type_def = vfs.adf_type_map_load()
+
+    def save_to_database(self, vfs: VfsDatabase):
+        vfs.adf_type_map_save(self.map_type_def)
 
     def extract_types_from_exe(self, exepath):
         self.map_type_def = {}
-        self.map_type_filename = {}
 
         exe_stat = os.stat(exepath)
 
@@ -912,30 +915,8 @@ class AdfDatabase:
             with ArchiveFile(BytesIO(exe_short)) as f:
                 adf = Adf()
                 adf.deserialize(f, process_instances=False)
-
-                exe_short = exe[poss:poss + adf.total_size]
-                fn = 'offset_{:08x}.adf'.format(poss)
-                fn_full = os.path.join(self.db_dir, fn)
-                with open(fn_full, 'wb') as fw:
-                    fw.write(exe_short)
-
                 for k, v in adf.map_typedef.items():
-                    ts = self.map_type_filename.get(k, set())
-                    ts.add(fn)
-                    self.map_type_filename[k] = ts
                     self.map_type_def[k] = v
-
-                for k, v in adf.map_stringhash.items():
-                    s = self.map_hash_string.get(k, set())
-                    s.add(v)
-                    self.map_hash_string[k] = s
-
-        with open(os.path.join(self.db_dir, 'map_type_filename.pickle'), 'wb') as fw:
-            pickle.dump(self.map_type_filename, fw)
-        with open(os.path.join(self.db_dir, 'map_type.pickle'), 'wb') as fw:
-            pickle.dump(self.map_type_def, fw)
-        # with open(os.path.join(self.db_dir, 'map_hash_string.pickle'), 'wb') as fw:
-        #     pickle.dump(self.map_hash_string, fw)
 
     def typedefs_add(self, map_typedefs):
         for k, v in map_typedefs.items():
@@ -1007,12 +988,12 @@ def buffer_read(f):
     return buffer
 
 
-def adf_read_node(vfs, node):
+def adf_read_node(vfs: VfsDatabase, adf_db, node):
     with ArchiveFile(vfs.file_obj_from(node)) as f:
         buffer = buffer_read(f)
     if node.ftype == FTYPE_ADF_BARE:
-        adf = vfs.adf_db.load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+        adf = adf_db.load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
     else:
-        adf = vfs.adf_db.load_adf(buffer)
+        adf = adf_db.load_adf(buffer)
 
     return adf

@@ -1,5 +1,6 @@
 import struct
 import datetime
+import os
 
 
 class Logger:
@@ -56,6 +57,12 @@ def remove_suffix_if_present(suffix, s):
 
 def align_to(v, boundry):
     return ((v + boundry - 1) // boundry) * boundry
+
+
+def make_dir_for_file(fn):
+    new_dir = os.path.dirname(fn)
+    os.makedirs(new_dir, exist_ok=True)
+    return new_dir
 
 
 '''

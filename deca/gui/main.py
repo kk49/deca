@@ -5,11 +5,10 @@ import argparse
 import pickle
 from typing import List
 from deca.errors import *
-from deca.vfs_processor import vfs_structure_prep, vfs_structure_open, VfsProcessor, VfsNode
+from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsProcessor, VfsNode
 from deca.ff_types import *
 from deca.builder import Builder
 from deca.util import Logger
-from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
 from deca.gui.viewer_adf import DataViewerAdf
 from deca.gui.viewer_rtpc import DataViewerRtpc
 from deca.gui.viewer_image import DataViewerImage
@@ -956,31 +955,11 @@ class MainWindow(QMainWindow):
         filename = QFileDialog.getOpenFileName(self, 'Create Project ...', game_loc, 'Game EXE (*.exe *.EXE)')
 
         if filename is not None and len(filename[0]) > 0:
-            exe_path = filename[0]
-            game_dir, exe_name = os.path.split(exe_path)
-            game_dir = os.path.join(game_dir, '')
-
-            game_info = None
-            if False:
-                pass
-            elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-                game_info = GameInfoGZB(game_dir, exe_name)
-            elif exe_name.find('GenerationZero') >= 0:
-                game_info = GameInfoGZ(game_dir, exe_name)
-            elif exe_name.find('theHunterCotW') >= 0:
-                game_info = GameInfoTHCOTW(game_dir, exe_name)
-            elif exe_name.find('JustCause3') >= 0:
-                game_info = GameInfoJC3(game_dir, exe_name)
-            elif exe_name.find('JustCause4') >= 0:
-                game_info = GameInfoJC4(game_dir, exe_name)
-            else:
+            vfs = vfs_structure_new(filename)
+            if vfs is None:
                 self.logger.log('Unknown Game {}'.format(filename))
-
-            if game_info is not None:
-                working_dir = '../work/{}/'.format(game_info.game_id)
-                vfs = vfs_structure_prep(game_info, working_dir)  # , logger=self.logger)
+            else:
                 self.vfs_set(vfs)
-
         else:
             self.logger.log('Cannot Create {}'.format(filename))
 
@@ -989,9 +968,7 @@ class MainWindow(QMainWindow):
         filename = QFileDialog.getOpenFileName(self, 'Open Project ...', '../work', 'Project File (project.json)')
         if filename is not None and len(filename[0]) > 0:
             project_file = filename[0]
-            # working_dir = './work/gzb/project.json'
-            # working_dir = './work/hp/project.json'
-            vfs = vfs_structure_open(project_file)  # , logger=self.logger)
+            vfs = vfs_structure_open(project_file)
             self.vfs_set(vfs)
         else:
             self.logger.log('Cannot Open {}'.format(filename))

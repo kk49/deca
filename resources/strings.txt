@@ -1,0 +1,7 @@
+equal
+less
+greater
+AND
+OR
+NOT
+

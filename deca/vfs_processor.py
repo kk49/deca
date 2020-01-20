@@ -118,8 +118,7 @@ class VfsProcessor(VfsDatabase):
             self.process_by_ftype(FTYPE_TXT, 'process_txt_initial')
             self.find_vpath_exe()
             self.find_vpath_procmon_dir()
-            self.find_vpath_procmon_file()
-            self.find_vpath_custom()
+            self.find_vpath_resources()
             self.find_vpath_guess()
             self.find_vpath_by_assoc()
             self.process_by_vhash('process_vhash_final')
@@ -414,25 +413,6 @@ class VfsProcessor(VfsDatabase):
 
             self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
 
-    def find_vpath_procmon_file(self):
-        fn = './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)
-        if os.path.isfile(fn):
-            hash4_to_add = []
-
-            self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/{}/strings_procmon.txt'.format(self.game_info.game_id))
-            with open(fn, 'rb') as f:
-                custom_strings = f.readlines()
-                custom_strings = set(custom_strings)
-                for s in custom_strings:
-                    propose_h4(hash4_to_add, s.strip(), None, used_at_runtime=True)
-
-            hash4_to_add = list(set(hash4_to_add))
-            if len(hash4_to_add) > 0:
-                self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-                self.hash4_add_many(hash4_to_add)
-
-            self.logger.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
-
     def find_vpath_procmon_dir(self):
         path_name = './procmon_csv/{}'.format(self.game_info.game_id)
         custom_strings = set()
@@ -467,23 +447,29 @@ class VfsProcessor(VfsDatabase):
 
         self.logger.log('STRINGS FROM HASH FROM PROCMON DIR: Total {} strings'.format(len(custom_strings)))
 
-    def find_vpath_custom(self):
-        fn = './resources/{}/strings.txt'.format(self.game_info.game_id)
-        if os.path.isfile(fn):
-            hash4_to_add = []
-            self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/{}/strings.txt'.format(self.game_info.game_id))
-            with open(fn, 'rb') as f:
-                custom_strings = f.readlines()
-                custom_strings = set(custom_strings)
-                for s in custom_strings:
-                    propose_h4(hash4_to_add, s.strip(), None, used_at_runtime=True)
+    def find_vpath_resources(self):
+        fns = [
+            './resources/strings.txt',
+            './resources/{}/strings.txt'.format(self.game_info.game_id),
+            './resources/{}/strings_procmon.txt'.format(self.game_info.game_id),
+        ]
+        hash4_to_add = []
 
-            hash4_to_add = list(set(hash4_to_add))
-            if len(hash4_to_add) > 0:
-                self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-                self.hash4_add_many(hash4_to_add)
+        for fn in fns:
+            if os.path.isfile(fn):
+                self.logger.log('STRINGS FROM RESOURCES: look for hashable strings in {}'.format(fn))
+                with open(fn, 'rb') as f:
+                    custom_strings = f.readlines()
+                    custom_strings = set(custom_strings)
+                    for s in custom_strings:
+                        propose_h4(hash4_to_add, s.strip(), None, used_at_runtime=True)
 
-            self.logger.log('STRINGS FROM CUSTOM: Total {} strings'.format(len(custom_strings)))
+        hash4_to_add = list(set(hash4_to_add))
+        if len(hash4_to_add) > 0:
+            self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
+            self.hash4_add_many(hash4_to_add)
+
+        self.logger.log('STRINGS FROM RESOURCES: Total {} strings'.format(len(hash4_to_add)))
 
     def find_vpath_guess(self):
         self.logger.log('STRINGS BY GUESSING: ...')

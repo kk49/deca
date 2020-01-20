@@ -33,7 +33,7 @@ class Builder:
             if src_path.find('DECA.FILE_LIST') >= 0:
                 with open(src_path, 'r') as f:
                     src_lines = f.readlines()
-                callex = re.compile(r'^([A-Za-z]*[.A-Za-z]*)\(([^\)]*)\);$')
+                callex = re.compile(r'^([A-Za-z]*[.A-Za-z]*)\(([^)]*)\);$')
                 for src_idx, src_line in enumerate(src_lines):
                     src_context = f'{src_path}:{src_idx + 1}'
                     mr = callex.match(src_line)
@@ -108,7 +108,8 @@ class Builder:
 
         vpath_complete_map[vpath] = fn_dst
 
-    def build_node(self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
+    def build_node(
+            self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
         vpath = vnode.vpath
 
         if vnode.ftype == FTYPE_SARC:
@@ -237,7 +238,6 @@ class Builder:
                             vnode=vnodes[0],
                             vfs=vfs,
                             vpath_complete_map=vpaths_completed)
-
 
             if not any_change and len(depends) > 0:
                 print('BUILD FAILED: Infinite loop:')

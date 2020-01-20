@@ -11,7 +11,7 @@ from deca.util import dump_block
 from pprint import pformat
 from deca.hash_jenkins import hash_little
 from deca.ff_types import FTYPE_ADF_BARE
-from deca.vfs_db import VfsDatabase
+from deca.vfs_db import VfsDatabase, VfsNode
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
@@ -21,9 +21,9 @@ from deca.vfs_db import VfsDatabase
 
 
 class AdfTypeMissing(Exception):
-    def __init__(self, vhash, *args, **kwargs):
+    def __init__(self, type_id, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
-        self.vhash = vhash
+        self.type_id = type_id
 
 
 class GdcArchiveEntry:
@@ -889,17 +889,21 @@ class Adf:
 
 
 class AdfDatabase:
-    def __init__(self):
-        self.map_type_def = {}
+    def __init__(self, vfs=None):
+        self.type_map_def = {}
+        self.type_missing = set()
+
+        if vfs is not None:
+            self.load_from_database(vfs)
 
     def load_from_database(self, vfs: VfsDatabase):
-        self.map_type_def = vfs.adf_type_map_load()
+        self.type_map_def, self.type_missing = vfs.adf_type_map_load()
 
     def save_to_database(self, vfs: VfsDatabase):
-        vfs.adf_type_map_save(self.map_type_def)
+        vfs.adf_type_map_save(self.type_map_def, self.type_missing)
 
     def extract_types_from_exe(self, exepath):
-        self.map_type_def = {}
+        self.type_map_def = {}
 
         exe_stat = os.stat(exepath)
 
@@ -916,24 +920,28 @@ class AdfDatabase:
                 adf = Adf()
                 adf.deserialize(f, process_instances=False)
                 for k, v in adf.map_typedef.items():
-                    self.map_type_def[k] = v
+                    self.type_map_def[k] = v
 
     def typedefs_add(self, map_typedefs):
         for k, v in map_typedefs.items():
-            if k not in self.map_type_def:
-                self.map_type_def[k] = v
+            if k not in self.type_map_def:
+                self.type_map_def[k] = v
 
-    def load_adf(self, buffer):
+    def _load_adf(self, buffer):
         with ArchiveFile(io.BytesIO(buffer)) as fp:
             obj = Adf()
             try:
-                obj.deserialize(fp, self.map_type_def)
+                obj.deserialize(fp, self.type_map_def)
+                # get typedefs from regular load, to handle the case where types are in ADF, and ADFB but not EXE
+                for k, v in obj.map_typedef.items():
+                    if k not in self.type_map_def:
+                        self.type_map_def[k] = v
                 return obj
             except EDecaErrorParse:
                 return None
 
-    def load_adf_bare(self, buffer, adf_type, offset, size):
-        if adf_type not in self.map_type_def:
+    def _load_adf_bare(self, buffer, adf_type, offset, size):
+        if adf_type not in self.type_map_def:
             raise AdfTypeMissing(adf_type)
 
         try:
@@ -945,7 +953,7 @@ class AdfDatabase:
             obj.instance_count = 1
             obj.instance_offset = None
 
-            obj.extended_map_typedef = self.map_type_def
+            obj.extended_map_typedef = self.type_map_def
 
             obj.table_instance[0].name = b'instance'
             obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
@@ -976,6 +984,21 @@ class AdfDatabase:
         except EDecaErrorParse:
             return None
 
+    def read_node(self, vfs: VfsDatabase, node: VfsNode):
+        with ArchiveFile(vfs.file_obj_from(node)) as f:
+            buffer = buffer_read(f)
+
+        try:
+            if node.ftype == FTYPE_ADF_BARE:
+                adf = self._load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+            else:
+                adf = self._load_adf(buffer)
+        except AdfTypeMissing as ae:
+            self.type_missing.add((ae.type_id, node.uid))
+            raise
+
+        return adf
+
 
 def buffer_read(f):
     buffer = b''
@@ -988,12 +1011,3 @@ def buffer_read(f):
     return buffer
 
 
-def adf_read_node(vfs: VfsDatabase, adf_db, node):
-    with ArchiveFile(vfs.file_obj_from(node)) as f:
-        buffer = buffer_read(f)
-    if node.ftype == FTYPE_ADF_BARE:
-        adf = adf_db.load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
-    else:
-        adf = adf_db.load_adf(buffer)
-
-    return adf

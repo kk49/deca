@@ -7,6 +7,7 @@ from typing import List
 from deca.errors import *
 from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsProcessor, VfsNode
 from deca.ff_types import *
+from deca.ff_adf import AdfDatabase
 from deca.builder import Builder
 from deca.util import Logger
 from deca.gui.viewer_adf import DataViewerAdf
@@ -45,6 +46,7 @@ class VfsNodeTableModel(QAbstractTableModel):
     def __init__(self, show_mapped=True):
         QAbstractTableModel.__init__(self)
         self.vfs = None
+        self.adf_db = None
         self.show_mapped = show_mapped
         self.table = None
 
@@ -58,7 +60,8 @@ class VfsNodeTableModel(QAbstractTableModel):
     def vfs_set(self, vfs):
         self.beginResetModel()
         self.vfs = vfs
-        self.table = self.vfs.table_vfsnode
+        self.adf_db = AdfDatabase(vfs)
+        self.table = self.vfs.nodes_select_all()
         if not self.show_mapped:
             self.table = [v for v in self.table if
                           v.vpath is None and v.pvpath is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
@@ -169,7 +172,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                     if node.used_at_runtime_depth is not None:
                         return used_color_calc(node.used_at_runtime_depth)
                 elif column == 5:
-                    if node.adf_type is not None and node.adf_type not in self.vfs.adf_db.map_type_def:
+                    if node.adf_type is not None and node.adf_type not in self.adf_db.type_map_def:
                         return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:
@@ -287,6 +290,7 @@ class VfsDirModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
         self.vfs = None
+        self.adf_db = None
         self.root_node = None
         self.n_rows = 0
         self.n_cols = 0
@@ -294,26 +298,28 @@ class VfsDirModel(QAbstractItemModel):
     def vfs_set(self, vfs):
         self.beginResetModel()
         self.vfs = vfs
+        self.adf_db = AdfDatabase(vfs)
         self.root_node = None
         self.root_node = VfsDirBranch(b'/')
 
-        keys = list(self.vfs.map_vpath_to_vfsnodes.keys())
+        keys = self.vfs.nodes_select_distinct_vpath()
         keys.sort()
         for vpath in keys:
-            vnodes = self.vfs.map_vpath_to_vfsnodes[vpath]
-            if len(vnodes) > 0 and vpath is not None:
-                if vpath.find(b'\\') >= 0:
-                    print('WINDOWS PATH {}'.format(vpath))
-                    path = vpath.split(b'\\')
-                else:
-                    path = vpath.split(b'/')
-                name = path[-1]
-                path = path[0:-1]
-                cnode = self.root_node
-                for p in path:
-                    cnode = cnode.child_add(VfsDirBranch(p))
+            if vpath is not None:
+                vnodes = self.vfs.nodes_where_vpath(vpath)
+                if len(vnodes) > 0:
+                    if vpath.find(b'\\') >= 0:
+                        print('WINDOWS PATH {}'.format(vpath))
+                        path = vpath.split(b'\\')
+                    else:
+                        path = vpath.split(b'/')
+                    name = path[-1]
+                    path = path[0:-1]
+                    cnode = self.root_node
+                    for p in path:
+                        cnode = cnode.child_add(VfsDirBranch(p))
 
-                cnode.child_add(VfsDirLeaf(name, vnodes))
+                    cnode.child_add(VfsDirLeaf(name, vnodes))
 
         self.endResetModel()
 
@@ -397,7 +403,7 @@ class VfsDirModel(QAbstractItemModel):
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
                 elif column == 5:
-                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.adf_db.map_type_def:
+                    if vnode.adf_type is not None and vnode.adf_type not in self.adf_db.type_map_def:
                         return QColor(Qt.red)
         return None
 
@@ -514,6 +520,7 @@ class DataViewWidget(QWidget):
     def __init__(self):
         QWidget.__init__(self)
         self.vfs = None
+        self.adf_db = None
 
         self.tab_info = DataViewerInfo()
         self.tab_raw = DataViewerRaw()
@@ -544,6 +551,8 @@ class DataViewWidget(QWidget):
 
     def vfs_set(self, vfs):
         self.vfs = vfs
+        self.adf_db = AdfDatabase()
+        self.adf_db.load_from_database(self.vfs)
 
     def vnode_selection_changed(self, vpaths):
         print('DataViewWidget:vnode_selection_changed: {}'.format(vpaths))
@@ -861,12 +870,13 @@ class MainWidget(QWidget):
         txt_in = self.vhash_to_vpath_in_edit.text()
 
         txt_out = ''
-        if self.vfs is not None and self.vfs.map_hash_to_vpath is not None:
+        if self.vfs is not None:
             try:
                 val_in = int(txt_in, 0)
-                txt_out = self.vfs.map_hash_to_vpath.get(val_in, '')
-                if isinstance(txt_out, set) and len(txt_out) > 0:
-                    txt_out = list(txt_out)[0].decode('utf-8')
+                nodes = self.vfs.nodes_where_vhash(val_in)
+                for node in nodes:
+                    if len(node.vpath) > 0:
+                        txt_out = node.vpath.decode('utf-8')
             except ValueError:
                 pass
 
@@ -940,8 +950,7 @@ class MainWindow(QMainWindow):
         self.vfs = vfs
         self.setWindowTitle(
             "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_info.game_dir))
-        self.status.showMessage(
-            "Data loaded and plotted: {}".format('hash_map_missing: {}'.format(len(vfs.hash_map_missing))))
+        self.status.showMessage("LOAD COMPLETE")
         self.main_widget.vfs_set(vfs)
         self.action_external_add.setEnabled(True)
 

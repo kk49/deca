@@ -62,6 +62,7 @@ class Deca3dMatrix:
 class Deca3dDatabase:
     def __init__(self, vfs, resource_prefix_abs, resource_prefix_uri, flat_file_layout):
         self.vfs = vfs
+        self.adf_db = AdfDatabase(vfs)
         self.resource_prefix_abs = resource_prefix_abs
         self.resource_prefix_uri = resource_prefix_uri
         self.map_vpath_to_texture = {}
@@ -73,22 +74,22 @@ class Deca3dDatabase:
     def gltf_add_texture(self, gltf, vpath):
         item = self.map_vpath_to_texture.get(vpath, Deca3dTexture(vpath))
         self.map_vpath_to_texture[vpath] = item
-        return item.add_to_gltf(self.vfs, self, gltf)
+        return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
     def gltf_add_meshc(self, gltf, vpath):
         item = self.map_vpath_to_meshc.get(vpath, Deca3dMeshc(vpath))
         self.map_vpath_to_meshc[vpath] = item
-        return item.add_to_gltf(self.vfs, self, gltf)
+        return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
     def gltf_add_modelc(self, gltf, vpath, material_properties=None):
         item = self.map_vpath_to_modelc.get(vpath, Deca3dModelc(vpath, material_properties))
         self.map_vpath_to_modelc[vpath] = item
-        return item.add_to_gltf(self.vfs, self, gltf)
+        return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
     def gltf_add_hk_skeleton(self, gltf, vpath, scene):
         item = self.map_vpath_to_hk_skeleton.get(vpath, Deca3dHkSkeleton(vpath, scene))
         self.map_vpath_to_hk_skeleton[vpath] = item
-        return item.add_to_gltf(self.vfs, self, gltf)
+        return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
     def gltf_finalize_mesh(self, mesh_org: pyg.Mesh, material_map=None):
         mesh = copy.deepcopy(mesh_org)
@@ -105,7 +106,7 @@ class Deca3dTexture:
         self.gltf_id = None
         self.texture_saved = False
 
-    def add_to_gltf(self, vfs, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if not self.texture_saved:
             vfs.logger.log('Texture:Setup: {}'.format(self.vpath))
             # dump textures
@@ -167,10 +168,10 @@ class Deca3dMeshc:
         self.vpath = vpath
         self.meshes = None
 
-    def add_to_gltf(self, vfs, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.meshes is None:
             vfs.logger.log('Setup Meshc: {}'.format(self.vpath))
-            mesh_adf = adf_read_node(vfs, vfs.map_vpath_to_vfsnodes[self.vpath][0])
+            mesh_adf = adf_db.read_node(vfs, vfs.map_vpath_to_vfsnodes[self.vpath][0])
             assert len(mesh_adf.table_instance) == 2
             assert mesh_adf.table_instance[0].type_hash == 0xea60065d
             # 0x67b3a453 - GenZ, 0xe6834477 - theHunter
@@ -187,7 +188,7 @@ class Deca3dMeshc:
                 hrmesh_node = vfs.map_vpath_to_vfsnodes[hrmesh_vpath2][0]
 
             if hrmesh_node is not None:
-                hrmesh_adf = adf_read_node(vfs, hrmesh_node)
+                hrmesh_adf = adf_db.read_node(vfs, hrmesh_node)
                 assert len(hrmesh_adf.table_instance) == 1
                 assert hrmesh_adf.table_instance[0].type_hash == 0x67b3a453
                 hrmesh_buffers = AmfMeshBuffers(hrmesh_adf, hrmesh_adf.table_instance_full_values[0])
@@ -387,7 +388,7 @@ class Deca3dModelc:
         self.models = None
         self.material_properties = material_properties
 
-    def add_to_gltf(self, vfs, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.models is None:
             vfs.logger.log('Setup Modelc: {}'.format(self.vpath))
 
@@ -400,7 +401,7 @@ class Deca3dModelc:
                 raise EDecaFileMissing('No Nodes: {}'.format(self.vpath))
 
             node = node[0]
-            model_adf = adf_read_node(vfs, node)
+            model_adf = adf_db.read_node(vfs, node)
             model = AmfModel(model_adf, model_adf.table_instance_full_values[0])
 
             material_map = {}
@@ -498,7 +499,7 @@ class Deca3dHkSkeleton:
         self.scene = scene
         self.skeleton = None
 
-    def add_to_gltf(self, vfs, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.skeleton is None:
             vfs.logger.log('Setup Modelc: {}'.format(self.vpath))
 

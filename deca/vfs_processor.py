@@ -11,14 +11,14 @@ import sqlite3
 import struct
 
 from deca.file import ArchiveFile
-from deca.vfs_db import VfsDatabase, VfsNode, propose_h4
+from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, db_to_vfs_node
 from deca.vfs_commands import run_mp_vfs_base, language_codes, MultiProcessVfsBase
 from deca.game_info import GameInfo, game_info_load, GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
 from deca.errors import EDecaFileExists
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_read_node, TypeDef
+from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, TypeDef
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
@@ -68,21 +68,8 @@ def vfs_structure_prep(project_file, working_dir, logger=None, debug=False):
     if logger is None:
         logger = Logger(working_dir)
 
-    vfs = None
-
     vfs = VfsProcessor(project_file, working_dir, logger)
-
-    # vfs.load_from_archives(debug=debug)
-
-    vfs.search_for_vpaths()
-
-    logger.log('CREATING: COMPLETE')
-
-    # dump vpath file if not present
-    vfs.dump_vpaths()
-
-    vfs.dump_status()
-
+    vfs.process(debug)
     return vfs
 
 
@@ -96,8 +83,6 @@ def game_file_to_sortable_string(v):
 class VfsProcessor(VfsDatabase):
     def __init__(self, project_file, working_dir, logger):
         VfsDatabase.__init__(self, project_file, working_dir, logger)
-
-        # self.db_update()
 
         self.external_files = set()
         self.progress_update_time_sec = 5.0
@@ -120,10 +105,107 @@ class VfsProcessor(VfsDatabase):
             self.logger.log('Process: {}: Start'.format(p))
             p.start()
 
-    def mp_issue_commands(self, command_list: list, debug=False):
+    def process(self, debug=False):
+        version = self.db_query_one("PRAGMA user_version")[0]
+        if version < 1:
+            self.db_reset()
+            self.load_from_archives(debug=debug)
+            self.process_by_ftype(FTYPE_ADF, 'process_adf_initial')
+            self.process_by_ftype(FTYPE_ADF_BARE, 'process_adf_initial')
+            self.process_by_ftype(FTYPE_RTPC, 'process_rtpc_initial')
+            self.process_by_ftype(FTYPE_GFX, 'process_gfx_initial')
+            self.process_by_ftype(FTYPE_TXT, 'process_txt_initial')
+            self.find_vpath_exe()
+            self.find_vpath_procmon_dir()
+            self.find_vpath_procmon_file()
+            self.find_vpath_custom()
+            self.find_vpath_guess()
+            self.find_vpath_by_assoc()
+            self.process_by_vhash('process_vhash_final')
+            self.update_used_depths()
+            self.dump_vpaths()
+            self.db_execute_one("PRAGMA user_version = 1;")
+
+        self.dump_status()
+        self.logger.log('PROCESSING: COMPLETE')
+
+    def dump_vpaths(self):
+        vpath_file = os.path.join(self.working_dir, 'vpaths.txt')
+        vpaths = self.nodes_select_distinct_vpath()
+        vpaths = list(set([v for v in vpaths if v is not None]))
+        vpaths.sort()
+        if not os.path.isfile(vpath_file):
+            self.logger.log('CREATING: vpaths.txt')
+            with open(vpath_file, 'w') as f:
+                for vpath in vpaths:
+                    f.write('{}\n'.format(vpath))
+
+    def dump_status(self):
+        # possible different vpaths with same hash, uncommon
+        q = "SELECT DISTINCT hash, COUNT(*) c FROM core_hash4 GROUP BY hash HAVING c > 1;"
+        dup_hash4 = self.db_query_all(q)
+        for vhash, c in dup_hash4:
+            q = "SELECT DISTINCT hash, string FROM core_hash4 WHERE hash = (?)"
+            hashes = self.db_query_all(q, [vhash])
+            fcs = []
+            gtz_count = 0
+            for h, s in hashes:
+                q = "SELECT DISTINCT uid FROM core_vnodes WHERE vpath = (?)"
+                nodes = self.db_query_all(q, [s])
+                fc = len(nodes)
+                self.logger.log(f'SUMMARY: Duplicate Path Hashes: {h:08x} {s}: {fc} nodes')
+                fcs.append(len(nodes))
+                if fc > 0:
+                    gtz_count += 1
+            if gtz_count > 1:
+                for (h, s), fc in zip(hashes, fcs):
+                    self.logger.log(f'WARNING: Duplicate Path Hashes: {h:08x} {s}: {fc} nodes')
+
+        # nodes with same hash but different paths, rare
+        q = "SELECT DISTINCT vpath_hash, vpath, COUNT(*) c FROM core_vnodes GROUP BY vpath_hash, vpath_hash HAVING c > 1;"
+        dup_nodes = self.db_query_all(q)
+        dup_map = {}
+        dup_count = {}
+        for vhash, vpath, c in dup_nodes:
+            if vhash not in dup_map:
+                dup_map[vhash] = {vpath}
+            else:
+                dup_map[vhash].add(vpath)
+                dup_count[vhash] = len(dup_map[vhash])
+
+        for vhash, vpaths in dup_count.items():
+            for vpath in vpaths:
+                self.logger.log(f'SUMMARY: Duplicate Node Hashes: {vhash:08x} {vpath}')
+
+        # ADF type summary
+        adf_db = AdfDatabase()
+        adf_db.load_from_database(self)
+
+        missing_types = set()
+        for t, uid in adf_db.type_missing:
+            missing_types.add(t)
+            node = self.node_where_uid(uid)
+            self.logger.log('SUMMARY: Missing Type {:08x} in {:08X} {}'.format(t, node.vhash, node.vpath))
+
+        self.logger.log(f'SUMMARY: Missing Types: {len(missing_types)} ')
+
+        # unmatched summary, common
+        q = "SELECT vpath_hash FROM core_vnodes WHERE vpath IS NULL"
+        nodes_no_vpath = self.db_query_all(q)
+        nodes_no_vpath = [r[0] for r in nodes_no_vpath]
+        nodes_no_vpath_set = set(nodes_no_vpath)
+        self.logger.log(f'SUMMARY: Unmatched Nodes: {len(nodes_no_vpath)}')
+        self.logger.log(f'SUMMARY: Unmatched Path Hashes: {len(nodes_no_vpath_set)}')
+
+    def mp_issue_commands(self, command_list: list, step_id=None, debug=False):
         command_todo = command_list.copy()
         command_active = {}
         command_complete = []
+
+        if step_id is None:
+            step_id = ''
+        else:
+            step_id = ': {}'.format(step_id)
 
         status = {}
         last_update = None
@@ -145,8 +227,8 @@ class VfsProcessor(VfsDatabase):
                         n_total += v[1]
                     if n_total > 0:
                         last_update = ctime
-                        self.logger.log('Processing: {} of {} done ({:3.1f}%) elapsed {:5.1f} seconds'.format(
-                            n_done, n_total, n_done / n_total * 100.0, ctime - start_time))
+                        self.logger.log('Processing{}: {} of {} done ({:3.1f}%) elapsed {:5.1f} seconds'.format(
+                            step_id, n_done, n_total, n_done / n_total * 100.0, ctime - start_time))
 
                 if len(command_active) < self.mp_n_processes and len(command_todo) > 0:
                     # add commands
@@ -165,11 +247,13 @@ class VfsProcessor(VfsDatabase):
                         proc_cmd = msg[1]
                         proc_params = msg[2]
 
-                        if proc_cmd not in {'log', 'status'} and debug:
+                        if proc_cmd not in {'trace', 'log', 'status'} and debug:
                             self.logger.log('Manager: received msg {}:{}'.format(proc_name, proc_cmd))
 
                         if proc_cmd == 'log':
                             self.logger.log('{}: {}'.format(proc_name, proc_params[0]))
+                        elif proc_cmd == 'trace':
+                            self.logger.trace('{}: {}'.format(proc_name, proc_params[0]))
                         elif proc_cmd == 'status':
                             status[proc_name] = proc_params
                         elif proc_cmd == 'cmd_done':
@@ -246,7 +330,7 @@ class VfsProcessor(VfsDatabase):
 
             any_change = False
 
-            new_nodes = set(self.nodes_unprocessed_uids())
+            new_nodes = set(self.nodes_where_processed_select_uid(0))
             new_nodes = new_nodes - processed_nodes
 
             if len(new_nodes) > 0:
@@ -258,19 +342,19 @@ class VfsProcessor(VfsDatabase):
 
                 commands = []
                 for ii in indexes:
-                    commands.append(['search_archives', [ii]])
+                    commands.append(['process_archives_initial', [ii]])
 
-                self.mp_issue_commands(commands)
+                self.mp_issue_commands(commands, step_id='Archives')
                 processed_nodes = processed_nodes.union(new_nodes)
                 self.logger.log('Expand Archives Phase {}: End'.format(phase_id))
 
-    def get_vnode_indexs_from_ftype(self, ftype):
+    def get_vnode_indexs_from_ftype(self, ftype, process_dups=False):
         indexs = []
         done_set = set()
-        src_indexes = self.nodes_ftype_uids(ftype)
+        src_indexes = self.nodes_where_ftype_select_uid(ftype)
         for idx in src_indexes:
-            node = self.node_get_uid(idx)
-            if node.is_valid() and node.ftype == ftype and node.vhash not in done_set:
+            node = self.node_where_uid(idx)
+            if node.is_valid() and node.ftype == ftype and (process_dups or node.vhash not in done_set):
                 done_set.add(node.vhash)
                 indexs.append(idx)
         return indexs, done_set
@@ -287,9 +371,25 @@ class VfsProcessor(VfsDatabase):
             for idxs in indexes2:
                 commands.append([cmd, [idxs]])
 
-            self.mp_issue_commands(commands)
+            self.mp_issue_commands(commands, step_id=ftype)
 
         self.logger.log('PROCESS: FTYPE = {}: Total files {}'.format(ftype, len(nodes_done)))
+
+    def process_by_vhash(self, cmd):
+        self.logger.log('PROCESS: VHASHes')
+
+        vhashes = self.nodes_select_distinct_vhash()
+
+        if len(vhashes) > 0:
+            indexes2 = [vhashes[v::self.mp_n_processes] for v in range(0, self.mp_n_processes)]
+
+            commands = []
+            for idxs in indexes2:
+                commands.append([cmd, [idxs]])
+
+            self.mp_issue_commands(commands, step_id='vhash')
+
+        self.logger.log('PROCESS: VHASHes: Total VHASHes {}'.format(len(vhashes)))
 
     def find_vpath_exe(self):
         fn = './resources/{}/all_strings.tsv'.format(self.game_info.game_id)
@@ -317,7 +417,7 @@ class VfsProcessor(VfsDatabase):
             hash4_to_add = []
 
             self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/{}/strings_procmon.txt'.format(self.game_info.game_id))
-            with open(fn, 'r') as f:
+            with open(fn, 'rb') as f:
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)
                 for s in custom_strings:
@@ -335,8 +435,6 @@ class VfsProcessor(VfsDatabase):
         custom_strings = set()
 
         if os.path.isdir(path_name):
-            hash4_to_add = []
-
             fns = os.listdir(path_name)
             fns = [os.path.join(path_name, fn) for fn in fns]
             for fn in fns:
@@ -354,13 +452,15 @@ class VfsProcessor(VfsDatabase):
                                 s = s.replace('\\', '/')
                                 custom_strings.add(s)
 
-        for s in custom_strings:
-            propose_h4(hash4_to_add, s.strip(), None, used_at_runtime=True)
+            hash4_to_add = []
 
-        hash4_to_add = list(set(hash4_to_add))
-        if len(hash4_to_add) > 0:
-            self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-            self.hash4_add_many(hash4_to_add)
+            for s in custom_strings:
+                propose_h4(hash4_to_add, s.strip().encode('ascii'), None, used_at_runtime=True)
+
+            hash4_to_add = list(set(hash4_to_add))
+            if len(hash4_to_add) > 0:
+                self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
+                self.hash4_add_many(hash4_to_add)
 
         self.logger.log('STRINGS FROM HASH FROM PROCMON DIR: Total {} strings'.format(len(custom_strings)))
 
@@ -369,7 +469,7 @@ class VfsProcessor(VfsDatabase):
         if os.path.isfile(fn):
             hash4_to_add = []
             self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/{}/strings.txt'.format(self.game_info.game_id))
-            with open(fn) as f:
+            with open(fn, 'rb') as f:
                 custom_strings = f.readlines()
                 custom_strings = set(custom_strings)
                 for s in custom_strings:
@@ -462,7 +562,7 @@ class VfsProcessor(VfsDatabase):
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: epe/ee, blo/bl/nl/fl/nl.mdic/fl.mdic, mesh*/model*, avtx/atx?]')
         pair_exts = self.game_info.file_assoc()
 
-        all_hash4 = self.hash4_get_strings()
+        all_hash4 = self.hash4_select_distinct_string()
         assoc_strings = {}
 
         for k in all_hash4:
@@ -475,7 +575,7 @@ class VfsProcessor(VfsDatabase):
                         for pk, pv in pe.items():
                             assoc_strings[file + pk] = pv
 
-        hash_present = set(self.node_get_hashes())
+        hash_present = set(self.nodes_select_distinct_vhash())
         hash4_to_add = []
         for k, v in assoc_strings.items():
             fn = k
@@ -489,6 +589,61 @@ class VfsProcessor(VfsDatabase):
             self.hash4_add_many(hash4_to_add)
 
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
+
+    # def find_adf_types_exe_noheader(self):
+    #     exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
+    #
+    #     with open(exe_path, 'rb') as f:
+    #         buffer = f.read(os.stat(exe_path).st_size)
+    #
+    #     for k, v in self.adf_missing_types.items():
+    #         lid = struct.pack('<L', k)
+    #         offset = 0
+    #         while True:
+    #             offset = buffer.find(lid, offset)
+    #             if offset < 0:
+    #                 break
+    #             print('Found {:08X} @ {}'.format(k, offset))
+    #
+    #             t = TypeDef()
+    #             with ArchiveFile(io.BytesIO(buffer)) as f:
+    #                 f.seek(offset - 12)  # rewind to begining of type
+    #                 t.deserialize(f, {})
+    #
+    #             offset += 1
+
+    def update_used_depths(self):
+        level = 0
+        while True:
+            self.logger.log('UPDATING USE DEPTH: {}'.format(level))
+            # puids = self.db_query_all("SELECT uid FROM core_vnodes WHERE used_at_runtime_depth == (?)", [level])
+            # puids = [n[0] for n in puids]
+            #
+            # if len(puids) == 0:
+            #     break
+
+            child_nodes = self.db_query_all(
+                """
+                SELECT * FROM core_vnodes WHERE 
+                    parent_id IN (SELECT uid FROM core_vnodes WHERE used_at_runtime_depth == (?))
+                """,
+                [level]
+            )
+            child_nodes = [db_to_vfs_node(n) for n in child_nodes]
+
+            level = level + 1
+
+            nodes_to_update = []
+            for child_node in child_nodes:
+                if child_node.used_at_runtime_depth is None or child_node.used_at_runtime_depth > level:
+                    child_node.used_at_runtime_depth = level
+                    nodes_to_update.append(child_node)
+
+            if len(nodes_to_update) > 0:
+                self.logger.log('DATABASE: Updating {} nodes'.format(len(nodes_to_update)))
+                self.node_update_many(nodes_to_update)
+            else:
+                break
 
     def node_update_vpath_mapping(self, vnode):
         vid = vnode.vhash
@@ -519,195 +674,6 @@ class VfsProcessor(VfsDatabase):
                 elif ext == b'.hmddsc':
                     vnode.ftype = FTYPE_HMDDSC
 
-    def process_vpaths(self):
-        hash4_rowid_map = self.hash4_get_map()
-        hash4_refs = self.hash4_get_references()
-
-        self.logger.log('process_vpaths: Input count {}'.format(len(hash4_refs)))
-
-        hash4_refs_rowid_map = {}
-        for rec in hash4_refs:
-            hash_row_id, src_node, is_adf_field_name, used_at_runtime, possible_ftypes = rec
-            rec_new = hash_row_id, is_adf_field_name, used_at_runtime, possible_ftypes
-            s = hash4_refs_rowid_map.get(hash_row_id, set())
-            s.add(rec_new)
-            hash4_refs_rowid_map[hash_row_id] = s
-
-        for hrid, rec_set in hash4_refs_rowid_map.items():
-            vhash, vpath = hash4_rowid_map[hrid]
-            vnodes = self.nodes_select_by_vhash(vhash)
-
-            nodes_to_update = []
-            if len(vnodes) > 0:
-                vnode: VfsNode
-                for vnode in vnodes:
-                    if vnode.is_valid():
-                        updated = False
-                        if vnode.vpath is None:
-                            for rec in rec_set:
-                                hash_row_id, is_adf_field_name, used_at_runtime, possible_ftypes = rec
-                                if possible_ftypes == 0:
-                                    possible_ftypes = ftype_list[FTYPE_ANY_TYPE]
-
-                                if vnode.ftype is None:
-                                    ftype_int = ftype_list[FTYPE_NO_TYPE]
-                                else:
-                                    ftype_int = ftype_list[vnode.ftype]
-
-                                if (ftype_int & possible_ftypes) != 0:
-                                    self.logger.trace('vpath:add  {} {:08X} {} {} {}'.format(vpath, vhash, src_node, possible_ftypes, vnode.ftype))
-                                    vnode.vpath = vpath
-                                    updated = True
-                                else:
-                                    self.logger.log('vpath:skip {} {:08X} {} {} {}'.format(vpath, vhash, src_node, possible_ftypes, vnode.ftype))
-
-                        if vnode.vpath == vpath:
-                            for rec in rec_set:
-                                hash_row_id, is_adf_field_name, used_at_runtime, possible_ftypes = rec
-                                if used_at_runtime and (vnode.used_at_runtime_depth is None or vnode.used_at_runtime_depth > 0):
-                                    # print('rnt', vp.vpath)
-                                    vnode.used_depth_set(0)
-                                    updated = True
-
-                        if updated:
-                            nodes_to_update.append(vnode)
-            else:
-                self.logger.trace('vpath:miss {} {:08X} {} {}'.format(vpath, vhash, src_node, possible_ftypes))
-
-            if len(nodes_to_update) > 0:
-                self.logger.log('DATABASE: Updating {} nodes: {:08X} {}'.format(len(nodes_to_update), vhash, vpath))
-                self.node_update_many(nodes_to_update)
-
-        # found_vpaths = list(found_vpaths)
-        # found_vpaths.sort()
-        # with open(self.working_dir + 'found_vpaths.txt', 'a') as f:
-        #     for vp in found_vpaths:
-        #         f.write('{}\n'.format(vp.decode('utf-8')))
-
-        #         for s in ss:
-        #             hid = hash_little(s)
-        #             if hid in self.hash_present:
-        #                 if hid in self.map_hash_to_vpath:
-        #                     if s != self.map_hash_to_vpath[hid]:
-        #                         self.logger.trace('HASH CONFLICT STRINGS: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], s))
-        #                         self.hash_bad[hid] = (self.map_hash_to_vpath[hid], s)
-        #                 else:
-        #                     if dump_found_paths:
-        #                         f.write('{:08X}\t{}\n'.format(hid, s))
-        #                     self.map_hash_to_vpath[hid] = s
-        #                     self.map_vpath_to_hash[s] = hid
-        #                     found = found + 1
-        #
-        # self.logger.log('fill in v_paths, mark extensions identified files as ftype')
-        #
-        # self.logger.log('PROCESS BASELINE VNODE INFORMATION')
-        # for idx in range(len(self.table_vfsnode)):
-        #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.vhash is not None:
-        #         hid = node.vhash
-        #         if node.vpath is not None:
-        #             if hid in self.map_hash_to_vpath:
-        #                 if self.map_hash_to_vpath[hid] != node.vpath:
-        #                     self.logger.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.vpath))
-        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.vpath)
-        #             else:
-        #                 self.map_hash_to_vpath[hid] = node.vpath
-        #                 self.map_vpath_to_hash[node.vpath] = hid
-        # self.logger.log('PROCESS BASELINE VNODE INFORMATION: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
-        #
-        # for idx in range(len(self.table_vfsnode)):
-        #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.vhash is not None and node.vpath is None:
-        #         if node.vhash in self.map_hash_to_vpath:
-        #             node.vpath = self.map_hash_to_vpath[node.vhash]
-        #
-        #     if node.is_valid() and node.vhash is not None:
-        #         if node.ftype not in {FTYPE_ARC, FTYPE_TAB}:
-        #             if node.vhash in self.map_hash_to_vpath:
-        #                 self.hash_map_present.add(node.vhash)
-        #             else:
-        #                 self.hash_map_missing.add(node.vhash)
-        #
-        #     if node.is_valid() and node.vpath is not None:
-        #         if os.path.splitext(node.vpath)[1][0:4] == b'.atx':
-        #             if node.ftype is not None:
-        #                 raise Exception('ATX marked as non ATX: {}'.format(node.vpath))
-        #             node.ftype = FTYPE_ATX
-        #
-        #         lst = self.map_vpath_to_vfsnodes.get(node.vpath, [])
-        #         if len(lst) > 0 and lst[0].offset is None:  # Do not let symlink be first is list # TODO Sort by accessibility
-        #             lst = [node] + lst
-        #         else:
-        #             lst.append(node)
-        #         self.map_vpath_to_vfsnodes[node.vpath] = lst
-
-    # def find_adf_types_exe_noheader(self):
-    #     exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
-    #
-    #     with open(exe_path, 'rb') as f:
-    #         buffer = f.read(os.stat(exe_path).st_size)
-    #
-    #     for k, v in self.adf_missing_types.items():
-    #         lid = struct.pack('<L', k)
-    #         offset = 0
-    #         while True:
-    #             offset = buffer.find(lid, offset)
-    #             if offset < 0:
-    #                 break
-    #             print('Found {:08X} @ {}'.format(k, offset))
-    #
-    #             t = TypeDef()
-    #             with ArchiveFile(io.BytesIO(buffer)) as f:
-    #                 f.seek(offset - 12)  # rewind to begining of type
-    #                 t.deserialize(f, {})
-    #
-    #             offset += 1
-
-    def search_for_vpaths(self):
-        # self.process_by_ftype(FTYPE_ADF, 'adf_initial_search')
-        # self.process_by_ftype(FTYPE_ADF_BARE, 'adf_initial_search')
-        # self.process_by_ftype(FTYPE_RTPC, 'rtpc_initial_search')
-        # self.process_by_ftype(FTYPE_GFX, 'gfx_initial_search')
-        # self.process_by_ftype(FTYPE_TXT, 'txt_initial_search')
-        # self.find_vpath_exe()
-        # self.find_vpath_procmon_dir()
-        # self.find_vpath_procmon_file()
-        # self.find_vpath_custom()
-        # self.find_vpath_guess()
-        # self.find_vpath_by_assoc()
-
-        self.process_vpaths()
-
-tatus        self.update_used_depths()
-
-    def dump_vpaths(self):
-        vpath_file = os.path.join(self.working_dir, 'vpaths.txt')
-        vpaths = self.node_get_vpaths()
-        vpaths.sort()
-        vpaths = [v for v in vpaths if v is not None]
-        if not os.path.isfile(vpath_file):
-            self.logger.log('CREATING: vpaths.txt')
-            with open(vpath_file, 'w') as f:
-                for vpath in vpaths:
-                    f.write('{}\n'.format(vpath))
-
-    def dump_status(self):
-        self.logger.log('hashes: {}, mappings missing: {}, mappings present {}, mapping conflict {}'.format(
-            len(self.hash_present),
-            len(self.hash_map_missing),
-            len(self.hash_map_present),
-            len(self.hash_map_conflict)))
-
-        for k, vs in self.adf_missing_types.items():
-            for v in vs:
-                vps = self.map_hash_to_vpath.get(v, {})
-                for vp in vps:
-                    self.logger.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp))
-
-        for vid in self.hash_map_conflict:
-            for vps in self.map_hash_to_vpath[vid]:
-                for vp in vps:
-                    self.logger.log('CONFLICT: {:08X} {}'.format(vid, vp))
 
     def external_file_add(self, filename):
         if not hasattr(self, 'external_files'):

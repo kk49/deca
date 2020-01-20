@@ -3,7 +3,7 @@ from deca.ff_avtx import Ddsc, image_export
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
 from deca.file import ArchiveFile
 from deca.ff_types import *
-from deca.ff_adf import adf_read_node
+from deca.ff_adf import AdfDatabase
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf
@@ -144,6 +144,8 @@ class ToolMakeWebMap:
             self.vfs = vfs_structure_open(vfs_config)
         else:
             self.vfs = vfs_config
+
+        self.adf_db = AdfDatabase(self.vfs)
 
     def tileset_make(self, img, tile_path, tile_size=256, max_zoom=-1):
         # save full image, mainly for debugging
@@ -364,18 +366,7 @@ class ToolMakeWebMap:
             fn = tileo[0]
             vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
 
-            with self.vfs.file_obj_from(vnode) as f:
-                if vnode.ftype == FTYPE_ADF:
-                    buffer = f.read(vnode.size_u)
-                    bmp_adf = self.vfs.adf_db.load_adf(buffer)
-                else:
-                    buffer = b''
-                    while True:
-                        v = f.read(16 * 1024 * 1024)
-                        if len(v) == 0:
-                            break
-                        buffer = buffer + v
-                    bmp_adf = self.vfs.adf_db.load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
+            bmp_adf = self.adf_db.read_node(self.vfs, vnode)
 
             bitfield = bmp_adf.table_instance_values[0]['Layers'][0]['Bitfield']
             bitfield = np.asarray(bitfield, dtype=np.uint32).data
@@ -429,7 +420,7 @@ class ToolMakeWebMap:
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped
         vnode = self.vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
-        adf = adf_read_node(self.vfs, vnode)
+        adf = self.adf_db.read_node(self.vfs, vnode)
         collectables = []
         for v in adf.table_instance_values[0]['Collectibles']:
             obj_id = v['ID']

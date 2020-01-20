@@ -12,6 +12,12 @@ from deca.util import make_dir_for_file
 from deca.game_info import GameInfo, game_info_load
 
 
+def to_bytes(s):
+    if isinstance(s, str):
+        s = s.encode('ascii', 'ignore')
+    return s
+
+
 def propose_h4(h4list, vpath, pnode, is_field_name=0, possible_ftypes=None, used_at_runtime=None):
     ptypes = 0
 
@@ -82,7 +88,6 @@ class VfsNode:
         self.offset = offset  # offset in parent
         self.size_c = size_c  # compressed size in client
         self.size_u = size_u  # extracted size
-        self.children = set()
         self.used_at_runtime_depth = used_at_runtime_depth
         self.processed = processed
 
@@ -94,12 +99,6 @@ class VfsNode:
 
     def is_valid(self):
         return self.uid is not None and self.uid != 0
-
-    def used_depth_set(self, v):
-        if self.used_at_runtime_depth is None or self.used_at_runtime_depth > v:
-            self.used_at_runtime_depth = v
-            for ch in self.children:
-                ch.used_depth_set(v+1)
 
     def __str__(self):
         info = []
@@ -119,7 +118,7 @@ class VfsNode:
 def db_to_vfs_node(v):
     # v = [int(v[0]), v[1], v[2], int(v[3]), v[4]] + [int(i) for i in v[5:]]
     node = VfsNode(
-        uid=v[0], ftype=v[1], vpath=v[2], vhash=v[3], pvpath=v[4],
+        uid=v[0], ftype=v[1], vpath=to_bytes(v[2]), vhash=v[3], pvpath=v[4],
         pid=v[5], index=v[6], level=v[7], compressed=v[8], offset=v[9],
         size_c=v[10], size_u=v[11], used_at_runtime_depth=v[12], adf_type=v[13], sarc_ext_hash=v[14],
         processed=v[15],
@@ -163,24 +162,22 @@ class VfsDatabase:
     def logger_set(self, logger):
         self.logger = logger
 
-    def db_update(self):
-        version = self.db_cur.execute('PRAGMA user_version').fetchone()[0]
-        if version < 1:
-            self.db_cur.execute('DROP INDEX IF EXISTS core_vpath_to_vnode;')
-            self.db_cur.execute('DROP INDEX IF EXISTS core_vhash_to_vnode;')
+    def db_reset(self):
+        self.db_cur.execute('DROP INDEX IF EXISTS core_vpath_to_vnode;')
+        self.db_cur.execute('DROP INDEX IF EXISTS core_vhash_to_vnode;')
 
-            self.db_cur.execute('DROP TABLE IF EXISTS core_vnodes;')
-            self.db_cur.execute('DROP TABLE IF EXISTS core_hash4;')
-            self.db_cur.execute('DROP TABLE IF EXISTS core_hash4_references;')
-            self.db_cur.execute('DROP TABLE IF EXISTS core_hash6;')
-            self.db_cur.execute('DROP TABLE IF EXISTS core_hash6_references;')
-            self.db_cur.execute('DROP TABLE IF EXISTS core_adf_types;')
+        self.db_cur.execute('DROP TABLE IF EXISTS core_vnodes;')
+        self.db_cur.execute('DROP TABLE IF EXISTS core_hash4;')
+        self.db_cur.execute('DROP TABLE IF EXISTS core_hash4_references;')
+        self.db_cur.execute('DROP TABLE IF EXISTS core_hash6;')
+        self.db_cur.execute('DROP TABLE IF EXISTS core_hash6_references;')
+        self.db_cur.execute('DROP TABLE IF EXISTS core_adf_types;')
 
-            self.db_cur.execute('VACUUM;')
+        self.db_cur.execute('VACUUM;')
 
-            self.db_conn.commit()
+        self.db_conn.commit()
 
-            self.db_setup()
+        self.db_setup()
 
     def db_setup(self):
         self.db_cur.execute(
@@ -249,8 +246,9 @@ class VfsDatabase:
             '''
             CREATE TABLE IF NOT EXISTS "core_adf_types" (
                 "hash" INTEGER NOT NULL,
+                "missing_in" INTEGER,
                 "pickle" BLOB,
-                PRIMARY KEY ("hash", "pickle")
+                PRIMARY KEY ("hash", "missing_in", "pickle")
             );
             '''
         )
@@ -267,53 +265,117 @@ class VfsDatabase:
 
         self.db_conn.commit()
 
-    def nodes_unprocessed_uids(self):
+    def db_execute_one(self, stmt, params=None, dbg='db_execute_one'):
+        if params is None:
+            params = []
+
         while True:
             try:
-                result = self.db_cur.execute("select uid from core_vnodes where processed == 0")
-                uids = result.fetchall()
+                result = self.db_cur.execute(stmt, params)
                 break
-            except sqlite3.OperationalError:
-                self.logger.log('node_db_select_uid: Waiting on database...')
+            except sqlite3.OperationalError as ex:
+                self.logger.log(f'{dbg}: Waiting on database...')
 
-        return [uid[0] for uid in uids]
+        return result
 
-    def nodes_ftype_uids(self, ftype):
+    def db_query_one(self, stmt, params=None, dbg='db_query_one'):
+        if params is None:
+            params = []
+
         while True:
             try:
-                result = self.db_cur.execute("select uid from core_vnodes where ftype == (?)", [ftype])
-                uids = result.fetchall()
+                result = self.db_cur.execute(stmt, params)
+                result = result.fetchone()
                 break
             except sqlite3.OperationalError:
-                self.logger.log('nodes_ftype_uids: Waiting on database...')
+                self.logger.log(f'{dbg}: Waiting on database...')
 
-        return [uid[0] for uid in uids]
+        return result
 
-    def node_db_select_uid(self, uid):
+    def db_query_all(self, stmt, params=None, dbg='db_query_all'):
+        if params is None:
+            params = []
+
         while True:
             try:
-                result = self.db_cur.execute("select * from core_vnodes where uid == (?)", [uid])
-                r1 = result.fetchone()
+                result = self.db_cur.execute(stmt, params)
+                result = result.fetchall()
                 break
             except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: node_db_select_uid: Waiting on database...')
+                self.logger.log(f'{dbg}: Waiting on database...')
 
+        return result
+
+    def nodes_select_all(self):
+        nodes = self.db_query_all(
+            "select * from core_vnodes", dbg='nodes_select_uids')
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def node_where_uid(self, uid):
+        r1 = self.db_query_one(
+            "select * from core_vnodes where uid == (?)", [uid], dbg='node_where_uid')
         r1 = db_to_vfs_node(r1)
         return r1
 
-    def nodes_select_by_vhash(self, vhash):
-        while True:
-            try:
-                result = self.db_cur.execute("select * from core_vnodes where vpath_hash == (?)", [vhash])
-                nodes = result.fetchall()
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('nodes_select_by_vhash: Waiting on database...')
+    def nodes_where_processed_select_uid(self, processed):
+        uids = self.db_query_all(
+            "select uid from core_vnodes where processed == (?)", [processed], dbg='nodes_where_processed_select_uid')
+        return [uid[0] for uid in uids]
 
+    def nodes_where_ftype_select_uid(self, ftype):
+        uids = self.db_query_all(
+            "select uid from core_vnodes where ftype == (?)", [ftype], dbg='nodes_where_ftype_select_uid')
+        return [uid[0] for uid in uids]
+
+    def nodes_where_vhash(self, vhash):
+        nodes = self.db_query_all(
+            "select * from core_vnodes where vpath_hash == (?)", [vhash], dbg='nodes_where_vhash')
         return [db_to_vfs_node(node) for node in nodes]
 
-    def node_get_uid(self, uid):
-        return self.node_db_select_uid(uid)
+    def nodes_where_vpath(self, vpath):
+        nodes = self.db_query_all(
+            "select * from core_vnodes where vpath == (?)", [vpath], dbg='nodes_where_vpath')
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_select_distinct_vhash(self):
+        result = self.db_query_all(
+            "SELECT DISTINCT vpath_hash FROM core_vnodes", dbg='nodes_select_distinct_vhash')
+        result = [r[0] for r in result if r[0] is not None]
+        return result
+
+    def nodes_select_distinct_vpath(self):
+        result = self.db_query_all(
+            "SELECT DISTINCT vpath FROM core_vnodes", dbg='nodes_select_distinct_vpath')
+        result = [to_bytes(r[0]) for r in result if r[0] is not None]
+        return result
+
+    def hash4_select_distinct_string(self):
+        result = self.db_query_all(
+            "SELECT DISTINCT string FROM core_hash4", dbg='hash4_select_distinct_string')
+        result = [to_bytes(r[0]) for r in result if r[0] is not None]
+        return result
+
+    def hash4_select_all_to_dict(self):
+        result = self.db_query_all(
+            "SELECT rowid, hash, string FROM core_hash4", dbg='hash4_select_all_to_dict')
+        result = [(r[0], (r[1], to_bytes(r[2]))) for r in result]
+        result = dict(result)
+        return result
+
+    def hash4_where_vhash_select_all(self, vhash):
+        result = self.db_query_all(
+            "SELECT rowid, hash, string FROM core_hash4 WHERE hash == (?)", [vhash], dbg='hash4_where_vhash_select_all')
+        return [(r[0], r[1], to_bytes(r[2])) for r in result]
+
+    def hash4_references_select_all(self):
+        result = self.db_query_all(
+            "SELECT * FROM core_hash4_references", dbg='hash4_references_select_all')
+        return result
+
+    def hash4_references_where_h4rowid_select_all(self, rowid):
+        result = self.db_query_all(
+            "SELECT * FROM core_hash4_references WHERE hash_row_id == (?)", [rowid], dbg='hash4_references_where_h4rowid_select_all')
+        return result
 
     def node_add_one(self, node: VfsNode):
         while True:
@@ -372,61 +434,6 @@ class VfsDatabase:
             except sqlite3.OperationalError:
                 self.logger.log('TIMEOUT: node_update_many: Waiting on database...')
         self.db_conn.commit()
-
-    def node_get_hashes(self):
-        while True:
-            try:
-                result = self.db_cur.execute("SELECT DISTINCT vpath_hash FROM core_vnodes")
-                result = result.fetchall()
-                break
-            except sqlite3.OperationalError as exc:
-                self.logger.log('TIMEOUT: node_get_hashes: Waiting on database...')
-        result = [r[0] for r in result]
-        return result
-
-    def node_get_vpaths(self):
-        while True:
-            try:
-                result = self.db_cur.execute("SELECT DISTINCT vpath FROM core_vnodes")
-                result = result.fetchall()
-                break
-            except sqlite3.OperationalError as exc:
-                self.logger.log('TIMEOUT: node_get_hashes: Waiting on database...')
-        result = [r[0] for r in result]
-        return result
-
-    def hash4_get_strings(self):
-        while True:
-            try:
-                result = self.db_cur.execute("SELECT string FROM core_hash4")
-                result = result.fetchall()
-                break
-            except sqlite3.OperationalError as exc:
-                self.logger.log('TIMEOUT: hash4_get_strings: Waiting on database...')
-        result = [r[0] for r in result]
-        return result
-
-    def hash4_get_map(self):
-        while True:
-            try:
-                result = self.db_cur.execute("SELECT rowid, hash, string FROM core_hash4")
-                result = result.fetchall()
-                break
-            except sqlite3.OperationalError as exc:
-                self.logger.log('TIMEOUT: hash4_get_map: Waiting on database...')
-        result = [(r[0], (r[1], r[2])) for r in result]
-        result = dict(result)
-        return result
-
-    def hash4_get_references(self):
-        while True:
-            try:
-                result = self.db_cur.execute("SELECT * FROM core_hash4_references")
-                result = result.fetchall()
-                break
-            except sqlite3.OperationalError as exc:
-                self.logger.log('TIMEOUT: hash4_get_references: Waiting on database...')
-        return result
 
     def hash4_add_many(self, hash_list):
         hash_list_str = [(h[0], h[1]) for h in hash_list]
@@ -516,18 +523,21 @@ class VfsDatabase:
 
         self.db_conn.commit()
 
-    def adf_type_map_save(self, adf_map):
+    def adf_type_map_save(self, adf_map, adf_missing):
         adf_list = []
 
         for k, v in adf_map.items():
             with io.BytesIO() as f:
                 pickle.dump(v, f)
-                adf_list.append((k, bytes(f.getbuffer())))
+                adf_list.append((k, 0, bytes(f.getbuffer())))
+
+        for type_id, missing_in in adf_missing:
+            adf_list.append((type_id, missing_in, bytes()))
 
         while True:
             try:
                 result = self.db_cur.executemany(
-                    "INSERT OR IGNORE INTO core_adf_types VALUES (?,?)", adf_list)
+                    "INSERT OR IGNORE INTO core_adf_types VALUES (?,?,?)", adf_list)
                 break
             except sqlite3.OperationalError:
                 self.logger.log('TIMEOUT: adf_type_map_save: Waiting on database...')
@@ -545,33 +555,39 @@ class VfsDatabase:
                 self.logger.log('TIMEOUT: adf_type_map_load: Waiting on database...')
 
         adf_map = {}
-        for k, b in result:
-            with io.BytesIO(b) as f:
-                v = pickle.load(f)
-            adf_map[k] = v
+        adf_missing = set()
+        for k, miss, b in result:
+            if len(b) > 0:
+                with io.BytesIO(b) as f:
+                    v = pickle.load(f)
+                adf_map[k] = v
+            elif miss is not None and miss != 1:
+                adf_missing.add((k, miss))
+            else:
+                raise NotImplemented(f'Unknown type record: {k}, {miss}, {b}')
 
-        return adf_map
+        return adf_map, adf_missing
 
     def file_obj_from(self, node: VfsNode, mode='rb'):
         if node.ftype == FTYPE_ARC:
             return open(node.pvpath, mode)
         elif node.ftype == FTYPE_TAB:
-            return self.file_obj_from(self.node_get_uid(node.pid))
+            return self.file_obj_from(self.node_where_uid(node.pid))
         elif node.is_compressed:
             cache_dir = self.working_dir + '__CACHE__/'
             os.makedirs(cache_dir, exist_ok=True)
             file_name = cache_dir + '{:08X}.dat'.format(node.vhash)
             if not os.path.isfile(file_name):
-                pnode = self.node_get_uid(node.pid)
+                pnode = self.node_where_uid(node.pid)
                 with ArchiveFile(self.file_obj_from(pnode, mode)) as pf:
                     pf.seek(node.offset)
                     extract_aaf(pf, file_name)
             return open(file_name, mode)
         elif node.ftype == FTYPE_ADF_BARE:
-            pnode = self.node_get_uid(node.pid)
+            pnode = self.node_where_uid(node.pid)
             return self.file_obj_from(pnode, mode)
         elif node.pid is not None:
-            pnode = self.node_get_uid(node.pid)
+            pnode = self.node_where_uid(node.pid)
             pf = self.file_obj_from(pnode, mode)
             pf.seek(node.offset)
             pf = SubsetFile(pf, node.size_u)

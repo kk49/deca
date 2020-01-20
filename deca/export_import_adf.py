@@ -19,11 +19,11 @@ def generate_export_file_path(vfs, export_path, vnode):
     return ofile
 
 
-def adf_export_xlsx_0x0b73315d(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite):
+def adf_export_xlsx_0x0b73315d(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite):
     ofile = generate_export_file_path(vfs, export_path, vnode)
     fn = ofile + '.xlsx'
 
-    adf = adf_read_node(vfs, vnode)
+    adf = adf_db.read_node(vfs, vnode)
 
     if not allow_overwrite and os.path.exists(fn):
         raise EDecaFileExists(fn)
@@ -84,7 +84,7 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsProcessor, vnode: VfsNode, export_path, a
     return fn
 
 
-def adf_export_amf_model_0xf7c20a69(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+def adf_export_amf_model_0xf7c20a69(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
@@ -96,12 +96,12 @@ def adf_export_amf_model_0xf7c20a69(vfs: VfsProcessor, vnode: VfsNode, export_pa
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def adf_export_mdic_0xb5b062f1(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+def adf_export_mdic_0xb5b062f1(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
     with gltf.scene():
-        adf = adf_read_node(vfs, vnode)
+        adf = adf_db.read_node(vfs, vnode)
         mdic = adf.table_instance_values[0]
         models = [list(vfs.map_hash_to_vpath.get(m, [None]))[0] for m in mdic['Models']]
         instances = mdic['Instances']
@@ -123,26 +123,28 @@ def adf_export_mdic_0xb5b062f1(vfs: VfsProcessor, vnode: VfsNode, export_path, a
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def adf_export_node(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
-    adf = adf_read_node(vfs, vnode)
+def adf_export_node(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+    adf = adf_db.read_node(vfs, vnode)
     if adf is not None:
         if len(adf.table_instance) == 1:
             if adf.table_instance[0].type_hash == 0x0B73315D:
-                adf_export_xlsx_0x0b73315d(vfs, vnode, export_path, allow_overwrite)
+                adf_export_xlsx_0x0b73315d(vfs, adf_db, vnode, export_path, allow_overwrite)
             elif adf.table_instance[0].type_hash == 0xf7c20a69:  # AmfModel
-                adf_export_amf_model_0xf7c20a69(vfs, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
+                adf_export_amf_model_0xf7c20a69(vfs, adf_db, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
             elif adf.table_instance[0].type_hash == 0xb5b062f1:  # mdic
-                adf_export_mdic_0xb5b062f1(vfs, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
+                adf_export_mdic_0xb5b062f1(vfs, adf_db, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
 
 
 def adf_export(vfs: VfsProcessor, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
+    adf_db = AdfDatabase(vfs)
+
     for vnode in vnodes:
         try:
             if save_to_processed:
-                adf_export_node(vfs, vnode, export_path, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
+                adf_export_node(vfs, adf_db, vnode, export_path, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
 
             if save_to_text:
-                adf = adf_read_node(vfs, vnode)
+                adf = adf_db.read_node(vfs, vnode)
 
                 fn = os.path.join(export_path, vnode.vpath.decode('utf-8')) + '.txt'
 

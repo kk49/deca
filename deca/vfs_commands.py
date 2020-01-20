@@ -17,7 +17,7 @@ from deca.errors import EDecaFileExists
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_read_node, TypeDef
+from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, TypeDef
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
@@ -56,11 +56,12 @@ class MultiProcessVfsBase:
         self.vfs = VfsDatabase(project_file, working_dir, self)
 
         self.commands = {
-            'search_archives': lambda idxs: self.command_process_wrapper(idxs, self.command_search_archives),
-            'adf_initial_search': lambda idxs: self.command_process_wrapper(idxs, self.command_process_adf_initial),
-            'rtpc_initial_search': lambda idxs: self.command_process_wrapper(idxs, self.command_process_rtpc_initial),
-            'gfx_initial_search': lambda idxs: self.command_process_wrapper(idxs, self.command_process_gfx_initial),
-            'txt_initial_search': lambda idxs: self.command_process_wrapper(idxs, self.command_process_txt_initial),
+            'process_archives_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_archives_initial),
+            'process_adf_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_adf_initial),
+            'process_rtpc_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_rtpc_initial),
+            'process_gfx_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_gfx_initial),
+            'process_txt_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_txt_initial),
+            'process_vhash_final': lambda idxs: self.process_by_vhash_wrapper(idxs, self.process_vhash_final),
         }
 
     def send(self, cmd, *params):
@@ -68,6 +69,9 @@ class MultiProcessVfsBase:
 
     def log(self, msg):
         self.send('log', msg)
+
+    def trace(self, msg):
+        self.send('trace', msg)
 
     def run(self):
         keep_running = True
@@ -99,7 +103,7 @@ class MultiProcessVfsBase:
             raise NotImplementedError(f'Command not implemented: {cmd}')
         command(*params)
 
-    def command_process_wrapper(self, indexes, func):
+    def process_wrapper(self, indexes, loop, iter):
         nodes_to_add = []
         nodes_to_update = []
         hash4_to_add = []  # hash, string, src, possible_ftypes
@@ -109,16 +113,7 @@ class MultiProcessVfsBase:
         adf_db = AdfDatabase()
         adf_db.load_from_database(self.vfs)
 
-        for i, index in enumerate(indexes):
-            self.send('status', i, n_indexes)
-            node = self.vfs.node_get_uid(index)
-            if node.is_valid():
-                updated = func(node, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add)
-
-                if updated:
-                    nodes_to_update.append(node)
-
-        self.send('status', n_indexes, n_indexes)
+        loop(indexes, iter, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add)
 
         n_nodes_to_add = len(nodes_to_add)
         if n_nodes_to_add > 0:
@@ -149,7 +144,35 @@ class MultiProcessVfsBase:
         self.log('DATABASE: Saving ADF Types')
         adf_db.save_to_database(self.vfs)
 
-    def command_search_archives(
+    def loop_node_by_uid(self, indexes, iter, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
+        n_indexes = len(indexes)
+        for i, index in enumerate(indexes):
+            self.send('status', i, n_indexes)
+
+            node = self.vfs.node_where_uid(index)
+            if node.is_valid():
+                updated = iter(node, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add)
+
+                if updated:
+                    nodes_to_update.append(node)
+
+        self.send('status', n_indexes, n_indexes)
+
+    def process_by_uid_wrapper(self, indexes, func):
+        self.process_wrapper(indexes, self.loop_node_by_uid, func)
+
+    def loop_vhash(self, vhashes, iter, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
+        n_indexes = len(vhashes)
+        for i, vhash in enumerate(vhashes):
+            self.send('status', i, n_indexes)
+            iter(vhash, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add)
+
+        self.send('status', n_indexes, n_indexes)
+
+    def process_by_vhash_wrapper(self, indexes, func):
+        self.process_wrapper(indexes, self.loop_vhash, func)
+
+    def process_archives_initial(
             self, node, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
         debug = False
         ver = self.vfs.game_info.archive_version
@@ -207,7 +230,7 @@ class MultiProcessVfsBase:
         elif node.vhash == deca.hash_jenkins.hash_little(b'gdc/global.gdcc'):
             # special case starting point for runtime
             node.processed = True
-            adf = adf_read_node(self.vfs, adf_db, node)
+            adf = adf_db.read_node(self.vfs, node)
 
             cnode_name = b'gdc/global.gdc.DECA'
             cnode = VfsNode(
@@ -220,8 +243,8 @@ class MultiProcessVfsBase:
             nodes_to_add.append(cnode)
 
         elif node.ftype in {FTYPE_GDCBODY}:
-            pnode = self.vfs.node_get_uid(node.pid)
-            adf = adf_read_node(self.vfs, adf_db, pnode)
+            pnode = self.vfs.node_where_uid(node.pid)
+            adf = adf_db.read_node(self.vfs, pnode)
 
             for entry in adf.table_instance_values[0]:
                 if isinstance(entry, GdcArchiveEntry):
@@ -264,11 +287,11 @@ class MultiProcessVfsBase:
         updated = node.processed
         return updated
 
-    def command_process_adf_initial(
+    def process_adf_initial(
             self, node: VfsNode, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
         updated = False
         try:
-            adf = adf_read_node(self.vfs, adf_db, node)
+            adf = adf_db.read_node(self.vfs, node)
 
             for sh in adf.table_stringhash:
                 vhash = hash_little(sh.value)
@@ -345,13 +368,12 @@ class MultiProcessVfsBase:
             #         map_typedefs[ientry.type_hash] = ientry
 
         except AdfTypeMissing as ae:
-            # adf_missing_types[ae.vhash] = adf_missing_types.get(ae.vhash, []) + [node.vhash]
             print('Missing Type {:08x} in {:08X} {} {}'.format(
-                ae.vhash, node.vhash, node.vpath, node.pvpath))
+                ae.type_id, node.vhash, node.vpath, node.pvpath))
 
         return updated
 
-    def command_process_rtpc_initial(
+    def process_rtpc_initial(
             self, node: VfsNode, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
         updated = False
         # try:
@@ -398,7 +420,7 @@ class MultiProcessVfsBase:
 
         return updated
 
-    def command_process_gfx_initial(
+    def process_gfx_initial(
             self, node: VfsNode, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
         updated = False
         with self.vfs.file_obj_from(node) as f:
@@ -430,7 +452,7 @@ class MultiProcessVfsBase:
 
         return updated
 
-    def command_process_txt_initial(
+    def process_txt_initial(
             self, node: VfsNode, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
         updated = False
 
@@ -446,3 +468,133 @@ class MultiProcessVfsBase:
                     propose_h4(hash4_to_add, item, node)
 
         return updated
+
+    def process_vhash_final(
+            self, vhash, i, n_indexes, adf_db, nodes_to_add, nodes_to_update, hash4_to_add, hash6_to_add):
+        nodes = self.vfs.nodes_where_vhash(vhash)
+        hash4 = self.vfs.hash4_where_vhash_select_all(vhash)
+
+        missed_vpaths = set()
+        h4ref_map = {}
+        for rowid, vhash, vpath in hash4:
+            missed_vpaths.add(vpath)
+            h4ref_map[rowid] = self.vfs.hash4_references_where_h4rowid_select_all(rowid)
+
+        # h4rowid, src_node, is_adf_field_name, used_at_runtime, possible_ftypes in h4ref
+
+        if len(nodes) > 0:
+            for node in nodes:
+                if node.is_valid():
+                    updated = False
+
+                    if node.ftype is None:
+                        ftype_int = ftype_list[FTYPE_NO_TYPE]
+                    else:
+                        ftype_int = ftype_list[node.ftype]
+
+                    for rowid, vhash, vpath in hash4:
+                        h4ref = h4ref_map[rowid]
+
+                        if node.vpath is None:
+                            for _, src_node, _, _, possible_ftypes in h4ref:
+                                if possible_ftypes is None or possible_ftypes == 0:
+                                    possible_ftypes = ftype_list[FTYPE_ANY_TYPE]
+
+                                if (ftype_int & possible_ftypes) != 0:
+                                    self.trace('vpath:add  {} {:08X} {} {} {}'.format(
+                                        vpath, vhash, src_node, possible_ftypes, node.ftype))
+                                    node.vpath = vpath
+                                    updated = True
+                                    break
+                                else:
+                                    self.log('vpath:skip {} {:08X} {} {} {}'.format(
+                                        vpath, vhash, src_node, possible_ftypes, node.ftype))
+
+                        if node.vpath == vpath:
+                            for _, _, _, used_at_runtime, _ in h4ref:
+                                if used_at_runtime:
+                                    node.used_at_runtime_depth = 0
+                                    updated = True
+                                    break
+
+                    if node.ftype is None and node.vpath is not None:
+                        file, ext = os.path.splitext(node.vpath)
+                        if ext[0:4] == b'.atx':
+                            node.ftype = FTYPE_ATX
+                            updated = True
+                        elif ext == b'.hmddsc':
+                            node.ftype = FTYPE_HMDDSC
+                            updated = True
+
+                    missed_vpaths.discard(node.vpath)
+
+                    if updated:
+                        nodes_to_update.append(node)
+
+        for vpath in missed_vpaths:
+            vhash = hash_little(vpath)
+            self.trace('vpath:miss {} {:08X}'.format(vpath, vhash))
+
+        # found_vpaths = list(found_vpaths)
+        # found_vpaths.sort()
+        # with open(self.working_dir + 'found_vpaths.txt', 'a') as f:
+        #     for vp in found_vpaths:
+        #         f.write('{}\n'.format(vp.decode('utf-8')))
+
+        #         for s in ss:
+        #             hid = hash_little(s)
+        #             if hid in self.hash_present:
+        #                 if hid in self.map_hash_to_vpath:
+        #                     if s != self.map_hash_to_vpath[hid]:
+        #                         self.logger.trace('HASH CONFLICT STRINGS: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], s))
+        #                         self.hash_bad[hid] = (self.map_hash_to_vpath[hid], s)
+        #                 else:
+        #                     if dump_found_paths:
+        #                         f.write('{:08X}\t{}\n'.format(hid, s))
+        #                     self.map_hash_to_vpath[hid] = s
+        #                     self.map_vpath_to_hash[s] = hid
+        #                     found = found + 1
+        #
+        # self.logger.log('fill in v_paths, mark extensions identified files as ftype')
+        #
+        # self.logger.log('PROCESS BASELINE VNODE INFORMATION')
+        # for idx in range(len(self.table_vfsnode)):
+        #     node = self.table_vfsnode[idx]
+        #     if node.is_valid() and node.vhash is not None:
+        #         hid = node.vhash
+        #         if node.vpath is not None:
+        #             if hid in self.map_hash_to_vpath:
+        #                 if self.map_hash_to_vpath[hid] != node.vpath:
+        #                     self.logger.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.vpath))
+        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.vpath)
+        #             else:
+        #                 self.map_hash_to_vpath[hid] = node.vpath
+        #                 self.map_vpath_to_hash[node.vpath] = hid
+        # self.logger.log('PROCESS BASELINE VNODE INFORMATION: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
+        #
+        # for idx in range(len(self.table_vfsnode)):
+        #     node = self.table_vfsnode[idx]
+        #     if node.is_valid() and node.vhash is not None and node.vpath is None:
+        #         if node.vhash in self.map_hash_to_vpath:
+        #             node.vpath = self.map_hash_to_vpath[node.vhash]
+        #
+        #     if node.is_valid() and node.vhash is not None:
+        #         if node.ftype not in {FTYPE_ARC, FTYPE_TAB}:
+        #             if node.vhash in self.map_hash_to_vpath:
+        #                 self.hash_map_present.add(node.vhash)
+        #             else:
+        #                 self.hash_map_missing.add(node.vhash)
+        #
+        #     if node.is_valid() and node.vpath is not None:
+        #         if os.path.splitext(node.vpath)[1][0:4] == b'.atx':
+        #             if node.ftype is not None:
+        #                 raise Exception('ATX marked as non ATX: {}'.format(node.vpath))
+        #             node.ftype = FTYPE_ATX
+        #
+        #         lst = self.map_vpath_to_vfsnodes.get(node.vpath, [])
+        #         if len(lst) > 0 and lst[0].offset is None:  # Do not let symlink be first is list # TODO Sort by accessibility
+        #             lst = [node] + lst
+        #         else:
+        #             lst.append(node)
+        #         self.map_vpath_to_vfsnodes[node.vpath] = lst
+

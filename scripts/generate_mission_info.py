@@ -1,9 +1,10 @@
 import re
 from deca.vfs_processor import vfs_structure_open
-from deca.ff_adf import adf_read_node
+from deca.ff_adf import AdfDatabase
 from deca.digest import process_translation_adf
 
 vfs = vfs_structure_open('/home/krys/prj/work/gz/project.json')
+adf_db = AdfDatabase(vfs)
 
 # load translation
 vnode = vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
@@ -11,7 +12,7 @@ with vfs.file_obj_from(vnode, 'rb') as f:
     tr = process_translation_adf(vfs, f, vnode.size_u)
 
 vnode = vfs.map_vpath_to_vfsnodes[b'missions/missions.group.hpmissionsc'][0]
-adf = adf_read_node(vfs, vnode)
+adf = adf_db.read_node(vfs, vnode)
 
 
 class GZMission:

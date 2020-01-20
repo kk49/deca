@@ -22,7 +22,7 @@ from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, TypeDef
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
-from deca.util import Logger, remove_prefix_if_present, remove_suffix_if_present
+from deca.util import Logger, make_dir_for_file, remove_prefix_if_present, remove_suffix_if_present
 from deca.hash_jenkins import hash_little
 from deca.ff_determine import determine_file_type_and_size
 
@@ -52,6 +52,7 @@ def vfs_structure_new(filename):
     if game_info is not None:
         working_dir = '../work/{}/'.format(game_info.game_id)
         project_file = os.path.join(working_dir, 'project.json')
+        make_dir_for_file(project_file)
         game_info.save(project_file)
         vfs = vfs_structure_prep(project_file, working_dir)  # , logger=self.logger)
 

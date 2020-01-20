@@ -1,4 +1,5 @@
 from deca.file import ArchiveFile
+from deca.vfs_db import VfsDatabase
 import struct
 from enum import IntEnum
 from typing import List, Dict
@@ -74,7 +75,45 @@ class RtpcProperty:
         return '@0x{:08x}({: 8d}) 0x{:08x} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
             self.pos, self.pos,
             self.name_hash,
-            self.data_raw, 
+            self.data_raw,
+            self.type,
+            PropType_names[self.type],
+            self.data_pos, self.data_pos,
+            data)
+        # return '0x{:08x}: {} = {}'.format(self.name_hash, PropType.type_names[self.type], self.data,)
+
+    def repr_with_name(self, vfs: VfsDatabase):
+        data = self.data
+        if self.type == PropType.type_objid.value:
+            name = vfs.hash6_where_vhash_select_all(data & 0x0000FFFFFFFFFFFF)
+            if len(name):
+                name = 'id:"{}"'.format(name[0][2].decode('utf-8'))
+            else:
+                name = 'id:0x{:012X}'.format(data)
+            data = name
+
+        elif self.type == PropType.type_event.value:
+            data_new = []
+            for d in data:
+                name = vfs.hash6_where_vhash_select_all(d & 0x0000FFFFFFFFFFFF)
+                if len(name):
+                    name = 'ev:"{}"'.format(name[0][2].decode('utf-8'))
+                else:
+                    name = 'ev:0x{:012X}'.format(d)
+                data_new.append(name)
+            data = data_new
+
+        name = vfs.hash4_where_vhash_select_all(self.name_hash)
+
+        if len(name):
+            name = '"{}"'.format(name[0][2].decode('utf-8'))
+        else:
+            name = f'0x{self.name_hash:08x}'
+
+        return '@0x{:08x}({: 8d}) {} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
+            self.pos, self.pos,
+            name,
+            self.data_raw,
             self.type,
             PropType_names[self.type],
             self.data_pos, self.data_pos,
@@ -194,19 +233,30 @@ class RtpcNode:
         return '{:08x} pc:{} cc:{} @ {} {:08x}'.format(
             self.name_hash, self.prop_count, self.child_count, self.data_offset, self.data_offset)
 
-    def dump_to_string(self, indent=0):
+    def repr_with_name(self, vfs):
+        name = vfs.hash4_where_vhash_select_all(self.name_hash)
+
+        if len(name):
+            name = '"{}"'.format(name[0][2].decode('utf-8'))
+        else:
+            name = f'0x{self.name_hash:08x}'
+
+        return 'n:{} pc:{} cc:{} @ {} {:08x}'.format(
+            name, self.prop_count, self.child_count, self.data_offset, self.data_offset)
+
+    def dump_to_string(self, vfs, indent=0):
         ind0 = ' ' * indent
         ind1 = ' ' * (indent + 2)
         ind2 = ' ' * (indent + 4)
         sbuf = ''
         sbuf = sbuf + ind0 + 'node:\n'
-        sbuf = sbuf + ind1 + self.__repr__() + '\n'
+        sbuf = sbuf + ind1 + self.repr_with_name(vfs) + '\n'
         sbuf = sbuf + ind1 + 'properties ---------------\n'
         for p in self.prop_table:
-            sbuf = sbuf + ind2 + p.__repr__() + '\n'
+            sbuf = sbuf + ind2 + p.repr_with_name(vfs) + '\n'
         sbuf = sbuf + ind1 + 'children -----------------\n'
         for c in self.child_table:
-            sbuf = sbuf + c.dump_to_string(indent + 4)
+            sbuf = sbuf + c.dump_to_string(vfs, indent + 4)
 
         return sbuf
 
@@ -270,5 +320,5 @@ class Rtpc:
         for child in node.child_table:
             self.visit(visitor, node=child)
 
-    def dump_to_string(self):
-        return self.root_node.dump_to_string()
+    def dump_to_string(self, vfs):
+        return self.root_node.dump_to_string(vfs)

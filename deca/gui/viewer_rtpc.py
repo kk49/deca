@@ -24,7 +24,7 @@ class DataViewerRtpc(DataViewer):
         rtpc = Rtpc()
         with vfs.file_obj_from(vnode) as f:
             rtpc.deserialize(f)
-        sbuf = rtpc.dump_to_string()
+        sbuf = rtpc.dump_to_string(vfs)
         self.text_box.setText(sbuf)
 
 

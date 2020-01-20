@@ -377,6 +377,11 @@ class VfsDatabase:
             "SELECT * FROM core_hash4_references WHERE hash_row_id == (?)", [rowid], dbg='hash4_references_where_h4rowid_select_all')
         return result
 
+    def hash6_where_vhash_select_all(self, vhash):
+        result = self.db_query_all(
+            "SELECT rowid, hash, string FROM core_hash6 WHERE hash == (?)", [vhash], dbg='hash6_where_vhash_select_all')
+        return [(r[0], r[1], to_bytes(r[2])) for r in result]
+
     def node_add_one(self, node: VfsNode):
         while True:
             try:

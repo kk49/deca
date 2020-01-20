@@ -127,6 +127,8 @@ class VfsProcessor(VfsDatabase):
             self.dump_vpaths()
             self.db_execute_one("PRAGMA user_version = 1;")
 
+        # TODO process any hashless strings in vhash4 and vhash6 table, assume outside program added them for testing
+
         self.dump_status()
         self.logger.log('PROCESSING: COMPLETE')
 

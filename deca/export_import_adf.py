@@ -84,7 +84,8 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: Vf
     return fn
 
 
-def adf_export_amf_model_0xf7c20a69(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+def adf_export_amf_model_0xf7c20a69(
+        vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
@@ -96,14 +97,22 @@ def adf_export_amf_model_0xf7c20a69(vfs: VfsProcessor, adf_db: AdfDatabase, vnod
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def adf_export_mdic_0xb5b062f1(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+def adf_export_mdic_0xb5b062f1(
+        vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
     with gltf.scene():
         adf = adf_db.read_node(vfs, vnode)
         mdic = adf.table_instance_values[0]
-        models = [list(vfs.map_hash_to_vpath.get(m, [None]))[0] for m in mdic['Models']]
+        models = []
+        for m in mdic['Models']:
+            vpaths = vfs.nodes_select_distinct_vpath_where_vhash(m)
+            if vpaths:
+                vpath = vpaths[0]
+            else:
+                vpath = None
+            models.append(vpath)
         instances = mdic['Instances']
         aabb = AABB(all6=mdic['AABB'])
         mid = aabb.mid()

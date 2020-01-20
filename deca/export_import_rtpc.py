@@ -49,12 +49,12 @@ def rtpc_export_node_recurse(
 
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data
-        rtpc_model_vpath = list(vfs.map_hash_to_vpath[rtpc_modelc_vhash])[0]
+        rtpc_model_vpath = vfs.nodes_select_distinct_vpath_where_vhash(rtpc_modelc_vhash)[0]
     elif rtpc_class == b'SCharacterPart':
         rtpc_model_vpath = rtpc.prop_map[0xb498c27d].data
     elif rtpc_class == b'CPartProp':
         rtpc_modelc_vhash = rtpc.prop_map[0xa74f2259].data
-        rtpc_model_vpath = list(vfs.map_hash_to_vpath[rtpc_modelc_vhash])[0]
+        rtpc_model_vpath = vfs.nodes_select_distinct_vpath_where_vhash(rtpc_modelc_vhash)[0]
     elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
         if 0x0f94740b in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data

@@ -942,6 +942,7 @@ class AdfDatabase:
                 adf.deserialize(f, process_instances=False)
                 for k, v in adf.map_typedef.items():
                     self.type_map_def[k] = v
+            # TODO also add field strings to adf_db/vfs, combine adf_db and vfs into GAME DATABASE?
 
     def typedefs_add(self, map_typedefs):
         for k, v in map_typedefs.items():

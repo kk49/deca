@@ -1,12 +1,12 @@
 import os
 import io
-import time
 import pprint
 import numpy as np
 from PIL import Image
 from deca.file import ArchiveFile
 from deca.errors import *
 from deca.ff_types import *
+from deca.vfs_db import VfsDatabase
 import deca.dxgi
 
 
@@ -316,7 +316,7 @@ class Ddsc:
                     print('dwPFFlags: {}'.format(test[1]))
 
 
-def image_load(vfs, vnode, save_raw_data=False):
+def image_load(vfs: VfsDatabase, vnode, save_raw_data=False):
     if vnode.ftype == FTYPE_BMP:
         f_ddsc = vfs.file_obj_from(vnode)
         ddsc = Ddsc()
@@ -337,7 +337,9 @@ def image_load(vfs, vnode, save_raw_data=False):
             else:
                 filename_ddsc = filename[0] + b'.ddsc'
 
-            if filename_ddsc in vfs.map_vpath_to_vfsnodes:
+            filename_ddsc_nodes = vfs.nodes_where_vpath(filename_ddsc)
+
+            if filename_ddsc_nodes:
                 extras = [b'.hmddsc']
                 for i in range(1, 16):
                     extras.append('.atx{}'.format(i).encode('ascii'))
@@ -345,23 +347,27 @@ def image_load(vfs, vnode, save_raw_data=False):
                 files = []
                 files.append([
                     filename_ddsc,
-                    vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_ddsc][0]),
+                    vfs.file_obj_from(filename_ddsc_nodes[0]),
                 ])
                 for extra in extras:
                     filename_atx = filename[0] + extra
-                    if filename_atx in vfs.map_vpath_to_vfsnodes:
+                    filename_atx_nodes = vfs.nodes_where_vpath(filename_atx)
+                    if filename_atx_nodes:
                         files.append([
                             filename_atx,
-                            vfs.file_obj_from(vfs.map_vpath_to_vfsnodes[filename_atx][0]),
+                            vfs.file_obj_from(filename_atx_nodes[0]),
                         ])
                 ddsc = Ddsc()
                 ddsc.load_ddsc_atx(files, save_raw_data=save_raw_data)
             else:
                 raise EDecaFileMissing('File {} is missing.'.format(filename_ddsc))
+    else:
+        raise EDecaIncorrectFileFormat('Cannot handle format {} in {}'.format(vnode.ftype, vnode.vpath))
+
     return ddsc
 
 
-def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_overwrite=False):
+def image_export(vfs: VfsDatabase, node, extract_dir, export_raw, export_processed, allow_overwrite=False):
     existing_files = []
     ddsc = image_load(vfs, node, save_raw_data=True)
 
@@ -372,7 +378,7 @@ def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_ove
             if multifile:
                 cnodes = [mip.filename for mip in ddsc.mips]
                 cnodes = set(cnodes)
-                cnodes = [vfs.map_vpath_to_vfsnodes[cnode][0] for cnode in cnodes]
+                cnodes = [vfs.nodes_where_vpath(cnode)[0] for cnode in cnodes]
             else:
                 cnodes = [node]
 
@@ -410,10 +416,14 @@ def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_ove
             if not allow_overwrite and os.path.isfile(ofile_img):
                 existing_files.append(ofile_img)
             else:
+                npimp = None
                 for i in range(len(ddsc.mips)):
                     if ddsc.mips[i].data is not None:
                         npimp = ddsc.mips[i].pil_image()
                         break
+                if npimp is None:
+                    raise EDecaIncorrectFileFormat('Could not find image data')
+
                 npimp.save(ofile_img)
 
             # export dds with all mip levels
@@ -486,7 +496,7 @@ def image_export(vfs, node, extract_dir, export_raw, export_processed, allow_ove
             raise EDecaFileExists(existing_files)
 
 
-def image_import(vfs, node, ifile: str, opath: str):
+def image_import(vfs: VfsDatabase, node, ifile: str, opath: str):
     print('Importing Image: {}\n  input {}\n  opath {}'.format(node.vpath, ifile, opath))
     ddsc = image_load(vfs, node, save_raw_data=True)
 

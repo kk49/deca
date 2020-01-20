@@ -1,4 +1,5 @@
 import copy
+from typing import Optional
 import xml.etree.ElementTree as ET
 from deca.util import remove_prefix_if_present
 from deca.ff_avtx import image_load
@@ -549,6 +550,7 @@ class Deca3dHkSkeleton:
             parents = []
             bone_info = []
             poses = []
+            num_bones = 0
             for child in skel:
                 if child.attrib['name'] == 'parentIndices':
                     txt = child.text
@@ -763,7 +765,7 @@ class DecaGltf:
         assert self.d_stack[-1] == item
         self.d_stack.pop(-1)
 
-    def export_modelc(self, vpath, transform: Deca3dMatrix, material_properties=None, skeleton_raw_path=None):
+    def export_modelc(self, vpath, transform: Optional[Deca3dMatrix], material_properties=None, skeleton_raw_path=None):
         if transform is None:
             transform = Deca3dMatrix()
 

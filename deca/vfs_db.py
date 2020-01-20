@@ -2,6 +2,7 @@ import os
 import io
 import sqlite3
 import pickle
+import re
 
 from deca.hash_jenkins import hash_little
 from deca.file import ArchiveFile, SubsetFile
@@ -10,6 +11,15 @@ from deca.ff_determine import determine_file_type_and_size
 from deca.ff_aaf import extract_aaf
 from deca.util import make_dir_for_file
 from deca.game_info import GameInfo, game_info_load
+
+
+def regexp(expr, item):
+    if item is None or expr is None:
+        return False
+    if isinstance(item, str):
+        item = item.encode('ascii')
+    reg = re.compile(expr)
+    return reg.search(item) is not None
 
 
 def to_bytes(s):
@@ -151,6 +161,7 @@ class VfsDatabase:
         make_dir_for_file(self.db_filename)
 
         self.db_conn = sqlite3.connect(self.db_filename)
+        self.db_conn.create_function("REGEXP", 2, regexp)
         self.db_cur = self.db_conn.cursor()
 
         self.db_setup()
@@ -287,7 +298,7 @@ class VfsDatabase:
                 result = self.db_cur.execute(stmt, params)
                 result = result.fetchone()
                 break
-            except sqlite3.OperationalError:
+            except sqlite3.OperationalError as exc:
                 self.logger.log(f'{dbg}: Waiting on database...')
 
         return result
@@ -301,7 +312,7 @@ class VfsDatabase:
                 result = self.db_cur.execute(stmt, params)
                 result = result.fetchall()
                 break
-            except sqlite3.OperationalError:
+            except sqlite3.OperationalError as exc:
                 self.logger.log(f'{dbg}: Waiting on database...')
 
         return result
@@ -337,6 +348,14 @@ class VfsDatabase:
             "select * from core_vnodes where vpath == (?)", [vpath], dbg='nodes_where_vpath')
         return [db_to_vfs_node(node) for node in nodes]
 
+    def nodes_where_vpath_regex_2(self, regex_0, regex_1):
+        nodes = self.db_query_all(
+            "select * from core_vnodes where (vpath REGEXP (?)) AND (vpath REGEXP (?))",
+            [regex_0, regex_1],
+            dbg='nodes_where_vpath_regex_2'
+        )
+        return [db_to_vfs_node(node) for node in nodes]
+
     def nodes_select_distinct_vhash(self):
         result = self.db_query_all(
             "SELECT DISTINCT vpath_hash FROM core_vnodes", dbg='nodes_select_distinct_vhash')
@@ -346,6 +365,12 @@ class VfsDatabase:
     def nodes_select_distinct_vpath(self):
         result = self.db_query_all(
             "SELECT DISTINCT vpath FROM core_vnodes", dbg='nodes_select_distinct_vpath')
+        result = [to_bytes(r[0]) for r in result if r[0] is not None]
+        return result
+
+    def nodes_select_distinct_vpath_where_vhash(self, vhash):
+        result = self.db_query_all(
+            "SELECT DISTINCT vpath FROM core_vnodes WHERE vpath_hash == (?)", [vhash], dbg='nodes_select_distinct_vpath')
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
         return result
 

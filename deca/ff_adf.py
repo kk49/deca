@@ -344,7 +344,7 @@ class AdfValue:
         return s
 
 
-def adf_format(v, type_map, indent=0):
+def adf_format(v, vfs, type_map, indent=0):
     s = ''
     if isinstance(v, AdfValue):
         type_def = type_map.get(v.type_id, TypeDef())
@@ -363,7 +363,7 @@ def adf_format(v, type_map, indent=0):
         s = ''
         if v.type_id == 0xdefe88ed:
             s = s + '  ' * indent + '# {}\n'.format(value_info)
-            s = s + adf_format(v.value, type_map, indent)
+            s = s + adf_format(v.value, vfs, type_map, indent)
         elif type_def.metatype is None or type_def.metatype == MetaType.Primative:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
         elif type_def.metatype == MetaType.Structure:
@@ -371,7 +371,7 @@ def adf_format(v, type_map, indent=0):
             s = s + '  ' * indent + '{\n'
             for k, iv in v.value.items():
                 s = s + '  ' * (indent + 1) + k + ':\n'
-                s = s + adf_format(iv, type_map, indent + 2)
+                s = s + adf_format(iv, vfs, type_map, indent + 2)
             s = s + '  ' * indent + '}\n'
         elif type_def.metatype == MetaType.Pointer:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
@@ -379,7 +379,7 @@ def adf_format(v, type_map, indent=0):
             s = s + '  ' * indent + '# ' + value_info + '\n'
             s = s + '  ' * indent + '[\n'
             for iv in v.value:
-                s = s + adf_format(iv, type_map, indent + 1)
+                s = s + adf_format(iv, vfs, type_map, indent + 1)
             s = s + '  ' * indent + ']\n'
         elif type_def.metatype == MetaType.String:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
@@ -390,13 +390,34 @@ def adf_format(v, type_map, indent=0):
         elif type_def.metatype == MetaType.StringHash:
             if type_def.size == 4:
                 vp = '0x{:08x}'.format(v.value)
+                hash_string = v.hash_string
+                if hash_string is None:
+                    name = vfs.hash4_where_vhash_select_all(v.value)
+                    if len(name):
+                        hash_string = 'DB:"{}"'.format(name[0][2].decode('utf-8'))
+                    else:
+                        hash_string = 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v.value)
             elif type_def.size == 6:
                 vp = '0x{:012x}'.format(v.value)
-            elif type_def.size == 6:
+                hash_string = v.hash_string
+                if hash_string is None:
+                    name = vfs.hash6_where_vhash_select_all(v.value & 0x0000FFFFFFFFFFFF)
+                    if len(name):
+                        hash_string = 'DB:"{}"'.format(name[0][2].decode('utf-8'))
+                    else:
+                        hash_string = 'OBJID {} 0x{:012x}'.format(type_def.size, v.value)
+            elif type_def.size == 8:
                 vp = '0x{:016x}'.format(v.value)
+                hash_string = v.hash_string
+                if hash_string is None:
+                    hash_string = 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v.value)
             else:
                 vp = v.value
-            s = s + '  ' * indent + '{} ({})  # {}\n'.format(v.hash_string, vp, value_info)
+                hash_string = v.hash_string
+                if hash_string is None:
+                    hash_string = 'NOT EXPECTED {}'.format(type_def.size)
+
+            s = s + '  ' * indent + '{} ({})  # {}\n'.format(hash_string, vp, value_info)
 
         return s
     elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], GdcArchiveEntry):
@@ -683,7 +704,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 elif v == 0xDEADBEEF:
                     vs = b''
                 else:
-                    vs = 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v)
+                    vs = None
             elif type_def.size == 6:
                 v0 = f.read_u16()
                 v1 = f.read_u16()
@@ -692,13 +713,13 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 if v in map_stringhash:
                     vs = map_stringhash[v].value
                 else:
-                    vs = 'OBJID {} 0x{:012x}'.format(type_def.size, v)
+                    vs = None
             elif type_def.size == 8:
                 v = f.read_u64()
-                vs = 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v)
+                vs = None
             else:
                 v = f.read(type_def.size)
-                vs = 'NOT EXPECTED {}'.format(type_def.size)
+                vs = None
 
             v = AdfValue(v, type_id, dpos + abs_offset, hash_string=vs)
         else:
@@ -738,7 +759,7 @@ class Adf:
         self.table_instance_full_values = []
         self.table_instance_values = []
 
-    def dump_to_string(self):
+    def dump_to_string(self, vfs):
         sbuf = ''
         sbuf = sbuf + '--------header\n'
         sbuf = sbuf + '{}: {}\n'.format('version', self.version)
@@ -787,7 +808,7 @@ class Adf:
                 end_str)
 
             # sbuf = sbuf + pformat(v, width=1024) + '\n'
-            sbuf = sbuf + adf_format(fv, self.extended_map_typedef) + '\n'
+            sbuf = sbuf + adf_format(fv, vfs, self.extended_map_typedef) + '\n'
 
         return sbuf
 

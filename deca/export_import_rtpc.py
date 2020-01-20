@@ -112,7 +112,7 @@ def rtpc_export(vfs: VfsProcessor, vnodes: List[VfsNode], export_path, allow_ove
                     if not allow_overwrite and os.path.exists(fn):
                         raise EDecaFileExists(fn)
 
-                    s = rtpc.dump_to_string()
+                    s = rtpc.dump_to_string(vfs)
 
                     ofiledir = os.path.dirname(fn)
                     os.makedirs(ofiledir, exist_ok=True)

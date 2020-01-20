@@ -156,13 +156,13 @@ class VfsProcessor(VfsDatabase):
                 q = "SELECT DISTINCT uid FROM core_vnodes WHERE vpath = (?)"
                 nodes = self.db_query_all(q, [s])
                 fc = len(nodes)
-                self.logger.log(f'SUMMARY: Duplicate Path Hashes: {h:08x} {s}: {fc} nodes')
+                self.logger.log(f'SUMMARY: Duplicate String4 Hashes: {h:08x} {s}: {fc} nodes')
                 fcs.append(len(nodes))
                 if fc > 0:
                     gtz_count += 1
             if gtz_count > 1:
                 for (h, s), fc in zip(hashes, fcs):
-                    self.logger.log(f'WARNING: Duplicate Path Hashes: {h:08x} {s}: {fc} nodes')
+                    self.logger.log(f'WARNING: Duplicate String4 Hashes: {h:08x} {s}: {fc} nodes')
 
         # nodes with same hash but different paths, rare
         q = "SELECT DISTINCT vpath_hash, vpath, COUNT(*) c FROM core_vnodes GROUP BY vpath_hash, vpath_hash HAVING c > 1;"

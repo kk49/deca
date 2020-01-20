@@ -151,7 +151,7 @@ def adf_export(vfs: VfsProcessor, vnodes: List[VfsNode], export_path, allow_over
                 if not allow_overwrite and os.path.exists(fn):
                     raise EDecaFileExists(fn)
 
-                s = adf.dump_to_string()
+                s = adf.dump_to_string(vfs)
 
                 fn_dir = os.path.dirname(fn)
                 os.makedirs(fn_dir, exist_ok=True)

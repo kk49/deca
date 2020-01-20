@@ -33,7 +33,7 @@ class DataViewerAdf(DataViewer):
         if obj is None:
             sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
         else:
-            sbuf = obj.dump_to_string()
+            sbuf = obj.dump_to_string(vfs)
 
         self.text_box.setText(sbuf)
 

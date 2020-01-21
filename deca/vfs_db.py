@@ -173,109 +173,6 @@ class VfsDatabase:
     def logger_set(self, logger):
         self.logger = logger
 
-    def db_reset(self):
-        self.db_cur.execute('DROP INDEX IF EXISTS core_vpath_to_vnode;')
-        self.db_cur.execute('DROP INDEX IF EXISTS core_vhash_to_vnode;')
-
-        self.db_cur.execute('DROP TABLE IF EXISTS core_vnodes;')
-        self.db_cur.execute('DROP TABLE IF EXISTS core_hash4;')
-        self.db_cur.execute('DROP TABLE IF EXISTS core_hash4_references;')
-        self.db_cur.execute('DROP TABLE IF EXISTS core_hash6;')
-        self.db_cur.execute('DROP TABLE IF EXISTS core_hash6_references;')
-        self.db_cur.execute('DROP TABLE IF EXISTS core_adf_types;')
-
-        self.db_cur.execute('VACUUM;')
-
-        self.db_conn.commit()
-
-        self.db_setup()
-
-    def db_setup(self):
-        self.db_cur.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_vnodes" (
-                "uid" INTEGER NOT NULL UNIQUE,
-                "ftype" TEXT,
-                "vpath" TEXT,
-                "vpath_hash" INTEGER,
-                "ppath" TEXT,
-                "parent_id" INTEGER,
-                "index_in_parent" INTEGER,
-                "level" INTEGER,
-                "is_compressed" INTEGER,
-                "offset" INTEGER,
-                "size_c" INTEGER,
-                "size_u" INTEGER,
-                "used_at_runtime_depth" INTEGER,
-                "gdcc_adf_type" INTEGER,
-                "ext_hash" INTEGER,
-                "processed" INTEGER,
-                PRIMARY KEY("uid")
-            );
-            '''
-        )
-        self.db_cur.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_hash4" (
-                "hash" INTEGER NOT NULL,
-                "string" TEXT,
-                PRIMARY KEY ("hash", "string")
-            );
-            '''
-        )
-        self.db_cur.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_hash4_references" (
-                "hash_row_id" INTEGER NOT NULL,
-                "src_node" INTEGER,
-                "is_adf_field_name" INTEGER,
-                "used_at_runtime" INTEGER,
-                "possible_file_types" INTEGER,
-                PRIMARY KEY ("hash_row_id", "src_node", "is_adf_field_name", "used_at_runtime", "possible_file_types")
-            );
-            '''
-        )
-        self.db_cur.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_hash6" (
-                "hash" INTEGER NOT NULL,
-                "string" TEXT,
-                PRIMARY KEY ("hash", "string")
-            );
-            '''
-        )
-        self.db_cur.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_hash6_references" (
-                "hash_row_id" INTEGER NOT NULL,
-                "src_node" INTEGER,
-                PRIMARY KEY ("hash_row_id", "src_node")
-            );
-            '''
-        )
-        self.db_cur.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_adf_types" (
-                "hash" INTEGER NOT NULL,
-                "missing_in" INTEGER,
-                "pickle" BLOB,
-                PRIMARY KEY ("hash", "missing_in", "pickle")
-            );
-            '''
-        )
-        self.db_cur.execute(
-            '''
-            CREATE INDEX IF NOT EXISTS "core_vpath_to_vnode" ON "core_vnodes" ("vpath"	ASC);
-            '''
-        )
-        self.db_cur.execute(
-            '''
-            CREATE INDEX IF NOT EXISTS "core_vhash_to_vnode" ON "core_vnodes" ("vpath_hash"	ASC);
-            '''
-        )
-
-        self.db_conn.commit()
-
     def db_execute_one(self, stmt, params=None, dbg='db_execute_one'):
         if params is None:
             params = []
@@ -316,6 +213,109 @@ class VfsDatabase:
                 self.logger.log(f'{dbg}: Waiting on database...')
 
         return result
+
+    def db_reset(self):
+        self.db_execute_one('DROP INDEX IF EXISTS core_vpath_to_vnode;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_vhash_to_vnode;')
+
+        self.db_execute_one('DROP TABLE IF EXISTS core_vnodes;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash4;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash4_references;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash6;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash6_references;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_adf_types;')
+
+        self.db_execute_one('VACUUM;')
+
+        self.db_conn.commit()
+
+        self.db_setup()
+
+    def db_setup(self):
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_vnodes" (
+                "uid" INTEGER NOT NULL UNIQUE,
+                "ftype" TEXT,
+                "vpath" TEXT,
+                "vpath_hash" INTEGER,
+                "ppath" TEXT,
+                "parent_id" INTEGER,
+                "index_in_parent" INTEGER,
+                "level" INTEGER,
+                "is_compressed" INTEGER,
+                "offset" INTEGER,
+                "size_c" INTEGER,
+                "size_u" INTEGER,
+                "used_at_runtime_depth" INTEGER,
+                "gdcc_adf_type" INTEGER,
+                "ext_hash" INTEGER,
+                "processed" INTEGER,
+                PRIMARY KEY("uid")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_hash4" (
+                "hash" INTEGER NOT NULL,
+                "string" TEXT,
+                PRIMARY KEY ("hash", "string")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_hash4_references" (
+                "hash_row_id" INTEGER NOT NULL,
+                "src_node" INTEGER,
+                "is_adf_field_name" INTEGER,
+                "used_at_runtime" INTEGER,
+                "possible_file_types" INTEGER,
+                PRIMARY KEY ("hash_row_id", "src_node", "is_adf_field_name", "used_at_runtime", "possible_file_types")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_hash6" (
+                "hash" INTEGER NOT NULL,
+                "string" TEXT,
+                PRIMARY KEY ("hash", "string")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_hash6_references" (
+                "hash_row_id" INTEGER NOT NULL,
+                "src_node" INTEGER,
+                PRIMARY KEY ("hash_row_id", "src_node")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_adf_types" (
+                "hash" INTEGER NOT NULL,
+                "missing_in" INTEGER,
+                "pickle" BLOB,
+                PRIMARY KEY ("hash", "missing_in", "pickle")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_vpath_to_vnode" ON "core_vnodes" ("vpath"	ASC);
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_vhash_to_vnode" ON "core_vnodes" ("vpath_hash"	ASC);
+            '''
+        )
+
+        self.db_conn.commit()
 
     def nodes_select_all(self):
         nodes = self.db_query_all(

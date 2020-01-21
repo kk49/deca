@@ -350,10 +350,10 @@ class VfsProcessor(VfsDatabase):
                 indexs.append(idx)
         return indexs, done_set
 
-    def process_by_ftype(self, ftype, cmd):
+    def process_by_ftype(self, ftype, cmd, process_dups=False):
         self.logger.log('PROCESS: FTYPE = {}'.format(ftype))
 
-        indexes, nodes_done = self.get_vnode_indexs_from_ftype(ftype)
+        indexes, nodes_done = self.get_vnode_indexs_from_ftype(ftype, process_dups)
 
         if len(indexes) > 0:
             indexes2 = [indexes[v::self.mp_n_processes] for v in range(0, self.mp_n_processes)]

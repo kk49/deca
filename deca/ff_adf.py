@@ -1,14 +1,10 @@
-import sys
 import io
 import os
 import enum
-import pickle
 from typing import List, Dict
 from io import BytesIO
 from deca.errors import *
-from deca.file import ArchiveFile, SubsetFile
-from deca.util import dump_block
-from pprint import pformat
+from deca.file import ArchiveFile
 from deca.hash_jenkins import hash_little
 from deca.ff_types import FTYPE_ADF_BARE
 from deca.vfs_db import VfsDatabase, VfsNode
@@ -22,7 +18,7 @@ from deca.vfs_db import VfsDatabase, VfsNode
 
 class AdfTypeMissing(Exception):
     def __init__(self, type_id, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
+        Exception.__init__(self, *args)
         self.type_id = type_id
 
 
@@ -139,7 +135,7 @@ class TypeDef:
             pass
         elif self.metatype == 1:  # Structure
             member_count = f.read_u32()
-            self.members = [MemberDef() for i in range(member_count)]
+            self.members = [MemberDef() for _ in range(member_count)]
             for i in range(member_count):
                 self.members[i].deserialize(f, nt)
         elif self.metatype == 2:  # Pointer
@@ -162,7 +158,7 @@ class TypeDef:
                 raise Exception('Not Implemented: count == {}'.format(count))
         elif self.metatype == 8:  # Enumeration
             count = f.read_u32()
-            self.members = [EnumDef() for i in range(count)]
+            self.members = [EnumDef() for _ in range(count)]
             for i in range(count):
                 self.members[i].deserialize(f, nt)
         elif self.metatype == 9:  # String Hash
@@ -198,6 +194,7 @@ class InstanceEntry:
     #     f.seek(self.offset)
     #     v = td.read(type_systems, f)
     #     return v
+
 
 typedef_s8 = 0x580D0A62
 typedef_u8 = 0x0ca2821d
@@ -345,7 +342,6 @@ class AdfValue:
 
 
 def adf_format(v, vfs, type_map, indent=0):
-    s = ''
     if isinstance(v, AdfValue):
         type_def = type_map.get(v.type_id, TypeDef())
 
@@ -396,7 +392,7 @@ def adf_format(v, vfs, type_map, indent=0):
                     if len(name):
                         hash_string = 'DB:"{}"'.format(name[0][2].decode('utf-8'))
                     else:
-                        hash_string = 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v.value)
+                        hash_string = 'Hash4:0x{:08x}'.format(v.value)
             elif type_def.size == 6:
                 vp = '0x{:012x}'.format(v.value)
                 hash_string = v.hash_string
@@ -405,17 +401,17 @@ def adf_format(v, vfs, type_map, indent=0):
                     if len(name):
                         hash_string = 'DB:"{}"'.format(name[0][2].decode('utf-8'))
                     else:
-                        hash_string = 'OBJID {} 0x{:012x}'.format(type_def.size, v.value)
+                        hash_string = 'Hash6:0x{:012x}'.format(v.value)
             elif type_def.size == 8:
                 vp = '0x{:016x}'.format(v.value)
                 hash_string = v.hash_string
                 if hash_string is None:
-                    hash_string = 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v.value)
+                    hash_string = 'Hash8:0x{:016x}'.format(v.value)
             else:
                 vp = v.value
                 hash_string = v.hash_string
                 if hash_string is None:
-                    hash_string = 'NOT EXPECTED {}'.format(type_def.size)
+                    hash_string = 'OTHER HASH {}'.format(type_def.size)
 
             s = s + '  ' * indent + '{} ({})  # {}\n'.format(hash_string, vp, value_info)
 
@@ -849,7 +845,7 @@ class Adf:
         self.comment = fp.read_strz()
 
         # name table
-        self.table_name = [[None, None] for i in range(self.nametable_count)]
+        self.table_name = [[0, b''] for i in range(self.nametable_count)]
         fp.seek(self.nametable_offset)
         for i in range(self.nametable_count):
             self.table_name[i][0] = fp.read_u8()
@@ -1007,8 +1003,8 @@ class AdfDatabase:
             return None
 
     def read_node(self, vfs: VfsDatabase, node: VfsNode):
-        with ArchiveFile(vfs.file_obj_from(node)) as f:
-            buffer = buffer_read(f)
+        with vfs.file_obj_from(node) as f:
+            buffer = f.read()
 
         try:
             if node.ftype == FTYPE_ADF_BARE:
@@ -1020,16 +1016,3 @@ class AdfDatabase:
             raise
 
         return adf
-
-
-def buffer_read(f):
-    buffer = b''
-    while True:
-        v = f.read(16 * 1024 * 1024)
-        if len(v) == 0:
-            break
-        buffer = buffer + v
-
-    return buffer
-
-

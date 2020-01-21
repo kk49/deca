@@ -1,6 +1,4 @@
 import numpy as np
-import struct
-import io
 from deca.file import ArchiveFile
 from deca.ff_aaf import load_aaf_header
 from deca.ff_types import *
@@ -83,7 +81,8 @@ def determine_file_type_and_size(f, file_size):
 
     # need to inspect file structure
 
-    if ftype is None:  # OBC files with (u32)4, (u32)count , 80 * count bytes, something to do with areas on the map? object placement?
+    if ftype is None:
+        # OBC files with (u32)4, (u32)count , 80 * count bytes, something to do with areas on the map? object placement?
         fm = ArchiveFile(f)
         fm.seek(start_pos)
         ver = fm.read_u32()
@@ -91,12 +90,12 @@ def determine_file_type_and_size(f, file_size):
         if ver == 4 and cnt * 80 + 8 == file_size:
             ftype = FTYPE_OBC
 
-    if ftype is None:  # text file only contains text bytes, json, xml, ...
-        fm.seek(start_pos)
-        counts = file_stats(fm, file_size)
-        all_sum = np.sum(counts)
-        pri_sum = np.sum(counts[[9, 10, 13] + list(range(20, 128))])
-        if all_sum == pri_sum:
-            ftype = FTYPE_TXT
+        if ftype is None:  # text file only contains text bytes, json, xml, ...
+            fm.seek(start_pos)
+            counts = file_stats(fm, file_size)
+            all_sum = np.sum(counts)
+            pri_sum = np.sum(counts[[9, 10, 13] + list(range(20, 128))])
+            if all_sum == pri_sum:
+                ftype = FTYPE_TXT
 
     return ftype, fsize

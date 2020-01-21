@@ -1,21 +1,21 @@
 import re
+from deca.vfs_db import VfsDatabase
 from deca.vfs_processor import vfs_structure_open
 from deca.ff_adf import AdfDatabase
 from deca.digest import process_translation_adf
 
 do_description = True
 
-vfs = vfs_structure_open('/home/krys/prj/work/gz/project.json')
+vfs: VfsDatabase = vfs_structure_open('/home/krys/prj/work/gz/project.json')
 adf_db = AdfDatabase(vfs)
 
 # load translation
-vnode = vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
-with vfs.file_obj_from(vnode, 'rb') as f:
-    tr = process_translation_adf(vfs, f, vnode.size_u)
+vnode = vfs.nodes_where_vpath(b'text/master_eng.stringlookup')[0]
+tr = process_translation_adf(vfs, adf_db, vnode)
 
 # LOAD from global/collection.collectionc
 # todo dump of different vnodes, one in gdcc is stripped
-vnode = vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
+vnode = vfs.nodes_where_vpath(b'global/collection.collectionc')[0]
 adf = adf_db.read_node(vfs, vnode)
 
 # todo use settings/hp_settings/codex_data.bin instead

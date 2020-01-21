@@ -3,8 +3,7 @@ from typing import List, TypeVar
 from .errors import *
 from .file import *
 from .ff_types import *
-from .vfs_db import VfsDatabase
-from .vfs_processor import VfsProcessor, VfsNode
+from .vfs_db import VfsDatabase, VfsNode
 from .export_import_adf import adf_export
 from .export_import_rtpc import rtpc_export
 from .ff_avtx import image_export
@@ -15,7 +14,7 @@ from .util import make_dir_for_file
 NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
-def fsb5c_export_processed(vfs, node, extract_dir, allow_overwrite=False):
+def fsb5c_export_processed(vfs: VfsDatabase, node, extract_dir, allow_overwrite=False):
     with vfs.file_obj_from(node, 'rb') as f:
         buffer = f.read(node.size_u)
 
@@ -36,7 +35,7 @@ def fsb5c_export_processed(vfs, node, extract_dir, allow_overwrite=False):
             fo.write(buffer)
 
 
-def expand_vpaths(vfs: VfsProcessor, vs, mask):
+def expand_vpaths(vfs: VfsDatabase, vs, mask):
     vos = []
 
     for v in vs:
@@ -54,7 +53,7 @@ def expand_vpaths(vfs: VfsProcessor, vs, mask):
 
 
 def extract_node_raw(
-        vfs: VfsProcessor,
+        vfs: VfsDatabase,
         node: VfsNode,
         extract_dir: str,
         allow_overwrite):
@@ -111,7 +110,7 @@ def find_vnode(vfs: VfsDatabase, v):
 
 
 def extract_raw(
-        vfs: VfsProcessor,
+        vfs: VfsDatabase,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
@@ -129,7 +128,7 @@ def extract_raw(
 
 
 def extract_contents(
-        vfs: VfsProcessor,
+        vfs: VfsDatabase,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
@@ -166,7 +165,7 @@ def extract_contents(
 
 
 def extract_processed(
-        vfs: VfsProcessor,
+        vfs: VfsDatabase,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,

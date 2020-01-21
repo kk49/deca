@@ -1,11 +1,12 @@
 import os
 import io
-from deca.file import ArchiveFile
+from .file import ArchiveFile
+from .vfs_db import VfsDatabase, VfsNode
+from .ff_adf import AdfDatabase
 
 
-def process_translation_adf(vfs, f, sz):
-    buffer = f.read(sz)
-    adf = vfs.adf_db.load_adf(buffer)
+def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode):
+    adf = adf_db.read_node(vfs, node)
 
     txt_buffer = adf.table_instance_values[0]['Text']
     txt_buffer = [(t + 256) % 256 for t in txt_buffer]

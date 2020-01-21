@@ -2,7 +2,7 @@ from deca.file import ArchiveFile
 from deca.vfs_db import VfsDatabase
 import struct
 from enum import IntEnum
-from typing import List, Dict
+from typing import List, Optional
 
 # Node Types
 
@@ -269,11 +269,11 @@ class RtpcNode:
         oldp = f.tell()
         f.seek(self.data_offset)
         # read properties
-        self.prop_table = [None] * self.prop_count
+        self.prop_table = []
         for i in range(self.prop_count):
             prop = RtpcProperty()
             prop.deserialize(f)
-            self.prop_table[i] = prop
+            self.prop_table.append(prop)
             self.prop_map[prop.name_hash] = prop
 
         #  children 4-byte aligned
@@ -281,11 +281,11 @@ class RtpcNode:
         f.seek(np + (4 - (np % 4)) % 4)
 
         # read children
-        self.child_table = [None] * self.child_count
+        self.child_table = []
         for i in range(self.child_count):
             child = RtpcNode()
             child.deserialize(f)
-            self.child_table[i] = child
+            self.child_table.append(child)
             self.child_map[child.name_hash] = child
 
         f.seek(oldp)
@@ -295,7 +295,7 @@ class Rtpc:
     def __init__(self):
         self.magic = None
         self.version = None
-        self.root_node: RtpcNode = None
+        self.root_node: Optional[RtpcNode] = None
 
     def deserialize(self, fraw):
         f = ArchiveFile(fraw)

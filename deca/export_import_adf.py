@@ -1,13 +1,12 @@
 import re
-from typing import List
 from .ff_adf import *
 from .xlsxwriter_hack import DecaWorkBook
 from .ff_adf_amf import AABB
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
-from .vfs_processor import VfsProcessor, VfsNode
+from .vfs_db import VfsDatabase, VfsNode
 
 
-def generate_export_file_path(vfs, export_path, vnode):
+def generate_export_file_path(vfs: VfsDatabase, export_path, vnode):
     if vnode.vpath is None:
         ofile = os.path.join(export_path, '{:08X}.dat'.format(vnode.vhash))
     else:
@@ -19,7 +18,7 @@ def generate_export_file_path(vfs, export_path, vnode):
     return ofile
 
 
-def adf_export_xlsx_0x0b73315d(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite):
+def adf_export_xlsx_0x0b73315d(vfs: VfsDatabase, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite):
     ofile = generate_export_file_path(vfs, export_path, vnode)
     fn = ofile + '.xlsx'
 
@@ -85,7 +84,7 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: Vf
 
 
 def adf_export_amf_model_0xf7c20a69(
-        vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+        vfs: VfsDatabase, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
@@ -98,7 +97,7 @@ def adf_export_amf_model_0xf7c20a69(
 
 
 def adf_export_mdic_0xb5b062f1(
-        vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
+        vfs: VfsDatabase, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
     vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
@@ -132,7 +131,8 @@ def adf_export_mdic_0xb5b062f1(
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def adf_export_node(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+def adf_export_node(
+        vfs: VfsDatabase, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
     adf = adf_db.read_node(vfs, vnode)
     if adf is not None:
         if len(adf.table_instance) == 1:
@@ -144,7 +144,8 @@ def adf_export_node(vfs: VfsProcessor, adf_db: AdfDatabase, vnode: VfsNode, expo
                 adf_export_mdic_0xb5b062f1(vfs, adf_db, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
 
 
-def adf_export(vfs: VfsProcessor, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
+def adf_export(
+        vfs: VfsDatabase, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
     adf_db = AdfDatabase(vfs)
 
     for vnode in vnodes:

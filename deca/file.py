@@ -24,10 +24,13 @@ class SubsetFile:
     def tell(self):
         return self.f.tell() - self.bpos
 
-    def read(self, n):
+    def read(self, n=None):
         bpos = self.f.tell()
-        epos = bpos + n
-        epos = min(epos, self.epos)
+        if n is None:
+            epos = self.epos
+        else:
+            epos = bpos + n
+            epos = min(epos, self.epos)
         return self.f.read(epos - bpos)
 
     def write(self, blk):
@@ -57,7 +60,7 @@ class ArchiveFile:
     def tell(self):
         return self.f.tell()
 
-    def read(self, n):
+    def read(self, n=None):
         return self.f.read(n)
 
     def write(self, blk):

@@ -9,9 +9,20 @@ class GameInfo:
         self.exe_name = exe_name
         self.game_id = game_id
         self.archive_version = 3
-        self.worlds = ['', 'worlds/base/']
-        for i in range(8):
-            self.worlds.append('worlds/world{}/'.format(i))
+        self.area_prefixs = ['']
+        self.worlds = [
+            ('', 'terrain/', 'terrain/hp/'),
+            ('', 'terrain/', 'terrain/jc3/'),
+            ('worlds/base/', 'worlds/base/terrain/', 'worlds/base/terrain/hp/'),
+        ]
+        for i in range(10):
+            self.worlds.append(
+                (
+                    f'worlds/world{i}/',
+                    f'worlds/world{i}/terrain/',
+                    f'worlds/world{i}/terrain/world{i}/',
+                )
+            )
 
     def save(self, filename):
         settings = {
@@ -188,6 +199,22 @@ class GameInfoGZB(GameInfo):
 class GameInfoTHCOTW(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'hp')
+        self.area_prefixs = [
+            '',
+            'globalhires_',
+
+            'hp_germany_farmland_fall_',
+            'hp_pacific_northwest_',
+            'hp_siberia_',
+            'hp_africa_',
+
+            'hp_patagonia_',
+            'hp_trophyworld_'
+            'hp_yukon_',
+            'hp_trophyworld_2_'
+            
+            'hp_iberia_',
+        ]
 
     def archive_path(self):
         archive_paths = []

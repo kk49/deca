@@ -1,29 +1,19 @@
 import os
-import pickle
 import io
 import multiprocessing
 import queue
-import re
-import json
-import csv
-import time
-import sqlite3
-import struct
 
 from deca.file import ArchiveFile
 from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, propose_h6
-from deca.game_info import GameInfo, game_info_load, GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
-from deca.errors import EDecaFileExists
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, TypeDef
+from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry
 from deca.ff_rtpc import Rtpc
 from deca.ff_arc_tab import TabFileV3, TabFileV4
 from deca.ff_sarc import FileSarc, EntrySarc
-from deca.util import Logger, remove_prefix_if_present, remove_suffix_if_present
+from deca.util import remove_prefix_if_present, remove_suffix_if_present
 from deca.hash_jenkins import hash_little
-from deca.ff_determine import determine_file_type_and_size
 from deca.kaitai.gfx import Gfx
 
 
@@ -332,13 +322,10 @@ class MultiProcessVfsBase:
                 fns = []
                 # self name patch files
                 if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
-                    for world in self.vfs.game_info.worlds:
-                        fn = world + 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+                    for world_rec in self.vfs.game_info.worlds:
+                        fn = world_rec[2] + 'patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
                             obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
                         fns.append(fn)
-                    fn = 'terrain/jc3/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
-                        obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
-                    fns.append(fn)
 
                 # self name environc files
                 if adf.table_instance[0].name == b'environ':

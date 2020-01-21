@@ -98,12 +98,14 @@ class FileSarc:
     def header_deserialize(self, fin):
         with ArchiveFile(fin) as f:
             self.version = f.read_u32()
-            assert(self.version == 4)
             self.magic = f.read(4)
-            assert(self.magic == b'SARC')
             self.ver2 = f.read_u32()
+            # assuming 16 byte boundry based on some some examples from theHunter:COTW
+            self.dir_block_len = f.read_u32()
+
+            assert(self.version == 4)
+            assert(self.magic == b'SARC')
             assert(self.ver2 in {2, 3})
-            self.dir_block_len = f.read_u32()  # assuming 16 byte boundry based on some some examples from theHunter:cotw
 
             self.entries = []
 
@@ -134,6 +136,8 @@ class FileSarc:
             self.entries_end = f.tell()
 
     def header_serialize(self, f):
+        vpath_string = b''
+
         if self.ver2 == 2:
             # calculate dir block length
             dir_block_len = 0
@@ -144,7 +148,6 @@ class FileSarc:
 
         elif self.ver2 == 3:
             # calculate dir block length
-            vpath_string = b''
             entry: EntrySarc
             for entry in self.entries:
                 entry.string_offset = len(vpath_string)

@@ -1,10 +1,11 @@
 import copy
 from typing import Optional
 import xml.etree.ElementTree as ET
-from deca.util import remove_prefix_if_present
-from deca.ff_avtx import image_load
-from deca.ff_adf import *
-from deca.ff_adf_amf import *
+from .vfs_db import VfsDatabase
+from .util import remove_prefix_if_present
+from .ff_avtx import image_load
+from .ff_adf import *
+from .ff_adf_amf import *
 import pygltflib as pyg
 import scipy.spatial.transform as sst
 
@@ -61,7 +62,7 @@ class Deca3dMatrix:
 
 
 class Deca3dDatabase:
-    def __init__(self, vfs, resource_prefix_abs, resource_prefix_uri, flat_file_layout):
+    def __init__(self, vfs: VfsDatabase, resource_prefix_abs, resource_prefix_uri, flat_file_layout):
         self.vfs = vfs
         self.adf_db = AdfDatabase(vfs)
         self.resource_prefix_abs = resource_prefix_abs
@@ -107,14 +108,14 @@ class Deca3dTexture:
         self.gltf_id = None
         self.texture_saved = False
 
-    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs: VfsDatabase, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if not self.texture_saved:
             vfs.logger.log('Texture:Setup: {}'.format(self.vpath))
             # dump textures
             texture_fn_uri = None
             if len(self.vpath) > 0:
-                texture_node = vfs.map_vpath_to_vfsnodes.get(self.vpath, [])
-                if len(texture_node) > 0:
+                texture_nodes = vfs.nodes_where_vpath(self.vpath)
+                if len(texture_nodes) > 0:
                     texture_fn = self.vpath.decode('utf-8') + '.png'
                     if db.flat_file_layout:
                         texture_fn = texture_fn.replace('/', '_')
@@ -122,7 +123,7 @@ class Deca3dTexture:
                     texture_fn_absolute = os.path.join(db.resource_prefix_abs, texture_fn)
 
                     if not os.path.isfile(texture_fn_absolute):
-                        texture_node = texture_node[0]
+                        texture_node = texture_nodes[0]
                         ddsc = image_load(vfs, texture_node, save_raw_data=True)
 
                         mips = None
@@ -169,10 +170,10 @@ class Deca3dMeshc:
         self.vpath = vpath
         self.meshes = None
 
-    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs: VfsDatabase, adf_db: AdfDatabase, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.meshes is None:
             vfs.logger.log('Setup Meshc: {}'.format(self.vpath))
-            mesh_adf = adf_db.read_node(vfs, vfs.map_vpath_to_vfsnodes[self.vpath][0])
+            mesh_adf = adf_db.read_node(vfs, vfs.nodes_where_vpath(self.vpath)[0])
             assert len(mesh_adf.table_instance) == 2
             assert mesh_adf.table_instance[0].type_hash == 0xea60065d
             # 0x67b3a453 - GenZ, 0xe6834477 - theHunter
@@ -183,10 +184,14 @@ class Deca3dMeshc:
             hrmesh_vpath = mesh_header.highLodPath
             hrmesh_vpath2 = remove_prefix_if_present(b'intermediate/', hrmesh_vpath)
             hrmesh_node = None
-            if hrmesh_vpath in vfs.map_vpath_to_vfsnodes:
-                hrmesh_node = vfs.map_vpath_to_vfsnodes[hrmesh_vpath][0]
-            elif hrmesh_vpath2 is not None and hrmesh_vpath2 in vfs.map_vpath_to_vfsnodes:
-                hrmesh_node = vfs.map_vpath_to_vfsnodes[hrmesh_vpath2][0]
+
+            hrmesh_nodes = vfs.nodes_where_vpath(hrmesh_vpath)
+            if hrmesh_nodes:
+                hrmesh_node = hrmesh_nodes[0]
+            elif hrmesh_vpath2 is not None:
+                hrmesh_nodes = vfs.nodes_where_vpath(hrmesh_vpath2)
+                if hrmesh_nodes:
+                    hrmesh_node = hrmesh_nodes[0]
 
             if hrmesh_node is not None:
                 hrmesh_adf = adf_db.read_node(vfs, hrmesh_node)
@@ -389,19 +394,15 @@ class Deca3dModelc:
         self.models = None
         self.material_properties = material_properties
 
-    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs: VfsDatabase, adf_db: AdfDatabase, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.models is None:
             vfs.logger.log('Setup Modelc: {}'.format(self.vpath))
 
-            if self.vpath not in vfs.map_vpath_to_vfsnodes:
+            nodes = vfs.nodes_where_vpath(self.vpath)
+            if len(nodes) == 0:
                 raise EDecaFileMissing('Not Mapped: {}'.format(self.vpath))
 
-            node = list(vfs.map_vpath_to_vfsnodes[self.vpath])
-
-            if len(node) == 0:
-                raise EDecaFileMissing('No Nodes: {}'.format(self.vpath))
-
-            node = node[0]
+            node = nodes[0]
             model_adf = adf_db.read_node(vfs, node)
             model = AmfModel(model_adf, model_adf.table_instance_full_values[0])
 
@@ -437,7 +438,8 @@ class Deca3dModelc:
                     else:
                         gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
 
-                    if False:
+                    use_spec_gloss = False
+                    if use_spec_gloss:
                         mat_sg = {}
                         tid = textures[0]
                         if tid is not None:
@@ -500,7 +502,7 @@ class Deca3dHkSkeleton:
         self.scene = scene
         self.skeleton = None
 
-    def add_to_gltf(self, vfs, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs: VfsDatabase, adf_db: AdfDatabase, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.skeleton is None:
             vfs.logger.log('Setup Modelc: {}'.format(self.vpath))
 
@@ -516,12 +518,14 @@ class Deca3dHkSkeleton:
             ppath_skel_xml = ppath_skel_raw + '.xml'
 
             if not os.path.isfile(ppath_skel_raw):
-                if vpath not in vfs.map_vpath_to_vfsnodes:
+                vnodes = vfs.nodes_where_vpath(vpath)
+
+                if len(vnodes) == 0:
                     raise EDecaFileMissing('Not Mapped: {}'.format(vpath))
 
-                vnode = vfs.map_vpath_to_vfsnodes[vpath][0]
-                with ArchiveFile(vfs.file_obj_from(vnode)) as f:
-                    buffer = buffer_read(f)
+                vnode = vnodes[0]
+                with vfs.file_obj_from(vnode) as f:
+                    buffer = f.read()
 
                 dir_path = os.path.dirname(ppath_skel_raw)
                 os.makedirs(dir_path, exist_ok=True)
@@ -579,7 +583,9 @@ class Deca3dHkSkeleton:
                 bnode = pyg.Node()
                 bnode_idx = len(gltf.nodes)
                 gltf.nodes.append(bnode)
-                # nodes are not connect to other hierchy so must be added to scene manually, so root nodes must be added manually
+
+                # nodes are not connect to other hierchy so must be added to scene
+                #   manually, so root nodes must be added manually
                 if pidx < 0:
                     self.scene.nodes.append(bnode_idx)
                 bone_nodes.append([bnode_idx, bnode])
@@ -691,7 +697,7 @@ class DecaGltfNode:
 
 
 class DecaGltf:
-    def __init__(self, vfs, export_path, filename, lod=0, save_to_one_dir=False, flat_file_layout=False):
+    def __init__(self, vfs: VfsDatabase, export_path, filename, lod=0, save_to_one_dir=False, flat_file_layout=False):
         self.vfs = vfs
         self.filename = filename
         self.lod = lod

@@ -1,28 +1,17 @@
 import os
-import pickle
-import io
 import multiprocessing
 import queue
 import re
-import json
 import csv
 import time
-import sqlite3
-import struct
 
-from deca.file import ArchiveFile
 from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, db_to_vfs_node
 from deca.vfs_commands import run_mp_vfs_base, language_codes, MultiProcessVfsBase
-from deca.game_info import GameInfo, game_info_load, GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
-from deca.errors import EDecaFileExists
+from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
 from deca.ff_types import *
-from deca.ff_txt import load_json
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, TypeDef
-from deca.ff_rtpc import Rtpc
-from deca.ff_arc_tab import TabFileV3, TabFileV4
-from deca.ff_sarc import FileSarc, EntrySarc
-from deca.util import Logger, make_dir_for_file, remove_prefix_if_present, remove_suffix_if_present
+from deca.ff_adf import AdfDatabase
+from deca.util import Logger, make_dir_for_file
 from deca.hash_jenkins import hash_little
 from deca.ff_determine import determine_file_type_and_size
 
@@ -34,9 +23,7 @@ def vfs_structure_new(filename):
 
     game_info = None
     vfs = None
-    if False:
-        pass
-    elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
+    if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
         game_info = GameInfoGZB(game_dir, exe_name)
     elif exe_name.find('GenerationZero') >= 0:
         game_info = GameInfoGZ(game_dir, exe_name)
@@ -90,8 +77,9 @@ class VfsProcessor(VfsDatabase):
 
         self.mp_q_results = multiprocessing.Queue()
         # assuming hyper-threading exists and slows down processing
-        self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
         # self.mp_n_processes = 1
+        self.mp_n_processes = max(1, 2 * multiprocessing.cpu_count() // 4)
+        # self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
 
         self.mp_processes = {}
         for i in range(self.mp_n_processes):
@@ -175,7 +163,8 @@ class VfsProcessor(VfsDatabase):
                 dup_map[vhash].add(vpath)
                 dup_count[vhash] = len(dup_map[vhash])
 
-        for vhash, vpaths in dup_count.items():
+        for vhash, count in dup_count.items():
+            vpaths = dup_map[vhash]
             for vpath in vpaths:
                 self.logger.log(f'SUMMARY: Duplicate Node Hashes: {vhash:08x} {vpath}')
 
@@ -476,11 +465,11 @@ class VfsProcessor(VfsDatabase):
         guess_strings = {}
         guess_strings['gdc/global.gdcc'] = FTYPE_ADF
         guess_strings['textures/ui/world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
-        for res_i in range(8):
+        for res_i in range(10):
             guess_strings['settings/hp_settings/reserve_{}.bin'.format(res_i)] = FTYPE_RTPC
             guess_strings['settings/hp_settings/reserve_{}.bl'.format(res_i)] = FTYPE_SARC
             guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
-            guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
+
             for zoom_i in [1, 2, 3]:
                 for index in range(500):
                     fn = 'textures/ui/map_reserve_{}/zoom{}/{}.ddsc'.format(res_i, zoom_i, index)
@@ -491,14 +480,15 @@ class VfsProcessor(VfsDatabase):
                 fn = 'textures/ui/warboard_map/zoom{}/{}.ddsc'.format(zoom_i, index)
                 guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
 
-        for world in self.game_info.worlds:
-            for i in range(64):
-                fn = world + 'terrain/hp/horizonmap/horizon_{}.ddsc'.format(i)
-                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
+        for world_rec in self.game_info.worlds:
+            for area_prefix in self.game_info.area_prefixs:
+                for i in range(64):
+                    fn = world_rec[2] + 'horizonmap/horizon_{}{}.ddsc'.format(area_prefix, i)
+                    guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
 
             for i in range(64):
                 for j in range(64):
-                    fn = world + 'ai/tiles/{:02d}_{:02d}.navmeshc'.format(i, j)
+                    fn = world_rec[0] + 'ai/tiles/{:02d}_{:02d}.navmeshc'.format(i, j)
                     guess_strings[fn] = [FTYPE_TAG0, FTYPE_H2014]
 
         prefixs = [

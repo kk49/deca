@@ -10,7 +10,7 @@ from deca.ff_types import *
 from deca.ff_determine import determine_file_type_and_size
 from deca.ff_aaf import extract_aaf
 from deca.util import make_dir_for_file
-from deca.game_info import GameInfo, game_info_load
+from deca.game_info import game_info_load
 
 
 def regexp(expr, item):

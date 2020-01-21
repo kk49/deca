@@ -1,7 +1,7 @@
 import os
 import re
 from typing import List
-from .vfs_processor import VfsProcessor, VfsNode
+from .vfs_db import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
 from .ff_rtpc import Rtpc, PropName, RtpcNode
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
@@ -16,7 +16,7 @@ b'CRigidObject'
 def rtpc_export_node_recurse(
         rtpc: RtpcNode,
         gltf: DecaGltf,
-        vfs: VfsProcessor,
+        vfs: VfsDatabase,
         world_matrix=None,
         material_properties=None,
         skeleton_raw_path=None):
@@ -59,13 +59,13 @@ def rtpc_export_node_recurse(
         if 0x0f94740b in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
     elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
-            if 0x0f94740b in rtpc.prop_map:
-                rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
+        if 0x0f94740b in rtpc.prop_map:
+            rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
     elif rtpc_class in {b'CCharacter'}:
         if 0xe8129fe6 in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xe8129fe6].data
     elif rtpc_class in {b'CBulletWeaponBase', b'CWeaponModItem', b'CModelAttachementWeaponComponent'}:
-        entity_type = rtpc.prop_map[0xd31ab684].data
+        # TODO entity_type = rtpc.prop_map[0xd31ab684].data
         if 0xf9dcf6ab in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xf9dcf6ab].data
 
@@ -81,7 +81,7 @@ def rtpc_export_node_recurse(
             world_matrix=world_matrix, material_properties=material_properties, skeleton_raw_path=skeleton_raw_path)
 
 
-def rtpc_export_node(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+def rtpc_export_node(vfs: VfsDatabase, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
     rtpc = Rtpc()
     with vfs.file_obj_from(vnode) as f:
         rtpc.deserialize(f)
@@ -97,7 +97,7 @@ def rtpc_export_node(vfs: VfsProcessor, vnode: VfsNode, export_path, allow_overw
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def rtpc_export(vfs: VfsProcessor, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
+def rtpc_export(vfs: VfsDatabase, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
     for vnode in vnodes:
         try:
             if save_to_processed:

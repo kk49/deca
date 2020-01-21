@@ -1,6 +1,4 @@
 from .viewer import *
-from ..ff_types import FTYPE_ADF_BARE, FTYPE_ADF
-from ..file import ArchiveFile
 from ..ff_adf import AdfTypeMissing, AdfDatabase
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont

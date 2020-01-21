@@ -26,5 +26,3 @@ class DataViewerRtpc(DataViewer):
             rtpc.deserialize(f)
         sbuf = rtpc.dump_to_string(vfs)
         self.text_box.setText(sbuf)
-
-

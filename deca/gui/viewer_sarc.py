@@ -25,5 +25,3 @@ class DataViewerSarc(DataViewer):
         sarc_file.header_deserialize(vfs.file_obj_from(vnode))
         sbuf = sarc_file.dump_str()
         self.text_box.setText(sbuf)
-
-

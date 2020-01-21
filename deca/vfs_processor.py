@@ -78,8 +78,8 @@ class VfsProcessor(VfsDatabase):
         self.mp_q_results = multiprocessing.Queue()
         # assuming hyper-threading exists and slows down processing
         # self.mp_n_processes = 1
-        self.mp_n_processes = max(1, 2 * multiprocessing.cpu_count() // 4)
-        # self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
+        # self.mp_n_processes = max(1, 2 * multiprocessing.cpu_count() // 4)
+        self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
 
         self.mp_processes = {}
         for i in range(self.mp_n_processes):

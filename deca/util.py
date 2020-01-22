@@ -12,16 +12,26 @@ class Logger:
         if self.working_dir is not None:
             with open(self.working_dir + 'log.txt', 'a') as f:
                 f.write(msg + '\n')
-                if level <= 0:
+                if level <= 2:
                     print(msg)
 
         return msg
 
-    def log(self, s):
+    def error(self, s):
         self.log_base(0, s)
 
-    def trace(self, s):
+    def warning(self, s):
         self.log_base(1, s)
+
+    def log(self, s):
+        self.log_base(2, s)
+
+    def trace(self, s):
+        self.log_base(3, s)
+
+    def debug(self, s):
+        self.log_base(3, s)
+
 
 
 def dump_line(line, width, format='hex'):

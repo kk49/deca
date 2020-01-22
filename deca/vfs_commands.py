@@ -2,9 +2,12 @@ import os
 import io
 import multiprocessing
 import queue
+import time
+import sys
+import traceback
 
 from deca.file import ArchiveFile
-from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, propose_h6
+from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, propose_h6, language_codes
 from deca.ff_types import *
 from deca.ff_txt import load_json
 import deca.ff_rtpc
@@ -17,31 +20,161 @@ from deca.hash_jenkins import hash_little
 from deca.kaitai.gfx import Gfx
 
 
-language_codes = [
-    'chi',  # Chinese
-    'eng',  # English
-    'fre',  # French
-    'ger',  # German
-    'jap',  # Japanese
-    'pol',  # Polish
-    'rus',  # Russian
-    'sch',  # Simplified Chinese
-    'spa',  # Spanish
-    'swe',  # Swedish
-]
+class MultiProcessControl:
+    def __init__(self, project_file, working_dir, logger):
+        self.project_file = project_file
+        self.working_dir = working_dir
+        self.logger = logger
+        self.progress_update_time_sec = 5.0
+
+        self.mp_q_results = multiprocessing.Queue()
+        # assuming hyper-threading exists and slows down processing
+        # self.mp_n_processes = 1
+        # self.mp_n_processes = max(1, 2 * multiprocessing.cpu_count() // 4)
+        self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
+
+        self.mp_processes = {}
+        for i in range(self.mp_n_processes):
+            name = 'process_{}'.format(i)
+
+            self.logger.debug('Process Create: {}'.format(name))
+            q_command = multiprocessing.Queue()
+            p = multiprocessing.Process(
+                target=run_mp_vfs_base, args=(name, project_file, working_dir, q_command, self.mp_q_results))
+            self.mp_processes[name] = (name, p, q_command)
+
+            self.logger.debug('Process Start: {}'.format(p))
+
+            p.start()
+
+    def do_map(self, cmd, params, step_id=None):
+        self.logger.log(f'Manager: "{cmd}" with {len(params)} parameters using {self.mp_n_processes} processes')
+
+        indexes = [params[v::self.mp_n_processes] for v in range(0, self.mp_n_processes)]
+
+        command_list = []
+        for ii in indexes:
+            command_list.append([cmd, [ii]])
+
+        self.mp_issue_commands(command_list, step_id=step_id)
+
+    def mp_issue_commands(self, command_list: list, step_id=None):
+        command_todo = command_list.copy()
+        command_active = {}
+        command_complete = []
+        processes_available = set(self.mp_processes.keys())
+
+        exception_list = []
+
+        if step_id is None:
+            step_id = ''
+        else:
+            step_id = ': {}'.format(step_id)
+
+        status = {}
+        last_update = None
+        start_time = time.time()
+
+        local = False
+        if local:
+            test = MultiProcessVfsBase('test', self.project_file, self.working_dir, None, self.mp_q_results)
+            for command in command_todo:
+                test.process_command(command[0], command[1])
+        else:
+            while len(processes_available) > 0 and (len(command_todo) + len(command_active)) > 0:
+                ctime = time.time()
+                if last_update is None or (last_update + self.progress_update_time_sec) < ctime:
+                    n_done = 0
+                    n_total = 0
+                    for k, v in status.items():
+                        n_done += v[0]
+                        n_total += v[1]
+                    if n_total > 0:
+                        last_update = ctime
+                        self.logger.log('Processing{}: {} of {} done ({:3.1f}%) elapsed {:5.1f} seconds'.format(
+                            step_id, n_done, n_total, n_done / n_total * 100.0, ctime - start_time))
+
+                if len(command_active) < self.mp_n_processes and len(command_todo) > 0:
+                    # add commands
+                    available_procs = processes_available - set(command_active.keys())
+                    proc = available_procs.pop()
+                    proc = self.mp_processes[proc]
+                    name = proc[0]
+                    q_command: queue.Queue = proc[2]
+                    command = command_todo.pop(0)
+                    command_active[name] = command
+                    q_command.put(command)
+                else:
+                    try:
+                        msg = self.mp_q_results.get(block=False, timeout=1)
+                        proc_name = msg[0]
+                        proc_cmd = msg[1]
+                        proc_params = msg[2]
+
+                        if proc_cmd not in {'trace', 'debug', 'log', 'status', 'exception', 'process_done'}:
+                            self.logger.debug('Manager: received msg {}:{}'.format(proc_name, proc_cmd))
+
+                        if proc_cmd == 'log':
+                            self.logger.log('{}: {}'.format(proc_name, proc_params[0]))
+                        elif proc_cmd == 'debug':
+                            self.logger.debug('{}: {}'.format(proc_name, proc_params[0]))
+                        elif proc_cmd == 'trace':
+                            self.logger.trace('{}: {}'.format(proc_name, proc_params[0]))
+                        elif proc_cmd == 'error':
+                            self.logger.error('{}: {}'.format(proc_name, proc_params[0]))
+                        elif proc_cmd == 'warning':
+                            self.logger.warning('{}: {}'.format(proc_name, proc_params[0]))
+                        elif proc_cmd == 'exception':
+                            exception_list.append(proc_params)
+                            self.logger.error('{}: EXCEPTION: {}'.format(proc_name, proc_params))
+                        elif proc_cmd == 'status':
+                            status[proc_name] = proc_params
+                        elif proc_cmd == 'cmd_done':
+                            command_active.pop(proc_name)
+                            command_complete.append([proc_name, proc_params])
+                            self.logger.debug('Manager: {} completed {}'.format(proc_name, proc_params))
+                        elif proc_cmd == 'process_done':
+                            self.logger.debug('Manager: {} DONE'.format(proc_name))
+                            command_active.pop(proc_name)
+                            processes_available.discard(proc_name)
+                        else:
+                            print(msg)
+                    except queue.Empty:
+                        pass
+
+            # shutdown processes
+            for k in processes_available:
+                v = self.mp_processes[k]
+                v[2].put(('exit', []))
+                self.logger.debug('Manager: Issued Exit to {}'.format(k))
+
+            # join
+            for k, v in self.mp_processes.items():
+                self.logger.debug('Manager: Joining {}'.format(k))
+                v[1].join()
+
+            if exception_list:
+                raise Exception('Manager: PROCESSING FAILED')
+
+            self.logger.log('Manager: Done')
 
 
 def run_mp_vfs_base(name, project_file, working_dir, q_in, q_out):
-    p = MultiProcessVfsBase(name, project_file, working_dir, q_in, q_out)
-    p.run()
+    try:
+        p = MultiProcessVfsBase(name, project_file, working_dir, q_in, q_out)
+        p.run()
+    except:
+        ei = sys.exc_info()
+        q_out.put((name, 'exception', [ei[0], ei[1], traceback.format_tb(ei[2])], ))
+
+    q_out.put((name, 'process_done', [],))
 
 
 class MultiProcessVfsBase:
-    def __init__(self, name, project_file, working_dir, q_in: multiprocessing.Queue, q_out: multiprocessing.Queue, debug=False):
+    def __init__(self, name, project_file, working_dir, q_in: multiprocessing.Queue, q_out: multiprocessing.Queue):
         self.name = name
         self.q_in = q_in
         self.q_out = q_out
-        self.debug = debug
 
         self.vfs = VfsDatabase(project_file, working_dir, self)
 
@@ -55,13 +188,16 @@ class MultiProcessVfsBase:
         }
 
     def send(self, cmd, *params):
-        self.q_out.put_nowait((self.name, cmd, params, ))
+        self.q_out.put((self.name, cmd, params, ))
 
     def log(self, msg):
         self.send('log', msg)
 
     def trace(self, msg):
-        self.send('trace', msg)
+        self.send('debug', msg)
+
+    def exception(self, exc):
+        self.send('exception', exc)
 
     def run(self):
         keep_running = True
@@ -72,8 +208,7 @@ class MultiProcessVfsBase:
                 cmd = cmd[0]
 
                 if cmd is not None:
-                    if self.debug:
-                        self.log('Processing Command "{}({})"'.format(cmd, len(params)))
+                    self.trace('Processing Command "{}({})"'.format(cmd, len(params)))
 
                     if cmd == 'exit':
                         keep_running = False
@@ -82,10 +217,6 @@ class MultiProcessVfsBase:
                         self.send('cmd_done', cmd)
             except queue.Empty:
                 pass
-            except Exception as e:
-                print('Exception: {}'.format(e))
-
-        self.send('process_done')
 
     def process_command(self, cmd, params):
         command = self.commands.get(cmd, None)
@@ -179,8 +310,7 @@ class MultiProcessVfsBase:
             cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid, level=node.level)
             nodes_to_add.append(cnode)
         elif node.ftype == FTYPE_TAB:
-            if debug:
-                self.log('Processing TAB: {}'.format(node.pvpath))
+            self.trace('Processing TAB: {}'.format(node.pvpath))
             node.processed = True
             with ArchiveFile(open(node.pvpath, 'rb'), debug=debug) as f:
                 if 3 == ver:

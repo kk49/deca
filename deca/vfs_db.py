@@ -13,6 +13,20 @@ from deca.util import make_dir_for_file
 from deca.game_info import game_info_load
 
 
+language_codes = [
+    'chi',  # Chinese
+    'eng',  # English
+    'fre',  # French
+    'ger',  # German
+    'jap',  # Japanese
+    'pol',  # Polish
+    'rus',  # Russian
+    'sch',  # Simplified Chinese
+    'spa',  # Spanish
+    'swe',  # Swedish
+]
+
+
 def regexp(expr, item):
     if item is None or expr is None:
         return False
@@ -147,7 +161,7 @@ def db_from_vfs_node(node):
 
 
 class VfsDatabase:
-    def __init__(self, project_file, working_dir, logger):
+    def __init__(self, project_file, working_dir, logger, init_display=False):
         self.project_file = project_file
         self.working_dir = working_dir
         self.logger = logger
@@ -155,7 +169,8 @@ class VfsDatabase:
 
         os.makedirs(working_dir, exist_ok=True)
 
-        logger.log('OPENING: {} {}'.format(self.game_info.game_dir, working_dir))
+        if init_display:
+            logger.log('OPENING: {} {}'.format(self.game_info.game_dir, working_dir))
 
         self.db_filename = os.path.join(self.working_dir, 'db', 'core.db')
         make_dir_for_file(self.db_filename)

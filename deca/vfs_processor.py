@@ -1,12 +1,9 @@
 import os
-import multiprocessing
-import queue
 import re
 import csv
-import time
 
-from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, db_to_vfs_node
-from deca.vfs_commands import run_mp_vfs_base, language_codes, MultiProcessVfsBase
+from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, db_to_vfs_node, language_codes
+from deca.vfs_commands import MultiProcessControl
 from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
 from deca.ff_types import *
 import deca.ff_rtpc
@@ -70,29 +67,9 @@ def game_file_to_sortable_string(v):
 
 class VfsProcessor(VfsDatabase):
     def __init__(self, project_file, working_dir, logger):
-        VfsDatabase.__init__(self, project_file, working_dir, logger)
+        VfsDatabase.__init__(self, project_file, working_dir, logger, init_display=True)
 
         self.external_files = set()
-        self.progress_update_time_sec = 5.0
-
-        self.mp_q_results = multiprocessing.Queue()
-        # assuming hyper-threading exists and slows down processing
-        # self.mp_n_processes = 1
-        # self.mp_n_processes = max(1, 2 * multiprocessing.cpu_count() // 4)
-        self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
-
-        self.mp_processes = {}
-        for i in range(self.mp_n_processes):
-            name = 'process_{}'.format(i)
-
-            self.logger.log('Create Process: {}'.format(name))
-            q_command = multiprocessing.Queue()
-            p = multiprocessing.Process(
-                target=run_mp_vfs_base, args=(name, project_file, working_dir, q_command, self.mp_q_results))
-            self.mp_processes[name] = (name, p, q_command)
-
-            self.logger.log('Process: {}: Start'.format(p))
-            p.start()
 
     def process(self, debug=False):
         version = self.db_query_one("PRAGMA user_version")[0]
@@ -188,75 +165,6 @@ class VfsProcessor(VfsDatabase):
         self.logger.log(f'SUMMARY: Unmatched Nodes: {len(nodes_no_vpath)}')
         self.logger.log(f'SUMMARY: Unmatched Path Hashes: {len(nodes_no_vpath_set)}')
 
-    def mp_issue_commands(self, command_list: list, step_id=None, debug=False):
-        command_todo = command_list.copy()
-        command_active = {}
-        command_complete = []
-
-        if step_id is None:
-            step_id = ''
-        else:
-            step_id = ': {}'.format(step_id)
-
-        status = {}
-        last_update = None
-        start_time = time.time()
-
-        local = False
-        if local:
-            test = MultiProcessVfsBase('test', self.project_file, self.working_dir, None, self.mp_q_results)
-            for command in command_todo:
-                test.process_command(command[0], command[1])
-        else:
-            while (len(command_todo) + len(command_active)) > 0:
-                ctime = time.time()
-                if last_update is None or (last_update + self.progress_update_time_sec) < ctime:
-                    n_done = 0
-                    n_total = 0
-                    for k, v in status.items():
-                        n_done += v[0]
-                        n_total += v[1]
-                    if n_total > 0:
-                        last_update = ctime
-                        self.logger.log('Processing{}: {} of {} done ({:3.1f}%) elapsed {:5.1f} seconds'.format(
-                            step_id, n_done, n_total, n_done / n_total * 100.0, ctime - start_time))
-
-                if len(command_active) < self.mp_n_processes and len(command_todo) > 0:
-                    # add commands
-                    available_procs = set(self.mp_processes.keys()) - set(command_active.keys())
-                    proc = available_procs.pop()
-                    proc = self.mp_processes[proc]
-                    name = proc[0]
-                    q_command: queue.Queue = proc[2]
-                    command = command_todo.pop(0)
-                    command_active[name] = command
-                    q_command.put_nowait(command)
-                else:
-                    try:
-                        msg = self.mp_q_results.get(block=False, timeout=1)
-                        proc_name = msg[0]
-                        proc_cmd = msg[1]
-                        proc_params = msg[2]
-
-                        if proc_cmd not in {'trace', 'log', 'status'} and debug:
-                            self.logger.log('Manager: received msg {}:{}'.format(proc_name, proc_cmd))
-
-                        if proc_cmd == 'log':
-                            self.logger.log('{}: {}'.format(proc_name, proc_params[0]))
-                        elif proc_cmd == 'trace':
-                            self.logger.trace('{}: {}'.format(proc_name, proc_params[0]))
-                        elif proc_cmd == 'status':
-                            status[proc_name] = proc_params
-                        elif proc_cmd == 'cmd_done':
-                            command_active.pop(proc_name)
-                            command_complete.append([proc_name, proc_params])
-                            if debug:
-                                self.logger.log('Manager: {} completed {}'.format(proc_name, proc_params))
-                        else:
-                            print(msg)
-                    except queue.Empty:
-                        pass
-
     def load_from_archives(self, debug=False):
         self.logger.log('Process EXE file')
 
@@ -312,32 +220,21 @@ class VfsProcessor(VfsDatabase):
             node = VfsNode(ftype=FTYPE_ARC, pvpath=file_arc)
             self.node_add_one(node)
 
-        any_change = True
         phase_id = 0
-        last_update = None
         processed_nodes = set()
-        while any_change:
+        while True:
             phase_id = phase_id + 1
-
-            any_change = False
-
             new_nodes = set(self.nodes_where_processed_select_uid(0))
             new_nodes = new_nodes - processed_nodes
 
             if len(new_nodes) > 0:
                 self.logger.log('Expand Archives Phase {}: Begin'.format(phase_id))
-                any_change = True
-                new_nodes_list = list(new_nodes)
-
-                indexes = [new_nodes_list[v::self.mp_n_processes] for v in range(0, self.mp_n_processes)]
-
-                commands = []
-                for ii in indexes:
-                    commands.append(['process_archives_initial', [ii]])
-
-                self.mp_issue_commands(commands, step_id='Archives')
+                commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+                commander.do_map('process_archives_initial', list(new_nodes), step_id='Archives')
                 processed_nodes = processed_nodes.union(new_nodes)
                 self.logger.log('Expand Archives Phase {}: End'.format(phase_id))
+            else:
+                break
 
     def get_vnode_indexs_from_ftype(self, ftype, process_dups=False):
         indexs = []
@@ -352,34 +249,18 @@ class VfsProcessor(VfsDatabase):
 
     def process_by_ftype(self, ftype, cmd, process_dups=False):
         self.logger.log('PROCESS: FTYPE = {}'.format(ftype))
-
         indexes, nodes_done = self.get_vnode_indexs_from_ftype(ftype, process_dups)
-
         if len(indexes) > 0:
-            indexes2 = [indexes[v::self.mp_n_processes] for v in range(0, self.mp_n_processes)]
-
-            commands = []
-            for idxs in indexes2:
-                commands.append([cmd, [idxs]])
-
-            self.mp_issue_commands(commands, step_id=ftype)
-
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            commander.do_map(cmd, indexes, step_id=ftype)
         self.logger.log('PROCESS: FTYPE = {}: Total files {}'.format(ftype, len(nodes_done)))
 
     def process_by_vhash(self, cmd):
         self.logger.log('PROCESS: VHASHes')
-
         vhashes = self.nodes_select_distinct_vhash()
-
         if len(vhashes) > 0:
-            indexes2 = [vhashes[v::self.mp_n_processes] for v in range(0, self.mp_n_processes)]
-
-            commands = []
-            for idxs in indexes2:
-                commands.append([cmd, [idxs]])
-
-            self.mp_issue_commands(commands, step_id='vhash')
-
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            commander.do_map(cmd, vhashes, step_id='vhash')
         self.logger.log('PROCESS: VHASHes: Total VHASHes {}'.format(len(vhashes)))
 
     def find_vpath_exe(self):

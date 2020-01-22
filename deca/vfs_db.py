@@ -188,6 +188,13 @@ class VfsDatabase:
     def logger_set(self, logger):
         self.logger = logger
 
+    def handle_exception(self, dbg, exc: sqlite3.OperationalError):
+        if len(exc.args) == 1 and exc.args[0] == 'database is locked':
+            self.logger.log(f'{dbg}: Waiting on database...')
+        else:
+            print(dbg, exc, exc.args)
+            raise
+
     def db_execute_one(self, stmt, params=None, dbg='db_execute_one'):
         if params is None:
             params = []
@@ -196,8 +203,21 @@ class VfsDatabase:
             try:
                 result = self.db_cur.execute(stmt, params)
                 break
-            except sqlite3.OperationalError as ex:
-                self.logger.log(f'{dbg}: Waiting on database...')
+            except sqlite3.OperationalError as exc:
+                self.handle_exception(dbg, exc)
+
+        return result
+
+    def db_execute_many(self, stmt, params=None, dbg='db_execute_many'):
+        if params is None:
+            params = []
+
+        while True:
+            try:
+                result = self.db_cur.executemany(stmt, params)
+                break
+            except sqlite3.OperationalError as exc:
+                self.handle_exception(dbg, exc)
 
         return result
 
@@ -211,7 +231,7 @@ class VfsDatabase:
                 result = result.fetchone()
                 break
             except sqlite3.OperationalError as exc:
-                self.logger.log(f'{dbg}: Waiting on database...')
+                self.handle_exception(dbg, exc)
 
         return result
 
@@ -225,7 +245,7 @@ class VfsDatabase:
                 result = result.fetchall()
                 break
             except sqlite3.OperationalError as exc:
-                self.logger.log(f'{dbg}: Waiting on database...')
+                self.handle_exception(dbg, exc)
 
         return result
 
@@ -423,13 +443,10 @@ class VfsDatabase:
         return [(r[0], r[1], to_bytes(r[2])) for r in result]
 
     def node_add_one(self, node: VfsNode):
-        while True:
-            try:
-                result = self.db_cur.execute(
-                    "insert into core_vnodes values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", db_from_vfs_node(node))
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: node_add_one: Waiting on database...')
+        result = self.db_execute_one(
+            "INSERT INTO core_vnodes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            db_from_vfs_node(node),
+            dbg='node_add_one')
 
         self.db_conn.commit()
 
@@ -440,70 +457,54 @@ class VfsDatabase:
     def node_add_many(self, nodes):
         db_nodes = [db_from_vfs_node(node) for node in nodes]
 
-        while True:
-            try:
-                result = self.db_cur.executemany(
-                    "insert into core_vnodes values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", db_nodes)
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: node_add_many: Waiting on database...')
+        result = self.db_execute_many(
+            "insert into core_vnodes values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            db_nodes,
+            dbg='node_add_many'
+        )
 
         self.db_conn.commit()
 
     def node_update_many(self, nodes: list):
         db_nodes = [db_from_vfs_node(node) for node in nodes]
         db_nodes = [db_node[1:] + db_node[0:1] for db_node in db_nodes]
-        while True:
-            try:
-                result = self.db_cur.executemany(
-                    """
-                    update core_vnodes set 
-                    ftype=(?),
-                    vpath=(?),
-                    vpath_hash=(?),
-                    ppath=(?),
-                    parent_id=(?),
-                    index_in_parent=(?),
-                    level=(?),
-                    is_compressed=(?),
-                    offset=(?),
-                    size_c=(?),
-                    size_u=(?),
-                    used_at_runtime_depth=(?),
-                    gdcc_adf_type=(?),
-                    ext_hash=(?),
-                    processed=(?)
-                    where uid=(?)
-                    """, db_nodes)
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: node_update_many: Waiting on database...')
+
+        result = self.db_execute_many(
+            """
+            update core_vnodes set 
+            ftype=(?),
+            vpath=(?),
+            vpath_hash=(?),
+            ppath=(?),
+            parent_id=(?),
+            index_in_parent=(?),
+            level=(?),
+            is_compressed=(?),
+            offset=(?),
+            size_c=(?),
+            size_u=(?),
+            used_at_runtime_depth=(?),
+            gdcc_adf_type=(?),
+            ext_hash=(?),
+            processed=(?)
+            where uid=(?)
+            """,
+            db_nodes,
+            dbg='node_update_many'
+        )
         self.db_conn.commit()
 
     def hash4_add_many(self, hash_list):
         hash_list_str = [(h[0], h[1]) for h in hash_list]
-
         hash_list_str_unique = list(set(hash_list_str))
-        while True:
-            try:
-                result = self.db_cur.executemany(
-                    "INSERT OR IGNORE INTO core_hash4 VALUES (?,?)", hash_list_str_unique)
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: hash4_add_many:insert:0: Waiting on database...')
-
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_hash4 VALUES (?,?)", hash_list_str_unique, dbg='hash4_add_many:insert:0')
         self.db_conn.commit()
 
         hash_list_map = {}
         for rec in hash_list_str_unique:
-            while True:
-                try:
-                    result = self.db_cur.execute(
-                        "SELECT rowid FROM core_hash4 WHERE hash==(?) and string==(?)", rec)
-                    result = result.fetchall()
-                    break
-                except sqlite3.OperationalError as exc:
-                    self.logger.log('TIMEOUT: hash4_add_many:select:0: Waiting on database...')
+            result = self.db_query_all(
+                "SELECT rowid FROM core_hash4 WHERE hash==(?) and string==(?)", rec, dbg='hash4_add_many:select:0')
 
             # we expect one and only one match for a hash+string
             assert len(result) == 1
@@ -511,43 +512,23 @@ class VfsDatabase:
             hash_list_map[rec] = row_id
 
         row_ids = [hash_list_map[rec] for rec in hash_list_str]
-
         ref_list = [(r, h[2], h[3], h[4], h[5]) for r, h in zip(row_ids, hash_list)]
         ref_list = list(set(ref_list))
-        while True:
-            try:
-                result = self.db_cur.executemany(
-                    "INSERT OR IGNORE INTO core_hash4_references VALUES (?,?,?,?,?)", ref_list)
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: hash4_add_many:insert:1: Waiting on database...')
-
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_hash4_references VALUES (?,?,?,?,?)", ref_list, dbg='hash4_add_many:insert:1')
         self.db_conn.commit()
 
     def hash6_add_many(self, hash_list):
         hash_list_str = [(h[0], h[1]) for h in hash_list]
-
         hash_list_str_unique = list(set(hash_list_str))
-        while True:
-            try:
-                result = self.db_cur.executemany(
-                    "INSERT OR IGNORE INTO core_hash6 VALUES (?,?)", hash_list_str_unique)
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: hash6_add_many:insert:0: Waiting on database...')
-
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_hash6 VALUES (?,?)", hash_list_str_unique, dbg='hash6_add_many:insert:0')
         self.db_conn.commit()
 
         hash_list_map = {}
         for rec in hash_list_str_unique:
-            while True:
-                try:
-                    result = self.db_cur.execute(
-                        "SELECT rowid FROM core_hash6 WHERE hash==(?) and string==(?)", rec)
-                    result = result.fetchall()
-                    break
-                except sqlite3.OperationalError as exc:
-                    self.logger.log('TIMEOUT: hash6_add_many:select:0: Waiting on database...')
+            result = self.db_query_all(
+                "SELECT rowid FROM core_hash6 WHERE hash==(?) and string==(?)", rec, dbg='hash6_add_many:select:0')
 
             # we expect one and only one match for a hash+string
             assert len(result) == 1
@@ -555,17 +536,10 @@ class VfsDatabase:
             hash_list_map[rec] = row_id
 
         row_ids = [hash_list_map[rec] for rec in hash_list_str]
-
         ref_list = [(r, h[2]) for r, h in zip(row_ids, hash_list)]
         ref_list = list(set(ref_list))
-        while True:
-            try:
-                result = self.db_cur.executemany(
-                    "INSERT OR IGNORE INTO core_hash6_references VALUES (?,?)", ref_list)
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: hash6_add_many:insert:1: Waiting on database...')
-
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_hash6_references VALUES (?,?)", ref_list, dbg='hash6_add_many:insert:1')
         self.db_conn.commit()
 
     def adf_type_map_save(self, adf_map, adf_missing):
@@ -579,25 +553,12 @@ class VfsDatabase:
         for type_id, missing_in in adf_missing:
             adf_list.append((type_id, missing_in, bytes()))
 
-        while True:
-            try:
-                result = self.db_cur.executemany(
-                    "INSERT OR IGNORE INTO core_adf_types VALUES (?,?,?)", adf_list)
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: adf_type_map_save: Waiting on database...')
-
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_adf_types VALUES (?,?,?)", adf_list, dbg='adf_type_map_save')
         self.db_conn.commit()
 
     def adf_type_map_load(self):
-        while True:
-            try:
-                result = self.db_cur.execute(
-                    "select * from core_adf_types")
-                result = result.fetchall()
-                break
-            except sqlite3.OperationalError:
-                self.logger.log('TIMEOUT: adf_type_map_load: Waiting on database...')
+        result = self.db_query_all("SELECT * FROM core_adf_types", dbg='adf_type_map_load')
 
         adf_map = {}
         adf_missing = set()

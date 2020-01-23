@@ -323,16 +323,22 @@ class VfsProcessor(VfsDatabase):
             './resources/{}/strings.txt'.format(self.game_info.game_id),
             './resources/{}/strings_procmon.txt'.format(self.game_info.game_id),
         ]
+
+        search_dir = './resources/ghidra_strings'
+        for file in os.listdir(search_dir):
+            fns.append(os.path.join(search_dir, file))
+
         hash4_to_add = []
 
         for fn in fns:
             if os.path.isfile(fn):
-                self.logger.log('STRINGS FROM RESOURCES: look for hashable strings in {}'.format(fn))
+                self.logger.log('STRINGS FROM RESOURCES: Loading possible strings from{}'.format(fn))
                 with open(fn, 'rb') as f:
                     custom_strings = f.readlines()
-                    custom_strings = set(custom_strings)
-                    for s in custom_strings:
-                        propose_h4(hash4_to_add, s.strip(), None, used_at_runtime=True)
+                custom_strings = set(custom_strings)
+                self.logger.log('STRINGS FROM RESOURCES: Loaded {} strings'.format(len(custom_strings)))
+                for s in custom_strings:
+                    propose_h4(hash4_to_add, s.strip(), None, used_at_runtime=True)
 
         hash4_to_add = list(set(hash4_to_add))
         if len(hash4_to_add) > 0:
@@ -533,7 +539,6 @@ class VfsProcessor(VfsDatabase):
                     vnode.ftype = FTYPE_ATX
                 elif ext == b'.hmddsc':
                     vnode.ftype = FTYPE_HMDDSC
-
 
     def external_file_add(self, filename):
         if not hasattr(self, 'external_files'):

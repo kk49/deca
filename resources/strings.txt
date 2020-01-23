@@ -136,3 +136,4 @@ world
 ------
 action
 depth
+kill_distance

@@ -242,7 +242,7 @@ class RtpcNode:
         name = vfs.hash4_where_vhash_select_all(self.name_hash)
 
         if len(name):
-            name = '"{}"'.format(name[0][2].decode('utf-8'))
+            name = 'DB:H4:"{}"'.format(name[0][2].decode('utf-8'))
         else:
             name = f'0x{self.name_hash:08x}'
 

@@ -87,5 +87,14 @@ def hash_little(data, initval=0):
 
 
 if __name__ == "__main__":
+    data = sys.argv[1]
+    initval = -0xdeadbeef
+    if isinstance(data, str):
+        c, b = hashlittle2(data.encode('ascii'), initval, 0)
+    else:
+        c, b = hashlittle2(data, initval, 0)
+
     hv = hash_little(sys.argv[1])
-    print('{} = {} , 0x{:08x}'.format(sys.argv[1], hv, hv))
+    print('hash4 "{}" = {:12} , 0x{:08x}'.format(data, hv, hv))
+    print('c     "{}" = {:12} , 0x{:08x}'.format(data, c, c))
+    print('b     "{}" = {:12} , 0x{:08x}'.format(data, b, b))

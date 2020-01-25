@@ -247,11 +247,11 @@ class VfsNodeTableWidget(QWidget):
 
 
 class VfsDirLeaf(object):
-    def __init__(self, name, vnodes):
+    def __init__(self, name, uid):
         self.name = name
         self.parent = None
         self.row = 0
-        self.vnodes = vnodes
+        self.uid = uid
 
     def vpath(self):
         pn = b''
@@ -272,12 +272,12 @@ class VfsDirBranch(object):
         self.child_name_map = {}
 
     def vpath(self, child_called=False):
-        s = b''
+        s = ''
         if self.parent is not None:
             s = self.parent.vpath(True)
-            s = s + self.name + b'/'
+            s = s + self.name + '/'
         if not child_called:
-            s = s + b'%'
+            s = s + r'%'
         return s
 
     def child_count(self):
@@ -303,38 +303,32 @@ class VfsDirModel(QAbstractItemModel):
         self.n_rows = 0
         self.n_cols = 0
 
-    def vfs_set(self, vfs):
+    def vfs_set(self, vfs: VfsDatabase):
         self.beginResetModel()
         self.vfs = vfs
         self.adf_db = AdfDatabase(vfs)
-        self.root_node = None
-        self.root_node = VfsDirBranch(b'/')
 
-        t0 = time.time()
-        vpaths = self.vfs.nodes_select_distinct_vpath()
-        t1 = time.time()
-
+        vpaths = self.vfs.nodes_select_vpath_uid_where_vpath_not_null()
         vpaths.sort()
-        for vpath in vpaths:
-            if vpath is not None:
-                vnodes = self.vfs.nodes_where_vpath(vpath)
-                if len(vnodes) > 0:
-                    if vpath.find(b'\\') >= 0:
-                        print(f'GUI: Warning: Windows Path {vpath}')
-                        path = vpath.split(b'\\')
-                    else:
-                        path = vpath.split(b'/')
-                    name = path[-1]
-                    path = path[0:-1]
-                    cnode = self.root_node
-                    for p in path:
-                        cnode = cnode.child_add(VfsDirBranch(p))
+        vpaths = dict(vpaths)
 
-                    cnode.child_add(VfsDirLeaf(name, vnodes))
-                else:
-                    print(f'GUI: Warning: Missing Path: {vpath}')
-        t2 = time.time()
-        print(f'Time dir: {t1-t0} {t2-t1}')
+        self.root_node = None
+        self.root_node = VfsDirBranch('/')
+        for vpath, uid in vpaths.items():
+            if vpath.find('\\') >= 0:
+                print(f'GUI: Warning: Windows Path {vpath}')
+                path = vpath.split('\\')
+            else:
+                path = vpath.split('/')
+
+            name = path[-1]
+            path = path[0:-1]
+            cnode = self.root_node
+            for p in path:
+                cnode = cnode.child_add(VfsDirBranch(p))
+
+            cnode.child_add(VfsDirLeaf(name, uid))
+
         self.endResetModel()
 
     def parent(self, index):
@@ -382,9 +376,10 @@ class VfsDirModel(QAbstractItemModel):
         column = index.column()
         if role == Qt.DisplayRole:
             if column == 0:
-                return node.name.decode('utf-8')
+                return node.name
             elif isinstance(node, VfsDirLeaf):
-                vnode: VfsNode = node.vnodes[0]
+                uid = node.uid
+                vnode: VfsNode = self.vfs.node_where_uid(uid)
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
@@ -412,7 +407,8 @@ class VfsDirModel(QAbstractItemModel):
                     return '{}'.format(vnode.used_at_runtime_depth)
         elif role == Qt.BackgroundColorRole:
             if isinstance(node, VfsDirLeaf):
-                vnode: VfsNode = node.vnodes[0]
+                uid = node.uid
+                vnode: VfsNode = self.vfs.node_where_uid(uid)
                 if column == 8:
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
@@ -440,7 +436,7 @@ class DecaSortFilterProxyModel(QSortFilterProxyModel):
                 vis = vis | self.check_node(cindex)
 
         elif isinstance(tnode, VfsDirLeaf):
-            vis = self.filter_expr.match(tnode.name.decode('utf-8')) is not None
+            vis = self.filter_expr.match(tnode.name) is not None
 
         self.vis_map[index] = vis
 
@@ -522,7 +518,9 @@ class VfsDirWidget(QWidget):
             index = self.proxy_model.mapToSource(index)
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
-                self.vnode_2click_selected(tnode.vnodes[0])
+                uid = tnode.uid
+                item = self.source_model.vfs.node_where_uid(uid)
+                self.vnode_2click_selected(item)
 
     def filter_vfspath_set(self, expr):
         # self.proxy_model.setFilterRegExp(QRegExp(expr, Qt.CaseInsensitive, QRegExp.RegExp))

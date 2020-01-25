@@ -363,15 +363,21 @@ class VfsDatabase:
         result = dict(result)
         return result
 
-    def hash_string_where_hash32_select_all(self, vhash):
-        result = self.db_query_all(
-            "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash32 == (?)", [vhash], dbg='hash_string_where_hash32_select_all')
-        return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
+    def hash_string_where_hash32_select_all(self, hash32):
+        if hash32 & 0xFFFFFFFF != hash32:
+            return []
+        else:
+            result = self.db_query_all(
+                "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash32 == (?)", [hash32], dbg='hash_string_where_hash32_select_all')
+            return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
 
-    def hash_string_where_hash48_select_all(self, vhash):
-        result = self.db_query_all(
-            "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash48 == (?)", [vhash], dbg='hash_string_where_hash48_select_all')
-        return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
+    def hash_string_where_hash48_select_all(self, hash48):
+        if hash48 & 0xFFFFFFFFFFFF != hash48:
+            return []
+        else:
+            result = self.db_query_all(
+                "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash48 == (?)", [hash48], dbg='hash_string_where_hash48_select_all')
+            return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
 
     def hash_string_references_select_all(self):
         result = self.db_query_all(

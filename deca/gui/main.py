@@ -1,8 +1,10 @@
 import sys
 import os
 import re
+import time
 
 from deca.errors import *
+from deca.vfs_db import VfsDatabase
 from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsNode
 from deca.ff_types import *
 from deca.ff_adf import AdfDatabase
@@ -41,12 +43,12 @@ def used_color_calc(level):
 
 
 class VfsNodeTableModel(QAbstractTableModel):
-    def __init__(self, show_mapped=True):
+    def __init__(self, show_all=True):
         QAbstractTableModel.__init__(self)
         self.vfs = None
         self.adf_db = None
-        self.show_mapped = show_mapped
-        self.table = None
+        self.show_all = show_all
+        self.uid_table = None
 
         self.remap = None
         self.remap_uid = None
@@ -55,14 +57,17 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.remap_hash = None
         self.column_ids = ["Index", "PIDX", "Type", "Hash", "EXT_hash", "ADF_type", "Size_U", "Size_C", "Path"]
 
-    def vfs_set(self, vfs):
+    def vfs_set(self, vfs: VfsDatabase):
         self.beginResetModel()
         self.vfs = vfs
         self.adf_db = AdfDatabase(vfs)
-        self.table = self.vfs.nodes_select_all()
-        if not self.show_mapped:
-            self.table = [v for v in self.table if
-                          v.vpath is None and v.pvpath is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
+
+        if self.show_all:
+            self.uid_table = self.vfs.nodes_select_uid()
+        else:
+            self.uid_table = self.vfs.nodes_where_unmapped_select_uid()
+        self.uid_table.sort()
+
         self.endResetModel()
 
     def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
@@ -102,10 +107,10 @@ class VfsNodeTableModel(QAbstractTableModel):
         pass
 
     def rowCount(self, parent=QModelIndex()):
-        if self.table is None:
+        if self.uid_table is None:
             return 0
         else:
-            return len(self.table)
+            return len(self.uid_table)
 
     def columnCount(self, parent=QModelIndex()):
         return 9
@@ -126,7 +131,8 @@ class VfsNodeTableModel(QAbstractTableModel):
             row = self.remap[row]
 
         if role == Qt.DisplayRole:
-            node: VfsNode = self.table[row]
+            uid = self.uid_table[row]
+            node: VfsNode = self.vfs.node_where_uid(uid)
             if node is None:
                 return 'NA'
             else:
@@ -164,7 +170,8 @@ class VfsNodeTableModel(QAbstractTableModel):
                         return ''
 
         elif role == Qt.BackgroundRole:
-            node = self.table[row]
+            uid = self.uid_table[row]
+            node: VfsNode = self.vfs.node_where_uid(uid)
             if node.is_valid():
                 if column == 8:
                     if node.used_at_runtime_depth is not None:
@@ -190,7 +197,7 @@ class VfsNodeTableWidget(QWidget):
         self.vnode_2click_selected = None
 
         # Getting the Model
-        self.model = VfsNodeTableModel(show_mapped=show_mapped)
+        self.model = VfsNodeTableModel(show_all=show_mapped)
 
         # Creating a QTableView
         self.table_view = QTableView()
@@ -227,13 +234,16 @@ class VfsNodeTableWidget(QWidget):
     def clicked(self, index):
         if index.isValid():
             if self.vnode_selection_changed is not None:
-                items = list(set([self.model.table[idx.row()] for idx in self.table_view.selectedIndexes()]))
+                items = list(set([self.model.uid_table[idx.row()] for idx in self.table_view.selectedIndexes()]))
+                items = [self.model.vfs.node_where_uid(i) for i in items]
                 self.vnode_selection_changed(items)
 
     def double_clicked(self, index):
         if index.isValid():
             if self.vnode_2click_selected is not None:
-                self.vnode_2click_selected(self.model.table[index.row()])
+                item = self.model.uid_table[index.row()]
+                item = self.model.vfs.node_where_uid(item)
+                self.vnode_2click_selected(item)
 
 
 class VfsDirLeaf(object):
@@ -300,7 +310,10 @@ class VfsDirModel(QAbstractItemModel):
         self.root_node = None
         self.root_node = VfsDirBranch(b'/')
 
+        t0 = time.time()
         vpaths = self.vfs.nodes_select_distinct_vpath()
+        t1 = time.time()
+
         vpaths.sort()
         for vpath in vpaths:
             if vpath is not None:
@@ -320,7 +333,8 @@ class VfsDirModel(QAbstractItemModel):
                     cnode.child_add(VfsDirLeaf(name, vnodes))
                 else:
                     print(f'GUI: Warning: Missing Path: {vpath}')
-
+        t2 = time.time()
+        print(f'Time dir: {t1-t0} {t2-t1}')
         self.endResetModel()
 
     def parent(self, index):

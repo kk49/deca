@@ -353,6 +353,17 @@ class VfsDatabase:
             "select * from core_vnodes", dbg='nodes_select_uids')
         return [db_to_vfs_node(node) for node in nodes]
 
+    def nodes_select_uid(self):
+        result = self.db_query_all(
+            "SELECT uid FROM core_vnodes", dbg='nodes_select_uid')
+        return [v[0] for v in result]
+
+    def nodes_where_unmapped_select_uid(self):
+        result = self.db_query_all(
+            "SELECT uid FROM core_vnodes WHERE (ftype is NULL or (ftype != (?) AND ftype != (?))) AND vpath IS NULL AND ppath IS NULL",
+            [FTYPE_ARC, FTYPE_TAB], dbg='nodes_where_unmapped_select_uid')
+        return [v[0] for v in result]
+
     def node_where_uid(self, uid):
         r1 = self.db_query_one(
             "select * from core_vnodes where uid == (?)", [uid], dbg='node_where_uid')

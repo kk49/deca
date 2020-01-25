@@ -3,7 +3,7 @@
 block_cipher = None
 
 added_files = [
-    ('resources/strings.txt', 'resources/strings.txt'),
+    ('resources/*.txt', 'resources/'),
     ('resources/gz', 'resources/gz'),
     ('resources/gzb', 'resources/gzb'),
     ('resources/hp', 'resources/hp'),

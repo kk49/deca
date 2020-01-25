@@ -5,7 +5,7 @@ from typing import List, Dict
 from io import BytesIO
 from deca.errors import *
 from deca.file import ArchiveFile
-from deca.hash_jenkins import hash_little
+from deca.hashes import hash32_func
 from deca.ff_types import FTYPE_ADF_BARE
 from deca.vfs_db import VfsDatabase, VfsNode
 
@@ -341,7 +341,7 @@ class AdfValue:
         return s
 
 
-def adf_format(v, vfs, type_map, indent=0):
+def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
     if isinstance(v, AdfValue):
         type_def = type_map.get(v.type_id, TypeDef())
 
@@ -388,18 +388,18 @@ def adf_format(v, vfs, type_map, indent=0):
                 vp = '0x{:08x}'.format(v.value)
                 hash_string = v.hash_string
                 if hash_string is None:
-                    name = vfs.hash4_where_vhash_select_all(v.value)
+                    name = vfs.hash_string_where_hash32_select_all(v.value)
                     if len(name):
-                        hash_string = 'DB:"{}"'.format(name[0][2].decode('utf-8'))
+                        hash_string = 'DB:"{}"'.format(name[0][3].decode('utf-8'))
                     else:
                         hash_string = 'Hash4:0x{:08x}'.format(v.value)
             elif type_def.size == 6:
                 vp = '0x{:012x}'.format(v.value)
                 hash_string = v.hash_string
                 if hash_string is None:
-                    name = vfs.hash6_where_vhash_select_all(v.value & 0x0000FFFFFFFFFFFF)
+                    name = vfs.hash_string_where_hash48_select_all(v.value & 0x0000FFFFFFFFFFFF)
                     if len(name):
-                        hash_string = 'DB:"{}"'.format(name[0][2].decode('utf-8'))
+                        hash_string = 'DB:"{}"'.format(name[0][3].decode('utf-8'))
                     else:
                         hash_string = 'Hash6:0x{:012x}'.format(v.value)
             elif type_def.size == 8:
@@ -552,7 +552,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
 
                 gdf.seek(string_offset)
                 vpath = gdf.read_strz()
-                vhash = hash_little(vpath)
+                vhash = hash32_func(vpath)
 
                 if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
                     # TODO this follows the data structure for an array of some type, 0xD74CC4CB is probably it's hash
@@ -974,7 +974,7 @@ class AdfDatabase:
             obj.extended_map_typedef = self.type_map_def
 
             obj.table_instance[0].name = b'instance'
-            obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
+            obj.table_instance[0].name_hash = hash32_func(obj.table_instance[0].name)
             obj.table_instance[0].type_hash = adf_type
             obj.table_instance[0].offset = offset
             obj.table_instance[0].size = size

@@ -4,7 +4,7 @@ import sqlite3
 import pickle
 import re
 
-from deca.hash_jenkins import hash_little
+from deca.hashes import hash32_func, hash48_func
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_determine import determine_file_type_and_size
@@ -40,56 +40,6 @@ def to_bytes(s):
     if isinstance(s, str):
         s = s.encode('ascii', 'ignore')
     return s
-
-
-def propose_h4(h4list, vpath, pnode, is_field_name=0, possible_ftypes=None, used_at_runtime=None):
-    ptypes = 0
-
-    if isinstance(vpath, str):
-        vpath = vpath.encode('ascii', 'ignore')
-    elif isinstance(vpath, bytes):
-        try:
-            vpath.decode('utf-8')
-        except UnicodeDecodeError:
-            # if logger is not None:
-            #     logger.log('propose: BAD STRING NOT UTF-8 {}'.format(vpath))
-            return None
-    else:
-        # if logger is not None:
-        #     logger.log('propose: BAD STRING {}'.format(vpath))
-        return None
-
-    vpath = vpath.replace(b'\\\\', b'/').replace(b'\\', b'/')
-
-    p = None
-    if pnode is not None:
-        p = pnode.uid
-
-    if possible_ftypes is None:
-        pass
-    elif isinstance(possible_ftypes, list):
-        for pt in possible_ftypes:
-            ptypes = ptypes | ftype_list[pt]
-    else:
-        ptypes = ptypes | ftype_list[possible_ftypes]
-
-    rec = (hash_little(vpath), vpath, p, is_field_name, used_at_runtime, ptypes)
-
-    h4list.append(rec)
-
-    return rec
-
-
-def propose_h6(h6list, vpath, pnode):
-    p = None
-    if pnode is not None:
-        p = pnode.uid
-
-    rec = (hash_little(vpath), vpath, p)
-
-    h6list.append(rec)
-
-    return rec
 
 
 class VfsNode:
@@ -254,10 +204,8 @@ class VfsDatabase:
         self.db_execute_one('DROP INDEX IF EXISTS core_vhash_to_vnode;')
 
         self.db_execute_one('DROP TABLE IF EXISTS core_vnodes;')
-        self.db_execute_one('DROP TABLE IF EXISTS core_hash4;')
-        self.db_execute_one('DROP TABLE IF EXISTS core_hash4_references;')
-        self.db_execute_one('DROP TABLE IF EXISTS core_hash6;')
-        self.db_execute_one('DROP TABLE IF EXISTS core_hash6_references;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash_strings;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash_string_references;')
         self.db_execute_one('DROP TABLE IF EXISTS core_adf_types;')
 
         self.db_execute_one('VACUUM;')
@@ -292,40 +240,23 @@ class VfsDatabase:
         )
         self.db_execute_one(
             '''
-            CREATE TABLE IF NOT EXISTS "core_hash4" (
-                "hash" INTEGER NOT NULL,
+            CREATE TABLE IF NOT EXISTS "core_hash_strings" (
+                "hash32" INTEGER NOT NULL,
+                "hash48" INTEGER NOT NULL,
                 "string" TEXT,
-                PRIMARY KEY ("hash", "string")
+                PRIMARY KEY ("hash32", "hash48", "string")
             );
             '''
         )
         self.db_execute_one(
             '''
-            CREATE TABLE IF NOT EXISTS "core_hash4_references" (
+            CREATE TABLE IF NOT EXISTS "core_hash_string_references" (
                 "hash_row_id" INTEGER NOT NULL,
                 "src_node" INTEGER,
                 "is_adf_field_name" INTEGER,
                 "used_at_runtime" INTEGER,
                 "possible_file_types" INTEGER,
                 PRIMARY KEY ("hash_row_id", "src_node", "is_adf_field_name", "used_at_runtime", "possible_file_types")
-            );
-            '''
-        )
-        self.db_execute_one(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_hash6" (
-                "hash" INTEGER NOT NULL,
-                "string" TEXT,
-                PRIMARY KEY ("hash", "string")
-            );
-            '''
-        )
-        self.db_execute_one(
-            '''
-            CREATE TABLE IF NOT EXISTS "core_hash6_references" (
-                "hash_row_id" INTEGER NOT NULL,
-                "src_node" INTEGER,
-                PRIMARY KEY ("hash_row_id", "src_node")
             );
             '''
         )
@@ -347,6 +278,16 @@ class VfsDatabase:
         self.db_execute_one(
             '''
             CREATE INDEX IF NOT EXISTS "core_vhash_to_vnode" ON "core_vnodes" ("vpath_hash"	ASC);
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_hash32_asc" ON "core_hash_strings" ("hash32"	ASC);
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_hash48_asc" ON "core_hash_strings" ("hash48"	ASC);
             '''
         )
 
@@ -373,7 +314,7 @@ class VfsDatabase:
             "select uid from core_vnodes where ftype == (?)", [ftype], dbg='nodes_where_ftype_select_uid')
         return [uid[0] for uid in uids]
 
-    def nodes_where_vhash(self, vhash):
+    def nodes_where_hash32(self, vhash):
         nodes = self.db_query_all(
             "select * from core_vnodes where vpath_hash == (?)", [vhash], dbg='nodes_where_vhash')
         return [db_to_vfs_node(node) for node in nodes]
@@ -409,38 +350,38 @@ class VfsDatabase:
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
         return result
 
-    def hash4_select_distinct_string(self):
+    def hash_string_select_distinct_string(self):
         result = self.db_query_all(
-            "SELECT DISTINCT string FROM core_hash4", dbg='hash4_select_distinct_string')
+            "SELECT DISTINCT string FROM core_hash_strings", dbg='hash_string_select_distinct_string')
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
         return result
 
-    def hash4_select_all_to_dict(self):
+    def hash_string_select_all_to_dict(self):
         result = self.db_query_all(
-            "SELECT rowid, hash, string FROM core_hash4", dbg='hash4_select_all_to_dict')
-        result = [(r[0], (r[1], to_bytes(r[2]))) for r in result]
+            "SELECT rowid, hash32, hash48, string FROM core_hash_strings", dbg='hash_string_select_all_to_dict')
+        result = [(r[0], (r[1], r[2], to_bytes(r[3]))) for r in result]
         result = dict(result)
         return result
 
-    def hash4_where_vhash_select_all(self, vhash):
+    def hash_string_where_hash32_select_all(self, vhash):
         result = self.db_query_all(
-            "SELECT rowid, hash, string FROM core_hash4 WHERE hash == (?)", [vhash], dbg='hash4_where_vhash_select_all')
-        return [(r[0], r[1], to_bytes(r[2])) for r in result]
+            "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash32 == (?)", [vhash], dbg='hash_string_where_hash32_select_all')
+        return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
 
-    def hash4_references_select_all(self):
+    def hash_string_where_hash48_select_all(self, vhash):
         result = self.db_query_all(
-            "SELECT * FROM core_hash4_references", dbg='hash4_references_select_all')
+            "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash48 == (?)", [vhash], dbg='hash_string_where_hash48_select_all')
+        return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
+
+    def hash_string_references_select_all(self):
+        result = self.db_query_all(
+            "SELECT * FROM core_hash_string_references", dbg='hash_string_references_select_all')
         return result
 
-    def hash4_references_where_h4rowid_select_all(self, rowid):
+    def hash_string_references_where_hs_rowid_select_all(self, rowid):
         result = self.db_query_all(
-            "SELECT * FROM core_hash4_references WHERE hash_row_id == (?)", [rowid], dbg='hash4_references_where_h4rowid_select_all')
+            "SELECT * FROM core_hash_string_references WHERE hash_row_id == (?)", [rowid], dbg='hash_string_references_where_hs_rowid_select_all')
         return result
-
-    def hash6_where_vhash_select_all(self, vhash):
-        result = self.db_query_all(
-            "SELECT rowid, hash, string FROM core_hash6 WHERE hash == (?)", [vhash], dbg='hash6_where_vhash_select_all')
-        return [(r[0], r[1], to_bytes(r[2])) for r in result]
 
     def node_add_one(self, node: VfsNode):
         result = self.db_execute_one(
@@ -465,7 +406,7 @@ class VfsDatabase:
 
         self.db_conn.commit()
 
-    def node_update_many(self, nodes: list):
+    def node_update_many(self, nodes: set):
         db_nodes = [db_from_vfs_node(node) for node in nodes]
         db_nodes = [db_node[1:] + db_node[0:1] for db_node in db_nodes]
 
@@ -494,17 +435,17 @@ class VfsDatabase:
         )
         self.db_conn.commit()
 
-    def hash4_add_many(self, hash_list):
-        hash_list_str = [(h[0], h[1]) for h in hash_list]
+    def hash_string_add_many(self, hash_list):
+        hash_list_str = [(h[0], h[1], h[2]) for h in hash_list]
         hash_list_str_unique = list(set(hash_list_str))
         result = self.db_execute_many(
-            "INSERT OR IGNORE INTO core_hash4 VALUES (?,?)", hash_list_str_unique, dbg='hash4_add_many:insert:0')
+            "INSERT OR IGNORE INTO core_hash_strings VALUES (?,?,?)", hash_list_str_unique, dbg='hash_string_add_many:insert:0')
         self.db_conn.commit()
 
         hash_list_map = {}
         for rec in hash_list_str_unique:
             result = self.db_query_all(
-                "SELECT rowid FROM core_hash4 WHERE hash==(?) and string==(?)", rec, dbg='hash4_add_many:select:0')
+                "SELECT rowid FROM core_hash_strings WHERE hash32==(?) and hash48==(?) and string==(?)", rec, dbg='hash_string_add_many:select:0')
 
             # we expect one and only one match for a hash+string
             assert len(result) == 1
@@ -512,34 +453,10 @@ class VfsDatabase:
             hash_list_map[rec] = row_id
 
         row_ids = [hash_list_map[rec] for rec in hash_list_str]
-        ref_list = [(r, h[2], h[3], h[4], h[5]) for r, h in zip(row_ids, hash_list)]
+        ref_list = [(r, h[3], h[4], h[5], h[6]) for r, h in zip(row_ids, hash_list)]
         ref_list = list(set(ref_list))
         result = self.db_execute_many(
-            "INSERT OR IGNORE INTO core_hash4_references VALUES (?,?,?,?,?)", ref_list, dbg='hash4_add_many:insert:1')
-        self.db_conn.commit()
-
-    def hash6_add_many(self, hash_list):
-        hash_list_str = [(h[0], h[1]) for h in hash_list]
-        hash_list_str_unique = list(set(hash_list_str))
-        result = self.db_execute_many(
-            "INSERT OR IGNORE INTO core_hash6 VALUES (?,?)", hash_list_str_unique, dbg='hash6_add_many:insert:0')
-        self.db_conn.commit()
-
-        hash_list_map = {}
-        for rec in hash_list_str_unique:
-            result = self.db_query_all(
-                "SELECT rowid FROM core_hash6 WHERE hash==(?) and string==(?)", rec, dbg='hash6_add_many:select:0')
-
-            # we expect one and only one match for a hash+string
-            assert len(result) == 1
-            row_id = result[0][0]
-            hash_list_map[rec] = row_id
-
-        row_ids = [hash_list_map[rec] for rec in hash_list_str]
-        ref_list = [(r, h[2]) for r, h in zip(row_ids, hash_list)]
-        ref_list = list(set(ref_list))
-        result = self.db_execute_many(
-            "INSERT OR IGNORE INTO core_hash6_references VALUES (?,?)", ref_list, dbg='hash6_add_many:insert:1')
+            "INSERT OR IGNORE INTO core_hash_string_references VALUES (?,?,?,?,?)", ref_list, dbg='hash_string_add_many:insert:1')
         self.db_conn.commit()
 
     def adf_type_map_save(self, adf_map, adf_missing):
@@ -616,7 +533,6 @@ class VfsDatabase:
             node.is_compressed = True
             with self.file_obj_from(node) as f:
                 node.ftype, node.size_u = determine_file_type_and_size(f, node.size_u)
-
 
 
 '''

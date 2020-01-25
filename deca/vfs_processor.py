@@ -1,15 +1,17 @@
 import os
 import re
 import csv
+import time
 
-from deca.vfs_db import VfsDatabase, VfsNode, propose_h4, db_to_vfs_node, language_codes
+from deca.vfs_db import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
+from .db_wrap import DbWrap
 from deca.vfs_commands import MultiProcessControl
 from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
 from deca.ff_types import *
 import deca.ff_rtpc
 from deca.ff_adf import AdfDatabase
 from deca.util import Logger, make_dir_for_file
-from deca.hash_jenkins import hash_little
+from deca.hashes import hash32_func
 from deca.ff_determine import determine_file_type_and_size
 
 
@@ -68,8 +70,20 @@ def game_file_to_sortable_string(v):
 class VfsProcessor(VfsDatabase):
     def __init__(self, project_file, working_dir, logger):
         VfsDatabase.__init__(self, project_file, working_dir, logger, init_display=True)
-
         self.external_files = set()
+        self.last_status_update = None
+
+    def log(self, msg):
+        self.logger.log(msg)
+
+    def trace(self, msg):
+        self.logger.trace(msg)
+
+    def status(self, i, n):
+        curr_time = time.time()
+        if self.last_status_update is None or self.last_status_update + 5 < curr_time:
+            self.last_status_update = curr_time
+            self.log('Completed {} of {}'.format(i, n))
 
     def process(self, debug=False):
         version = self.db_query_one("PRAGMA user_version")[0]
@@ -109,10 +123,10 @@ class VfsProcessor(VfsDatabase):
 
     def dump_status(self):
         # possible different vpaths with same hash, uncommon
-        q = "SELECT DISTINCT hash, COUNT(*) c FROM core_hash4 GROUP BY hash HAVING c > 1;"
+        q = "SELECT DISTINCT hash32, COUNT(*) c FROM core_hash_strings GROUP BY hash32 HAVING c > 1;"
         dup_hash4 = self.db_query_all(q)
         for vhash, c in dup_hash4:
-            q = "SELECT DISTINCT hash, string FROM core_hash4 WHERE hash = (?)"
+            q = "SELECT DISTINCT hash32, string FROM core_hash_strings WHERE hash32 = (?)"
             hashes = self.db_query_all(q, [vhash])
             fcs = []
             gtz_count = 0
@@ -206,7 +220,7 @@ class VfsProcessor(VfsDatabase):
             with open(ua_file, 'rb') as f:
                 ftype, fsize = determine_file_type_and_size(f, os.stat(ua_file).st_size)
             vpath = os.path.basename(ua_file).encode('utf-8')
-            vhash = deca.hash_jenkins.hash_little(vpath)
+            vhash = deca.hashes.hash32_func(vpath)
             node = VfsNode(
                 vhash=vhash, vpath=vpath, pvpath=ua_file, ftype=ftype,
                 size_u=fsize, size_c=fsize, offset=0)
@@ -266,20 +280,16 @@ class VfsProcessor(VfsDatabase):
     def find_vpath_exe(self):
         fn = './resources/{}/all_strings.tsv'.format(self.game_info.game_id)
         if os.path.isfile(fn):
-            hash4_to_add = []
             self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/{}/all_strings.tsv'.format(self.game_info.game_id))
             with open(fn, 'rb') as f:
                 exe_strings = f.readlines()
             exe_strings = [line.split(b'\t') for line in exe_strings]
             exe_strings = [line[3].strip() for line in exe_strings if len(line) >= 4]
             exe_strings = list(set(exe_strings))
-            for s in exe_strings:
-                propose_h4(hash4_to_add, s, None)
 
-            hash4_to_add = list(set(hash4_to_add))
-            if len(hash4_to_add) > 0:
-                self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-                self.hash4_add_many(hash4_to_add)
+            with DbWrap(self, logger=self) as db:
+                for s in exe_strings:
+                    db.propose_string(s, None)
 
             self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
 
@@ -305,47 +315,37 @@ class VfsProcessor(VfsDatabase):
                                 s = s.replace('\\', '/')
                                 custom_strings.add(s)
 
-            hash4_to_add = []
-
-            for s in custom_strings:
-                propose_h4(hash4_to_add, s.strip().encode('ascii'), None, used_at_runtime=True)
-
-            hash4_to_add = list(set(hash4_to_add))
-            if len(hash4_to_add) > 0:
-                self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-                self.hash4_add_many(hash4_to_add)
+            with DbWrap(self, logger=self) as db:
+                for s in custom_strings:
+                    db.propose_string(s.strip().encode('ascii'), None, used_at_runtime=True)
 
         self.logger.log('STRINGS FROM HASH FROM PROCMON DIR: Total {} strings'.format(len(custom_strings)))
 
     def find_vpath_resources(self):
         fns = [
-            './resources/strings.txt',
-            './resources/{}/strings.txt'.format(self.game_info.game_id),
-            './resources/{}/strings_procmon.txt'.format(self.game_info.game_id),
+            (False, './resources/strings.txt'),
+            (False, './resources/{}/strings.txt'.format(self.game_info.game_id)),
+            (True, './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)),
         ]
 
         search_dir = './resources/ghidra_strings'
         for file in os.listdir(search_dir):
-            fns.append(os.path.join(search_dir, file))
+            fns.append((False, os.path.join(search_dir, file)))
 
-        hash4_to_add = []
+        string_count = 0
+        with DbWrap(self, logger=self) as db:
+            for used_at_runtime, fn in fns:
+                if os.path.isfile(fn):
+                    self.logger.log('STRINGS FROM RESOURCES: Loading possible strings from {}'.format(fn))
+                    with open(fn, 'rb') as f:
+                        custom_strings = f.readlines()
+                    custom_strings = set(custom_strings)
+                    string_count += len(custom_strings)
+                    self.logger.log('STRINGS FROM RESOURCES: Loaded {} strings'.format(len(custom_strings)))
+                    for s in custom_strings:
+                        db.propose_string(s.strip(), None, used_at_runtime=used_at_runtime)
 
-        for fn in fns:
-            if os.path.isfile(fn):
-                self.logger.log('STRINGS FROM RESOURCES: Loading possible strings from{}'.format(fn))
-                with open(fn, 'rb') as f:
-                    custom_strings = f.readlines()
-                custom_strings = set(custom_strings)
-                self.logger.log('STRINGS FROM RESOURCES: Loaded {} strings'.format(len(custom_strings)))
-                for s in custom_strings:
-                    propose_h4(hash4_to_add, s.strip(), None, used_at_runtime=True)
-
-        hash4_to_add = list(set(hash4_to_add))
-        if len(hash4_to_add) > 0:
-            self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-            self.hash4_add_many(hash4_to_add)
-
-        self.logger.log('STRINGS FROM RESOURCES: Total {} strings'.format(len(hash4_to_add)))
+        self.logger.log('STRINGS FROM RESOURCES: Total {} strings'.format(string_count))
 
     def find_vpath_guess(self):
         self.logger.log('STRINGS BY GUESSING: ...')
@@ -411,16 +411,11 @@ class VfsProcessor(VfsDatabase):
             fn = 'text/master_{}.stringlookup'.format(lng)
             guess_strings[fn] = [FTYPE_ADF, FTYPE_ADF_BARE]
 
-        hash4_to_add = []
-        for k, v in guess_strings.items():
-            fn = k
-            fn = fn.encode('ascii')
-            propose_h4(hash4_to_add, fn, None, possible_ftypes=v)
-
-        hash4_to_add = list(set(hash4_to_add))
-        if len(hash4_to_add) > 0:
-            self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-            self.hash4_add_many(hash4_to_add)
+        with DbWrap(self, logger=self) as db:
+            for k, v in guess_strings.items():
+                fn = k
+                fn = fn.encode('ascii')
+                db.propose_string(fn, None, possible_file_types=v)
 
         self.logger.log('STRINGS BY GUESSING: Total {} guesses'.format(len(guess_strings)))
 
@@ -428,7 +423,7 @@ class VfsProcessor(VfsDatabase):
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: epe/ee, blo/bl/nl/fl/nl.mdic/fl.mdic, mesh*/model*, avtx/atx?]')
         pair_exts = self.game_info.file_assoc()
 
-        all_hash4 = self.hash4_select_distinct_string()
+        all_hash4 = self.hash_string_select_distinct_string()
         assoc_strings = {}
 
         for k in all_hash4:
@@ -442,17 +437,13 @@ class VfsProcessor(VfsDatabase):
                             assoc_strings[file + pk] = pv
 
         hash_present = set(self.nodes_select_distinct_vhash())
-        hash4_to_add = []
-        for k, v in assoc_strings.items():
-            fn = k
-            fh = hash_little(fn)
-            if fh in hash_present:
-                propose_h4(hash4_to_add, fn, None, possible_ftypes=v)
 
-        hash4_to_add = list(set(hash4_to_add))
-        if len(hash4_to_add) > 0:
-            self.logger.log('DATABASE: Inserting {} hash 4 strings'.format(len(hash4_to_add)))
-            self.hash4_add_many(hash4_to_add)
+        with DbWrap(self, logger=self) as db:
+            for k, v in assoc_strings.items():
+                fn = k
+                fh = hash32_func(fn)
+                if fh in hash_present:
+                    db.propose_string(fn, None, possible_file_types=v)
 
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
 
@@ -480,7 +471,9 @@ class VfsProcessor(VfsDatabase):
 
     def update_used_depths(self):
         level = 0
-        while True:
+        keep_going = True
+        while keep_going:
+            keep_going = False
             self.logger.log('UPDATING USE DEPTH: {}'.format(level))
             # puids = self.db_query_all("SELECT uid FROM core_vnodes WHERE used_at_runtime_depth == (?)", [level])
             # puids = [n[0] for n in puids]
@@ -499,17 +492,12 @@ class VfsProcessor(VfsDatabase):
 
             level = level + 1
 
-            nodes_to_update = []
-            for child_node in child_nodes:
-                if child_node.used_at_runtime_depth is None or child_node.used_at_runtime_depth > level:
-                    child_node.used_at_runtime_depth = level
-                    nodes_to_update.append(child_node)
-
-            if len(nodes_to_update) > 0:
-                self.logger.log('DATABASE: Updating {} nodes'.format(len(nodes_to_update)))
-                self.node_update_many(nodes_to_update)
-            else:
-                break
+            with DbWrap(self, logger=self) as db:
+                for child_node in child_nodes:
+                    if child_node.used_at_runtime_depth is None or child_node.used_at_runtime_depth > level:
+                        keep_going = True
+                        child_node.used_at_runtime_depth = level
+                        db.node_update(child_node)
 
     def node_update_vpath_mapping(self, vnode):
         vid = vnode.vhash
@@ -551,7 +539,7 @@ class VfsProcessor(VfsDatabase):
             vpath = filename.replace(':', '/')
             vpath = vpath.replace('\\', '/')
             vpath = ('__EXTERNAL_FILES__' + vpath).encode('ascii')
-            vhash = deca.hash_jenkins.hash_little(vpath)
+            vhash = deca.hashes.hash32_func(vpath)
             vnode = VfsNode(
                 vhash=vhash, vpath=vpath, pvpath=filename, ftype=ftype,
                 size_u=fsize, size_c=fsize, offset=0)

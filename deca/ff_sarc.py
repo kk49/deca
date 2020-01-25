@@ -1,5 +1,5 @@
 from deca.file import ArchiveFile
-from deca.hash_jenkins import hash_little
+from deca.hashes import hash32_func
 from deca.util import align_to
 import os
 import numpy as np
@@ -28,7 +28,7 @@ class EntrySarc:
         self.META_entry_size_ptr = f.tell()
         self.length = f.read_u32()
 
-        self.vhash = hash_little(self.vpath)
+        self.vhash = hash32_func(self.vpath)
         self.is_symlink = self.offset == 0
 
     def serialize_v2(self, f: ArchiveFile):
@@ -53,13 +53,13 @@ class EntrySarc:
 
         self.is_symlink = self.offset == 0
 
-        assert(self.vhash == hash_little(self.vpath))
-        assert(self.file_extention_hash == hash_little(os.path.splitext(self.vpath)[1]))
+        assert(self.vhash == hash32_func(self.vpath))
+        assert(self.file_extention_hash == hash32_func(os.path.splitext(self.vpath)[1]))
 
     def serialize_v3(self, f):
         # update entry based on vpath
-        self.vhash = hash_little(self.vpath)
-        self.file_extention_hash = hash_little(os.path.splitext(self.vpath)[1])
+        self.vhash = hash32_func(self.vpath)
+        self.file_extention_hash = hash32_func(os.path.splitext(self.vpath)[1])
 
         f.write_u32(self.string_offset)
         f.write_u32(self.offset)

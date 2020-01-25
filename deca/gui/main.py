@@ -874,7 +874,7 @@ class MainWidget(QWidget):
         if self.vfs is not None:
             try:
                 val_in = int(txt_in, 0)
-                nodes = self.vfs.nodes_where_vhash(val_in)
+                nodes = self.vfs.nodes_where_hash32(val_in)
                 for node in nodes:
                     if len(node.vpath) > 0:
                         txt_out = node.vpath.decode('utf-8')

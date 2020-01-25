@@ -15,7 +15,7 @@ class GameInfo:
             ('', 'terrain/', 'terrain/jc3/'),
             ('worlds/base/', 'worlds/base/terrain/', 'worlds/base/terrain/hp/'),
         ]
-        for i in range(10):
+        for i in range(4):
             self.worlds.append(
                 (
                     f'worlds/world{i}/',
@@ -108,16 +108,16 @@ class GameInfoGZ(GameInfo):
             },
             {
                 b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
                 b'.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
                 b'.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
                 b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
             {
                 b'.fmod_sbankc': FTYPE_TXT,

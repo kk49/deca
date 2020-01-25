@@ -85,12 +85,12 @@ class RtpcProperty:
     def repr_with_name(self, vfs: VfsDatabase):
         data = self.data
         if self.type == PropType.type_objid.value:
-            name6 = vfs.hash6_where_vhash_select_all(data & 0x0000FFFFFFFFFFFF)
-            name4 = vfs.hash4_where_vhash_select_all(data)
+            name6 = vfs.hash_string_where_hash48_select_all(data & 0x0000FFFFFFFFFFFF)
+            name4 = vfs.hash_string_where_hash32_select_all(data)
             if len(name6):
-                name = 'id:DB:H6:"{}"'.format(name6[0][2].decode('utf-8'))
+                name = 'id:DB:H6:"{}"'.format(name6[0][3].decode('utf-8'))
             elif len(name4):
-                name = 'id:DB:H4:"{}"'.format(name4[0][2].decode('utf-8'))
+                name = 'id:DB:H4:"{}"'.format(name4[0][3].decode('utf-8'))
             else:
                 name = 'id:0x{:012X}'.format(data)
             data = name
@@ -98,20 +98,20 @@ class RtpcProperty:
         elif self.type == PropType.type_event.value:
             data_new = []
             for d in data:
-                name6 = vfs.hash6_where_vhash_select_all(d & 0x0000FFFFFFFFFFFF)
-                name4 = vfs.hash4_where_vhash_select_all(d)
+                name6 = vfs.hash_string_where_hash48_select_all(d & 0x0000FFFFFFFFFFFF)
+                name4 = vfs.hash_string_where_hash32_select_all(d)
                 if len(name6):
-                    name = 'ev:DB:H6:"{}"'.format(name6[0][2].decode('utf-8'))
+                    name = 'ev:DB:H6:"{}"'.format(name6[0][3].decode('utf-8'))
                 elif len(name4):
-                    name = 'ev:DB:H4:"{}"'.format(name4[0][2].decode('utf-8'))
+                    name = 'ev:DB:H4:"{}"'.format(name4[0][3].decode('utf-8'))
                 else:
                     name = 'ev:0x{:012X}'.format(d)
                 data_new.append(name)
             data = data_new
 
-        name = vfs.hash4_where_vhash_select_all(self.name_hash)
+        name = vfs.hash_string_where_hash32_select_all(self.name_hash)
         if len(name):
-            name = '"{}"'.format(name[0][2].decode('utf-8'))
+            name = '"{}"'.format(name[0][3].decode('utf-8'))
         else:
             name = f'0x{self.name_hash:08x}'
 
@@ -239,10 +239,10 @@ class RtpcNode:
             self.name_hash, self.prop_count, self.child_count, self.data_offset, self.data_offset)
 
     def repr_with_name(self, vfs):
-        name = vfs.hash4_where_vhash_select_all(self.name_hash)
+        name = vfs.hash_string_where_hash32_select_all(self.name_hash)
 
         if len(name):
-            name = 'DB:H4:"{}"'.format(name[0][2].decode('utf-8'))
+            name = 'DB:H4:"{}"'.format(name[0][3].decode('utf-8'))
         else:
             name = f'0x{self.name_hash:08x}'
 

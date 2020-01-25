@@ -1,7 +1,7 @@
 from deca.file import ArchiveFile
 import numpy as np
 import os
-from deca.hash_jenkins import hash_little
+from deca.hashes import hash32_func
 
 # fn = '/home/krys/prj/deca/work/gz/extracted/global/global.blo'
 #

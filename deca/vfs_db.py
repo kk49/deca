@@ -49,6 +49,13 @@ def to_str(s):
     return s
 
 
+def common_prefix(s0, s1):
+    cnt = 0
+    while len(s0) > cnt and len(s1) > cnt and s0[cnt] == s1[cnt]:
+        cnt += 1
+    return s0[:cnt], s0[cnt:], s1[cnt:]
+
+
 is_compressed_file_mask = 1 << 0
 is_processed_file_mask = 1 << 1
 is_temporary_file_mask = 1 << 2
@@ -577,21 +584,38 @@ class VfsDatabase:
         elif node.ftype == FTYPE_TAB:
             return self.file_obj_from(self.node_where_uid(node.pid))
         elif node.compressed_file_get():
-            cache_dir = self.working_dir + '__CACHE__/'
+            pid = node.pid
+            parent_nodes = []
+            parent_paths = []
+            while pid is not None:
+                parent_node = self.node_where_uid(pid)
+                pid = parent_node.pid
+                parent_nodes.append(parent_node)
+                pp = None
+                if parent_node.pvpath is not None:
+                    prefix, end0, end1 = common_prefix(parent_node.pvpath, self.game_info.game_dir)
+                    f,e = os.path.splitext(end0)
+                    if e != '.tab':
+                        pp = end0
+                else:
+                    pp = '{:08X}.dat'.format(parent_node.vhash)
+                if pp is not None:
+                    parent_paths.append(pp)
+            parent_node = parent_nodes[0]
+            cache_dir = os.path.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
             os.makedirs(cache_dir, exist_ok=True)
-            file_name = cache_dir + '{:08X}.dat'.format(node.vhash)
+            file_name = os.path.join(cache_dir, '{:08X}.dat'.format(node.vhash))
             if not os.path.isfile(file_name):
-                pnode = self.node_where_uid(node.pid)
-                with ArchiveFile(self.file_obj_from(pnode, mode)) as pf:
+                with ArchiveFile(self.file_obj_from(parent_node, mode)) as pf:
                     pf.seek(node.offset)
                     extract_aaf(pf, file_name)
             return open(file_name, mode)
         elif node.ftype == FTYPE_ADF_BARE:
-            pnode = self.node_where_uid(node.pid)
-            return self.file_obj_from(pnode, mode)
+            parent_node = self.node_where_uid(node.pid)
+            return self.file_obj_from(parent_node, mode)
         elif node.pid is not None:
-            pnode = self.node_where_uid(node.pid)
-            pf = self.file_obj_from(pnode, mode)
+            parent_node = self.node_where_uid(node.pid)
+            pf = self.file_obj_from(parent_node, mode)
             pf.seek(node.offset)
             pf = SubsetFile(pf, node.size_u)
             return pf

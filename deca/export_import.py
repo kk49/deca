@@ -44,7 +44,9 @@ def expand_vpaths(vfs: VfsDatabase, vs, mask):
             id_pat = v.encode('ascii')
 
         if isinstance(id_pat, bytes):
-            nodes = vfs.nodes_where_vpath_regex_2(mask, id_pat)
+            nodes = vfs.nodes_where_vpath_like_regex(id_pat, mask)
+            nodes = dict([(n.vpath, n) for n in nodes])
+            nodes = list(nodes.values())
             vos += nodes
         else:
             vos.append(v)

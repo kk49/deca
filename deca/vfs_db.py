@@ -4,7 +4,6 @@ import sqlite3
 import pickle
 import re
 
-from deca.hashes import hash32_func, hash48_func
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_determine import determine_file_type_and_size
@@ -30,6 +29,8 @@ language_codes = [
 def regexp(expr, item):
     if item is None or expr is None:
         return False
+    if isinstance(expr, str):
+        expr = expr.encode('ascii')
     if isinstance(item, str):
         item = item.encode('ascii')
     reg = re.compile(expr)
@@ -42,31 +43,82 @@ def to_bytes(s):
     return s
 
 
+def to_str(s):
+    if isinstance(s, bytes):
+        s = s.decode('utf-8')
+    return s
+
+
+is_compressed_file_mask = 1 << 0
+is_processed_file_mask = 1 << 1
+is_temporary_file_mask = 1 << 2
+
+
 class VfsNode:
     def __init__(
-            self, uid=None, ftype=None, compressed=False,
-            vhash=None, pvpath=None, vpath=None, pid=None, level=0, index=None, offset=None,
-            size_c=None, size_u=None, processed=False, used_at_runtime_depth=None,
-            adf_type=None, sarc_ext_hash=None):
+            self, uid=None, ftype=None,
+            vhash=None, pvpath=None, vpath=None, pid=None, index=None, offset=None,
+            size_c=None, size_u=None, used_at_runtime_depth=None,
+            adf_type=None, ext_hash=None,
+            is_compressed_file=False,
+            is_processed_file=False,
+            is_temporary_file=False,
+            flags=None):
         self.uid = uid
         self.ftype = ftype
         self.adf_type = adf_type
-        self.sarc_type = sarc_ext_hash
-        self.is_compressed = compressed
+        self.ext_hash = ext_hash
         self.vpath = vpath
         self.vhash = vhash
         self.pvpath = pvpath
         self.pid = pid
-        self.level = level
         self.index = index  # index in parent
         self.offset = offset  # offset in parent
         self.size_c = size_c  # compressed size in client
         self.size_u = size_u  # extracted size
         self.used_at_runtime_depth = used_at_runtime_depth
-        self.processed = processed
+
+        if flags is None:
+            self.flags = 0
+            if is_compressed_file:
+                self.flags = self.flags | is_compressed_file_mask
+            if is_processed_file:
+                self.flags = self.flags | is_processed_file_mask
+            if is_temporary_file:
+                self.flags = self.flags | is_temporary_file_mask
+        else:
+            self.flags = flags
+
+    def flags_get(self, bit):
+        return (self.flags & bit) == bit
+
+    def flags_set(self, bit, value):
+        if value:
+            value = bit
+        else:
+            value = 0
+        self.flags = (self.flags & ~bit) | value
+
+    def compressed_file_get(self):
+        return self.flags_get(is_compressed_file_mask)
+
+    def compressed_file_set(self, value):
+        self.flags_set(is_compressed_file_mask, value)
+
+    def processed_file_get(self):
+        return self.flags_get(is_processed_file_mask)
+
+    def processed_file_set(self, value):
+        self.flags_set(is_processed_file_mask, value)
+
+    def temporary_file_get(self):
+        return self.flags_get(is_temporary_file_mask)
+
+    def temporary_file_set(self, value):
+        self.flags_set(is_temporary_file_mask, value)
 
     def file_type(self):
-        if self.is_compressed:
+        if self.compressed_file_get():
             return self.ftype + '.z'
         else:
             return self.ftype
@@ -90,22 +142,19 @@ class VfsNode:
 
 
 def db_to_vfs_node(v):
-    # v = [int(v[0]), v[1], v[2], int(v[3]), v[4]] + [int(i) for i in v[5:]]
     node = VfsNode(
-        uid=v[0], ftype=v[1], vpath=to_bytes(v[2]), vhash=v[3], pvpath=v[4],
-        pid=v[5], index=v[6], level=v[7], compressed=v[8], offset=v[9],
-        size_c=v[10], size_u=v[11], used_at_runtime_depth=v[12], adf_type=v[13], sarc_ext_hash=v[14],
-        processed=v[15],
+        uid=v[0], ftype=to_str(v[1]), vpath=to_bytes(v[2]), vhash=v[3], pvpath=to_str(v[4]),
+        pid=v[5], index=v[6], flags=v[7], offset=v[8], size_c=v[9], size_u=v[10],
+        used_at_runtime_depth=v[11], adf_type=v[12], ext_hash=v[13],
     )
     return node
 
 
-def db_from_vfs_node(node):
+def db_from_vfs_node(node: VfsNode):
     v = (
-        node.uid, node.ftype, node.vpath, node.vhash, node.pvpath,
-        node.pid, node.index, node.level, node.is_compressed, node.offset,
-        node.size_c, node.size_u, node.used_at_runtime_depth, node.adf_type, node.sarc_type,
-        node.processed
+        node.uid, to_str(node.ftype), to_str(node.vpath), node.vhash, to_str(node.pvpath),
+        node.pid, node.index, node.flags, node.offset, node.size_c, node.size_u,
+        node.used_at_runtime_depth, node.adf_type, node.ext_hash,
     )
     return v
 
@@ -126,6 +175,7 @@ class VfsDatabase:
         make_dir_for_file(self.db_filename)
 
         self.db_conn = sqlite3.connect(self.db_filename)
+        # self.db_conn.text_factory = bytes
         self.db_conn.create_function("REGEXP", 2, regexp)
         self.db_cur = self.db_conn.cursor()
 
@@ -225,15 +275,13 @@ class VfsDatabase:
                 "ppath" TEXT,
                 "parent_id" INTEGER,
                 "index_in_parent" INTEGER,
-                "level" INTEGER,
-                "is_compressed" INTEGER,
+                "flags" INTEGER,
                 "offset" INTEGER,
                 "size_c" INTEGER,
                 "size_u" INTEGER,
                 "used_at_runtime_depth" INTEGER,
-                "gdcc_adf_type" INTEGER,
+                "adf_type" INTEGER,
                 "ext_hash" INTEGER,
-                "processed" INTEGER,
                 PRIMARY KEY("uid")
             );
             '''
@@ -304,10 +352,26 @@ class VfsDatabase:
         r1 = db_to_vfs_node(r1)
         return r1
 
-    def nodes_where_processed_select_uid(self, processed):
+    def nodes_where_flag_select_uid(self, mask, value, dbg='nodes_where_flag_select_uid'):
         uids = self.db_query_all(
-            "select uid from core_vnodes where processed == (?)", [processed], dbg='nodes_where_processed_select_uid')
+            "select uid from core_vnodes where flags & (?) == (?)", [mask, value], dbg=dbg)
         return [uid[0] for uid in uids]
+
+    def nodes_where_processed_select_uid(self, processed):
+        mask = is_processed_file_mask
+        if processed:
+            value = is_processed_file_mask
+        else:
+            value = 0
+        return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_processed_select_uid')
+
+    def nodes_where_temporary_select_uid(self, temporary):
+        mask = is_temporary_file_mask
+        if temporary:
+            value = is_temporary_file_mask
+        else:
+            value = 0
+        return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_temporary_select_uid')
 
     def nodes_where_ftype_select_uid(self, ftype):
         uids = self.db_query_all(
@@ -320,15 +384,21 @@ class VfsDatabase:
         return [db_to_vfs_node(node) for node in nodes]
 
     def nodes_where_vpath(self, vpath):
+        if isinstance(vpath, bytes):
+            vpath = vpath.decode('utf-8')
         nodes = self.db_query_all(
-            "select * from core_vnodes where vpath == (?)", [vpath], dbg='nodes_where_vpath')
+            "select * from core_vnodes where vpath == (?)", [vpath], dbg='nodes_where_vpath_like')
         return [db_to_vfs_node(node) for node in nodes]
 
-    def nodes_where_vpath_regex_2(self, regex_0, regex_1):
+    def nodes_where_vpath_like_regex(self, p0, p1):
+        if isinstance(p0, bytes):
+            p0 = p0.decode('utf-8')
+        if isinstance(p1, bytes):
+            p1 = p1.decode('utf-8')
         nodes = self.db_query_all(
-            "select * from core_vnodes where (vpath REGEXP (?)) AND (vpath REGEXP (?))",
-            [regex_0, regex_1],
-            dbg='nodes_where_vpath_regex_2'
+            "select * from core_vnodes where (vpath LIKE (?)) AND (vpath REGEXP (?))",
+            [p0, p1],
+            dbg='nodes_where_vpath_like_regex'
         )
         return [db_to_vfs_node(node) for node in nodes]
 
@@ -389,9 +459,15 @@ class VfsDatabase:
             "SELECT * FROM core_hash_string_references WHERE hash_row_id == (?)", [rowid], dbg='hash_string_references_where_hs_rowid_select_all')
         return result
 
+    def nodes_delete_where_uid(self, uids):
+        result = self.db_execute_many(
+            "DELETE FROM core_vnodes WHERE uid=(?)", uids, dbg='nodes_delete_where_uid'
+        )
+        self.db_conn.commit()
+
     def node_add_one(self, node: VfsNode):
         result = self.db_execute_one(
-            "INSERT INTO core_vnodes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO core_vnodes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             db_from_vfs_node(node),
             dbg='node_add_one')
 
@@ -405,7 +481,7 @@ class VfsDatabase:
         db_nodes = [db_from_vfs_node(node) for node in nodes]
 
         result = self.db_execute_many(
-            "insert into core_vnodes values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "insert into core_vnodes values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             db_nodes,
             dbg='node_add_many'
         )
@@ -418,23 +494,21 @@ class VfsDatabase:
 
         result = self.db_execute_many(
             """
-            update core_vnodes set 
+            UPDATE core_vnodes SET 
             ftype=(?),
             vpath=(?),
             vpath_hash=(?),
             ppath=(?),
             parent_id=(?),
             index_in_parent=(?),
-            level=(?),
-            is_compressed=(?),
+            flags=(?),
             offset=(?),
             size_c=(?),
             size_u=(?),
             used_at_runtime_depth=(?),
-            gdcc_adf_type=(?),
-            ext_hash=(?),
-            processed=(?)
-            where uid=(?)
+            adf_type=(?),
+            ext_hash=(?)
+            WHERE uid=(?)
             """,
             db_nodes,
             dbg='node_update_many'
@@ -442,7 +516,7 @@ class VfsDatabase:
         self.db_conn.commit()
 
     def hash_string_add_many(self, hash_list):
-        hash_list_str = [(h[0], h[1], h[2]) for h in hash_list]
+        hash_list_str = [(h[0], h[1], to_str(h[2])) for h in hash_list]
         hash_list_str_unique = list(set(hash_list_str))
         result = self.db_execute_many(
             "INSERT OR IGNORE INTO core_hash_strings VALUES (?,?,?)", hash_list_str_unique, dbg='hash_string_add_many:insert:0')
@@ -502,7 +576,7 @@ class VfsDatabase:
             return open(node.pvpath, mode)
         elif node.ftype == FTYPE_TAB:
             return self.file_obj_from(self.node_where_uid(node.pid))
-        elif node.is_compressed:
+        elif node.compressed_file_get():
             cache_dir = self.working_dir + '__CACHE__/'
             os.makedirs(cache_dir, exist_ok=True)
             file_name = cache_dir + '{:08X}.dat'.format(node.vhash)
@@ -528,7 +602,7 @@ class VfsDatabase:
 
     def determine_ftype(self, node: VfsNode):
         if node.ftype is None:
-            node.is_compressed = False
+            node.compressed_file_set(False)
             if node.offset is None:
                 node.ftype = FTYPE_SYMLINK
             else:
@@ -536,7 +610,7 @@ class VfsDatabase:
                     node.ftype, node.size_u = determine_file_type_and_size(f, node.size_c)
 
         if node.ftype is FTYPE_AAF:
-            node.is_compressed = True
+            node.compressed_file_set(True)
             with self.file_obj_from(node) as f:
                 node.ftype, node.size_u = determine_file_type_and_size(f, node.size_u)
 

@@ -70,7 +70,6 @@ def game_file_to_sortable_string(v):
 class VfsProcessor(VfsDatabase):
     def __init__(self, project_file, working_dir, logger):
         VfsDatabase.__init__(self, project_file, working_dir, logger, init_display=True)
-        self.external_files = set()
         self.last_status_update = None
 
     def log(self, msg):
@@ -106,6 +105,8 @@ class VfsProcessor(VfsDatabase):
             self.db_execute_one("PRAGMA user_version = 1;")
 
         # TODO process any hashless strings in vhash4 and vhash6 table, assume outside program added them for testing
+
+        self.process_remove_temporary_nodes()
 
         self.dump_status()
         self.logger.log('PROCESSING: COMPLETE')
@@ -329,8 +330,9 @@ class VfsProcessor(VfsDatabase):
         ]
 
         search_dir = './resources/ghidra_strings'
-        for file in os.listdir(search_dir):
-            fns.append((False, os.path.join(search_dir, file)))
+        if os.path.isdir(search_dir):
+            for file in os.listdir(search_dir):
+                fns.append((False, os.path.join(search_dir, file)))
 
         string_count = 0
         with DbWrap(self, logger=self) as db:
@@ -499,54 +501,35 @@ class VfsProcessor(VfsDatabase):
                         child_node.used_at_runtime_depth = level
                         db.node_update(child_node)
 
-    def node_update_vpath_mapping(self, vnode):
-        vid = vnode.vhash
-        if vnode.vpath is None:
-            self.hash_map_missing.add(vid)
-        else:
-            self.hash_map_present.add(vid)
-            vpath = vnode.vpath
-            if vid in self.map_hash_to_vpath:
-                self.map_hash_to_vpath[vid].add(vpath)
-                if len(self.map_hash_to_vpath[vid]) > 1:
-                    self.hash_map_conflict.add(vid)
-            else:
-                self.map_hash_to_vpath[vid] = {vpath}
-
-            vl = self.map_vpath_to_vfsnodes.get(vpath, [])
-            if vnode.offset is None:
-                vl = vl + [vnode]
-            else:
-                vl = [vnode] + vl
-            self.map_vpath_to_vfsnodes[vpath] = vl
-
-            # tag atx file type since they have no header info
-            if vnode.ftype is None and vnode.vpath is not None:
-                file, ext = os.path.splitext(vnode.vpath)
-                if ext[0:4] == b'.atx':
-                    vnode.ftype = FTYPE_ATX
-                elif ext == b'.hmddsc':
-                    vnode.ftype = FTYPE_HMDDSC
+    def process_remove_temporary_nodes(self):
+        uids = self.nodes_where_temporary_select_uid(True)
+        uids = [(uid, ) for uid in uids]
+        if uids:
+            self.nodes_delete_where_uid(uids)
 
     def external_file_add(self, filename):
-        if not hasattr(self, 'external_files'):
-            self.external_files = set()
-
-        if filename not in self.external_files and os.path.isfile(filename):
+        if os.path.isfile(filename):
             with open(filename, 'rb') as f:
                 ftype, fsize = determine_file_type_and_size(f, os.stat(filename).st_size)
+
+            if ftype is None:
+                file, ext = os.path.splitext(filename)
+                if ext[0:4] == b'.atx':
+                    ftype = FTYPE_ATX
+                elif ext == b'.hmddsc':
+                    ftype = FTYPE_HMDDSC
 
             vpath = filename.replace(':', '/')
             vpath = vpath.replace('\\', '/')
             vpath = ('__EXTERNAL_FILES__' + vpath).encode('ascii')
             vhash = deca.hashes.hash32_func(vpath)
+
+            # tag atx file type since they have no header info
+
             vnode = VfsNode(
                 vhash=vhash, vpath=vpath, pvpath=filename, ftype=ftype,
-                size_u=fsize, size_c=fsize, offset=0)
+                size_u=fsize, size_c=fsize, offset=0, is_temporary_file=True)
             self.node_add_one(vnode)
-            self.node_update_vpath_mapping(vnode)
-
-            self.external_files.add(filename)
 
             self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))
         else:

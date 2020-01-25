@@ -1,12 +1,9 @@
 import sys
 import os
 import re
-import argparse
-import pickle
 
-from typing import List
 from deca.errors import *
-from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsProcessor, VfsNode
+from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsNode
 from deca.ff_types import *
 from deca.ff_adf import AdfDatabase
 from deca.builder import Builder
@@ -145,10 +142,10 @@ class VfsNodeTableModel(QAbstractTableModel):
                     else:
                         return '{:08X}'.format(node.vhash)
                 elif column == 4:
-                    if node.sarc_type is None:
+                    if node.ext_hash is None:
                         return ''
                     else:
-                        return '{:08X}'.format(node.sarc_type)
+                        return '{:08X}'.format(node.ext_hash)
                 elif column == 5:
                     if node.adf_type is None:
                         return ''
@@ -270,7 +267,7 @@ class VfsDirBranch(object):
             s = self.parent.vpath(True)
             s = s + self.name + b'/'
         if not child_called:
-            s = s + b'.*'
+            s = s + b'%'
         return s
 
     def child_count(self):
@@ -303,14 +300,14 @@ class VfsDirModel(QAbstractItemModel):
         self.root_node = None
         self.root_node = VfsDirBranch(b'/')
 
-        keys = self.vfs.nodes_select_distinct_vpath()
-        keys.sort()
-        for vpath in keys:
+        vpaths = self.vfs.nodes_select_distinct_vpath()
+        vpaths.sort()
+        for vpath in vpaths:
             if vpath is not None:
                 vnodes = self.vfs.nodes_where_vpath(vpath)
                 if len(vnodes) > 0:
                     if vpath.find(b'\\') >= 0:
-                        print('WINDOWS PATH {}'.format(vpath))
+                        print(f'GUI: Warning: Windows Path {vpath}')
                         path = vpath.split(b'\\')
                     else:
                         path = vpath.split(b'/')
@@ -321,6 +318,8 @@ class VfsDirModel(QAbstractItemModel):
                         cnode = cnode.child_add(VfsDirBranch(p))
 
                     cnode.child_add(VfsDirLeaf(name, vnodes))
+                else:
+                    print(f'GUI: Warning: Missing Path: {vpath}')
 
         self.endResetModel()
 
@@ -382,10 +381,10 @@ class VfsDirModel(QAbstractItemModel):
                     else:
                         return '{:08X}'.format(vnode.vhash)
                 elif column == 4:
-                    if vnode.sarc_type is None:
+                    if vnode.ext_hash is None:
                         return ''
                     else:
-                        return '{:08x}'.format(vnode.sarc_type)
+                        return '{:08x}'.format(vnode.ext_hash)
                 elif column == 5:
                     if vnode.adf_type is None:
                         return ''
@@ -412,7 +411,7 @@ class VfsDirModel(QAbstractItemModel):
 class DecaSortFilterProxyModel(QSortFilterProxyModel):
     def __init__(self, *args, **kwargs):
         QSortFilterProxyModel.__init__(self, *args, **kwargs)
-        self.filter_expr = '.*'
+        self.filter_expr = re.compile('.*')
         self.vis_map = {}
 
     def check_node(self, index):

@@ -248,24 +248,24 @@ class MultiProcessVfsBase:
             self.status(n_indexes, n_indexes)
 
     def process_archives_initial(
-            self, node, i, n_indexes, db: DbWrap):
+            self, node: VfsNode, i, n_indexes, db: DbWrap):
         debug = False
         ver = db.game_info().archive_version
 
         if node.ftype == FTYPE_EXE:
-            node.processed = True
+            node.processed_file_set(True)
             db.extract_types_from_exe(node.pvpath)
 
         elif node.ftype == FTYPE_ARC:
             # here we add the tab file as a child of the ARC, a trick to make it work with our data model
-            node.processed = True
+            node.processed_file_set(True)
             tab_path = os.path.splitext(node.pvpath)
             tab_path = tab_path[0] + '.tab'
-            cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid, level=node.level)
+            cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid)
             db.node_add(cnode)
         elif node.ftype == FTYPE_TAB:
             self.trace('Processing TAB: {}'.format(node.pvpath))
-            node.processed = True
+            node.processed_file_set(True)
             with ArchiveFile(open(node.pvpath, 'rb'), debug=debug) as f:
                 if 3 == ver:
                     tab_file = TabFileV3()
@@ -279,12 +279,12 @@ class MultiProcessVfsBase:
                 for i in range(len(tab_file.file_table)):
                     te = tab_file.file_table[i]
                     cnode = VfsNode(
-                        vhash=te.hashname, pid=node.uid, level=node.level + 1, index=i,
+                        vhash=te.hashname, pid=node.uid, index=i,
                         offset=te.offset, size_c=te.size_c, size_u=te.size_u)
                     db.node_add(cnode)
 
         elif node.ftype == FTYPE_SARC:
-            node.processed = True
+            node.processed_file_set(True)
             sarc_file = FileSarc()
             sarc_file.header_deserialize(db.file_obj_from(node))
 
@@ -294,23 +294,23 @@ class MultiProcessVfsBase:
                 if offset == 0:
                     offset = None  # sarc files with zero offset are not in file, but reference hash value
                 cnode = VfsNode(
-                    vhash=se.vhash, pid=node.uid, level=node.level + 1, index=se.index,
+                    vhash=se.vhash, pid=node.uid, index=se.index,
                     offset=offset, size_c=se.length, size_u=se.length, vpath=se.vpath,
-                    sarc_ext_hash=se.file_extention_hash)
+                    ext_hash=se.file_extention_hash)
 
                 db.node_add(cnode)
                 db.propose_string(cnode.vpath, node)
 
         elif node.vhash == deca.hashes.hash32_func(b'gdc/global.gdcc'):
             # special case starting point for runtime
-            node.processed = True
+            node.processed_file_set(True)
             adf = db.node_read_adf(node)
 
             cnode_name = b'gdc/global.gdc.DECA'
             cnode = VfsNode(
                 vhash=deca.hashes.hash32_func(cnode_name),
                 vpath=cnode_name,
-                ftype=FTYPE_GDCBODY, pid=node.uid, level=node.level,
+                ftype=FTYPE_GDCBODY, pid=node.uid,
                 offset=adf.table_instance[0].offset,
                 size_c=adf.table_instance[0].size,
                 size_u=adf.table_instance[0].size)
@@ -329,15 +329,15 @@ class MultiProcessVfsBase:
                         ftype = FTYPE_ADF_BARE
                         # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.vpath))
                     cnode = VfsNode(
-                        vhash=entry.vpath_hash, pid=node.uid, level=node.level + 1, index=entry.index,
+                        vhash=entry.vpath_hash, pid=node.uid, index=entry.index,
                         offset=entry.offset, size_c=entry.size, size_u=entry.size, vpath=entry.vpath,
                         ftype=ftype, adf_type=adf_type)
                     db.node_add(cnode)
                     db.propose_string(cnode.vpath, node)
 
-        elif node.sarc_type == 0xb4c9109e or (
+        elif node.ext_hash == 0xb4c9109e or (
                 node.vpath is not None and node.vpath.endswith(b'.resourcebundle')):
-            node.processed = True
+            node.processed_file_set(True)
             with ArchiveFile(db.file_obj_from(node)) as f:
                 index = 0
                 while f.tell() < node.size_u:
@@ -348,9 +348,9 @@ class MultiProcessVfsBase:
                     buffer = f.read(size)
 
                     cnode = VfsNode(
-                        vhash=vhash, pid=node.uid, level=node.level + 1, index=index,
+                        vhash=vhash, pid=node.uid, index=index,
                         offset=offset, size_c=size, size_u=size,
-                        sarc_ext_hash=ext_hash)
+                        ext_hash=ext_hash)
                     index += 1
 
                     db.node_add(cnode)
@@ -358,7 +358,7 @@ class MultiProcessVfsBase:
         else:
             pass
 
-        updated = node.processed
+        updated = node.processed_file_get()
         if updated:
             db.node_update(node)
 

@@ -3,9 +3,11 @@
 block_cipher = None
 
 added_files = [
+    ('resources/*.txt', 'resources/'),
     ('resources/gz', 'resources/gz'),
     ('resources/gzb', 'resources/gzb'),
     ('resources/hp', 'resources/hp'),
+    ('resources/ghidra_strings', 'resources/ghidra_strings'),
     ('tool_resources/make_web_map', 'tool_resources/make_web_map'),
 ]
 

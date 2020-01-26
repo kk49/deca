@@ -1,16 +1,13 @@
-import sys
 import io
 import os
 import enum
-import pickle
 from typing import List, Dict
 from io import BytesIO
 from deca.errors import *
-from deca.file import ArchiveFile, SubsetFile
-from deca.util import dump_block
-from pprint import pformat
-from deca.hash_jenkins import hash_little
+from deca.file import ArchiveFile
+from deca.hashes import hash32_func
 from deca.ff_types import FTYPE_ADF_BARE
+from deca.vfs_db import VfsDatabase, VfsNode
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 
@@ -20,9 +17,9 @@ from deca.ff_types import FTYPE_ADF_BARE
 
 
 class AdfTypeMissing(Exception):
-    def __init__(self, vhash, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
-        self.vhash = vhash
+    def __init__(self, type_id, *args, **kwargs):
+        Exception.__init__(self, *args)
+        self.type_id = type_id
 
 
 class GdcArchiveEntry:
@@ -138,7 +135,7 @@ class TypeDef:
             pass
         elif self.metatype == 1:  # Structure
             member_count = f.read_u32()
-            self.members = [MemberDef() for i in range(member_count)]
+            self.members = [MemberDef() for _ in range(member_count)]
             for i in range(member_count):
                 self.members[i].deserialize(f, nt)
         elif self.metatype == 2:  # Pointer
@@ -161,7 +158,7 @@ class TypeDef:
                 raise Exception('Not Implemented: count == {}'.format(count))
         elif self.metatype == 8:  # Enumeration
             count = f.read_u32()
-            self.members = [EnumDef() for i in range(count)]
+            self.members = [EnumDef() for _ in range(count)]
             for i in range(count):
                 self.members[i].deserialize(f, nt)
         elif self.metatype == 9:  # String Hash
@@ -197,6 +194,7 @@ class InstanceEntry:
     #     f.seek(self.offset)
     #     v = td.read(type_systems, f)
     #     return v
+
 
 typedef_s8 = 0x580D0A62
 typedef_u8 = 0x0ca2821d
@@ -343,8 +341,7 @@ class AdfValue:
         return s
 
 
-def adf_format(v, type_map, indent=0):
-    s = ''
+def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
     if isinstance(v, AdfValue):
         type_def = type_map.get(v.type_id, TypeDef())
 
@@ -362,7 +359,7 @@ def adf_format(v, type_map, indent=0):
         s = ''
         if v.type_id == 0xdefe88ed:
             s = s + '  ' * indent + '# {}\n'.format(value_info)
-            s = s + adf_format(v.value, type_map, indent)
+            s = s + adf_format(v.value, vfs, type_map, indent)
         elif type_def.metatype is None or type_def.metatype == MetaType.Primative:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
         elif type_def.metatype == MetaType.Structure:
@@ -370,7 +367,7 @@ def adf_format(v, type_map, indent=0):
             s = s + '  ' * indent + '{\n'
             for k, iv in v.value.items():
                 s = s + '  ' * (indent + 1) + k + ':\n'
-                s = s + adf_format(iv, type_map, indent + 2)
+                s = s + adf_format(iv, vfs, type_map, indent + 2)
             s = s + '  ' * indent + '}\n'
         elif type_def.metatype == MetaType.Pointer:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
@@ -378,7 +375,7 @@ def adf_format(v, type_map, indent=0):
             s = s + '  ' * indent + '# ' + value_info + '\n'
             s = s + '  ' * indent + '[\n'
             for iv in v.value:
-                s = s + adf_format(iv, type_map, indent + 1)
+                s = s + adf_format(iv, vfs, type_map, indent + 1)
             s = s + '  ' * indent + ']\n'
         elif type_def.metatype == MetaType.String:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)
@@ -389,13 +386,34 @@ def adf_format(v, type_map, indent=0):
         elif type_def.metatype == MetaType.StringHash:
             if type_def.size == 4:
                 vp = '0x{:08x}'.format(v.value)
+                hash_string = v.hash_string
+                if hash_string is None:
+                    name = vfs.hash_string_where_hash32_select_all(v.value)
+                    if len(name):
+                        hash_string = 'DB:"{}"'.format(name[0][3].decode('utf-8'))
+                    else:
+                        hash_string = 'Hash4:0x{:08x}'.format(v.value)
             elif type_def.size == 6:
                 vp = '0x{:012x}'.format(v.value)
-            elif type_def.size == 6:
+                hash_string = v.hash_string
+                if hash_string is None:
+                    name = vfs.hash_string_where_hash48_select_all(v.value & 0x0000FFFFFFFFFFFF)
+                    if len(name):
+                        hash_string = 'DB:"{}"'.format(name[0][3].decode('utf-8'))
+                    else:
+                        hash_string = 'Hash6:0x{:012x}'.format(v.value)
+            elif type_def.size == 8:
                 vp = '0x{:016x}'.format(v.value)
+                hash_string = v.hash_string
+                if hash_string is None:
+                    hash_string = 'Hash8:0x{:016x}'.format(v.value)
             else:
                 vp = v.value
-            s = s + '  ' * indent + '{} ({})  # {}\n'.format(v.hash_string, vp, value_info)
+                hash_string = v.hash_string
+                if hash_string is None:
+                    hash_string = 'OTHER HASH {}'.format(type_def.size)
+
+            s = s + '  ' * indent + '{} ({})  # {}\n'.format(hash_string, vp, value_info)
 
         return s
     elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], GdcArchiveEntry):
@@ -534,7 +552,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
 
                 gdf.seek(string_offset)
                 vpath = gdf.read_strz()
-                vhash = hash_little(vpath)
+                vhash = hash32_func(vpath)
 
                 if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
                     # TODO this follows the data structure for an array of some type, 0xD74CC4CB is probably it's hash
@@ -682,7 +700,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 elif v == 0xDEADBEEF:
                     vs = b''
                 else:
-                    vs = 'MISSING_STRINGHASH {} 0x{:08x}'.format(type_def.size, v)
+                    vs = None
             elif type_def.size == 6:
                 v0 = f.read_u16()
                 v1 = f.read_u16()
@@ -691,13 +709,13 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 if v in map_stringhash:
                     vs = map_stringhash[v].value
                 else:
-                    vs = 'OBJID {} 0x{:012x}'.format(type_def.size, v)
+                    vs = None
             elif type_def.size == 8:
                 v = f.read_u64()
-                vs = 'NOT EXPECTED {} 0x{:016x}'.format(type_def.size, v)
+                vs = None
             else:
                 v = f.read(type_def.size)
-                vs = 'NOT EXPECTED {}'.format(type_def.size)
+                vs = None
 
             v = AdfValue(v, type_id, dpos + abs_offset, hash_string=vs)
         else:
@@ -737,7 +755,7 @@ class Adf:
         self.table_instance_full_values = []
         self.table_instance_values = []
 
-    def dump_to_string(self):
+    def dump_to_string(self, vfs):
         sbuf = ''
         sbuf = sbuf + '--------header\n'
         sbuf = sbuf + '{}: {}\n'.format('version', self.version)
@@ -786,7 +804,7 @@ class Adf:
                 end_str)
 
             # sbuf = sbuf + pformat(v, width=1024) + '\n'
-            sbuf = sbuf + adf_format(fv, self.extended_map_typedef) + '\n'
+            sbuf = sbuf + adf_format(fv, vfs, self.extended_map_typedef) + '\n'
 
         return sbuf
 
@@ -827,7 +845,7 @@ class Adf:
         self.comment = fp.read_strz()
 
         # name table
-        self.table_name = [[None, None] for i in range(self.nametable_count)]
+        self.table_name = [[0, b''] for i in range(self.nametable_count)]
         fp.seek(self.nametable_offset)
         for i in range(self.nametable_count):
             self.table_name[i][0] = fp.read_u8()
@@ -888,15 +906,21 @@ class Adf:
 
 
 class AdfDatabase:
-    def __init__(self, db_dir):
-        self.db_dir = db_dir
-        self.map_type_def = {}
-        self.map_type_filename = {}
-        self.map_hash_string = {}
+    def __init__(self, vfs=None):
+        self.type_map_def = {}
+        self.type_missing = set()
+
+        if vfs is not None:
+            self.load_from_database(vfs)
+
+    def load_from_database(self, vfs: VfsDatabase):
+        self.type_map_def, self.type_missing = vfs.adf_type_map_load()
+
+    def save_to_database(self, vfs: VfsDatabase):
+        vfs.adf_type_map_save(self.type_map_def, self.type_missing)
 
     def extract_types_from_exe(self, exepath):
-        self.map_type_def = {}
-        self.map_type_filename = {}
+        self.type_map_def = {}
 
         exe_stat = os.stat(exepath)
 
@@ -912,47 +936,30 @@ class AdfDatabase:
             with ArchiveFile(BytesIO(exe_short)) as f:
                 adf = Adf()
                 adf.deserialize(f, process_instances=False)
-
-                exe_short = exe[poss:poss + adf.total_size]
-                fn = 'offset_{:08x}.adf'.format(poss)
-                fn_full = os.path.join(self.db_dir, fn)
-                with open(fn_full, 'wb') as fw:
-                    fw.write(exe_short)
-
                 for k, v in adf.map_typedef.items():
-                    ts = self.map_type_filename.get(k, set())
-                    ts.add(fn)
-                    self.map_type_filename[k] = ts
-                    self.map_type_def[k] = v
-
-                for k, v in adf.map_stringhash.items():
-                    s = self.map_hash_string.get(k, set())
-                    s.add(v)
-                    self.map_hash_string[k] = s
-
-        with open(os.path.join(self.db_dir, 'map_type_filename.pickle'), 'wb') as fw:
-            pickle.dump(self.map_type_filename, fw)
-        with open(os.path.join(self.db_dir, 'map_type.pickle'), 'wb') as fw:
-            pickle.dump(self.map_type_def, fw)
-        # with open(os.path.join(self.db_dir, 'map_hash_string.pickle'), 'wb') as fw:
-        #     pickle.dump(self.map_hash_string, fw)
+                    self.type_map_def[k] = v
+            # TODO also add field strings to adf_db/vfs, combine adf_db and vfs into GAME DATABASE?
 
     def typedefs_add(self, map_typedefs):
         for k, v in map_typedefs.items():
-            if k not in self.map_type_def:
-                self.map_type_def[k] = v
+            if k not in self.type_map_def:
+                self.type_map_def[k] = v
 
-    def load_adf(self, buffer):
+    def _load_adf(self, buffer):
         with ArchiveFile(io.BytesIO(buffer)) as fp:
             obj = Adf()
             try:
-                obj.deserialize(fp, self.map_type_def)
+                obj.deserialize(fp, self.type_map_def)
+                # get typedefs from regular load, to handle the case where types are in ADF, and ADFB but not EXE
+                for k, v in obj.map_typedef.items():
+                    if k not in self.type_map_def:
+                        self.type_map_def[k] = v
                 return obj
             except EDecaErrorParse:
                 return None
 
-    def load_adf_bare(self, buffer, adf_type, offset, size):
-        if adf_type not in self.map_type_def:
+    def _load_adf_bare(self, buffer, adf_type, offset, size):
+        if adf_type not in self.type_map_def:
             raise AdfTypeMissing(adf_type)
 
         try:
@@ -964,10 +971,10 @@ class AdfDatabase:
             obj.instance_count = 1
             obj.instance_offset = None
 
-            obj.extended_map_typedef = self.map_type_def
+            obj.extended_map_typedef = self.type_map_def
 
             obj.table_instance[0].name = b'instance'
-            obj.table_instance[0].name_hash = hash_little(obj.table_instance[0].name)
+            obj.table_instance[0].name_hash = hash32_func(obj.table_instance[0].name)
             obj.table_instance[0].type_hash = adf_type
             obj.table_instance[0].offset = offset
             obj.table_instance[0].size = size
@@ -995,24 +1002,17 @@ class AdfDatabase:
         except EDecaErrorParse:
             return None
 
+    def read_node(self, vfs: VfsDatabase, node: VfsNode):
+        with vfs.file_obj_from(node) as f:
+            buffer = f.read()
 
-def buffer_read(f):
-    buffer = b''
-    while True:
-        v = f.read(16 * 1024 * 1024)
-        if len(v) == 0:
-            break
-        buffer = buffer + v
+        try:
+            if node.ftype == FTYPE_ADF_BARE:
+                adf = self._load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+            else:
+                adf = self._load_adf(buffer)
+        except AdfTypeMissing as ae:
+            self.type_missing.add((ae.type_id, node.uid))
+            raise
 
-    return buffer
-
-
-def adf_node_read(vfs, node):
-    with ArchiveFile(vfs.file_obj_from(node)) as f:
-        buffer = buffer_read(f)
-    if node.ftype == FTYPE_ADF_BARE:
-        adf = vfs.adf_db.load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
-    else:
-        adf = vfs.adf_db.load_adf(buffer)
-
-    return adf
+        return adf

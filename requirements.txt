@@ -8,3 +8,4 @@ XlsxWriter==1.1.5
 pygltflib==1.11.7
 openpyxl==3.0.2
 kaitaistruct==0.8
+mmh3

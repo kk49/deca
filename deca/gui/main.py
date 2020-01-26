@@ -1,15 +1,15 @@
 import sys
 import os
 import re
-import argparse
-import pickle
-from typing import List
+import time
+
 from deca.errors import *
-from deca.vfs_db import vfs_structure_prep, vfs_structure_open, VfsStructure, VfsNode
+from deca.vfs_db import VfsDatabase
+from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsNode
 from deca.ff_types import *
+from deca.ff_adf import AdfDatabase
 from deca.builder import Builder
 from deca.util import Logger
-from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
 from deca.gui.viewer_adf import DataViewerAdf
 from deca.gui.viewer_rtpc import DataViewerRtpc
 from deca.gui.viewer_image import DataViewerImage
@@ -43,11 +43,12 @@ def used_color_calc(level):
 
 
 class VfsNodeTableModel(QAbstractTableModel):
-    def __init__(self, show_mapped=True):
+    def __init__(self, show_all=True):
         QAbstractTableModel.__init__(self)
         self.vfs = None
-        self.show_mapped = show_mapped
-        self.table = None
+        self.adf_db = None
+        self.show_all = show_all
+        self.uid_table = None
 
         self.remap = None
         self.remap_uid = None
@@ -56,13 +57,17 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.remap_hash = None
         self.column_ids = ["Index", "PIDX", "Type", "Hash", "EXT_hash", "ADF_type", "Size_U", "Size_C", "Path"]
 
-    def vfs_set(self, vfs):
+    def vfs_set(self, vfs: VfsDatabase):
         self.beginResetModel()
         self.vfs = vfs
-        self.table = self.vfs.table_vfsnode
-        if not self.show_mapped:
-            self.table = [v for v in self.table if
-                          v.vpath is None and v.pvpath is None and v.ftype not in {FTYPE_TAB, FTYPE_ARC}]
+        self.adf_db = AdfDatabase(vfs)
+
+        if self.show_all:
+            self.uid_table = self.vfs.nodes_select_uid()
+        else:
+            self.uid_table = self.vfs.nodes_where_unmapped_select_uid()
+        self.uid_table.sort()
+
         self.endResetModel()
 
     def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
@@ -102,10 +107,10 @@ class VfsNodeTableModel(QAbstractTableModel):
         pass
 
     def rowCount(self, parent=QModelIndex()):
-        if self.table is None:
+        if self.uid_table is None:
             return 0
         else:
-            return len(self.table)
+            return len(self.uid_table)
 
     def columnCount(self, parent=QModelIndex()):
         return 9
@@ -126,7 +131,8 @@ class VfsNodeTableModel(QAbstractTableModel):
             row = self.remap[row]
 
         if role == Qt.DisplayRole:
-            node: VfsNode = self.table[row]
+            uid = self.uid_table[row]
+            node: VfsNode = self.vfs.node_where_uid(uid)
             if node is None:
                 return 'NA'
             else:
@@ -142,10 +148,10 @@ class VfsNodeTableModel(QAbstractTableModel):
                     else:
                         return '{:08X}'.format(node.vhash)
                 elif column == 4:
-                    if node.sarc_type is None:
+                    if node.ext_hash is None:
                         return ''
                     else:
-                        return '{:08X}'.format(node.sarc_type)
+                        return '{:08X}'.format(node.ext_hash)
                 elif column == 5:
                     if node.adf_type is None:
                         return ''
@@ -164,13 +170,14 @@ class VfsNodeTableModel(QAbstractTableModel):
                         return ''
 
         elif role == Qt.BackgroundRole:
-            node = self.table[row]
+            uid = self.uid_table[row]
+            node: VfsNode = self.vfs.node_where_uid(uid)
             if node.is_valid():
                 if column == 8:
                     if node.used_at_runtime_depth is not None:
                         return used_color_calc(node.used_at_runtime_depth)
                 elif column == 5:
-                    if node.adf_type is not None and node.adf_type not in self.vfs.adf_db.map_type_def:
+                    if node.adf_type is not None and node.adf_type not in self.adf_db.type_map_def:
                         return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:
@@ -190,7 +197,7 @@ class VfsNodeTableWidget(QWidget):
         self.vnode_2click_selected = None
 
         # Getting the Model
-        self.model = VfsNodeTableModel(show_mapped=show_mapped)
+        self.model = VfsNodeTableModel(show_all=show_mapped)
 
         # Creating a QTableView
         self.table_view = QTableView()
@@ -227,21 +234,24 @@ class VfsNodeTableWidget(QWidget):
     def clicked(self, index):
         if index.isValid():
             if self.vnode_selection_changed is not None:
-                items = list(set([self.model.table[idx.row()] for idx in self.table_view.selectedIndexes()]))
+                items = list(set([self.model.uid_table[idx.row()] for idx in self.table_view.selectedIndexes()]))
+                items = [self.model.vfs.node_where_uid(i) for i in items]
                 self.vnode_selection_changed(items)
 
     def double_clicked(self, index):
         if index.isValid():
             if self.vnode_2click_selected is not None:
-                self.vnode_2click_selected(self.model.table[index.row()])
+                item = self.model.uid_table[index.row()]
+                item = self.model.vfs.node_where_uid(item)
+                self.vnode_2click_selected(item)
 
 
 class VfsDirLeaf(object):
-    def __init__(self, name, vnodes):
+    def __init__(self, name, uid):
         self.name = name
         self.parent = None
         self.row = 0
-        self.vnodes = vnodes
+        self.uid = uid
 
     def vpath(self):
         pn = b''
@@ -262,12 +272,12 @@ class VfsDirBranch(object):
         self.child_name_map = {}
 
     def vpath(self, child_called=False):
-        s = b''
+        s = ''
         if self.parent is not None:
             s = self.parent.vpath(True)
-            s = s + self.name + b'/'
+            s = s + self.name + '/'
         if not child_called:
-            s = s + b'.*'
+            s = s + r'%'
         return s
 
     def child_count(self):
@@ -288,33 +298,36 @@ class VfsDirModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
         self.vfs = None
+        self.adf_db = None
         self.root_node = None
         self.n_rows = 0
         self.n_cols = 0
 
-    def vfs_set(self, vfs):
+    def vfs_set(self, vfs: VfsDatabase):
         self.beginResetModel()
         self.vfs = vfs
+        self.adf_db = AdfDatabase(vfs)
+
+        vpaths = self.vfs.nodes_select_vpath_uid_where_vpath_not_null()
+        vpaths.sort()
+        vpaths = dict(vpaths)
+
         self.root_node = None
-        self.root_node = VfsDirBranch(b'/')
+        self.root_node = VfsDirBranch('/')
+        for vpath, uid in vpaths.items():
+            if vpath.find('\\') >= 0:
+                print(f'GUI: Warning: Windows Path {vpath}')
+                path = vpath.split('\\')
+            else:
+                path = vpath.split('/')
 
-        keys = list(self.vfs.map_vpath_to_vfsnodes.keys())
-        keys.sort()
-        for vpath in keys:
-            vnodes = self.vfs.map_vpath_to_vfsnodes[vpath]
-            if len(vnodes) > 0 and vpath is not None:
-                if vpath.find(b'\\') >= 0:
-                    print('WINDOWS PATH {}'.format(vpath))
-                    path = vpath.split(b'\\')
-                else:
-                    path = vpath.split(b'/')
-                name = path[-1]
-                path = path[0:-1]
-                cnode = self.root_node
-                for p in path:
-                    cnode = cnode.child_add(VfsDirBranch(p))
+            name = path[-1]
+            path = path[0:-1]
+            cnode = self.root_node
+            for p in path:
+                cnode = cnode.child_add(VfsDirBranch(p))
 
-                cnode.child_add(VfsDirLeaf(name, vnodes))
+            cnode.child_add(VfsDirLeaf(name, uid))
 
         self.endResetModel()
 
@@ -363,9 +376,10 @@ class VfsDirModel(QAbstractItemModel):
         column = index.column()
         if role == Qt.DisplayRole:
             if column == 0:
-                return node.name.decode('utf-8')
+                return node.name
             elif isinstance(node, VfsDirLeaf):
-                vnode: VfsNode = node.vnodes[0]
+                uid = node.uid
+                vnode: VfsNode = self.vfs.node_where_uid(uid)
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
@@ -376,10 +390,10 @@ class VfsDirModel(QAbstractItemModel):
                     else:
                         return '{:08X}'.format(vnode.vhash)
                 elif column == 4:
-                    if vnode.sarc_type is None:
+                    if vnode.ext_hash is None:
                         return ''
                     else:
-                        return '{:08x}'.format(vnode.sarc_type)
+                        return '{:08x}'.format(vnode.ext_hash)
                 elif column == 5:
                     if vnode.adf_type is None:
                         return ''
@@ -393,12 +407,13 @@ class VfsDirModel(QAbstractItemModel):
                     return '{}'.format(vnode.used_at_runtime_depth)
         elif role == Qt.BackgroundColorRole:
             if isinstance(node, VfsDirLeaf):
-                vnode: VfsNode = node.vnodes[0]
+                uid = node.uid
+                vnode: VfsNode = self.vfs.node_where_uid(uid)
                 if column == 8:
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
                 elif column == 5:
-                    if vnode.adf_type is not None and vnode.adf_type not in self.vfs.adf_db.map_type_def:
+                    if vnode.adf_type is not None and vnode.adf_type not in self.adf_db.type_map_def:
                         return QColor(Qt.red)
         return None
 
@@ -406,7 +421,7 @@ class VfsDirModel(QAbstractItemModel):
 class DecaSortFilterProxyModel(QSortFilterProxyModel):
     def __init__(self, *args, **kwargs):
         QSortFilterProxyModel.__init__(self, *args, **kwargs)
-        self.filter_expr = '.*'
+        self.filter_expr = re.compile('.*')
         self.vis_map = {}
 
     def check_node(self, index):
@@ -421,7 +436,7 @@ class DecaSortFilterProxyModel(QSortFilterProxyModel):
                 vis = vis | self.check_node(cindex)
 
         elif isinstance(tnode, VfsDirLeaf):
-            vis = self.filter_expr.match(tnode.name.decode('utf-8')) is not None
+            vis = self.filter_expr.match(tnode.name) is not None
 
         self.vis_map[index] = vis
 
@@ -503,7 +518,9 @@ class VfsDirWidget(QWidget):
             index = self.proxy_model.mapToSource(index)
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
-                self.vnode_2click_selected(tnode.vnodes[0])
+                uid = tnode.uid
+                item = self.source_model.vfs.node_where_uid(uid)
+                self.vnode_2click_selected(item)
 
     def filter_vfspath_set(self, expr):
         # self.proxy_model.setFilterRegExp(QRegExp(expr, Qt.CaseInsensitive, QRegExp.RegExp))
@@ -515,6 +532,7 @@ class DataViewWidget(QWidget):
     def __init__(self):
         QWidget.__init__(self)
         self.vfs = None
+        self.adf_db = None
 
         self.tab_info = DataViewerInfo()
         self.tab_raw = DataViewerRaw()
@@ -545,6 +563,8 @@ class DataViewWidget(QWidget):
 
     def vfs_set(self, vfs):
         self.vfs = vfs
+        self.adf_db = AdfDatabase()
+        self.adf_db.load_from_database(self.vfs)
 
     def vnode_selection_changed(self, vpaths):
         print('DataViewWidget:vnode_selection_changed: {}'.format(vpaths))
@@ -862,12 +882,13 @@ class MainWidget(QWidget):
         txt_in = self.vhash_to_vpath_in_edit.text()
 
         txt_out = ''
-        if self.vfs is not None and self.vfs.map_hash_to_vpath is not None:
+        if self.vfs is not None:
             try:
                 val_in = int(txt_in, 0)
-                txt_out = self.vfs.map_hash_to_vpath.get(val_in, '')
-                if isinstance(txt_out, set) and len(txt_out) > 0:
-                    txt_out = list(txt_out)[0].decode('utf-8')
+                nodes = self.vfs.nodes_where_hash32(val_in)
+                for node in nodes:
+                    if len(node.vpath) > 0:
+                        txt_out = node.vpath.decode('utf-8')
             except ValueError:
                 pass
 
@@ -941,8 +962,7 @@ class MainWindow(QMainWindow):
         self.vfs = vfs
         self.setWindowTitle(
             "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_info.game_dir))
-        self.status.showMessage(
-            "Data loaded and plotted: {}".format('hash_map_missing: {}'.format(len(vfs.hash_map_missing))))
+        self.status.showMessage("LOAD COMPLETE")
         self.main_widget.vfs_set(vfs)
         self.action_external_add.setEnabled(True)
 
@@ -956,31 +976,11 @@ class MainWindow(QMainWindow):
         filename = QFileDialog.getOpenFileName(self, 'Create Project ...', game_loc, 'Game EXE (*.exe *.EXE)')
 
         if filename is not None and len(filename[0]) > 0:
-            exe_path = filename[0]
-            game_dir, exe_name = os.path.split(exe_path)
-            game_dir = os.path.join(game_dir, '')
-
-            game_info = None
-            if False:
-                pass
-            elif exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-                game_info = GameInfoGZB(game_dir, exe_name)
-            elif exe_name.find('GenerationZero') >= 0:
-                game_info = GameInfoGZ(game_dir, exe_name)
-            elif exe_name.find('theHunterCotW') >= 0:
-                game_info = GameInfoTHCOTW(game_dir, exe_name)
-            elif exe_name.find('JustCause3') >= 0:
-                game_info = GameInfoJC3(game_dir, exe_name)
-            elif exe_name.find('JustCause4') >= 0:
-                game_info = GameInfoJC4(game_dir, exe_name)
-            else:
+            vfs = vfs_structure_new(filename)
+            if vfs is None:
                 self.logger.log('Unknown Game {}'.format(filename))
-
-            if game_info is not None:
-                working_dir = '../work/{}/'.format(game_info.game_id)
-                vfs = vfs_structure_prep(game_info, working_dir)  # , logger=self.logger)
+            else:
                 self.vfs_set(vfs)
-
         else:
             self.logger.log('Cannot Create {}'.format(filename))
 
@@ -989,9 +989,7 @@ class MainWindow(QMainWindow):
         filename = QFileDialog.getOpenFileName(self, 'Open Project ...', '../work', 'Project File (project.json)')
         if filename is not None and len(filename[0]) > 0:
             project_file = filename[0]
-            # working_dir = './work/gzb/project.json'
-            # working_dir = './work/hp/project.json'
-            vfs = vfs_structure_open(project_file)  # , logger=self.logger)
+            vfs = vfs_structure_open(project_file)
             self.vfs_set(vfs)
         else:
             self.logger.log('Cannot Open {}'.format(filename))

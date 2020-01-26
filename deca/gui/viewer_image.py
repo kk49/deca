@@ -220,7 +220,7 @@ class DataViewerImage(DataViewer):
     def color_control_clicked(self, checked):
         self.update_image()
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+    def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
         self.ddsc = None
         self.select_dropdown.clear()
 

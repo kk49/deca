@@ -20,11 +20,9 @@ class DataViewerRtpc(DataViewer):
         self.main_layout.addWidget(self.text_box)
         self.setLayout(self.main_layout)
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+    def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
         rtpc = Rtpc()
         with vfs.file_obj_from(vnode) as f:
             rtpc.deserialize(f)
-        sbuf = rtpc.dump_to_string()
+        sbuf = rtpc.dump_to_string(vfs)
         self.text_box.setText(sbuf)
-
-

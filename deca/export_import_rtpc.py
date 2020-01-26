@@ -1,7 +1,7 @@
 import os
 import re
 from typing import List
-from .vfs_db import VfsStructure, VfsNode
+from .vfs_db import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
 from .ff_rtpc import Rtpc, PropName, RtpcNode
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
@@ -16,7 +16,7 @@ b'CRigidObject'
 def rtpc_export_node_recurse(
         rtpc: RtpcNode,
         gltf: DecaGltf,
-        vfs: VfsStructure,
+        vfs: VfsDatabase,
         world_matrix=None,
         material_properties=None,
         skeleton_raw_path=None):
@@ -49,23 +49,23 @@ def rtpc_export_node_recurse(
 
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data
-        rtpc_model_vpath = list(vfs.map_hash_to_vpath[rtpc_modelc_vhash])[0]
+        rtpc_model_vpath = vfs.nodes_select_distinct_vpath_where_vhash(rtpc_modelc_vhash)[0]
     elif rtpc_class == b'SCharacterPart':
         rtpc_model_vpath = rtpc.prop_map[0xb498c27d].data
     elif rtpc_class == b'CPartProp':
         rtpc_modelc_vhash = rtpc.prop_map[0xa74f2259].data
-        rtpc_model_vpath = list(vfs.map_hash_to_vpath[rtpc_modelc_vhash])[0]
+        rtpc_model_vpath = vfs.nodes_select_distinct_vpath_where_vhash(rtpc_modelc_vhash)[0]
     elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
         if 0x0f94740b in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
     elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
-            if 0x0f94740b in rtpc.prop_map:
-                rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
+        if 0x0f94740b in rtpc.prop_map:
+            rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
     elif rtpc_class in {b'CCharacter'}:
         if 0xe8129fe6 in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xe8129fe6].data
     elif rtpc_class in {b'CBulletWeaponBase', b'CWeaponModItem', b'CModelAttachementWeaponComponent'}:
-        entity_type = rtpc.prop_map[0xd31ab684].data
+        # TODO entity_type = rtpc.prop_map[0xd31ab684].data
         if 0xf9dcf6ab in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xf9dcf6ab].data
 
@@ -81,7 +81,7 @@ def rtpc_export_node_recurse(
             world_matrix=world_matrix, material_properties=material_properties, skeleton_raw_path=skeleton_raw_path)
 
 
-def rtpc_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+def rtpc_export_node(vfs: VfsDatabase, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
     rtpc = Rtpc()
     with vfs.file_obj_from(vnode) as f:
         rtpc.deserialize(f)
@@ -97,7 +97,7 @@ def rtpc_export_node(vfs: VfsStructure, vnode: VfsNode, export_path, allow_overw
     vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
 
 
-def rtpc_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
+def rtpc_export(vfs: VfsDatabase, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
     for vnode in vnodes:
         try:
             if save_to_processed:
@@ -112,7 +112,7 @@ def rtpc_export(vfs: VfsStructure, vnodes: List[VfsNode], export_path, allow_ove
                     if not allow_overwrite and os.path.exists(fn):
                         raise EDecaFileExists(fn)
 
-                    s = rtpc.dump_to_string()
+                    s = rtpc.dump_to_string(vfs)
 
                     ofiledir = os.path.dirname(fn)
                     os.makedirs(ofiledir, exist_ok=True)

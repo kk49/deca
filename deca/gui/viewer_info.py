@@ -30,7 +30,7 @@ class DataViewerInfo(DataViewer):
         #         sbuf += self._dump_ancestors(vfs, vfs.table_vfsnode[vnode.pid].vhash, indent + 1)
         return sbuf
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
+    def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
         sbuf = self._dump_ancestors(vfs, vnode.vhash, 0)
 
         self.text_box.setText(sbuf)

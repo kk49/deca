@@ -1,20 +1,20 @@
 import os
-import re
 from typing import List, TypeVar
 from .errors import *
 from .file import *
 from .ff_types import *
-from .vfs_db import VfsStructure, VfsNode
+from .vfs_db import VfsDatabase, VfsNode
 from .export_import_adf import adf_export
 from .export_import_rtpc import rtpc_export
-from .ff_avtx import Ddsc, image_export
+from .ff_avtx import image_export
 from .ff_sarc import FileSarc
+from .util import make_dir_for_file
 
 
 NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
-def fsb5c_export_processed(vfs, node, extract_dir, allow_overwrite=False):
+def fsb5c_export_processed(vfs: VfsDatabase, node, extract_dir, allow_overwrite=False):
     with vfs.file_obj_from(node, 'rb') as f:
         buffer = f.read(node.size_u)
 
@@ -28,28 +28,26 @@ def fsb5c_export_processed(vfs, node, extract_dir, allow_overwrite=False):
 
     vfs.logger.log('Exporting {}'.format(ofile))
 
-    ofiledir = os.path.dirname(ofile)
-    os.makedirs(ofiledir, exist_ok=True)
+    make_dir_for_file(ofile)
 
     if allow_overwrite or not os.path.isfile(ofile):
         with open(ofile, 'wb') as fo:
             fo.write(buffer)
 
 
-def expand_vpaths(vfs: VfsStructure, vs, mask):
+def expand_vpaths(vfs: VfsDatabase, vs, mask):
     vos = []
 
-    expr_mask = re.compile(mask)
     for v in vs:
-        id = v
-        if isinstance(v, str):
-            id = v.encode('ascii')
+        id_pat = v
+        if isinstance(id_pat, str):
+            id_pat = v.encode('ascii')
 
-        if isinstance(id, bytes):
-            expr = re.compile(id)
-            for k in vfs.map_vpath_to_vfsnodes:
-                if expr.match(k) and expr_mask.match(k):
-                    vos.append(k)
+        if isinstance(id_pat, bytes):
+            nodes = vfs.nodes_where_vpath_like_regex(id_pat, mask)
+            nodes = dict([(n.vpath, n) for n in nodes])
+            nodes = list(nodes.values())
+            vos += nodes
         else:
             vos.append(v)
 
@@ -57,7 +55,7 @@ def expand_vpaths(vfs: VfsStructure, vs, mask):
 
 
 def extract_node_raw(
-        vfs: VfsStructure,
+        vfs: VfsDatabase,
         node: VfsNode,
         extract_dir: str,
         allow_overwrite):
@@ -71,8 +69,7 @@ def extract_node_raw(
 
                 vfs.logger.log('Exporting {}'.format(ofile))
 
-                ofiledir = os.path.dirname(ofile)
-                os.makedirs(ofiledir, exist_ok=True)
+                make_dir_for_file(ofile)
 
                 if node.ftype == FTYPE_ADF_BARE:
                     do_export_raw = False
@@ -94,28 +91,35 @@ def extract_node_raw(
     return None
 
 
+def find_vnode(vfs: VfsDatabase, v):
+    vnode = None
+    vpath = None
+    if isinstance(v, bytes):
+        vpath = v
+    elif isinstance(v, VfsNode):
+        vnode = v
+    else:
+        raise NotImplementedError('find_vnode: Could not extract {}'.format(v))
+
+    if vpath is not None:
+        nodes = vfs.nodes_where_vpath(vpath)
+        if nodes:
+            vnode = nodes[0]
+        else:
+            raise EDecaFileMissing('find_vnode: Missing {}'.format(vpath.decode('utf-8')))
+
+    return vnode
+
+
 def extract_raw(
-        vfs: VfsStructure,
+        vfs: VfsDatabase,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
         allow_overwrite=False):
     vs = expand_vpaths(vfs, vnodes, mask)
     for i, v in enumerate(vs):
-        vnode = None
-        id = None
-        if isinstance(v, bytes):
-            id = v
-        elif isinstance(v, VfsNode):
-            vnode = v
-        else:
-            raise NotImplementedError('extract_raw: Could not extract {}'.format(v))
-
-        if id is not None:
-            if id in vfs.map_vpath_to_vfsnodes:
-                vnode = vfs.map_vpath_to_vfsnodes[id][0]
-            else:
-                raise EDecaFileMissing('extract_raw: Missing {}'.format(id.decode('utf-8')))
+        vnode = find_vnode(vfs, v)
 
         if vnode is not None:
             try:
@@ -126,27 +130,14 @@ def extract_raw(
 
 
 def extract_contents(
-        vfs: VfsStructure,
+        vfs: VfsDatabase,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
         allow_overwrite=False):
     vs = expand_vpaths(vfs, vnodes, mask)
     for i, v in enumerate(vs):
-        vnode = None
-        id = None
-        if isinstance(v, bytes):
-            id = v
-        elif isinstance(v, VfsNode):
-            vnode = v
-        else:
-            raise NotImplementedError('extract_raw: Could not extract {}'.format(v))
-
-        if id is not None:
-            if id in vfs.map_vpath_to_vfsnodes:
-                vnode = vfs.map_vpath_to_vfsnodes[id][0]
-            else:
-                raise EDecaFileMissing('extract_raw: Missing {}'.format(id.decode('utf-8')))
+        vnode = find_vnode(vfs, v)
 
         if vnode is not None:
             try:
@@ -176,7 +167,7 @@ def extract_contents(
 
 
 def extract_processed(
-        vfs: VfsStructure,
+        vfs: VfsDatabase,
         vnodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
@@ -192,20 +183,7 @@ def extract_processed(
     vs_fsb5cs = []
     vs_other = []
     for i, v in enumerate(vs):
-        vnode = None
-        id = None
-        if isinstance(v, bytes):
-            id = v
-        elif isinstance(v, VfsNode):
-            vnode = v
-        else:
-            raise NotImplementedError('extract_raw: Could not extract {}'.format(v))
-
-        if id is not None:
-            if id in vfs.map_vpath_to_vfsnodes:
-                vnode = vfs.map_vpath_to_vfsnodes[id][0]
-            else:
-                raise EDecaFileMissing('extract_raw: Missing {}'.format(id.decode('utf-8')))
+        vnode = find_vnode(vfs, v)
 
         if vnode is not None and vnode.is_valid() and vnode.offset is not None:
             try:
@@ -233,8 +211,7 @@ def extract_processed(
 
             vfs.logger.log('Exporting {}'.format(ofile))
 
-            ofiledir = os.path.dirname(ofile)
-            os.makedirs(ofiledir, exist_ok=True)
+            make_dir_for_file(ofile)
 
             try:
                 fsb5c_export_processed(vfs, vnode, extract_dir, allow_overwrite=allow_overwrite)
@@ -250,8 +227,7 @@ def extract_processed(
 
             vfs.logger.log('Exporting {}'.format(ofile))
 
-            ofiledir = os.path.dirname(ofile)
-            os.makedirs(ofiledir, exist_ok=True)
+            make_dir_for_file(ofile)
 
             try:
                 image_export(vfs, vnode, extract_dir, False, True, allow_overwrite=allow_overwrite)
@@ -259,6 +235,16 @@ def extract_processed(
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-    adf_export(vfs, vs_adf, extract_dir, allow_overwrite=allow_overwrite, save_to_processed=save_to_processed, save_to_text=save_to_text, save_to_one_dir=save_to_one_dir)
+    adf_export(
+        vfs, vs_adf, extract_dir,
+        allow_overwrite=allow_overwrite,
+        save_to_processed=save_to_processed,
+        save_to_text=save_to_text,
+        save_to_one_dir=save_to_one_dir)
 
-    rtpc_export(vfs, vs_rtpc, extract_dir, allow_overwrite=allow_overwrite, save_to_processed=save_to_processed, save_to_text=save_to_text, save_to_one_dir=save_to_one_dir)
+    rtpc_export(
+        vfs, vs_rtpc, extract_dir,
+        allow_overwrite=allow_overwrite,
+        save_to_processed=save_to_processed,
+        save_to_text=save_to_text,
+        save_to_one_dir=save_to_one_dir)

@@ -1,27 +1,15 @@
 import os
-import pickle
 import io
-import multiprocessing
+import sqlite3
+import pickle
 import re
-import json
-import csv
-import time
 
-from deca.file import ArchiveFile
-from deca.vfs_base import VfsBase, VfsNode, VfsPathNode, VfsPathMap
-from deca.game_info import GameInfo, game_info_load
-from deca.errors import EDecaFileExists
+from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
-from deca.ff_txt import load_json
-import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase, AdfTypeMissing, GdcArchiveEntry, adf_node_read
-from deca.ff_rtpc import Rtpc
-from deca.ff_arc_tab import TabFileV3, TabFileV4
-from deca.ff_sarc import FileSarc, EntrySarc
-from deca.util import Logger, remove_prefix_if_present, remove_suffix_if_present
-from deca.hash_jenkins import hash_little
 from deca.ff_determine import determine_file_type_and_size
-from deca.kaitai.gfx import Gfx
+from deca.ff_aaf import extract_aaf
+from deca.util import make_dir_for_file
+from deca.game_info import game_info_load
 
 
 language_codes = [
@@ -38,907 +26,662 @@ language_codes = [
 ]
 
 
-def game_file_to_sortable_string(v):
-    if v[0:4] == 'game':
-        return 'game{:08}'.format(int(v[4:]))
-    else:
-        return v
-
-
-class VfsStructure(VfsBase):
-    def __init__(self, game_info: GameInfo, working_dir, logger):
-        VfsBase.__init__(self, game_info, working_dir, logger)
-        self.adf_db = None
-        self.external_files = set()
-        self.progress_update_time_sec = 5.0
-
-    def prepare_adf_db(self, debug=False):
-        save_dir = os.path.join(self.working_dir, 'adf_types')
-        os.makedirs(save_dir, exist_ok=True)
-        self.adf_db = AdfDatabase(save_dir)
-
-        exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
-        self.adf_db.extract_types_from_exe(exe_path)
-
-    def load_from_archives(self, ver, debug=False):  # game_dir, archive_paths,
-        self.logger.log('find all tab/arc files')
-        input_files = []
-
-        dir_in = self.game_info.archive_path()
-        dir_found = []
-
-        while len(dir_in) > 0:
-            d = dir_in.pop(0)
-            if os.path.isdir(d):
-                dir_found.append(d)
-                files = os.listdir(d)
-                for file in files:
-                    ff = os.path.join(d, file)
-                    if os.path.isdir(ff):
-                        dir_in.append(ff)
-
-        for fcat in dir_found:
-            self.logger.log('Processing Directory: {}'.format(fcat))
-            if os.path.isdir(fcat):
-                files = os.listdir(fcat)
-                ifns = []
-                for file in files:
-                    if 'tab' == file[-3:]:
-                        ifns.append(file[0:-4])
-                ifns.sort(key=game_file_to_sortable_string)
-                for ifn in ifns:
-                    input_files.append(os.path.join(fcat, ifn))
-
-        self.logger.log('process unarchived files')
-        for ua_file in self.game_info.unarchived_files():
-            with open(ua_file, 'rb') as f:
-                ftype, fsize = determine_file_type_and_size(f, os.stat(ua_file).st_size)
-            vpath = os.path.basename(ua_file).encode('utf-8')
-            vhash = deca.hash_jenkins.hash_little(vpath)
-            self.node_add(VfsNode(
-                vhash=vhash, vpath=vpath, pvpath=ua_file, ftype=ftype,
-                size_u=fsize, size_c=fsize, offset=0))
-
-        self.logger.log('process all game tab / arc files')
-        for ta_file in input_files:
-            inpath = os.path.join(ta_file)
-            file_arc = inpath + '.arc'
-            self.node_add(VfsNode(ftype=FTYPE_ARC, pvpath=file_arc))
-
-        any_change = True
-        n_nodes = 0
-        phase_id = 0
-        last_update = None
-        while any_change:
-            phase_id = phase_id + 1
-            self.logger.log('Expand Archives Phase {}: Begin'.format(phase_id))
-
-            any_change = False
-            idx = n_nodes  # start after last processed node
-            n_nodes = len(self.table_vfsnode)  # only process this level of nodes
-            while idx < n_nodes:
-                ctime = time.time()
-                if last_update is None or (last_update + self.progress_update_time_sec) < ctime:
-                    last_update = ctime
-                    self.logger.log('Finding Files: {} of {}'.format(idx, len(self.table_vfsnode)))
-
-                node = self.table_vfsnode[idx]
-                if node.is_valid() and not node.processed:
-                    if node.ftype == FTYPE_ARC:
-                        # here we add the tab file as a child of the ARC, a trick to make it work with our data model
-                        node.processed = True
-                        any_change = True
-                        tab_path = os.path.splitext(node.pvpath)
-                        tab_path = tab_path[0] + '.tab'
-                        cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid, level=node.level)
-                        self.node_add(cnode)
-                    elif node.ftype == FTYPE_TAB:
-                        self.logger.log('Processing TAB: {}'.format(node.pvpath))
-                        node.processed = True
-                        any_change = True
-                        with ArchiveFile(open(node.pvpath, 'rb'), debug=debug) as f:
-                            if 3 == ver:
-                                tab_file = TabFileV3()
-                            elif 4 == ver:
-                                tab_file = TabFileV4()
-                            else:
-                                raise NotImplementedError('Unknown TAB file version {}'.format(ver))
-
-                            tab_file.deserialize(f)
-
-                            for i in range(len(tab_file.file_table)):
-                                te = tab_file.file_table[i]
-                                cnode = VfsNode(
-                                    vhash=te.hashname, pid=node.uid, level=node.level + 1, index=i,
-                                    offset=te.offset, size_c=te.size_c, size_u=te.size_u)
-                                self.node_add(cnode)
-
-                    elif node.ftype == FTYPE_SARC:
-                        node.processed = True
-                        any_change = True
-                        sarc_file = FileSarc()
-                        sarc_file.header_deserialize(self.file_obj_from(node))
-
-                        for se in sarc_file.entries:
-                            se: EntrySarc = se
-                            offset = se.offset
-                            if offset == 0:
-                                offset = None  # sarc files with zero offset are not in file, but reference hash value
-                            cnode = VfsNode(
-                                vhash=se.vhash, pid=node.uid, level=node.level + 1, index=se.index,
-                                offset=offset, size_c=se.length, size_u=se.length, vpath=se.vpath,
-                                sarc_ext_hash=se.file_extention_hash)
-
-                            self.node_add(cnode)
-                            self.possible_vpath_map.propose(cnode.vpath, [FTYPE_SARC, node], vnode=cnode)
-
-                    elif node.vhash == deca.hash_jenkins.hash_little(b'gdc/global.gdcc'):
-                        # special case starting point for runtime
-                        node.processed = True
-                        any_change = True
-                        with self.file_obj_from(node) as f:
-                            buffer = f.read(node.size_u)
-                        adf = self.adf_db.load_adf(buffer)
-
-                        bnode_name = b'gdc/global.gdc.DECA'
-                        bnode = VfsNode(
-                            vhash=deca.hash_jenkins.hash_little(bnode_name),
-                            vpath=bnode_name,
-                            ftype=FTYPE_GDCBODY, pid=node.uid, level=node.level,
-                            offset=adf.table_instance[0].offset,
-                            size_c=adf.table_instance[0].size,
-                            size_u=adf.table_instance[0].size)
-                        self.node_add(bnode)
-
-                        for entry in adf.table_instance_values[0]:
-                            if isinstance(entry, GdcArchiveEntry):
-                                # self.logger.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.vpath))
-                                adf_type = entry.adf_type_hash
-                                ftype = None
-                                if adf_type is not None:
-                                    ftype = FTYPE_ADF_BARE
-                                    # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.vpath))
-                                cnode = VfsNode(
-                                    vhash=entry.vpath_hash, pid=bnode.uid, level=bnode.level + 1, index=entry.index,
-                                    offset=entry.offset, size_c=entry.size, size_u=entry.size, vpath=entry.vpath,
-                                    ftype=ftype, adf_type=adf_type)
-                                self.node_add(cnode)
-                                self.possible_vpath_map.propose(cnode.vpath, [FTYPE_ADF, node], vnode=cnode)
-
-                    else:
-                        pass
-                idx = idx + 1
-            self.logger.log('Expand Archives Phase {}: End'.format(phase_id))
-
-    def get_vnode_indexs_from_ftype(self, ftype):
-        indexs = []
-        done_set = set()
-        for idx in range(len(self.table_vfsnode)):
-            node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == ftype and node.vhash not in done_set:
-                done_set.add(node.vhash)
-                indexs.append(idx)
-        return indexs, done_set
-
-    def find_vpath_adf_core(self, q, indexs, desired_adf_files):
-        vpath_map = VfsPathMap(self.logger)
-        adf_missing_types = {}
-        map_name_usage = {}
-        map_vhash_usage = {}
-        map_adftype_usage = {}
-        map_typedefs = {}
-
-        for idx in indexs:
-            node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == desired_adf_files:
-                try:
-                    adf = adf_node_read(self, node)
-                    for sh in adf.table_stringhash:
-                        vpath_map.propose(sh.value, [FTYPE_ADF, node])
-
-                        rp = remove_prefix_if_present(b'intermediate/', sh.value)
-                        if rp is not None:
-                            vpath_map.propose(rp, [FTYPE_ADF, node])
-
-                        rp = remove_suffix_if_present(b'.stop', sh.value)
-                        if rp is None:
-                            rp = remove_suffix_if_present(b'.play', sh.value)
-
-                        if rp is not None:
-                            # self.logger.log('Found possible wavc file from: {}'.format(sh.value))
-                            for lng in language_codes:
-                                fn = b'sound/dialogue/' + lng.encode('ascii') + b'/' + rp + b'.wavc'
-                                # self.logger.log('  Trying: {}'.format(fn))
-                                vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=[FTYPE_FSB5C])
-
-                    for sh in adf.found_strings:
-                        vpath_map.propose(sh, [FTYPE_ADF, node])
-                        rp = remove_prefix_if_present(b'intermediate/', sh)
-                        if rp is not None:
-                            vpath_map.propose(rp, [FTYPE_ADF, node])
-
-                    for sh in adf.table_name:
-                        s = sh[1]
-                        st = map_name_usage.get(s, set())
-                        st.add(node)
-                        map_name_usage[s] = st
-
-                    for sh in adf.table_stringhash:
-                        s = sh.value
-                        st = map_vhash_usage.get(s, set())
-                        st.add(node)
-                        map_vhash_usage[s] = st
-
-                    if len(adf.table_instance_values) > 0 and \
-                            adf.table_instance_values[0] is not None and \
-                            isinstance(adf.table_instance_values[0], dict):
-                        obj0 = adf.table_instance_values[0]
-
-                        fns = []
-                        # self name patch files
-                        if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
-                            for world in self.worlds:
-                                fn = world + 'terrain/hp/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
-                                    obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
-                                fns.append(fn)
-                            fn = 'terrain/jc3/patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
-                                obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
-                            fns.append(fn)
-
-                        # self name environc files
-                        if adf.table_instance[0].name == b'environ':
-                            fn = 'environment/weather/{}.environc'.format(obj0['Name'].decode('utf-8'))
-                            fns.append(fn)
-                            fn = 'environment/{}.environc'.format(obj0['Name'].decode('utf-8'))
-                            fns.append(fn)
-
-                        found_any = False
-                        for fn in fns:
-                            if node.vhash == hash_little(fn):
-                                vpath_map.propose(fn, [FTYPE_ADF, node], possible_ftypes=FTYPE_ADF)
-                                found_any = True
-
-                        if len(fns) > 0 and not found_any:
-                            self.logger.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.vhash, fns[0]))
-
-                    for ientry in adf.table_typedef:
-                        adf_type_hash = ientry.type_hash
-                        ev = map_adftype_usage.get(adf_type_hash, set())
-                        ev.add(node.uid)
-                        map_adftype_usage[adf_type_hash] = ev
-                        if ientry.type_hash not in map_typedefs:
-                            map_typedefs[ientry.type_hash] = ientry
-
-                except AdfTypeMissing as ae:
-                    adf_missing_types[ae.vhash] = adf_missing_types.get(ae.vhash, []) + [node.vhash]
-                    print('Missing Type {:08x} in {:08X} {} {}'.format(
-                        ae.vhash, node.vhash, node.vpath, node.pvpath))
-
-        q.put([vpath_map, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage, map_typedefs])
-
-    def find_vpath_adf(self, vpath_map, do_adfb=False):
-        desired_adf_files = FTYPE_ADF
-        if do_adfb:
-            desired_adf_files = FTYPE_ADF_BARE
-
-        self.logger.log('PROCESS ADFs: find strings, propose terrain patches. FTYPE = {}'.format(desired_adf_files))
-
-        indexes, adf_done = self.get_vnode_indexs_from_ftype(desired_adf_files)
-        scount = 0
-
-        if len(indexes) > 0:
-            q = multiprocessing.Queue()
-
-            if os.name != 'nt':
-                nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 2))   # assuming hyperthreading exists and slows down processing
-
-                indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
-
-                procs = []
-                for idxs in indexes2:
-                    self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-                    p = multiprocessing.Process(target=self.find_vpath_adf_core, args=(q, idxs, desired_adf_files))
-                    self.logger.log('Process: {}: Start'.format(p))
-                    p.start()
-                    procs.append(p)
-            else:
-                procs = [None]
-                self.find_vpath_adf_core(q, indexes, desired_adf_files)
-
-            for i in range(len(procs)):
-                self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
-                vpath_map_work, adf_missing_types, map_name_usage, map_vhash_usage, map_adftype_usage, map_typedefs = q.get()
-                scount += len(vpath_map_work.nodes)
-
-                vpath_map.merge(vpath_map_work)
-
-                for k, v in adf_missing_types.items():
-                    self.adf_missing_types[k] = self.adf_missing_types.get(k, []) + v
-
-                for k, v in map_name_usage.items():
-                    self.map_name_usage[k] = self.map_name_usage.get(k, set()).union(v)
-
-                for k, v in map_vhash_usage.items():
-                    self.map_vhash_usage[k] = self.map_vhash_usage.get(k, set()).union(v)
-
-                for k, v in map_adftype_usage.items():
-                    self.map_adftype_usage[k] = self.map_adftype_usage.get(k, set()).union(v)
-
-                self.adf_db.typedefs_add(map_typedefs)
-
-                self.logger.log('Process Done {} of {}'.format(i + 1, len(procs)))
-
-            for p in procs:
-                if p is not None:
-                    self.logger.log('Process: {}: Joining'.format(p))
-                    p.join()
-                    self.logger.log('Process: {}: Joined'.format(p))
-
-        self.logger.log('PROCESS ADFs: Total ADFs: {}, Total Strings: {}'.format(len(adf_done), scount))
-
-    def find_vpath_rtpc_core(self, q, indexs):
-        vpath_map = VfsPathMap(self.logger)
-        for idx in indexs:
-            node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_RTPC:
-                # try:
-                with self.file_obj_from(node) as f:
-                    buf = f.read(node.size_u)
-
-                # with open('dump.dat', 'wb') as fo:
-                #     fo.write(buf)
-
-                rtpc = Rtpc()
-                with io.BytesIO(buf) as f:
-                    rtpc.deserialize(f)
-
-                rnodelist = [rtpc.root_node]
-
-                while len(rnodelist) > 0:
-                    rnode = rnodelist.pop(0)
-
-                    for c in rnode.child_table:
-                        rnodelist.append(c)
-
-                    for p in rnode.prop_table:
-                        if p.type == deca.ff_rtpc.PropType.type_str.value:
-                            s = p.data
-                            vpath_map.propose(s, [FTYPE_RTPC, node])
-
-                            fn, ext = os.path.splitext(s)
-                            if ext in {b'.tga', b'.dds'}:
-                                vpath_map.propose(fn + b'.ddsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
-                            elif ext == b'.skeleton':
-                                vpath_map.propose(fn + b'.bsk', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0])
-                            elif ext == b'.ragdoll':
-                                vpath_map.propose(fn + b'.brd', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_TAG0])
-                                vpath_map.propose(fn + b'.ragdolsettingsc', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
-                            elif ext == b'.al':
-                                vpath_map.propose(fn + b'.afsmb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
-                                vpath_map.propose(fn + b'.asb', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_RTPC])
-                            elif ext == b'.model_xml':
-                                vpath_map.propose(fn + b'.model_xmlc', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.model.xml', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.model.xmlc', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.xml', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.xmlc', [FTYPE_RTPC, node])
-                                vpath_map.propose(fn + b'.modelc', [FTYPE_RTPC, node])
-                            elif len(ext) > 0:
-                                vpath_map.propose(s + b'c', [FTYPE_RTPC, node], possible_ftypes=[FTYPE_ADF])
-
-                            '''
-                            animations/skeletons/characters/machines/skirmisher_secondary_motion.skeleton -> bsk tag0
-                            animations/ragdoll/skirmisher_sm.ragdoll -> brd tag0 , ragdolsettingsc ADF, ADF_BARE
-                            animations/statemachines/machines/skirmisher/skirmisher_base.al -> {afsmb, asb} rtpc
-                            editor/entities/characters/machines/skirmisher/skir_damage.mdp -> mdpc ADF, ADF_BARE
-                            editor/entities/characters/default_ground_alignment.mtune -> mtunec ADF, ADF_BARE
-                            '''
-        q.put(vpath_map)
-
-    def find_vpath_rtpc(self, vpath_map):
-        self.logger.log('PROCESS RTPCs: look for hashable strings in RTPC files')
-
-        indexes, rtpc_done = self.get_vnode_indexs_from_ftype(FTYPE_RTPC)
-        scount = 0
-        if len(indexes) > 0:
-            q = multiprocessing.Queue()
-
-            if os.name != 'nt':
-                nprocs = min(len(indexes), max(1, multiprocessing.cpu_count() // 2))  # assuming hyperthreading exists and slows down processing
-
-                indexes2 = [indexes[v::nprocs] for v in range(0, nprocs)]
-
-                procs = []
-                for idxs in indexes2:
-                    self.logger.log('Create Process: ({},{},{})'.format(min(idxs), max(idxs), len(idxs)))
-                    p = multiprocessing.Process(target=self.find_vpath_rtpc_core, args=(q, idxs,))
-                    self.logger.log('Process: {}: Start'.format(p))
-                    p.start()
-                    procs.append(p)
-            else:
-                procs = [None]
-                self.find_vpath_rtpc_core(q, indexes)
-
-            for i in range(len(procs)):
-                self.logger.log('Waiting {} of {}'.format(i+1, len(procs)))
-                vpath_map_work = q.get()
-                scount += len(vpath_map_work.nodes)
-                vpath_map.merge(vpath_map_work)
-                self.logger.log('Process Done {} of {}'.format(i+1, len(procs)))
-
-            for p in procs:
-                if p is not None:
-                    self.logger.log('Process: {}: Joining'.format(p))
-                    p.join()
-                    self.logger.log('Process: {}: Joined'.format(p))
-
-        self.logger.log('PROCESS RTPCs: Total RTPCs: {}, Total Strings: {}'.format(len(rtpc_done), scount))
-
-    def find_vpath_gfx(self, vpath_map):
-        self.logger.log('PROCESS GFXs: look for hashable strings in autodesk ScaleForm files')
-        done_set = set()
-        for idx in range(len(self.table_vfsnode)):
-            node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_GFX and node.vhash not in done_set:
-                with self.file_obj_from(node) as f:
-                    buffer = f.read(node.size_u)
-
-                gfx = Gfx.from_bytes(buffer)
-
-                for tag in gfx.zlib_body.tags:
-                    if Gfx.TagType.gfx_exporter_info == tag.record_header.tag_type:
-                        vpath_map.propose(f'ui/{tag.tag_body.name}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
-                        for i in range(255):
-                            fn = 'ui/{}_i{:x}.ddsc'.format(tag.tag_body.name, i)
-                            vpath_map.propose(fn, [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
-
-                    elif tag.record_header.tag_type in {Gfx.TagType.gfx_define_external_image, Gfx.TagType.gfx_define_external_image2}:
-                        fn = tag.tag_body.file_name
-                        fn = os.path.basename(fn)
-                        fn, ext = os.path.splitext(fn)
-                        vpath_map.propose(f'ui/{fn}.ddsc', [FTYPE_GFX, node], possible_ftypes=[FTYPE_AVTX, FTYPE_DDS])
-
-                    elif Gfx.TagType.import_assets2 == tag.record_header.tag_type:
-                        fn = tag.tag_body.url
-                        fn = os.path.basename(fn)
-                        fn, ext = os.path.splitext(fn)
-                        vpath_map.propose(f'ui/{tag.tag_body.url}', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
-                        vpath_map.propose(f'ui/{fn}.gfx', [FTYPE_GFX, node], possible_ftypes=[FTYPE_GFX])
-
-                done_set.add(node.vhash)
-
-        self.logger.log('PROCESS GFXs: Total GFX files {}'.format(len(done_set)))
-
-    def find_vpath_json(self, vpath_map):
-        self.logger.log('PROCESS JSONs: look for hashable strings in json files')
-        json_done = set()
-        for idx in range(len(self.table_vfsnode)):
-            node = self.table_vfsnode[idx]
-            if node.is_valid() and node.ftype == FTYPE_TXT and node.vhash not in json_done:
-                with self.file_obj_from(node) as f:
-                    buffer = f.read(node.size_u)
-
-                json = load_json(buffer)
-                if json is not None:
-                    json_done.add(node.vhash)
-
-                # Parse {"0":[]. "1":[]}
-                if isinstance(json, dict) and '0' in json and '1' in json:
-                    for k, v in json.items():
-                        for item in v:
-                            vpath_map.propose(item, [FTYPE_TXT, node])
-        self.logger.log('PROCESS JSONs: Total JSON files {}'.format(len(json_done)))
-
-    def find_vpath_exe(self, vpath_map):
-        fn = './resources/{}/all_strings.tsv'.format(self.game_info.game_id)
-        if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/{}/all_strings.tsv'.format(self.game_info.game_id))
-            with open(fn, 'r') as f:
-                exe_strings = f.readlines()
-            exe_strings = [line.split('\t') for line in exe_strings]
-            exe_strings = [line[3].strip() for line in exe_strings if len(line) >= 4]
-            exe_strings = list(set(exe_strings))
-            for s in exe_strings:
-                vpath_map.propose(s, ['EXE', None])
-            self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
-
-    def find_vpath_procmon_file(self, vpath_map):
-        fn = './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)
-        if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM PROCMON: look for hashable strings in resources/{}/strings_procmon.txt'.format(self.game_info.game_id))
-            with open(fn) as f:
-                custom_strings = f.readlines()
-                custom_strings = set(custom_strings)
-                for s in custom_strings:
-                    vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
-            self.logger.log('STRINGS FROM HASH FROM PROCMON: Total {} strings'.format(len(custom_strings)))
-
-    def find_vpath_procmon_dir(self, vpath_map):
-        path_name = './procmon_csv/{}'.format(self.game_info.game_id)
-        custom_strings = set()
-
-        if os.path.isdir(path_name):
-            fns = os.listdir(path_name)
-            fns = [os.path.join(path_name, fn) for fn in fns]
-            for fn in fns:
-                if os.path.isfile(fn):
-                    self.logger.log('STRINGS FROM PROCMON DIR: look for hashable strings in {}'.format(fn))
-                    with open(fn, 'r') as f:
-                        db = csv.reader(f, delimiter=',', quotechar='"')
-                        p = re.compile(r'^.*\\dropzone\\(.*)$')
-                        for row in db:
-                            pth = row[6]
-                            # print(pth)
-                            r = p.match(pth)
-                            if r is not None:
-                                s = r.groups(1)[0]
-                                s = s.replace('\\', '/')
-                                custom_strings.add(s)
-
-        for s in custom_strings:
-            vpath_map.propose(s.strip(), ['PROCMON', None], used_at_runtime=True)
-        self.logger.log('STRINGS FROM HASH FROM PROCMON DIR: Total {} strings'.format(len(custom_strings)))
-
-    def find_vpath_custom(self, vpath_map):
-        fn = './resources/{}/strings.txt'.format(self.game_info.game_id)
-        if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM CUSTOM: look for hashable strings in resources/{}/strings.txt'.format(self.game_info.game_id))
-            with open(fn) as f:
-                custom_strings = f.readlines()
-                custom_strings = set(custom_strings)
-                for s in custom_strings:
-                    vpath_map.propose(s.strip(), ['CUSTOM', None])
-            self.logger.log('STRINGS FROM CUSTOM: Total {} strings'.format(len(custom_strings)))
-
-    def find_vpath_guess(self, vpath_map):
-        self.logger.log('STRINGS BY GUESSING: ...')
-        guess_strings = {}
-        guess_strings['gdc/global.gdcc'] = FTYPE_ADF
-        guess_strings['textures/ui/world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
-        for res_i in range(8):
-            guess_strings['settings/hp_settings/reserve_{}.bin'.format(res_i)] = FTYPE_RTPC
-            guess_strings['settings/hp_settings/reserve_{}.bl'.format(res_i)] = FTYPE_SARC
-            guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
-            guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
-            for zoom_i in [1, 2, 3]:
-                for index in range(500):
-                    fn = 'textures/ui/map_reserve_{}/zoom{}/{}.ddsc'.format(res_i, zoom_i, index)
-                    guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
-
-        for zoom_i in [1, 2, 3]:
-            for index in range(500):
-                fn = 'textures/ui/warboard_map/zoom{}/{}.ddsc'.format(zoom_i, index)
-                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
-
-        for world in self.worlds:
-            for i in range(64):
-                fn = world + 'terrain/hp/horizonmap/horizon_{}.ddsc'.format(i)
-                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
-
-            for i in range(64):
-                for j in range(64):
-                    fn = world + 'ai/tiles/{:02d}_{:02d}.navmeshc'.format(i, j)
-                    guess_strings[fn] = [FTYPE_TAG0, FTYPE_H2014]
-
-        prefixs = [
-            'ui/character_creation_i',
-            'ui/cutscene_ui_i',
-            'ui/hud_i',
-            'ui/intro_i',
-            'ui/in_game_menu_background_i',
-            'ui/in_game_menu_overlay_i',
-            'ui/intro_i',
-            'ui/inventory_screen_i',
-            'ui/load_i',
-            'ui/main_menu_i',
-            'ui/overlay_i',
-            'ui/player_downed_screen_i',
-            'ui/profile_picker_i',
-            'ui/reward_sequence_i',
-            'ui/settings_i',
-            'ui/skills_screen_i',
-            'ui/team_screen_i',
-            'ui/title_i',
-        ]
-        for prefix in prefixs:
-            for i in range(255):
-                fn = '{}{:x}.ddsc'.format(prefix, i)
-                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
-
-        for i in range(255):
-            fn = 'textures/ui/load/{}.ddsc'.format(i)
-            guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
-
-        for lng in language_codes:
-            fn = 'text/master_{}.stringlookup'.format(lng)
-            guess_strings[fn] = [FTYPE_ADF, FTYPE_ADF_BARE]
-
-        for k, v in guess_strings.items():
-            fn = k
-            fn = fn.encode('ascii')
-            vpath_map.propose(fn, ['GUESS', None], possible_ftypes=v)
-
-        self.logger.log('STRINGS BY GUESSING: Total {} guesses'.format(len(guess_strings)))
-
-    def find_vpath_by_assoc(self, vpath_map):
-        self.logger.log('STRINGS BY FILE NAME ASSOCIATION: epe/ee, blo/bl/nl/fl/nl.mdic/fl.mdic, mesh*/model*, avtx/atx?]')
-        pair_exts = self.game_info.file_assoc()
-
-        assoc_strings = {}
-        for k, v in vpath_map.nodes.items():
-            file_ext = os.path.splitext(k.decode('utf-8'))
-            if len(file_ext[0]) > 0 and len(file_ext[1]) > 0:
-                file = file_ext[0]
-                ext = file_ext[1]
-                for pe in pair_exts:
-                    if ext in pe:
-                        for pk, pv in pe.items():
-                            assoc_strings[file + pk] = pv
-
-        for k, v in assoc_strings.items():
-            fn = k
-            fn = fn.encode('ascii')
-            fh = hash_little(fn)
-            if fh in self.hash_present:
-                vpath_map.propose(fn, ['ASSOC', None], possible_ftypes=v)
-
-        self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
-
-    def node_update_vpath_mapping(self, vnode):
-        vid = vnode.vhash
-        if vnode.vpath is None:
-            self.hash_map_missing.add(vid)
+def regexp(expr, item):
+    if item is None or expr is None:
+        return False
+    if isinstance(expr, str):
+        expr = expr.encode('ascii')
+    if isinstance(item, str):
+        item = item.encode('ascii')
+    reg = re.compile(expr)
+    return reg.search(item) is not None
+
+
+def to_bytes(s):
+    if isinstance(s, str):
+        s = s.encode('ascii', 'ignore')
+    return s
+
+
+def to_str(s):
+    if isinstance(s, bytes):
+        s = s.decode('utf-8')
+    return s
+
+
+def common_prefix(s0, s1):
+    cnt = 0
+    while len(s0) > cnt and len(s1) > cnt and s0[cnt] == s1[cnt]:
+        cnt += 1
+    return s0[:cnt], s0[cnt:], s1[cnt:]
+
+
+is_compressed_file_mask = 1 << 0
+is_processed_file_mask = 1 << 1
+is_temporary_file_mask = 1 << 2
+
+
+class VfsNode:
+    def __init__(
+            self, uid=None, ftype=None,
+            vhash=None, pvpath=None, vpath=None, pid=None, index=None, offset=None,
+            size_c=None, size_u=None, used_at_runtime_depth=None,
+            adf_type=None, ext_hash=None,
+            is_compressed_file=False,
+            is_processed_file=False,
+            is_temporary_file=False,
+            flags=None):
+        self.uid = uid
+        self.ftype = ftype
+        self.adf_type = adf_type
+        self.ext_hash = ext_hash
+        self.vpath = vpath
+        self.vhash = vhash
+        self.pvpath = pvpath
+        self.pid = pid
+        self.index = index  # index in parent
+        self.offset = offset  # offset in parent
+        self.size_c = size_c  # compressed size in client
+        self.size_u = size_u  # extracted size
+        self.used_at_runtime_depth = used_at_runtime_depth
+
+        if flags is None:
+            self.flags = 0
+            if is_compressed_file:
+                self.flags = self.flags | is_compressed_file_mask
+            if is_processed_file:
+                self.flags = self.flags | is_processed_file_mask
+            if is_temporary_file:
+                self.flags = self.flags | is_temporary_file_mask
         else:
-            self.hash_map_present.add(vid)
-            vpath = vnode.vpath
-            if vid in self.map_hash_to_vpath:
-                self.map_hash_to_vpath[vid].add(vpath)
-                if len(self.map_hash_to_vpath[vid]) > 1:
-                    self.hash_map_conflict.add(vid)
-            else:
-                self.map_hash_to_vpath[vid] = {vpath}
+            self.flags = flags
 
-            vl = self.map_vpath_to_vfsnodes.get(vpath, [])
-            if vnode.offset is None:
-                vl = vl + [vnode]
-            else:
-                vl = [vnode] + vl
-            self.map_vpath_to_vfsnodes[vpath] = vl
+    def flags_get(self, bit):
+        return (self.flags & bit) == bit
 
-            # tag atx file type since they have no header info
-            if vnode.ftype is None and vnode.vpath is not None:
-                file, ext = os.path.splitext(vnode.vpath)
-                if ext[0:4] == b'.atx':
-                    vnode.ftype = FTYPE_ATX
-                elif ext == b'.hmddsc':
-                    vnode.ftype = FTYPE_HMDDSC
-
-    def process_vpaths(self):
-        self.logger.log('process_vpaths: Input count {}'.format(len(self.possible_vpath_map.nodes)))
-
-        self.hash_map_present = set()
-        self.hash_map_missing = set()
-        self.hash_map_conflict = set()
-        self.map_hash_to_vpath = {}
-        self.map_vpath_to_vfsnodes = {}
-
-        found_vpaths = set()
-
-        vp: VfsPathNode
-        for vp in self.possible_vpath_map.nodes.values():
-            vpid = vp.vhash
-            if vpid in self.map_hash_to_vnodes:
-                vnodes = self.map_hash_to_vnodes[vpid]
-                vnode: VfsNode
-                for vnode in vnodes:
-                    if vnode.is_valid():
-                        if vnode.vpath is None:
-                            if (len(vp.possible_ftypes) == 0) or (FTYPE_ANY_TYPE in vp.possible_ftypes) or \
-                               (vnode.ftype is None and FTYPE_NO_TYPE in vp.possible_ftypes) or \
-                               (vnode.ftype in vp.possible_ftypes):
-                                self.logger.trace('vpath:add  {} {:08X} {} {} {}'.format(vp.vpath, vp.vhash, len(vp.src), vp.possible_ftypes, vnode.ftype))
-                                vnode.vpath = vp.vpath
-                                found_vpaths.add(vp.vpath)
-                            else:
-                                self.logger.log('vpath:skip {} {:08X} {} {} {}'.format(vp.vpath, vp.vhash, len(vp.src), vp.possible_ftypes, vnode.ftype))
-
-                        if vnode.vpath == vp.vpath:
-                            if vp.used_at_runtime and (vnode.used_at_runtime_depth is None or vnode.used_at_runtime_depth > 0):
-                                # print('rnt', vp.vpath)
-                                vnode.used_depth_set(0)
-            else:
-                self.logger.trace('vpath:miss {} {:08X} {} {}'.format(vp.vpath, vp.vhash, len(vp.src), vp.possible_ftypes))
-
-        vnode: VfsNode
-        for vnode in self.table_vfsnode:
-            if vnode.is_valid() and vnode.vhash is not None:
-                self.node_update_vpath_mapping(vnode)
-
-        found_vpaths = list(found_vpaths)
-        found_vpaths.sort()
-        with open(self.working_dir + 'found_vpaths.txt', 'a') as f:
-            for vp in found_vpaths:
-                f.write('{}\n'.format(vp.decode('utf-8')))
-
-        #         for s in ss:
-        #             hid = hash_little(s)
-        #             if hid in self.hash_present:
-        #                 if hid in self.map_hash_to_vpath:
-        #                     if s != self.map_hash_to_vpath[hid]:
-        #                         self.logger.trace('HASH CONFLICT STRINGS: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], s))
-        #                         self.hash_bad[hid] = (self.map_hash_to_vpath[hid], s)
-        #                 else:
-        #                     if dump_found_paths:
-        #                         f.write('{:08X}\t{}\n'.format(hid, s))
-        #                     self.map_hash_to_vpath[hid] = s
-        #                     self.map_vpath_to_hash[s] = hid
-        #                     found = found + 1
-        #
-        # self.logger.log('fill in v_paths, mark extensions identified files as ftype')
-        #
-        # self.logger.log('PROCESS BASELINE VNODE INFORMATION')
-        # for idx in range(len(self.table_vfsnode)):
-        #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.vhash is not None:
-        #         hid = node.vhash
-        #         if node.vpath is not None:
-        #             if hid in self.map_hash_to_vpath:
-        #                 if self.map_hash_to_vpath[hid] != node.vpath:
-        #                     self.logger.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.vpath))
-        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.vpath)
-        #             else:
-        #                 self.map_hash_to_vpath[hid] = node.vpath
-        #                 self.map_vpath_to_hash[node.vpath] = hid
-        # self.logger.log('PROCESS BASELINE VNODE INFORMATION: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
-        #
-        # for idx in range(len(self.table_vfsnode)):
-        #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.vhash is not None and node.vpath is None:
-        #         if node.vhash in self.map_hash_to_vpath:
-        #             node.vpath = self.map_hash_to_vpath[node.vhash]
-        #
-        #     if node.is_valid() and node.vhash is not None:
-        #         if node.ftype not in {FTYPE_ARC, FTYPE_TAB}:
-        #             if node.vhash in self.map_hash_to_vpath:
-        #                 self.hash_map_present.add(node.vhash)
-        #             else:
-        #                 self.hash_map_missing.add(node.vhash)
-        #
-        #     if node.is_valid() and node.vpath is not None:
-        #         if os.path.splitext(node.vpath)[1][0:4] == b'.atx':
-        #             if node.ftype is not None:
-        #                 raise Exception('ATX marked as non ATX: {}'.format(node.vpath))
-        #             node.ftype = FTYPE_ATX
-        #
-        #         lst = self.map_vpath_to_vfsnodes.get(node.vpath, [])
-        #         if len(lst) > 0 and lst[0].offset is None:  # Do not let symlink be first is list # TODO Sort by accessibility
-        #             lst = [node] + lst
-        #         else:
-        #             lst.append(node)
-        #         self.map_vpath_to_vfsnodes[node.vpath] = lst
-
-    def search_for_vpaths(self):
-        self.find_vpath_adf(self.possible_vpath_map, do_adfb=False)
-        self.find_vpath_adf(self.possible_vpath_map, do_adfb=True)
-        self.find_vpath_rtpc(self.possible_vpath_map)
-        self.find_vpath_gfx(self.possible_vpath_map)
-        self.find_vpath_json(self.possible_vpath_map)
-        self.find_vpath_exe(self.possible_vpath_map)
-        self.find_vpath_procmon_dir(self.possible_vpath_map)
-        self.find_vpath_procmon_file(self.possible_vpath_map)
-        self.find_vpath_custom(self.possible_vpath_map)
-        self.find_vpath_guess(self.possible_vpath_map)
-        self.find_vpath_by_assoc(self.possible_vpath_map)
-
-        self.process_vpaths()
-
-    def dump_status(self):
-        self.logger.log('hashes: {}, mappings missing: {}, mappings present {}, mapping conflict {}'.format(
-            len(self.hash_present),
-            len(self.hash_map_missing),
-            len(self.hash_map_present),
-            len(self.hash_map_conflict)))
-
-        for k, vs in self.adf_missing_types.items():
-            for v in vs:
-                vps = self.map_hash_to_vpath.get(v, {})
-                for vp in vps:
-                    self.logger.log('Missing Type {:08x} in {:08X} {}'.format(k, v, vp))
-
-        for vid in self.hash_map_conflict:
-            for vps in self.map_hash_to_vpath[vid]:
-                for vp in vps:
-                    self.logger.log('CONFLICT: {:08X} {}'.format(vid, vp))
-
-    def external_file_add(self, filename):
-        if not hasattr(self, 'external_files'):
-            self.external_files = set()
-
-        if filename not in self.external_files and os.path.isfile(filename):
-            with open(filename, 'rb') as f:
-                ftype, fsize = determine_file_type_and_size(f, os.stat(filename).st_size)
-
-            vpath = filename.replace(':', '/')
-            vpath = vpath.replace('\\', '/')
-            vpath = ('__EXTERNAL_FILES__' + vpath).encode('ascii')
-            vhash = deca.hash_jenkins.hash_little(vpath)
-            vnode = VfsNode(
-                vhash=vhash, vpath=vpath, pvpath=filename, ftype=ftype,
-                size_u=fsize, size_c=fsize, offset=0)
-            self.node_add(vnode)
-            self.node_update_vpath_mapping(vnode)
-
-            self.external_files.add(filename)
-
-            self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))
+    def flags_set(self, bit, value):
+        if value:
+            value = bit
         else:
-            self.logger.log('FAILED TO OPEN:  {}'.format(filename))
+            value = 0
+        self.flags = (self.flags & ~bit) | value
 
+    def compressed_file_get(self):
+        return self.flags_get(is_compressed_file_mask)
 
-def vfs_structure_prep(game_info, working_dir, logger=None, debug=False):
-    os.makedirs(working_dir, exist_ok=True)
+    def compressed_file_set(self, value):
+        self.flags_set(is_compressed_file_mask, value)
 
-    if logger is None:
-        logger = Logger(working_dir)
+    def processed_file_get(self):
+        return self.flags_get(is_processed_file_mask)
 
-    version = 0
-    vfs = None
-    cache_file = working_dir + 'vfs_cache.pickle'
-    if os.path.isfile(cache_file):
-        logger.log('LOADING: {} : {}'.format(game_info.game_dir, working_dir))
-        with open(cache_file, 'rb') as f:
-            data = pickle.load(f)
+    def processed_file_set(self, value):
+        self.flags_set(is_processed_file_mask, value)
 
-        if isinstance(data, list):
-            version = data[0]
-            vfs = data[1]
+    def temporary_file_get(self):
+        return self.flags_get(is_temporary_file_mask)
+
+    def temporary_file_set(self, value):
+        self.flags_set(is_temporary_file_mask, value)
+
+    def file_type(self):
+        if self.compressed_file_get():
+            return self.ftype + '.z'
         else:
-            version = 1
-            vfs = data
+            return self.ftype
 
-        vfs.logger_set(logger)
-        logger.log('LOADING: COMPLETE')
+    def is_valid(self):
+        return self.uid is not None and self.uid != 0
 
-    if version < 1:
-        logger.log('CREATING: {} {}'.format(game_info.game_dir, working_dir))
-
-        game_info.save(os.path.join(working_dir, 'project.json'))
-
-        version = 1
-        vfs = VfsStructure(game_info, working_dir, logger)
-
-        # parse exe
-        vfs.prepare_adf_db(debug=debug)
-
-        # parse archive files
-        vfs.load_from_archives(debug=debug, ver=game_info.archive_version)
-
-        # search for vpaths
-        vfs.search_for_vpaths()
-        with open(cache_file, 'wb') as f:
-            data = [version, vfs]
-            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
-        logger.log('CREATING: COMPLETE')
-
-    vfs.dump_status()
-
-    vfs.working_dir = working_dir
-
-    # dump vpath file if not present
-    vpath_file = os.path.join(vfs.working_dir, 'vpaths.txt')
-    if not os.path.isfile(vpath_file):
-        logger.log('CREATING: vpaths.txt')
-        vpaths = list(vfs.map_vpath_to_vfsnodes.keys())
-        vpaths.sort()
-        with open(vpath_file, 'w') as f:
-            for vpath in vpaths:
-                f.write('{}\n'.format(vpath))
-
-    return vfs
+    def __str__(self):
+        info = []
+        if self.ftype is not None:
+            info.append('ft:{}'.format(self.file_type()))
+        if self.vhash is not None:
+            info.append('h:{:08X}'.format(self.vhash))
+        if self.vpath is not None:
+            info.append('v:{}'.format(self.vpath))
+        if self.pvpath is not None:
+            info.append('p:{}'.format(self.pvpath))
+        if len(info) == 0:
+            info.append('child({},{})'.format(self.pid, self.index))
+        return ' '.join(info)
 
 
-def vfs_structure_open(project_file, logger=None, debug=False):
-    working_dir = os.path.join(os.path.split(project_file)[0], '')
-    game_info = game_info_load(project_file)
+def db_to_vfs_node(v):
+    node = VfsNode(
+        uid=v[0], ftype=to_str(v[1]), vpath=to_bytes(v[2]), vhash=v[3], pvpath=to_str(v[4]),
+        pid=v[5], index=v[6], flags=v[7], offset=v[8], size_c=v[9], size_u=v[10],
+        used_at_runtime_depth=v[11], adf_type=v[12], ext_hash=v[13],
+    )
+    return node
 
-    return vfs_structure_prep(game_info, working_dir, logger=logger, debug=debug)
+
+def db_from_vfs_node(node: VfsNode):
+    v = (
+        node.uid, to_str(node.ftype), to_str(node.vpath), node.vhash, to_str(node.pvpath),
+        node.pid, node.index, node.flags, node.offset, node.size_c, node.size_u,
+        node.used_at_runtime_depth, node.adf_type, node.ext_hash,
+    )
+    return v
+
+
+class VfsDatabase:
+    def __init__(self, project_file, working_dir, logger, init_display=False):
+        self.project_file = project_file
+        self.working_dir = working_dir
+        self.logger = logger
+        self.game_info = game_info_load(project_file)
+
+        os.makedirs(working_dir, exist_ok=True)
+
+        if init_display:
+            logger.log('OPENING: {} {}'.format(self.game_info.game_dir, working_dir))
+
+        self.db_filename = os.path.join(self.working_dir, 'db', 'core.db')
+        make_dir_for_file(self.db_filename)
+
+        self.db_conn = sqlite3.connect(self.db_filename)
+        # self.db_conn.text_factory = bytes
+        self.db_conn.create_function("REGEXP", 2, regexp)
+        self.db_cur = self.db_conn.cursor()
+
+        self.db_setup()
+
+        # track info from ADFs
+        self.map_adftype_usage = {}
+        self.adf_missing_types = {}
+
+    def logger_set(self, logger):
+        self.logger = logger
+
+    def handle_exception(self, dbg, exc: sqlite3.OperationalError):
+        if len(exc.args) == 1 and exc.args[0] == 'database is locked':
+            self.logger.log(f'{dbg}: Waiting on database...')
+        else:
+            print(dbg, exc, exc.args)
+            raise
+
+    def db_execute_one(self, stmt, params=None, dbg='db_execute_one'):
+        if params is None:
+            params = []
+
+        while True:
+            try:
+                result = self.db_cur.execute(stmt, params)
+                break
+            except sqlite3.OperationalError as exc:
+                self.handle_exception(dbg, exc)
+
+        return result
+
+    def db_execute_many(self, stmt, params=None, dbg='db_execute_many'):
+        if params is None:
+            params = []
+
+        while True:
+            try:
+                result = self.db_cur.executemany(stmt, params)
+                break
+            except sqlite3.OperationalError as exc:
+                self.handle_exception(dbg, exc)
+
+        return result
+
+    def db_query_one(self, stmt, params=None, dbg='db_query_one'):
+        if params is None:
+            params = []
+
+        while True:
+            try:
+                result = self.db_cur.execute(stmt, params)
+                result = result.fetchone()
+                break
+            except sqlite3.OperationalError as exc:
+                self.handle_exception(dbg, exc)
+
+        return result
+
+    def db_query_all(self, stmt, params=None, dbg='db_query_all'):
+        if params is None:
+            params = []
+
+        while True:
+            try:
+                result = self.db_cur.execute(stmt, params)
+                result = result.fetchall()
+                break
+            except sqlite3.OperationalError as exc:
+                self.handle_exception(dbg, exc)
+
+        return result
+
+    def db_reset(self):
+        self.db_execute_one('DROP INDEX IF EXISTS core_vpath_to_vnode;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_vhash_to_vnode;')
+
+        self.db_execute_one('DROP TABLE IF EXISTS core_vnodes;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash_strings;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_hash_string_references;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_adf_types;')
+
+        self.db_execute_one('VACUUM;')
+
+        self.db_conn.commit()
+
+        self.db_setup()
+
+    def db_setup(self):
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_vnodes" (
+                "uid" INTEGER NOT NULL UNIQUE,
+                "ftype" TEXT,
+                "vpath" TEXT,
+                "vpath_hash" INTEGER,
+                "ppath" TEXT,
+                "parent_id" INTEGER,
+                "index_in_parent" INTEGER,
+                "flags" INTEGER,
+                "offset" INTEGER,
+                "size_c" INTEGER,
+                "size_u" INTEGER,
+                "used_at_runtime_depth" INTEGER,
+                "adf_type" INTEGER,
+                "ext_hash" INTEGER,
+                PRIMARY KEY("uid")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_hash_strings" (
+                "hash32" INTEGER NOT NULL,
+                "hash48" INTEGER NOT NULL,
+                "string" TEXT,
+                PRIMARY KEY ("hash32", "hash48", "string")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_hash_string_references" (
+                "hash_row_id" INTEGER NOT NULL,
+                "src_node" INTEGER,
+                "is_adf_field_name" INTEGER,
+                "used_at_runtime" INTEGER,
+                "possible_file_types" INTEGER,
+                PRIMARY KEY ("hash_row_id", "src_node", "is_adf_field_name", "used_at_runtime", "possible_file_types")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_adf_types" (
+                "hash" INTEGER NOT NULL,
+                "missing_in" INTEGER,
+                "pickle" BLOB,
+                PRIMARY KEY ("hash", "missing_in", "pickle")
+            );
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_vpath_to_vnode" ON "core_vnodes" ("vpath"	ASC);
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_vhash_to_vnode" ON "core_vnodes" ("vpath_hash"	ASC);
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_hash32_asc" ON "core_hash_strings" ("hash32"	ASC);
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_hash48_asc" ON "core_hash_strings" ("hash48"	ASC);
+            '''
+        )
+
+        self.db_conn.commit()
+
+    def nodes_select_all(self):
+        nodes = self.db_query_all(
+            "select * from core_vnodes", dbg='nodes_select_uids')
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_select_uid(self):
+        result = self.db_query_all(
+            "SELECT uid FROM core_vnodes", dbg='nodes_select_uid')
+        return [v[0] for v in result]
+
+    def nodes_select_vpath_uid_where_vpath_not_null(self):
+        result = self.db_query_all(
+            "SELECT vpath, uid FROM core_vnodes WHERE vpath IS NOT NULL", dbg='nodes_select_uid_vpath')
+        return result
+
+    def nodes_where_unmapped_select_uid(self):
+        result = self.db_query_all(
+            "SELECT uid FROM core_vnodes WHERE (ftype is NULL or (ftype != (?) AND ftype != (?))) AND vpath IS NULL AND ppath IS NULL",
+            [FTYPE_ARC, FTYPE_TAB], dbg='nodes_where_unmapped_select_uid')
+        return [v[0] for v in result]
+
+    def node_where_uid(self, uid):
+        r1 = self.db_query_one(
+            "select * from core_vnodes where uid == (?)", [uid], dbg='node_where_uid')
+        r1 = db_to_vfs_node(r1)
+        return r1
+
+    def nodes_where_flag_select_uid(self, mask, value, dbg='nodes_where_flag_select_uid'):
+        uids = self.db_query_all(
+            "select uid from core_vnodes where flags & (?) == (?)", [mask, value], dbg=dbg)
+        return [uid[0] for uid in uids]
+
+    def nodes_where_processed_select_uid(self, processed):
+        mask = is_processed_file_mask
+        if processed:
+            value = is_processed_file_mask
+        else:
+            value = 0
+        return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_processed_select_uid')
+
+    def nodes_where_temporary_select_uid(self, temporary):
+        mask = is_temporary_file_mask
+        if temporary:
+            value = is_temporary_file_mask
+        else:
+            value = 0
+        return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_temporary_select_uid')
+
+    def nodes_where_ftype_select_uid(self, ftype):
+        uids = self.db_query_all(
+            "select uid from core_vnodes where ftype == (?)", [ftype], dbg='nodes_where_ftype_select_uid')
+        return [uid[0] for uid in uids]
+
+    def nodes_where_hash32(self, vhash):
+        nodes = self.db_query_all(
+            "select * from core_vnodes where vpath_hash == (?)", [vhash], dbg='nodes_where_vhash')
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_where_vpath(self, vpath):
+        if isinstance(vpath, bytes):
+            vpath = vpath.decode('utf-8')
+        nodes = self.db_query_all(
+            "select * from core_vnodes where vpath == (?)", [vpath], dbg='nodes_where_vpath_like')
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_where_vpath_like_regex(self, p0, p1):
+        if isinstance(p0, bytes):
+            p0 = p0.decode('utf-8')
+        if isinstance(p1, bytes):
+            p1 = p1.decode('utf-8')
+        nodes = self.db_query_all(
+            "select * from core_vnodes where (vpath LIKE (?)) AND (vpath REGEXP (?))",
+            [p0, p1],
+            dbg='nodes_where_vpath_like_regex'
+        )
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_select_distinct_vhash(self):
+        result = self.db_query_all(
+            "SELECT DISTINCT vpath_hash FROM core_vnodes", dbg='nodes_select_distinct_vhash')
+        result = [r[0] for r in result if r[0] is not None]
+        return result
+
+    def nodes_select_distinct_vpath(self):
+        result = self.db_query_all(
+            "SELECT DISTINCT vpath FROM core_vnodes", dbg='nodes_select_distinct_vpath')
+        result = [to_bytes(r[0]) for r in result if r[0] is not None]
+        return result
+
+    def nodes_select_distinct_vpath_where_vhash(self, vhash):
+        result = self.db_query_all(
+            "SELECT DISTINCT vpath FROM core_vnodes WHERE vpath_hash == (?)", [vhash], dbg='nodes_select_distinct_vpath')
+        result = [to_bytes(r[0]) for r in result if r[0] is not None]
+        return result
+
+    def hash_string_select_distinct_string(self):
+        result = self.db_query_all(
+            "SELECT DISTINCT string FROM core_hash_strings", dbg='hash_string_select_distinct_string')
+        result = [to_bytes(r[0]) for r in result if r[0] is not None]
+        return result
+
+    def hash_string_select_all_to_dict(self):
+        result = self.db_query_all(
+            "SELECT rowid, hash32, hash48, string FROM core_hash_strings", dbg='hash_string_select_all_to_dict')
+        result = [(r[0], (r[1], r[2], to_bytes(r[3]))) for r in result]
+        result = dict(result)
+        return result
+
+    def hash_string_where_hash32_select_all(self, hash32):
+        if hash32 & 0xFFFFFFFF != hash32:
+            return []
+        else:
+            result = self.db_query_all(
+                "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash32 == (?)", [hash32], dbg='hash_string_where_hash32_select_all')
+            return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
+
+    def hash_string_where_hash48_select_all(self, hash48):
+        if hash48 & 0xFFFFFFFFFFFF != hash48:
+            return []
+        else:
+            result = self.db_query_all(
+                "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash48 == (?)", [hash48], dbg='hash_string_where_hash48_select_all')
+            return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
+
+    def hash_string_references_select_all(self):
+        result = self.db_query_all(
+            "SELECT * FROM core_hash_string_references", dbg='hash_string_references_select_all')
+        return result
+
+    def hash_string_references_where_hs_rowid_select_all(self, rowid):
+        result = self.db_query_all(
+            "SELECT * FROM core_hash_string_references WHERE hash_row_id == (?)", [rowid], dbg='hash_string_references_where_hs_rowid_select_all')
+        return result
+
+    def nodes_delete_where_uid(self, uids):
+        result = self.db_execute_many(
+            "DELETE FROM core_vnodes WHERE uid=(?)", uids, dbg='nodes_delete_where_uid'
+        )
+        self.db_conn.commit()
+
+    def node_add_one(self, node: VfsNode):
+        result = self.db_execute_one(
+            "INSERT INTO core_vnodes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            db_from_vfs_node(node),
+            dbg='node_add_one')
+
+        self.db_conn.commit()
+
+        node.uid = result.lastrowid
+
+        return node
+
+    def node_add_many(self, nodes):
+        db_nodes = [db_from_vfs_node(node) for node in nodes]
+
+        result = self.db_execute_many(
+            "insert into core_vnodes values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            db_nodes,
+            dbg='node_add_many'
+        )
+
+        self.db_conn.commit()
+
+    def node_update_many(self, nodes: set):
+        db_nodes = [db_from_vfs_node(node) for node in nodes]
+        db_nodes = [db_node[1:] + db_node[0:1] for db_node in db_nodes]
+
+        result = self.db_execute_many(
+            """
+            UPDATE core_vnodes SET 
+            ftype=(?),
+            vpath=(?),
+            vpath_hash=(?),
+            ppath=(?),
+            parent_id=(?),
+            index_in_parent=(?),
+            flags=(?),
+            offset=(?),
+            size_c=(?),
+            size_u=(?),
+            used_at_runtime_depth=(?),
+            adf_type=(?),
+            ext_hash=(?)
+            WHERE uid=(?)
+            """,
+            db_nodes,
+            dbg='node_update_many'
+        )
+        self.db_conn.commit()
+
+    def hash_string_add_many(self, hash_list):
+        hash_list_str = [(h[0], h[1], to_str(h[2])) for h in hash_list]
+        hash_list_str_unique = list(set(hash_list_str))
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_hash_strings VALUES (?,?,?)", hash_list_str_unique, dbg='hash_string_add_many:insert:0')
+        self.db_conn.commit()
+
+        hash_list_map = {}
+        for rec in hash_list_str_unique:
+            result = self.db_query_all(
+                "SELECT rowid FROM core_hash_strings WHERE hash32==(?) and hash48==(?) and string==(?)", rec, dbg='hash_string_add_many:select:0')
+
+            # we expect one and only one match for a hash+string
+            assert len(result) == 1
+            row_id = result[0][0]
+            hash_list_map[rec] = row_id
+
+        row_ids = [hash_list_map[rec] for rec in hash_list_str]
+        ref_list = [(r, h[3], h[4], h[5], h[6]) for r, h in zip(row_ids, hash_list)]
+        ref_list = list(set(ref_list))
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_hash_string_references VALUES (?,?,?,?,?)", ref_list, dbg='hash_string_add_many:insert:1')
+        self.db_conn.commit()
+
+    def adf_type_map_save(self, adf_map, adf_missing):
+        adf_list = []
+
+        for k, v in adf_map.items():
+            with io.BytesIO() as f:
+                pickle.dump(v, f)
+                adf_list.append((k, 0, bytes(f.getbuffer())))
+
+        for type_id, missing_in in adf_missing:
+            adf_list.append((type_id, missing_in, bytes()))
+
+        result = self.db_execute_many(
+            "INSERT OR IGNORE INTO core_adf_types VALUES (?,?,?)", adf_list, dbg='adf_type_map_save')
+        self.db_conn.commit()
+
+    def adf_type_map_load(self):
+        result = self.db_query_all("SELECT * FROM core_adf_types", dbg='adf_type_map_load')
+
+        adf_map = {}
+        adf_missing = set()
+        for k, miss, b in result:
+            if len(b) > 0:
+                with io.BytesIO(b) as f:
+                    v = pickle.load(f)
+                adf_map[k] = v
+            elif miss is not None and miss != 1:
+                adf_missing.add((k, miss))
+            else:
+                raise NotImplemented(f'Unknown type record: {k}, {miss}, {b}')
+
+        return adf_map, adf_missing
+
+    def file_obj_from(self, node: VfsNode, mode='rb'):
+        if node.ftype == FTYPE_ARC:
+            return open(node.pvpath, mode)
+        elif node.ftype == FTYPE_TAB:
+            return self.file_obj_from(self.node_where_uid(node.pid))
+        elif node.compressed_file_get():
+            pid = node.pid
+            parent_nodes = []
+            parent_paths = []
+            while pid is not None:
+                parent_node = self.node_where_uid(pid)
+                pid = parent_node.pid
+                parent_nodes.append(parent_node)
+                pp = None
+                if parent_node.pvpath is not None:
+                    prefix, end0, end1 = common_prefix(parent_node.pvpath, self.game_info.game_dir)
+                    f,e = os.path.splitext(end0)
+                    if e != '.tab':
+                        pp = end0
+                else:
+                    pp = '{:08X}.dat'.format(parent_node.vhash)
+                if pp is not None:
+                    parent_paths.append(pp)
+            parent_node = parent_nodes[0]
+            cache_dir = os.path.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
+            os.makedirs(cache_dir, exist_ok=True)
+            file_name = os.path.join(cache_dir, '{:08X}.dat'.format(node.vhash))
+            if not os.path.isfile(file_name):
+                with ArchiveFile(self.file_obj_from(parent_node, mode)) as pf:
+                    pf.seek(node.offset)
+                    extract_aaf(pf, file_name)
+            return open(file_name, mode)
+        elif node.ftype == FTYPE_ADF_BARE:
+            parent_node = self.node_where_uid(node.pid)
+            return self.file_obj_from(parent_node, mode)
+        elif node.pid is not None:
+            parent_node = self.node_where_uid(node.pid)
+            pf = self.file_obj_from(parent_node, mode)
+            pf.seek(node.offset)
+            pf = SubsetFile(pf, node.size_u)
+            return pf
+        elif node.pvpath is not None:
+            return open(node.pvpath, mode)
+        else:
+            raise Exception('NOT IMPLEMENTED: DEFAULT')
+
+    def determine_ftype(self, node: VfsNode):
+        if node.ftype is None:
+            node.compressed_file_set(False)
+            if node.offset is None:
+                node.ftype = FTYPE_SYMLINK
+            else:
+                with self.file_obj_from(node) as f:
+                    node.ftype, node.size_u = determine_file_type_and_size(f, node.size_c)
+
+        if node.ftype is FTYPE_AAF:
+            node.compressed_file_set(True)
+            with self.file_obj_from(node) as f:
+                node.ftype, node.size_u = determine_file_type_and_size(f, node.size_u)
+
+
+'''
+--vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .
+'''
+
+'''
+tab/arc - file archive {hash, file}
+aaf - compressed single file
+sarc - file archive: {filename, hash, file}
+avtx - directx image archives can contain multiple MIP levels
+headerless-avtx - directx image archives with no header probably connected to avtx files can contain multiple MIP levels
+adf - typed files with objects/type/...
+'''
+
+'''
+VfsTable
+
+uid : u64
+ftype : u32
+vhash : u32
+pvpath : str
+vpath : str
+pid : u64
+index : u64  # index in parent
+offset : u64 # offset in parent
+size_c : u64 # compressed size in client
+size_u : u64 # extracted size
+
+VfshashToNameMap
+VfsNameToHashMap
+'''

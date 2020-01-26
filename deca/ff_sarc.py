@@ -1,5 +1,5 @@
 from deca.file import ArchiveFile
-from deca.hash_jenkins import hash_little
+from deca.hashes import hash32_func
 from deca.util import align_to
 import os
 import numpy as np
@@ -28,7 +28,7 @@ class EntrySarc:
         self.META_entry_size_ptr = f.tell()
         self.length = f.read_u32()
 
-        self.vhash = hash_little(self.vpath)
+        self.vhash = hash32_func(self.vpath)
         self.is_symlink = self.offset == 0
 
     def serialize_v2(self, f: ArchiveFile):
@@ -53,13 +53,13 @@ class EntrySarc:
 
         self.is_symlink = self.offset == 0
 
-        assert(self.vhash == hash_little(self.vpath))
-        assert(self.file_extention_hash == hash_little(os.path.splitext(self.vpath)[1]))
+        assert(self.vhash == hash32_func(self.vpath))
+        assert(self.file_extention_hash == hash32_func(os.path.splitext(self.vpath)[1]))
 
     def serialize_v3(self, f):
         # update entry based on vpath
-        self.vhash = hash_little(self.vpath)
-        self.file_extention_hash = hash_little(os.path.splitext(self.vpath)[1])
+        self.vhash = hash32_func(self.vpath)
+        self.file_extention_hash = hash32_func(os.path.splitext(self.vpath)[1])
 
         f.write_u32(self.string_offset)
         f.write_u32(self.offset)
@@ -98,12 +98,14 @@ class FileSarc:
     def header_deserialize(self, fin):
         with ArchiveFile(fin) as f:
             self.version = f.read_u32()
-            assert(self.version == 4)
             self.magic = f.read(4)
-            assert(self.magic == b'SARC')
             self.ver2 = f.read_u32()
+            # assuming 16 byte boundry based on some some examples from theHunter:COTW
+            self.dir_block_len = f.read_u32()
+
+            assert(self.version == 4)
+            assert(self.magic == b'SARC')
             assert(self.ver2 in {2, 3})
-            self.dir_block_len = f.read_u32()  # assuming 16 byte boundry based on some some examples from theHunter:cotw
 
             self.entries = []
 
@@ -134,6 +136,8 @@ class FileSarc:
             self.entries_end = f.tell()
 
     def header_serialize(self, f):
+        vpath_string = b''
+
         if self.ver2 == 2:
             # calculate dir block length
             dir_block_len = 0
@@ -144,7 +148,6 @@ class FileSarc:
 
         elif self.ver2 == 3:
             # calculate dir block length
-            vpath_string = b''
             entry: EntrySarc
             for entry in self.entries:
                 entry.string_offset = len(vpath_string)

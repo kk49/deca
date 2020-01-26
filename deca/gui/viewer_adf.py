@@ -1,6 +1,5 @@
 from .viewer import *
-from ..ff_types import FTYPE_ADF_BARE, FTYPE_ADF
-from ..file import ArchiveFile
+from ..ff_adf import AdfTypeMissing, AdfDatabase
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
@@ -21,26 +20,19 @@ class DataViewerAdf(DataViewer):
         self.main_layout.addWidget(self.text_box)
         self.setLayout(self.main_layout)
 
-    def vnode_process(self, vfs: VfsStructure, vnode: VfsNode):
-        buffer = b''
-        with ArchiveFile(vfs.file_obj_from(vnode)) as f:
-            while True:
-                v = f.read(16*1024*1024)
-                if len(v) == 0:
-                    break
-                buffer = buffer + v
+    def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
+        adf_db = AdfDatabase(vfs)
 
-        sbuf = ''
-        if vnode.ftype == FTYPE_ADF_BARE:
-            obj = vfs.adf_db.load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
-            if obj is None:
-                sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
-            else:
-                sbuf = obj.dump_to_string()
+        try:
+            obj = adf_db.read_node(vfs, vnode)
+        except AdfTypeMissing:
+            obj = None
+
+        if obj is None:
+            sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
         else:
-            obj = vfs.adf_db.load_adf(buffer)
-            if obj is not None:
-                sbuf = obj.dump_to_string()
+            sbuf = obj.dump_to_string(vfs)
+
         self.text_box.setText(sbuf)
 
 

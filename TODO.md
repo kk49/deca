@@ -1,5 +1,21 @@
-* Handle lFSB5 extract FSB5 files?
+* unify string hash tables
+* theHunter uses 4byte hash for event ids?
+* try all hash ideas when resolving unknown hash, give lookup number of known bytes
+* get strings from JC3 and the hunter and GZ EXE and make one master list, older games may expose more
+* Change bob's error source to generateor?
+
 * Handle rival images, how are the name generated
+
+* strings
+  * hash4
+  * hash6
+  * string
+* string_define -> node
+* string_usage -> node
+
+* event_id_usage -> ???
+* object_id_usage -> node
+* object_id_define -> node
 
 * track audio files to events, determine how translatable audio files are used  
   * Example file hash == 00FFFE21 file number 15604

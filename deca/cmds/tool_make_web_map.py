@@ -1,9 +1,8 @@
-from deca.vfs_db import vfs_structure_open
-from deca.ff_avtx import Ddsc, image_export
-from deca.ff_rtpc import Rtpc, PropName, RtpcProperty, RtpcNode
-from deca.file import ArchiveFile
-from deca.ff_types import *
-from deca.ff_adf import adf_node_read
+from deca.vfs_processor import vfs_structure_open
+from deca.vfs_db import VfsDatabase
+from deca.ff_avtx import Ddsc
+from deca.ff_rtpc import Rtpc, PropName, RtpcProperty
+from deca.ff_adf import AdfDatabase
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf
@@ -141,9 +140,11 @@ class RtpcLootVisitor:
 class ToolMakeWebMap:
     def __init__(self, vfs_config):
         if isinstance(vfs_config, str):
-            self.vfs = vfs_structure_open(vfs_config)
+            self.vfs: VfsDatabase = vfs_structure_open(vfs_config)
         else:
-            self.vfs = vfs_config
+            self.vfs: VfsDatabase = vfs_config
+
+        self.adf_db = AdfDatabase(self.vfs)
 
     def tileset_make(self, img, tile_path, tile_size=256, max_zoom=-1):
         # save full image, mainly for debugging
@@ -190,7 +191,10 @@ class ToolMakeWebMap:
                     os.makedirs(dpath, exist_ok=True)
                     for y in range(0, 2 ** zlevel):
                         fpath = os.path.join(dpath, '{}.png'.format(y))
-                        zimgs[(zooms-1)].crop((x * width, y * width, (x + 1) * width, (y + 1) * width)).resize((tile_size, tile_size), Image.NEAREST).save(fpath)
+                        img = zimgs[(zooms-1)]
+                        img = img.crop((x * width, y * width, (x + 1) * width, (y + 1) * width))
+                        img = img.resize((tile_size, tile_size), Image.NEAREST)
+                        img.save(fpath)
 
     def make_web_map(self, wdir, copy_support_files):
         force_topo_tiles = False
@@ -214,7 +218,8 @@ class ToolMakeWebMap:
                 y = i // 16
                 fn = 'textures/ui/map_reserve_0/zoom3/{}.ddsc'.format(i)
                 fn = fn.encode('ascii')
-                vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
+                
+                vnode = self.vfs.nodes_where_vpath(fn)[0]
                 img = Ddsc()
                 with self.vfs.file_obj_from(vnode) as f:
                     img.load_ddsc(f)
@@ -239,7 +244,7 @@ class ToolMakeWebMap:
                 y = i // 16
                 fn = 'textures/ui/warboard_map/zoom3/{}.ddsc'.format(i)
                 fn = fn.encode('ascii')
-                vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
+                vnode = self.vfs.nodes_where_vpath(fn)[0]
                 img = Ddsc()
                 with self.vfs.file_obj_from(vnode) as f:
                     img.load_ddsc(f)
@@ -255,7 +260,7 @@ class ToolMakeWebMap:
         # BUILD height map
         # extract full res image
         fn = b'terrain/global_heightfield.rawc'
-        vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
+        vnode = self.vfs.nodes_where_vpath(fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(1024 * 1024)
@@ -274,7 +279,7 @@ class ToolMakeWebMap:
         # BUILD water nvwaveworks map
         # extract full res image
         fn = b'terrain/water_nvwaveworks_mod.rawc'
-        vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
+        vnode = self.vfs.nodes_where_vpath(fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(1024 * 1024)
@@ -293,7 +298,7 @@ class ToolMakeWebMap:
         # BUILD water gerstner map
         # extract full res image
         fn = b'terrain/water_gerstner_mod.rawc'
-        vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
+        vnode = self.vfs.nodes_where_vpath(fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(1024 * 1024)
@@ -311,7 +316,7 @@ class ToolMakeWebMap:
 
         # TODO parse terrain/nv_water_cull_mask.rawc ? 1 bit per pixel 512x512 pixels
         fn = b'terrain/nv_water_cull_mask.rawc'
-        vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
+        vnode = self.vfs.nodes_where_vpath(fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(32 * 1024)
@@ -362,20 +367,9 @@ class ToolMakeWebMap:
 
         for tileo in tile_overlays:
             fn = tileo[0]
-            vnode = self.vfs.map_vpath_to_vfsnodes[fn][0]
+            vnode = self.vfs.nodes_where_vpath(fn)[0]
 
-            with self.vfs.file_obj_from(vnode) as f:
-                if vnode.ftype == FTYPE_ADF:
-                    buffer = f.read(vnode.size_u)
-                    bmp_adf = self.vfs.adf_db.load_adf(buffer)
-                else:
-                    buffer = b''
-                    while True:
-                        v = f.read(16 * 1024 * 1024)
-                        if len(v) == 0:
-                            break
-                        buffer = buffer + v
-                    bmp_adf = self.vfs.adf_db.load_adf_bare(buffer, vnode.adf_type, vnode.offset, vnode.size_u)
+            bmp_adf = self.adf_db.read_node(self.vfs, vnode)
 
             bitfield = bmp_adf.table_instance_values[0]['Layers'][0]['Bitfield']
             bitfield = np.asarray(bitfield, dtype=np.uint32).data
@@ -398,13 +392,13 @@ class ToolMakeWebMap:
             self.tileset_make(img, os.path.join(wdir, 'map', 'z0', '{}'.format(tileo[1])))
 
         # load translation
-        vnode = self.vfs.map_vpath_to_vfsnodes[b'text/master_eng.stringlookup'][0]
-        with self.vfs.file_obj_from(vnode, 'rb') as f:
-            tr = process_translation_adf(self.vfs, f, vnode.size_u)
+        vnode = self.vfs.nodes_where_vpath(b'text/master_eng.stringlookup')[0]
+        tr = process_translation_adf(self.vfs, self.adf_db, vnode)
 
         # load collectable codex
-        vnode = self.vfs.map_vpath_to_vfsnodes[b'settings/hp_settings/codex_data.bin'][0]
-        codex_fn = adf_export_xlsx_0x0b73315d(self.vfs, vnode, export_path=export_path, allow_overwrite=True)
+        vnode = self.vfs.nodes_where_vpath(b'settings/hp_settings/codex_data.bin')[0]
+        codex_fn = adf_export_xlsx_0x0b73315d(
+            self.vfs, self.adf_db, vnode, export_path=export_path, allow_overwrite=True)
         codex_wb = openpyxl.load_workbook(filename=codex_fn)
         codex_id = []
         codex_name = []
@@ -428,8 +422,8 @@ class ToolMakeWebMap:
 
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped
-        vnode = self.vfs.map_vpath_to_vfsnodes[b'global/collection.collectionc'][0]
-        adf = adf_node_read(self.vfs, vnode)
+        vnode = self.vfs.nodes_where_vpath(b'global/collection.collectionc')[0]
+        adf = self.adf_db.read_node(self.vfs, vnode)
         collectables = []
         for v in adf.table_instance_values[0]['Collectibles']:
             obj_id = v['ID']
@@ -464,54 +458,60 @@ class ToolMakeWebMap:
         print('PROCESSING: mdics')
         mdic_expr = re.compile(rb'^.*mdic$')
         mdics = []
-        for fn, vnodes in self.vfs.map_vpath_to_vfsnodes.items():
-            if mdic_expr.match(fn) and len(vnodes) > 0:
-                print('PROCESSING: {}'.format(fn))
-                vnode = vnodes[0]
-                with self.vfs.file_obj_from(vnode, 'rb') as f:
-                    buffer = f.read(vnode.size_u)
-                    adf = self.vfs.adf_db.load_adf(buffer)
-                    aabb = AABB(all6=adf.table_instance_values[0]['AABB'])
-                    border = [
-                        [aabb.min[0], aabb.min[2]],
-                        [aabb.max[0], aabb.min[2]],
-                        [aabb.max[0], aabb.max[2]],
-                        [aabb.min[0], aabb.max[2]],
-                    ]
 
-                    coords = []
-                    for pt in border:
-                        x = pt[0] * src_to_dst_x_scale + dst_x0
-                        y = pt[1] * src_to_dst_y_scale + dst_y0
-                        coords.append([x, y])
+        vpaths = self.vfs.nodes_select_distinct_vpath()
+        vpaths = [v for v in vpaths if mdic_expr.match(v)]
 
-                    obj = {
-                        'type': 'Feature',
-                        'properties': {
-                            'type': 'mdic',
-                            'uid': vnode.vhash,
-                            'uid_str': vnode.vpath.decode('utf-8'),
-                            'comment': '',
-                            'position': [aabb.min.tolist(), aabb.max.tolist()],
-                        },
-                        'geometry': {
-                            'type': 'Polygon',
-                            'coordinates': [coords]
-                        },
-                    }
-                    mdics.append(obj)
+        for fn in vpaths:
+            print('PROCESSING: {}'.format(fn))
+            vnodes = self.vfs.nodes_where_vpath(fn)
+            vnode = vnodes[0]
+            adf = self.adf_db.read_node(self.vfs, vnode)
+            aabb = AABB(all6=adf.table_instance_values[0]['AABB'])
+            border = [
+                [aabb.min[0], aabb.min[2]],
+                [aabb.max[0], aabb.min[2]],
+                [aabb.max[0], aabb.max[2]],
+                [aabb.min[0], aabb.max[2]],
+            ]
+
+            coords = []
+            for pt in border:
+                x = pt[0] * src_to_dst_x_scale + dst_x0
+                y = pt[1] * src_to_dst_y_scale + dst_y0
+                coords.append([x, y])
+
+            obj = {
+                'type': 'Feature',
+                'properties': {
+                    'type': 'mdic',
+                    'uid': vnode.vhash,
+                    'uid_str': vnode.vpath.decode('utf-8'),
+                    'comment': '',
+                    'position': [aabb.min.tolist(), aabb.max.tolist()],
+                },
+                'geometry': {
+                    'type': 'Polygon',
+                    'coordinates': [coords]
+                },
+            }
+            mdics.append(obj)
 
         print('PROCESSING: blo(s)')
         visitor = RtpcLootVisitor(tr=tr)
         blo_expr = re.compile(rb'^.*blo$')
-        for fn, vnodes in self.vfs.map_vpath_to_vfsnodes.items():
-            if blo_expr.match(fn) and len(vnodes) > 0:
-                print('PROCESSING: {}'.format(fn))
-                vnode = vnodes[0]
-                with self.vfs.file_obj_from(vnode, 'rb') as f:
-                    rtpc = Rtpc()
-                    rtpc.deserialize(f)
-                rtpc.visit(visitor)
+
+        vpaths = self.vfs.nodes_select_distinct_vpath()
+        vpaths = [v for v in vpaths if blo_expr.match(v)]
+
+        for fn in vpaths:
+            print('PROCESSING: {}'.format(fn))
+            vnodes = self.vfs.nodes_where_vpath(fn)
+            vnode = vnodes[0]
+            with self.vfs.file_obj_from(vnode, 'rb') as f:
+                rtpc = Rtpc()
+                rtpc.deserialize(f)
+            rtpc.visit(visitor)
 
         # results from found rtpc records
         print('Region: count = {}'.format(len(visitor.regions)))
@@ -519,7 +519,6 @@ class ToolMakeWebMap:
         print('MDICs: count = {}'.format(len(mdics)))
         for k, v in visitor.points.items():
             print('{}: count = {}'.format(k, len(v)))
-
 
         fpath = os.path.join(dpath, 'data_full.js')
         with open(fpath, 'w') as f:

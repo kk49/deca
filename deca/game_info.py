@@ -9,6 +9,20 @@ class GameInfo:
         self.exe_name = exe_name
         self.game_id = game_id
         self.archive_version = 3
+        self.area_prefixs = ['']
+        self.worlds = [
+            ('', 'terrain/', 'terrain/hp/'),
+            ('', 'terrain/', 'terrain/jc3/'),
+            ('worlds/base/', 'worlds/base/terrain/', 'worlds/base/terrain/hp/'),
+        ]
+        for i in range(4):
+            self.worlds.append(
+                (
+                    f'worlds/world{i}/',
+                    f'worlds/world{i}/terrain/',
+                    f'worlds/world{i}/terrain/world{i}/',
+                )
+            )
 
     def save(self, filename):
         settings = {
@@ -72,42 +86,47 @@ class GameInfoGZ(GameInfo):
     def file_assoc(self):
         return [
             {
-                '.ee': FTYPE_SARC,
-                '.epe': FTYPE_RTPC,
+                b'.ee': FTYPE_SARC,
+                b'.epe': FTYPE_RTPC,
             },
             {
-                '.bl': FTYPE_SARC,
-                '.nl': FTYPE_SARC,
-                '.fl': FTYPE_SARC,
-                '.blo': FTYPE_RTPC,
-                '.nl.mdic': self.mdic_ftype(),
-                '.fl.mdic': self.mdic_ftype(),
-                '.pfs': self.pfs_ftype(),
-                '.obc': FTYPE_OBC,
+                b'.bl': FTYPE_SARC,
+                b'.nl': FTYPE_SARC,
+                b'.fl': FTYPE_SARC,
+                b'.blo': FTYPE_RTPC,
+                b'.nl.mdic': self.mdic_ftype(),
+                b'.fl.mdic': self.mdic_ftype(),
+                b'.pfs': self.pfs_ftype(),
+                b'.obc': FTYPE_OBC,
             },
             {
-                '.meshc': FTYPE_ADF,
-                '.hrmeshc': FTYPE_ADF,
-                '.modelc': FTYPE_ADF,
-                '.model_deps': FTYPE_TXT,
-                '.pfxc': self.pfs_ftype(),
+                b'.meshc': FTYPE_ADF,
+                b'.hrmeshc': FTYPE_ADF,
+                b'.modelc': FTYPE_ADF,
+                b'.model_deps': FTYPE_TXT,
+                b'.pfxc': self.pfs_ftype(),
             },
             {
-                '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                '.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
+                # b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
             {
-                '.fmod_sbankc': FTYPE_TXT,
-                '.fmod_bankc': FTYPE_RIFF,
+                b'.fmod_sbankc': FTYPE_TXT,
+                b'.fmod_bankc': FTYPE_RIFF,
+            },
+            {
+                b'.swf': FTYPE_GFX,
+                b'.cfx': FTYPE_GFX,
+                b'.gfx': FTYPE_GFX,
             },
         ]
 
@@ -137,42 +156,42 @@ class GameInfoGZB(GameInfo):
     def file_assoc(self):
         return [
             {
-                '.ee': FTYPE_SARC,
-                '.epe': FTYPE_RTPC,
+                b'.ee': FTYPE_SARC,
+                b'.epe': FTYPE_RTPC,
             },
             {
-                '.bl': FTYPE_SARC,
-                '.nl': FTYPE_SARC,
-                '.fl': FTYPE_SARC,
-                '.blo': FTYPE_RTPC,
-                '.nl.mdic': self.mdic_ftype(),
-                '.fl.mdic': self.mdic_ftype(),
-                '.pfs': self.pfs_ftype(),
-                '.obc': FTYPE_OBC,
+                b'.bl': FTYPE_SARC,
+                b'.nl': FTYPE_SARC,
+                b'.fl': FTYPE_SARC,
+                b'.blo': FTYPE_RTPC,
+                b'.nl.mdic': self.mdic_ftype(),
+                b'.fl.mdic': self.mdic_ftype(),
+                b'.pfs': self.pfs_ftype(),
+                b'.obc': FTYPE_OBC,
             },
             {
-                '.meshc': FTYPE_ADF,
-                '.hrmeshc': FTYPE_ADF,
-                '.modelc': FTYPE_ADF,
-                '.model_deps': FTYPE_TXT,
-                '.pfxc': self.pfs_ftype(),
+                b'.meshc': FTYPE_ADF,
+                b'.hrmeshc': FTYPE_ADF,
+                b'.modelc': FTYPE_ADF,
+                b'.model_deps': FTYPE_TXT,
+                b'.pfxc': self.pfs_ftype(),
             },
             {
-                '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                '.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
+                b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
             {
-                '.fmod_sbankc': FTYPE_TXT,
-                '.fmod_bankc': FTYPE_RIFF,
+                b'.fmod_sbankc': FTYPE_TXT,
+                b'.fmod_bankc': FTYPE_RIFF,
             },
         ]
 
@@ -180,6 +199,22 @@ class GameInfoGZB(GameInfo):
 class GameInfoTHCOTW(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'hp')
+        self.area_prefixs = [
+            '',
+            'globalhires_',
+
+            'hp_germany_farmland_fall_',
+            'hp_pacific_northwest_',
+            'hp_siberia_',
+            'hp_africa_',
+
+            'hp_patagonia_',
+            'hp_trophyworld_'
+            'hp_yukon_',
+            'hp_trophyworld_2_'
+            
+            'hp_iberia_',
+        ]
 
     def archive_path(self):
         archive_paths = []
@@ -201,34 +236,40 @@ class GameInfoTHCOTW(GameInfo):
     def file_assoc(self):
         return [
             {
-                '.ee': FTYPE_SARC,
-                '.epe': FTYPE_RTPC,
+                b'.ee': FTYPE_SARC,
+                b'.epe': FTYPE_RTPC,
             },
             {
-                '.bl': FTYPE_SARC,
-                '.nl': FTYPE_SARC,
-                '.fl': FTYPE_SARC,
-                '.blo': FTYPE_RTPC,
-                '.nl.mdic': self.mdic_ftype(),
-                '.fl.mdic': self.mdic_ftype(),
-                '.pfs': self.pfs_ftype(),
-                '.obc': FTYPE_OBC,
+                b'.bl': FTYPE_SARC,
+                b'.nl': FTYPE_SARC,
+                b'.fl': FTYPE_SARC,
+                b'.blo': FTYPE_RTPC,
+                b'.nl.mdic': self.mdic_ftype(),
+                b'.fl.mdic': self.mdic_ftype(),
+                b'.pfs': self.pfs_ftype(),
+                b'.obc': FTYPE_OBC,
             },
             {
-                '.meshc': FTYPE_ADF,
-                '.hrmeshc': FTYPE_ADF,
-                '.modelc': FTYPE_ADF,
-                '.model_deps': FTYPE_TXT,
-                '.pfxc': self.pfs_ftype()
+                b'.meshc': FTYPE_ADF,
+                b'.hrmeshc': FTYPE_ADF,
+                b'.modelc': FTYPE_ADF,
+                b'.model_deps': FTYPE_TXT,
+                b'.pfxc': self.pfs_ftype()
             },
             {
-                '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                '.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
+                b'.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
             {
-                '.fmod_sbankc': FTYPE_TXT,
-                '.fmod_bankc': FTYPE_RIFF,
+                b'.fmod_sbankc': FTYPE_TXT,
+                b'.fmod_bankc': FTYPE_RIFF,
             },
+            {
+                b'.swf': FTYPE_GFX,
+                b'.cfx': FTYPE_GFX,
+                b'.gfx': FTYPE_GFX,
+            },
+
         ]
 
 
@@ -258,30 +299,40 @@ class GameInfoJC3(GameInfo):
     def file_assoc(self):
         return [
             {
-                '.ee': FTYPE_SARC,
-                '.epe': FTYPE_RTPC,
+                b'.ee': FTYPE_SARC,
+                b'.epe': FTYPE_RTPC,
             },
             {
-                '.bl': FTYPE_SARC,
-                '.nl': FTYPE_SARC,
-                '.fl': FTYPE_SARC,
-                '.blo': FTYPE_RTPC,
-                '.nl.mdic': self.mdic_ftype(),
-                '.fl.mdic': self.mdic_ftype(),
-                '.pfs': self.pfs_ftype(),
-                '.obc': FTYPE_OBC,
+                b'.bl': FTYPE_SARC,
+                b'.nl': FTYPE_SARC,
+                b'.fl': FTYPE_SARC,
+                b'.blo': FTYPE_RTPC,
+                b'.nl.mdic': self.mdic_ftype(),
+                b'.fl.mdic': self.mdic_ftype(),
+                b'.pfs': self.pfs_ftype(),
+                b'.obc': FTYPE_OBC,
             },
             {
-                '.meshc': FTYPE_ADF,
-                '.hrmeshc': FTYPE_ADF,
-                '.modelc': FTYPE_ADF,
-                '.model_deps': FTYPE_TXT,
-                '.pfxc': self.pfs_ftype(),
+                b'.meshc': FTYPE_ADF,
+                b'.hrmeshc': FTYPE_ADF,
+                b'.modelc': FTYPE_ADF,
+                b'.model_deps': FTYPE_TXT,
+                b'.pfxc': self.pfs_ftype(),
             },
             {
-                '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                '.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
+                b'.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
+            {
+                b'.fmod_sbankc': FTYPE_TXT,
+                b'.fmod_bankc': FTYPE_RIFF,
+            },
+            {
+                b'.swf': FTYPE_GFX,
+                b'.cfx': FTYPE_GFX,
+                b'.gfx': FTYPE_GFX,
+            },
+
         ]
 
 
@@ -310,39 +361,48 @@ class GameInfoJC4(GameInfo):
     def file_assoc(self):
         return [
             {
-                '.ee': FTYPE_SARC,
-                '.epe': FTYPE_RTPC,
+                b'.ee': FTYPE_SARC,
+                b'.epe': FTYPE_RTPC,
             },
             {
-                '.bl': FTYPE_SARC,
-                '.nl': FTYPE_SARC,
-                '.fl': FTYPE_SARC,
-                '.blo': FTYPE_RTPC,
-                '.nl.mdic': self.mdic_ftype(),
-                '.fl.mdic': self.mdic_ftype(),
-                '.pfs': self.pfs_ftype(),
-                '.obc': FTYPE_OBC,
+                b'.bl': FTYPE_SARC,
+                b'.nl': FTYPE_SARC,
+                b'.fl': FTYPE_SARC,
+                b'.blo': FTYPE_RTPC,
+                b'.nl.mdic': self.mdic_ftype(),
+                b'.fl.mdic': self.mdic_ftype(),
+                b'.pfs': self.pfs_ftype(),
+                b'.obc': FTYPE_OBC,
             },
             {
-                '.meshc': FTYPE_ADF,
-                '.hrmeshc': FTYPE_ADF,
-                '.modelc': FTYPE_ADF,
-                '.model_deps': FTYPE_TXT,
-                '.pfxc': self.pfs_ftype(),
+                b'.meshc': FTYPE_ADF,
+                b'.hrmeshc': FTYPE_ADF,
+                b'.modelc': FTYPE_ADF,
+                b'.model_deps': FTYPE_TXT,
+                b'.pfxc': self.pfs_ftype(),
             },
             {
-                '.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                '.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
-                '.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
+                b'.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
+            },
+            {
+                b'.fmod_sbankc': FTYPE_TXT,
+                b'.fmod_bankc': FTYPE_RIFF,
+            },
+            {
+                b'.swf': FTYPE_GFX,
+                b'.cfx': FTYPE_GFX,
+                b'.gfx': FTYPE_GFX,
             },
         ]
 

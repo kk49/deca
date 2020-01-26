@@ -25,6 +25,23 @@ class PropType(IntEnum):
     type_event = 14
 
 
+k_type_none = PropType.type_none.value
+k_type_u32 = PropType.type_u32.value
+k_type_f32 = PropType.type_f32.value
+k_type_str = PropType.type_str.value
+k_type_vec2 = PropType.type_vec2.value
+k_type_vec3 = PropType.type_vec3.value
+k_type_vec4 = PropType.type_vec4.value
+k_type_mat3x3 = PropType.type_mat3x3.value
+k_type_mat4x4 = PropType.type_mat4x4.value
+k_type_array_u32 = PropType.type_array_u32.value
+k_type_array_f32 = PropType.type_array_f32.value
+k_type_array_u8 = PropType.type_array_u8.value
+k_type_depreciated_12 = PropType.type_depreciated_12.value
+k_type_objid = PropType.type_objid.value
+k_type_event = PropType.type_event.value
+
+
 PropType_names = [
     'none',
     'u32',
@@ -67,9 +84,9 @@ class RtpcProperty:
 
     def __repr__(self):
         data = self.data
-        if self.type == PropType.type_objid.value:
+        if self.type == k_type_objid:
             data = 'id:0x{:012X}'.format(data)
-        elif self.type == PropType.type_event.value:
+        elif self.type == k_type_event:
             data = ['ev:0x{:012X}'.format(d) for d in data]
 
         return '@0x{:08x}({: 8d}) 0x{:08x} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
@@ -84,7 +101,7 @@ class RtpcProperty:
 
     def repr_with_name(self, vfs: VfsDatabase):
         data = self.data
-        if self.type == PropType.type_objid.value:
+        if self.type == k_type_objid:
             name6 = vfs.hash_string_where_hash48_select_all(data & 0x0000FFFFFFFFFFFF)
             name4 = vfs.hash_string_where_hash32_select_all(data)
             if len(name6):
@@ -95,7 +112,7 @@ class RtpcProperty:
                 name = 'id:0x{:012X}'.format(data)
             data = name
 
-        elif self.type == PropType.type_event.value:
+        elif self.type == k_type_event:
             data_new = []
             for d in data:
                 name6 = vfs.hash_string_where_hash48_select_all(d & 0x0000FFFFFFFFFFFF)
@@ -135,49 +152,49 @@ class RtpcProperty:
         self.data = self.data_raw
 
         raw_buf = struct.pack('I', self.data_raw)
-        if self.type == PropType.type_none:
+        if self.type == k_type_none:
             pass
-        elif self.type == PropType.type_u32:
+        elif self.type == k_type_u32:
             self.data = struct.unpack('I', raw_buf)[0]
-        elif self.type == PropType.type_f32:
+        elif self.type == k_type_f32:
             self.data = struct.unpack('f', raw_buf)[0]
-        elif self.type == PropType.type_str:
+        elif self.type == k_type_str:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = f.read_strz()
             f.seek(opos)
-        elif self.type == PropType.type_vec2:
+        elif self.type == k_type_vec2:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(2))
             f.seek(opos)
-        elif self.type == PropType.type_vec3:
+        elif self.type == k_type_vec3:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(3))
             f.seek(opos)
-        elif self.type == PropType.type_vec4:
+        elif self.type == k_type_vec4:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(4))
             f.seek(opos)
-        elif self.type == PropType.type_mat3x3:
+        elif self.type == k_type_mat3x3:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(9))
             f.seek(opos)
-        elif self.type == PropType.type_mat4x4:
+        elif self.type == k_type_mat4x4:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = list(f.read_f32(16))
             f.seek(opos)
-        elif self.type == PropType.type_array_u32:
+        elif self.type == k_type_array_u32:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
@@ -186,7 +203,7 @@ class RtpcProperty:
             if n > 0:
                 self.data = list(f.read_u32(n))
             f.seek(opos)
-        elif self.type == PropType.type_array_f32:
+        elif self.type == k_type_array_f32:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
@@ -195,7 +212,7 @@ class RtpcProperty:
             if n > 0:
                 self.data = list(f.read_f32(n))
             f.seek(opos)
-        elif self.type == PropType.type_array_u8:
+        elif self.type == k_type_array_u8:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
@@ -204,13 +221,13 @@ class RtpcProperty:
             if n > 0:
                 self.data = list(f.read_u8(n))
             f.seek(opos)
-        elif self.type == PropType.type_objid:
+        elif self.type == k_type_objid:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)
             self.data = f.read_u64()
             f.seek(opos)
-        elif self.type == PropType.type_event:
+        elif self.type == k_type_event:
             opos = f.tell()
             self.data_pos = self.data_raw
             f.seek(self.data_raw)

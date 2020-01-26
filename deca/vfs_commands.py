@@ -14,7 +14,7 @@ from .db_wrap import DbWrap
 from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
-from .ff_rtpc import Rtpc
+from .ff_rtpc import Rtpc, k_type_str
 from .ff_arc_tab import TabFileV3, TabFileV4
 from .ff_sarc import FileSarc, EntrySarc
 from .util import remove_prefix_if_present, remove_suffix_if_present
@@ -460,7 +460,7 @@ class MultiProcessVfsBase:
                 rnodelist.append(c)
 
             for p in rnode.prop_table:
-                if p.type == deca.ff_rtpc.PropType.type_str.value:
+                if p.type == k_type_str:
                     s = p.data
                     db.propose_string(s, node)
 

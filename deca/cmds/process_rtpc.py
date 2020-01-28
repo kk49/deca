@@ -4,9 +4,7 @@ from deca.ff_rtpc import Rtpc
 
 
 if len(sys.argv) < 2:
-    in_file = '/home/krys/prj/deca/work/gz/exported/editor/entities/characters/machines/dreadnought/drea_classa_load01.epe'
-    in_file = 'dump.dat'
-    in_file = '/home/krys/prj/deca/work/gz/exported/global/global.blo'
+    in_file = '/home/krys/prj/work/jc4/__CACHE__/archives_win64/boot_patch/game0.arc/DED58CCC.dat'
 else:
     in_file = sys.argv[1]
 

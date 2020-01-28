@@ -15,11 +15,29 @@ from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
 from .ff_rtpc import Rtpc, k_type_str
-from .ff_arc_tab import TabFileV3, TabFileV4
+from .ff_arc_tab import TabFileV3, TabFileV4, TabEntryFileBase, compression_00_none, compression_04_oo
 from .ff_sarc import FileSarc, EntrySarc
 from .util import remove_prefix_if_present, remove_suffix_if_present
 from .hashes import hash32_func
 from .kaitai.gfx import Gfx
+from .compress import apex_oo_decompress
+
+
+class LogWrapper:
+    def __init__(self, logger):
+        self._logger = logger
+
+    def log(self, msg):
+        self._logger.log(msg)
+
+    def trace(self, msg):
+        self._logger.trace(msg)
+
+    def status(self, i, n):
+        self._logger.log(f'STATUS: {i} of {n}')
+
+    def exception(self, exc):
+        self._logger.error(f'EXCEPTION {exc}')
 
 
 class MultiProcessControl:
@@ -29,25 +47,10 @@ class MultiProcessControl:
         self.logger = logger
         self.progress_update_time_sec = 5.0
 
-        self.mp_q_results = multiprocessing.Queue()
         # assuming hyper-threading exists and slows down processing
         # self.mp_n_processes = 1
         # self.mp_n_processes = max(1, 2 * multiprocessing.cpu_count() // 4)
         self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
-
-        self.mp_processes = {}
-        for i in range(self.mp_n_processes):
-            name = 'process_{}'.format(i)
-
-            self.logger.debug('Process Create: {}'.format(name))
-            q_command = multiprocessing.Queue()
-            p = multiprocessing.Process(
-                target=run_mp_vfs_base, args=(name, project_file, working_dir, q_command, self.mp_q_results))
-            self.mp_processes[name] = (name, p, q_command)
-
-            self.logger.debug('Process Start: {}'.format(p))
-
-            p.start()
 
     def do_map(self, cmd, params, step_id=None):
         self.logger.log(f'Manager: "{cmd}" with {len(params)} parameters using {self.mp_n_processes} processes')
@@ -64,7 +67,6 @@ class MultiProcessControl:
         command_todo = command_list.copy()
         command_active = {}
         command_complete = []
-        processes_available = set(self.mp_processes.keys())
 
         exception_list = []
 
@@ -77,12 +79,31 @@ class MultiProcessControl:
         last_update = None
         start_time = time.time()
 
-        local = False
+        local = True
         if local:
-            test = MultiProcessVfsBase('test', self.project_file, self.working_dir, None, self.mp_q_results)
+            vfs = VfsDatabase(self.project_file, self.working_dir, self.logger)
+            processor = Processor(vfs, LogWrapper(self.logger))
             for command in command_todo:
-                test.process_command(command[0], command[1])
+                processor.process_command(command[0], command[1])
         else:
+            mp_q_results = multiprocessing.Queue()
+
+            mp_processes = {}
+            for i in range(self.mp_n_processes):
+                name = 'process_{}'.format(i)
+
+                self.logger.debug('Process Create: {}'.format(name))
+                q_command = multiprocessing.Queue()
+                p = multiprocessing.Process(
+                    target=run_mp_vfs_base, args=(name, self.project_file, self.working_dir, q_command, mp_q_results))
+                mp_processes[name] = (name, p, q_command)
+
+                self.logger.debug('Process Start: {}'.format(p))
+
+                p.start()
+
+            processes_available = set(mp_processes.keys())
+
             while len(processes_available) > 0 and (len(command_todo) + len(command_active)) > 0:
                 ctime = time.time()
                 if last_update is None or (last_update + self.progress_update_time_sec) < ctime:
@@ -100,7 +121,7 @@ class MultiProcessControl:
                     # add commands
                     available_procs = processes_available - set(command_active.keys())
                     proc = available_procs.pop()
-                    proc = self.mp_processes[proc]
+                    proc = mp_processes[proc]
                     name = proc[0]
                     q_command: queue.Queue = proc[2]
                     command = command_todo.pop(0)
@@ -108,7 +129,7 @@ class MultiProcessControl:
                     q_command.put(command)
                 else:
                     try:
-                        msg = self.mp_q_results.get(block=False, timeout=1)
+                        msg = mp_q_results.get(block=False, timeout=1)
                         proc_name = msg[0]
                         proc_cmd = msg[1]
                         proc_params = msg[2]
@@ -146,12 +167,12 @@ class MultiProcessControl:
 
             # shutdown processes
             for k in processes_available:
-                v = self.mp_processes[k]
+                v = mp_processes[k]
                 v[2].put(('exit', []))
                 self.logger.debug('Manager: Issued Exit to {}'.format(k))
 
             # join
-            for k, v in self.mp_processes.items():
+            for k, v in mp_processes.items():
                 self.logger.debug('Manager: Joining {}'.format(k))
                 v[1].join()
 
@@ -161,24 +182,10 @@ class MultiProcessControl:
             self.logger.log('Manager: Done')
 
 
-def run_mp_vfs_base(name, project_file, working_dir, q_in, q_out):
-    try:
-        p = MultiProcessVfsBase(name, project_file, working_dir, q_in, q_out)
-        p.run()
-    except:
-        ei = sys.exc_info()
-        q_out.put((name, 'exception', [ei[0], ei[1], traceback.format_tb(ei[2])], ))
-
-    q_out.put((name, 'process_done', [],))
-
-
-class MultiProcessVfsBase:
-    def __init__(self, name, project_file, working_dir, q_in: multiprocessing.Queue, q_out: multiprocessing.Queue):
-        self.name = name
-        self.q_in = q_in
-        self.q_out = q_out
-
-        self._vfs = VfsDatabase(project_file, working_dir, self)
+class Processor:
+    def __init__(self, vfs, comm):
+        self._vfs = vfs
+        self._comm = comm
 
         self.commands = {
             'process_archives_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_archives_initial),
@@ -189,39 +196,14 @@ class MultiProcessVfsBase:
             'process_vhash_final': lambda idxs: self.process_by_vhash_wrapper(idxs, self.process_vhash_final),
         }
 
-    def send(self, cmd, *params):
-        self.q_out.put((self.name, cmd, params, ))
+        nhf = []
+        for world_rec in self._vfs.game_info.worlds:
+            for v0 in range(64):
+                for v1 in range(64):
+                    fn = world_rec[2] + 'navheightfield/globalhires/{:02d}_{:02d}.nhf'.format(v0, v1)
+                    nhf.append((fn, hash32_func(fn)))
 
-    def log(self, msg):
-        self.send('log', msg)
-
-    def trace(self, msg):
-        self.send('debug', msg)
-
-    def status(self, i, n):
-        self.send('status', i, n)
-
-    def exception(self, exc):
-        self.send('exception', exc)
-
-    def run(self):
-        keep_running = True
-        while keep_running:
-            try:
-                cmd = self.q_in.get(block=True, timeout=1.0)
-                params = cmd[1]
-                cmd = cmd[0]
-
-                if cmd is not None:
-                    self.trace('Processing Command "{}({})"'.format(cmd, len(params)))
-
-                    if cmd == 'exit':
-                        keep_running = False
-                    else:
-                        self.process_command(cmd, params)
-                        self.send('cmd_done', cmd)
-            except queue.Empty:
-                pass
+        self.nav_height_field_possible_names = nhf
 
     def process_command(self, cmd, params):
         command = self.commands.get(cmd, None)
@@ -231,21 +213,21 @@ class MultiProcessVfsBase:
 
     def process_by_uid_wrapper(self, indexes, func):
         n_indexes = len(indexes)
-        with DbWrap(self._vfs, logger=self, index_offset=n_indexes) as db:
+        with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, index in enumerate(indexes):
-                self.status(i, n_indexes)
+                self._comm.status(i, n_indexes)
                 node = db.node_where_uid(index)
                 if node.is_valid():
                     func(node, i, n_indexes, db)
-            self.status(n_indexes, n_indexes)
+            self._comm.status(n_indexes, n_indexes)
 
     def process_by_vhash_wrapper(self, vhashes, func):
         n_indexes = len(vhashes)
-        with DbWrap(self._vfs, logger=self, index_offset=n_indexes) as db:
+        with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, vhash in enumerate(vhashes):
-                self.status(i, n_indexes)
+                self._comm.status(i, n_indexes)
                 func(vhash, i, n_indexes, db)
-            self.status(n_indexes, n_indexes)
+            self._comm.status(n_indexes, n_indexes)
 
     def process_archives_initial(
             self, node: VfsNode, i, n_indexes, db: DbWrap):
@@ -264,7 +246,7 @@ class MultiProcessVfsBase:
             cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid)
             db.node_add(cnode)
         elif node.ftype == FTYPE_TAB:
-            self.trace('Processing TAB: {}'.format(node.pvpath))
+            self._comm.trace('Processing TAB: {}'.format(node.pvpath))
             node.processed_file_set(True)
             with ArchiveFile(open(node.pvpath, 'rb'), debug=debug) as f:
                 if 3 == ver:
@@ -276,12 +258,30 @@ class MultiProcessVfsBase:
 
                 tab_file.deserialize(f)
 
-                for i in range(len(tab_file.file_table)):
-                    te = tab_file.file_table[i]
-                    cnode = VfsNode(
-                        vhash=te.hashname, pid=node.uid, index=i,
-                        offset=te.offset, size_c=te.size_c, size_u=te.size_u)
-                    db.node_add(cnode)
+                te: TabEntryFileBase
+                for i, te in enumerate(tab_file.file_table):
+                    if te.size_c > 0 and te.size_u > 0:
+                        cnode = VfsNode(
+                            vhash=te.hashname, pid=node.uid, index=i,
+                            offset=te.offset, size_c=te.size_c, size_u=te.size_u,
+                            is_compressed_file=(te.compression_type != compression_00_none))
+                        db.node_add(cnode)
+
+                        if 4 == ver and cnode.compressed_file_get():
+                            file_name = db.generate_cache_file_name(cnode)
+                            if not os.path.isfile(file_name):
+                                if te.compression_type == compression_04_oo:
+                                    deca.util.make_dir_for_file(file_name)
+                                    with db.file_obj_from(node) as f_in:
+                                        with open(file_name, 'wb') as f_out:
+                                            f_in.seek(cnode.offset)
+                                            for in_len, out_len in te.file_block_table:
+                                                in_buffer = f_in.read(in_len)
+                                                out_buffer, ret = apex_oo_decompress(in_buffer, in_len, out_len)
+                                                f_out.write(out_buffer)
+                                else:
+                                    raise NotImplementedError('Unknown Compression Flag: {} = {}, {}'.format(
+                                        file_name, te.compression_type, te.compression_flags))
 
         elif node.ftype == FTYPE_SARC:
             node.processed_file_set(True)
@@ -335,8 +335,8 @@ class MultiProcessVfsBase:
                     db.node_add(cnode)
                     db.propose_string(cnode.vpath, node)
 
-        elif node.ext_hash == 0xb4c9109e or (
-                node.vpath is not None and node.vpath.endswith(b'.resourcebundle')):
+        elif node.ftype != FTYPE_SYMLINK and \
+                (node.ext_hash == 0xb4c9109e or (node.vpath is not None and node.vpath.endswith(b'.resourcebundle'))):
             node.processed_file_set(True)
             with ArchiveFile(db.file_obj_from(node)) as f:
                 index = 0
@@ -406,17 +406,32 @@ class MultiProcessVfsBase:
                         fn = world_rec[2] + 'patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
                             obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
                         fns.append(fn)
+                        fn = world_rec[2] + 'occluder/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+                            obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
+                        fns.append(fn)
+
+                if adf.table_instance[0].name == b'NavHeightfield':
+                    fns = fns + self.nav_height_field_possible_names
 
                 # self name environc files
                 if adf.table_instance[0].name == b'environ':
                     fn = 'environment/weather/{}.environc'.format(obj0['Name'].decode('utf-8'))
                     fns.append(fn)
+                    fn = 'environment/presets/{}.environc'.format(obj0['Name'].decode('utf-8'))
+                    fns.append(fn)
                     fn = 'environment/{}.environc'.format(obj0['Name'].decode('utf-8'))
                     fns.append(fn)
 
                 found_any = False
-                for fn in fns:
-                    if node.vhash == hash32_func(fn):
+                for fne in fns:
+                    if isinstance(fne, str):
+                        fn = fne
+                        fnh = hash32_func(fn)
+                    else:
+                        fn = fne[0]
+                        fnh = fne[1]
+
+                    if node.vhash == fnh:
                         if node.vpath is None:
                             node.vpath = fn
                             updated = True
@@ -424,7 +439,7 @@ class MultiProcessVfsBase:
                         found_any = True
 
                 if len(fns) > 0 and not found_any:
-                    self.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.vhash, fns[0]))
+                    self._comm.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.vhash, fns[0]))
 
             # for ientry in adf.table_typedef:
             #     adf_type_hash = ientry.type_hash
@@ -435,7 +450,7 @@ class MultiProcessVfsBase:
             #         map_typedefs[ientry.type_hash] = ientry
 
         except AdfTypeMissing as ae:
-            print('Missing Type {:08x} in {:08X} {} {}'.format(
+            self._comm.log('Missing Type {:08x} in {:08X} {} {}'.format(
                 ae.type_id, node.vhash, node.vpath, node.pvpath))
 
         if updated:
@@ -568,13 +583,13 @@ class MultiProcessVfsBase:
                                     possible_ftypes = ftype_list[FTYPE_ANY_TYPE]
 
                                 if (ftype_int & possible_ftypes) != 0:
-                                    self.trace('vpath:add  {} {:08X} {} {} {}'.format(
+                                    self._comm.trace('vpath:add  {} {:08X} {} {} {}'.format(
                                         vpath, hash32, src_node, possible_ftypes, node.ftype))
                                     node.vpath = vpath
                                     updated = True
                                     break
                                 else:
-                                    self.log('vpath:skip {} {:08X} {} {} {}'.format(
+                                    self._comm.log('vpath:skip {} {:08X} {} {} {}'.format(
                                         vpath, hash32, src_node, possible_ftypes, node.ftype))
 
                         if node.vpath == vpath:
@@ -595,12 +610,17 @@ class MultiProcessVfsBase:
 
                     missed_vpaths.discard(node.vpath)
 
+                    if node.ext_hash is None and node.vpath is not None:
+                        file, ext = os.path.splitext(node.vpath)
+                        node.ext_hash = hash32_func(ext)
+                        updated = True
+
                     if updated:
                         db.node_update(node)
 
         for vpath in missed_vpaths:
             hash32 = hash32_func(vpath)
-            self.trace('vpath:miss {} {:08X}'.format(vpath, hash32))
+            self._comm.trace('vpath:miss {} {:08X}'.format(vpath, hash32))
 
         # found_vpaths = list(found_vpaths)
         # found_vpaths.sort()
@@ -665,3 +685,56 @@ class MultiProcessVfsBase:
         #             lst.append(node)
         #         self.map_vpath_to_vfsnodes[node.vpath] = lst
 
+
+class MultiProcessVfsBase:
+    def __init__(self, name, q_in: multiprocessing.Queue, q_out: multiprocessing.Queue):
+        self.name = name
+        self.q_in = q_in
+        self.q_out = q_out
+
+    def send(self, cmd, *params):
+        self.q_out.put((self.name, cmd, params, ))
+
+    def log(self, msg):
+        self.send('log', msg)
+
+    def trace(self, msg):
+        self.send('debug', msg)
+
+    def status(self, i, n):
+        self.send('status', i, n)
+
+    def exception(self, exc):
+        self.send('exception', exc)
+
+    def run(self, processor: Processor):
+        keep_running = True
+        while keep_running:
+            try:
+                cmd = self.q_in.get(block=True, timeout=1.0)
+                params = cmd[1]
+                cmd = cmd[0]
+
+                if cmd is not None:
+                    self.trace('Processing Command "{}({})"'.format(cmd, len(params)))
+
+                    if cmd == 'exit':
+                        keep_running = False
+                    else:
+                        processor.process_command(cmd, params)
+                        self.send('cmd_done', cmd)
+            except queue.Empty:
+                pass
+
+
+def run_mp_vfs_base(name, project_file, working_dir, q_in, q_out):
+    try:
+        p = MultiProcessVfsBase(name, q_in, q_out)
+        vfs = VfsDatabase(project_file, working_dir, p)
+        processor = Processor(vfs, p)
+        p.run(processor)
+    except:
+        ei = sys.exc_info()
+        q_out.put((name, 'exception', [ei[0], ei[1], traceback.format_tb(ei[2])], ))
+
+    q_out.put((name, 'process_done', [],))

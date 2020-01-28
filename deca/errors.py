@@ -23,3 +23,8 @@ class EDecaBuildError(Exception):
 class EDecaIncorrectFileFormat(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
+
+
+class EDecaOutOfData(Exception):
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)

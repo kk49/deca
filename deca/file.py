@@ -1,4 +1,5 @@
 import struct
+from deca.errors import EDecaOutOfData
 
 
 class SubsetFile:
@@ -78,15 +79,19 @@ class ArchiveFile:
                 r = r + v
         return r
 
-    def read_base(self, fmt, elen, n):
+    def read_base(self, fmt, elen, n, raise_on_no_data):
         if n is None:
             buf = self.f.read(elen)
             if len(buf) != elen:
+                if raise_on_no_data:
+                    raise EDecaOutOfData()
                 return None
             v = struct.unpack(fmt, buf)[0]
         else:
             buf = self.f.read(elen * n)
             if len(buf) != elen * n:
+                if raise_on_no_data:
+                    raise EDecaOutOfData()
                 return None
             v = struct.unpack(fmt * n, buf)
 
@@ -97,52 +102,52 @@ class ArchiveFile:
 
         return v
 
-    def read_c8(self, n=None):
-        return self.read_base('c', 1, n)
+    def read_c8(self, n=None, raise_on_no_data=False):
+        return self.read_base('c', 1, n, raise_on_no_data)
 
-    def read_strl_u32(self, n=None):
+    def read_strl_u32(self, n=None, raise_on_no_data=False):
         if n is None:
-            sz = self.read_u32()
-            return self.read_strl(sz)
+            sz = self.read_u32(raise_on_no_data=raise_on_no_data)
+            return self.read_strl(sz, raise_on_no_data=raise_on_no_data)
         else:
             sl = []
             for i in range(n):
-                sl.append(self.read_strl_u32())
+                sl.append(self.read_strl_u32(raise_on_no_data=raise_on_no_data))
             return sl
 
-    def read_strl(self, n=None):
-        v = self.read_base('c', 1, n)
+    def read_strl(self, n=None, raise_on_no_data=False):
+        v = self.read_base('c', 1, n, raise_on_no_data)
         return b''.join(v)
 
-    def read_s8(self, n=None):
-        return self.read_base('b', 1, n)
+    def read_s8(self, n=None, raise_on_no_data=False):
+        return self.read_base('b', 1, n, raise_on_no_data)
 
-    def read_u8(self, n=None):
-        return self.read_base('B', 1, n)
+    def read_u8(self, n=None, raise_on_no_data=False):
+        return self.read_base('B', 1, n, raise_on_no_data)
 
-    def read_s16(self, n=None):
-        return self.read_base('h', 2, n)
+    def read_s16(self, n=None, raise_on_no_data=False):
+        return self.read_base('h', 2, n, raise_on_no_data)
 
-    def read_u16(self, n=None):
-        return self.read_base('H', 2, n)
+    def read_u16(self, n=None, raise_on_no_data=False):
+        return self.read_base('H', 2, n, raise_on_no_data)
 
-    def read_s32(self, n=None):
-        return self.read_base('i', 4, n)
+    def read_s32(self, n=None, raise_on_no_data=False):
+        return self.read_base('i', 4, n, raise_on_no_data)
 
-    def read_u32(self, n=None):
-        return self.read_base('I', 4, n)
+    def read_u32(self, n=None, raise_on_no_data=False):
+        return self.read_base('I', 4, n, raise_on_no_data)
 
-    def read_s64(self, n=None):
-        return self.read_base('q', 8, n)
+    def read_s64(self, n=None, raise_on_no_data=False):
+        return self.read_base('q', 8, n, raise_on_no_data)
 
-    def read_u64(self, n=None):
-        return self.read_base('Q', 8, n)
+    def read_u64(self, n=None, raise_on_no_data=False):
+        return self.read_base('Q', 8, n, raise_on_no_data)
 
-    def read_f32(self, n=None):
-        return self.read_base('f', 4, n)
+    def read_f32(self, n=None, raise_on_no_data=False):
+        return self.read_base('f', 4, n, raise_on_no_data)
 
-    def read_f64(self, n=None):
-        return self.read_base('d', 8, n)
+    def read_f64(self, n=None, raise_on_no_data=False):
+        return self.read_base('d', 8, n, raise_on_no_data)
 
     def write_base(self, fmt, elen, v):
         if isinstance(v, list) or isinstance(v, tuple):

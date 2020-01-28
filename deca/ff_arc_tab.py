@@ -1,3 +1,6 @@
+from deca.errors import EDecaOutOfData
+
+
 class TabFileBase:
     def __init__(self):
         self.unk = []
@@ -56,14 +59,10 @@ class TabFileV4(TabFileBase):
         t1_len = f.read_u32()
         t1 = []
         for i in range(t1_len):
-            t1.append([f.read_u32(), f.read_u32()])
+            len_c = f.read_u32()
+            len_u = f.read_u32()
+            t1.append([len_c, len_u])
         self.file_block_table = t1
-
-        self.unk += [f.read_u32()]
-        self.unk += [f.read_u32()]
-        self.unk += [f.read_u32()]  # len dup 1 of file entries
-        self.unk += [f.read_u32()]  # len dup 2 of file entries
-        self.unk += [f.read_u32()]
 
         self.file_table = []
         self.file_hash_map = {}
@@ -74,14 +73,18 @@ class TabFileV4(TabFileBase):
             entry = TabEntryFileV4()
 
         # give each file entry its info about its file blocks
+        no_block = [0xffffffff, 0xffffffff]
         fbt = [None] * len(self.file_block_table)
-        for i in range(len(self.file_table)):
-            fte = self.file_table[i]
-            if fte.file_block_index > 0:
-                fbt[fte.file_block_index] = i
+        for i, fte in enumerate(self.file_table):
+            fbi = fte.file_block_index
+            if self.file_block_table[fbi] != no_block:
+                fbt[fbi] = i
                 fte.file_block_table = []
-        fbt[0] = None
-        fbt[-1] = None
+
+        for i, fb in enumerate(self.file_block_table):
+            if fb == no_block:
+                fbt[i] = None
+
         for i in range(2, len(fbt)-1):
             if fbt[i] is None:
                 fbt[i] = fbt[i-1]
@@ -97,6 +100,13 @@ class TabFileV4(TabFileBase):
         raise NotImplementedError('Interface Class')
 
 
+compression_00_none = 0
+compression_01_unknown = 1
+compression_02_zlib = 2
+compression_03_oo = 3
+compression_04_oo = 4
+
+
 class TabEntryFileBase:
     def __init__(self):
         self.hashname = None
@@ -104,7 +114,8 @@ class TabEntryFileBase:
         self.size_c = None
         self.size_u = None
         self.file_block_index = None
-        self.flags = None
+        self.compression_type = None
+        self.compression_flags = None
         self.file_block_table = []
 
     def deserialize(self, f):
@@ -120,7 +131,8 @@ class TabEntryFileBase:
             l,
             ['{:08x}'.format(v) for v in l],
             self.file_block_index,
-            self.flags,
+            self.compression_type,
+            self.compression_flags,
             self.file_block_table
         ]
 
@@ -130,17 +142,22 @@ class TabEntryFileV3(TabEntryFileBase):
         TabEntryFileBase.__init__(self)
 
     def deserialize(self, f):
-        tmp = f.read_u32()
-        if tmp is None:
-            return False
-        self.hashname = tmp
-        self.offset = f.read_u32()
-        self.size_c = f.read_u32()
-        self.size_u = self.size_c
-        self.file_block_table = [[self.size_c, self.size_u]]
+        try:
+            self.hashname = f.read_u32(raise_on_no_data=True)
+            self.offset = f.read_u32(raise_on_no_data=True)
+            self.size_c = f.read_u32(raise_on_no_data=True)
+            self.size_u = self.size_c
+            self.file_block_table = [[self.size_c, self.size_u]]
+            self.compression_flags = 0
+            if self.size_c == self.size_u:
+                self.compression_type = compression_00_none
+            else:
+                self.compression_type = compression_02_zlib
 
-        if f.debug:
-            self.debug()
+            if f.debug:
+                self.debug()
+        except EDecaOutOfData:
+            return False
 
         return True
 
@@ -153,19 +170,20 @@ class TabEntryFileV4(TabEntryFileBase):
         TabEntryFileBase.__init__(self)
 
     def deserialize(self, f):
-        tmp = f.read_u32()
-        if tmp is None:
-            return False
-        self.hashname = tmp
-        self.offset = f.read_u32()
-        self.size_c = f.read_u32()
-        self.size_u = f.read_u32()
-        self.file_block_index = f.read_u16()
-        self.flags = f.read_u16()
-        self.file_block_table = [[self.size_c, self.size_u]]
+        try:
+            self.hashname = f.read_u32(raise_on_no_data=True)
+            self.offset = f.read_u32(raise_on_no_data=True)
+            self.size_c = f.read_u32(raise_on_no_data=True)
+            self.size_u = f.read_u32(raise_on_no_data=True)
+            self.file_block_index = f.read_u16(raise_on_no_data=True)
+            self.compression_type = f.read_u8(raise_on_no_data=True)
+            self.compression_flags = f.read_u8(raise_on_no_data=True)
+            self.file_block_table = [[self.size_c, self.size_u]]
 
-        if f.debug:
-            print(self.debug())
+            if f.debug:
+                print(self.debug())
+        except EDecaOutOfData:
+            return False
 
         return True
 

@@ -353,21 +353,17 @@ class VfsProcessor(VfsDatabase):
         self.logger.log('STRINGS BY GUESSING: ...')
         guess_strings = {}
         guess_strings['gdc/global.gdcc'] = FTYPE_ADF
-        guess_strings['textures/ui/world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
+
         for res_i in range(10):
             guess_strings['settings/hp_settings/reserve_{}.bin'.format(res_i)] = FTYPE_RTPC
             guess_strings['settings/hp_settings/reserve_{}.bl'.format(res_i)] = FTYPE_SARC
-            guess_strings['textures/ui/map_reserve_{}/world_map.ddsc'.format(res_i)] = [FTYPE_AVTX, FTYPE_DDS]
 
-            for zoom_i in [1, 2, 3]:
-                for index in range(500):
-                    fn = 'textures/ui/map_reserve_{}/zoom{}/{}.ddsc'.format(res_i, zoom_i, index)
-                    guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
-
-        for zoom_i in [1, 2, 3]:
-            for index in range(500):
-                fn = 'textures/ui/warboard_map/zoom{}/{}.ddsc'.format(zoom_i, index)
-                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
+        # maps
+        for map_prefix in self.game_info.map_prefixes:
+            guess_strings[map_prefix + 'world_map.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
+            for zoom_i in self.game_info.map_zooms:
+                for index in range(self.game_info.map_max_count):
+                    guess_strings[map_prefix + f'zoom{zoom_i}/{index}.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
 
         for world_rec in self.game_info.worlds:
             for area_prefix in self.game_info.area_prefixs:

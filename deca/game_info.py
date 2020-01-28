@@ -10,9 +10,11 @@ class GameInfo:
         self.game_id = game_id
         self.archive_version = 3
         self.area_prefixs = ['']
+
         self.worlds = [
             ('', 'terrain/', 'terrain/hp/'),
             ('', 'terrain/', 'terrain/jc3/'),
+            ('', 'terrain/', 'terrain/jc4/'),
             ('worlds/base/', 'worlds/base/terrain/', 'worlds/base/terrain/hp/'),
         ]
         for i in range(4):
@@ -23,6 +25,12 @@ class GameInfo:
                     f'worlds/world{i}/terrain/world{i}/',
                 )
             )
+
+        self.map_zooms = [0, 1, 2, 3]
+        self.map_max_count = 500
+        self.map_prefixes = [
+            'textures/ui/',
+        ]
 
     def save(self, filename):
         settings = {
@@ -60,6 +68,11 @@ class GameInfo:
 class GameInfoGZ(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'gz')
+        self.map_prefixes += [
+            'textures/ui/map_reserve_0/',
+            'textures/ui/map_reserve_1/',
+            'textures/ui/warboard_map/',
+        ]
 
     def unarchived_files(self):
         files = [os.path.join(self.game_dir, 'Shaders_F.shader_bundle')]
@@ -276,6 +289,14 @@ class GameInfoTHCOTW(GameInfo):
 class GameInfoJC3(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'jc3')
+        self.map_prefixes += [
+            'dlc/agency/textures/ui/map0/',
+            'dlc/agency/textures/ui/map1/',
+            'dlc/agency/textures/ui/map2/',
+            'dlc/agency/textures/ui/map3/',
+            'dlc/daredevil/textures/ui/',
+            'dlc/demonios/textures/ui/',
+        ]
 
     def archive_path(self):
         archive_paths = []
@@ -340,6 +361,14 @@ class GameInfoJC4(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'jc4')
         self.archive_version = 4
+        self.map_prefixes += [
+            'dlc/agency/textures/ui/map0/',
+            'dlc/agency/textures/ui/map1/',
+            'dlc/agency/textures/ui/map2/',
+            'dlc/agency/textures/ui/map3/',
+            'dlc/daredevil/textures/ui/',
+            'dlc/demonios/textures/ui/',
+        ]
 
     def archive_path(self):
         archive_paths = []

@@ -103,9 +103,12 @@ def find_vnode(vfs: VfsDatabase, v):
 
     if vpath is not None:
         nodes = vfs.nodes_where_vpath(vpath)
-        if nodes:
-            vnode = nodes[0]
-        else:
+        vnode = None
+        for node in nodes:
+            if node.offset is not None:
+                vnode = node
+                break
+        if vnode is None:
             raise EDecaFileMissing('find_vnode: Missing {}'.format(vpath.decode('utf-8')))
 
     return vnode

@@ -28,6 +28,9 @@ class DbWrap:
     def index_offset_set(self, index_offset):
         self._index_offset = index_offset
 
+    def generate_cache_file_name(self, node):
+        return self._db.generate_cache_file_name(node)
+
     def file_obj_from(self, node, mode='rb'):
         return self._db.file_obj_from(node, mode)
 

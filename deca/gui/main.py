@@ -308,7 +308,7 @@ class VfsDirModel(QAbstractItemModel):
         self.vfs = vfs
         self.adf_db = AdfDatabase(vfs)
 
-        vpaths = self.vfs.nodes_select_vpath_uid_where_vpath_not_null()
+        vpaths = self.vfs.nodes_select_vpath_uid_where_vpath_not_null_type_not_symlink()
         vpaths.sort()
         vpaths = dict(vpaths)
 
@@ -830,7 +830,7 @@ class MainWidget(QWidget):
         #     self.bt_extract.setEnabled(True)
 
     def extract(self, eid, extract_dir):
-        if self.current_vpaths is not None and len(self.current_vpaths) > 0:
+        if self.current_vpaths:
             try:
                 if self.chkbx_export_raw.isChecked():
                     extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)

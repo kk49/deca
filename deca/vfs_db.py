@@ -4,6 +4,7 @@ import sqlite3
 import pickle
 import re
 
+import deca.util
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_determine import determine_file_type_and_size
@@ -125,10 +126,15 @@ class VfsNode:
         self.flags_set(is_temporary_file_mask, value)
 
     def file_type(self):
-        if self.compressed_file_get():
-            return self.ftype + '.z'
+        if self.ftype is None:
+            ftype = ''
         else:
-            return self.ftype
+            ftype = self.ftype
+
+        if self.compressed_file_get():
+            return ftype + '.z'
+        else:
+            return ftype
 
     def is_valid(self):
         return self.uid is not None and self.uid != 0
@@ -358,9 +364,10 @@ class VfsDatabase:
             "SELECT uid FROM core_vnodes", dbg='nodes_select_uid')
         return [v[0] for v in result]
 
-    def nodes_select_vpath_uid_where_vpath_not_null(self):
+    def nodes_select_vpath_uid_where_vpath_not_null_type_not_symlink(self):
         result = self.db_query_all(
-            "SELECT vpath, uid FROM core_vnodes WHERE vpath IS NOT NULL", dbg='nodes_select_uid_vpath')
+            "SELECT vpath, uid FROM core_vnodes WHERE vpath IS NOT NULL AND (ftype != 'symlink' OR ftype IS NULL)",
+            dbg='nodes_select_vpath_uid_where_vpath_not_null_type_not_symlink')
         return result
 
     def nodes_where_unmapped_select_uid(self):
@@ -594,37 +601,43 @@ class VfsDatabase:
 
         return adf_map, adf_missing
 
+    def generate_cache_file_name(self, node):
+        pid = node.pid
+        parent_nodes = []
+        parent_paths = []
+        while pid is not None:
+            parent_node = self.node_where_uid(pid)
+            pid = parent_node.pid
+            parent_nodes.append(parent_node)
+            pp = None
+            if parent_node.pvpath is not None:
+                prefix, end0, end1 = common_prefix(parent_node.pvpath, self.game_info.game_dir)
+                f, e = os.path.splitext(end0)
+                if e != '.tab':
+                    pp = end0
+            else:
+                pp = '{:08X}.dat'.format(parent_node.vhash)
+            if pp is not None:
+                parent_paths.append(pp)
+        cache_dir = os.path.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
+        file_name = os.path.join(cache_dir, '{:08X}.dat'.format(node.vhash))
+        return file_name
+
     def file_obj_from(self, node: VfsNode, mode='rb'):
         if node.ftype == FTYPE_ARC:
             return open(node.pvpath, mode)
         elif node.ftype == FTYPE_TAB:
             return self.file_obj_from(self.node_where_uid(node.pid))
         elif node.compressed_file_get():
-            pid = node.pid
-            parent_nodes = []
-            parent_paths = []
-            while pid is not None:
-                parent_node = self.node_where_uid(pid)
-                pid = parent_node.pid
-                parent_nodes.append(parent_node)
-                pp = None
-                if parent_node.pvpath is not None:
-                    prefix, end0, end1 = common_prefix(parent_node.pvpath, self.game_info.game_dir)
-                    f,e = os.path.splitext(end0)
-                    if e != '.tab':
-                        pp = end0
-                else:
-                    pp = '{:08X}.dat'.format(parent_node.vhash)
-                if pp is not None:
-                    parent_paths.append(pp)
-            parent_node = parent_nodes[0]
-            cache_dir = os.path.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
-            os.makedirs(cache_dir, exist_ok=True)
-            file_name = os.path.join(cache_dir, '{:08X}.dat'.format(node.vhash))
+            file_name = self.generate_cache_file_name(node)
+            make_dir_for_file(file_name)
+            parent_node = self.node_where_uid(node.pid)
+
             if not os.path.isfile(file_name):
                 with ArchiveFile(self.file_obj_from(parent_node, mode)) as pf:
                     pf.seek(node.offset)
                     extract_aaf(pf, file_name)
+
             return open(file_name, mode)
         elif node.ftype == FTYPE_ADF_BARE:
             parent_node = self.node_where_uid(node.pid)
@@ -642,12 +655,15 @@ class VfsDatabase:
 
     def determine_ftype(self, node: VfsNode):
         if node.ftype is None:
-            node.compressed_file_set(False)
             if node.offset is None:
                 node.ftype = FTYPE_SYMLINK
             else:
-                with self.file_obj_from(node) as f:
-                    node.ftype, node.size_u = determine_file_type_and_size(f, node.size_c)
+                if node.compressed_file_get():
+                    with self.file_obj_from(node) as f:
+                        node.ftype, _ = determine_file_type_and_size(f, node.size_c)  # todo special case for jc4 /rage2 conmpression needs to be cleaned up
+                else:
+                    with self.file_obj_from(node) as f:
+                        node.ftype, node.size_u = determine_file_type_and_size(f, node.size_c)
 
         if node.ftype is FTYPE_AAF:
             node.compressed_file_set(True)

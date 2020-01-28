@@ -79,7 +79,7 @@ class MultiProcessControl:
         last_update = None
         start_time = time.time()
 
-        local = True
+        local = False
         if local:
             vfs = VfsDatabase(self.project_file, self.working_dir, self.logger)
             processor = Processor(vfs, LogWrapper(self.logger))

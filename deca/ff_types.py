@@ -1,3 +1,10 @@
+compression_00_none = 0
+compression_v4_01_unknown = 0x01
+compression_v4_02_unknown = 0x02
+compression_v4_03_oo = 0x03
+compression_v4_04_oo = 0x04
+compression_v3_zlib = 0xff
+
 FTYPE_ARC = 'arc'
 FTYPE_TAB = 'tab'
 FTYPE_AAF = 'aaf'
@@ -22,6 +29,7 @@ FTYPE_RBMDL = 'rbmdl'
 FTYPE_GDCBODY = 'gdc'
 FTYPE_GFX = 'gfx'
 FTYPE_OGG = 'ogg'
+FTYPE_BINK = 'kb2'
 
 FTYPE_SYMLINK = 'symlink'
 
@@ -57,6 +65,7 @@ ftype_list = {
     FTYPE_GDCBODY: 1 << 23,
     FTYPE_GFX: 1 << 24,
     FTYPE_OGG: 1 << 25,
+    FTYPE_BINK: 1 << 26,
     FTYPE_EXE: 1 << 63,
     FTYPE_ANY_TYPE: 0xFFffFFffFFffFFff,
 }

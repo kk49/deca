@@ -1,4 +1,5 @@
 from deca.errors import EDecaOutOfData
+from deca.ff_types import *
 
 
 class TabFileBase:
@@ -100,13 +101,6 @@ class TabFileV4(TabFileBase):
         raise NotImplementedError('Interface Class')
 
 
-compression_00_none = 0
-compression_01_unknown = 1
-compression_02_zlib = 2
-compression_03_oo = 3
-compression_04_oo = 4
-
-
 class TabEntryFileBase:
     def __init__(self):
         self.hashname = None
@@ -152,7 +146,7 @@ class TabEntryFileV3(TabEntryFileBase):
             if self.size_c == self.size_u:
                 self.compression_type = compression_00_none
             else:
-                self.compression_type = compression_02_zlib
+                self.compression_type = compression_v3_zlib
 
             if f.debug:
                 self.debug()

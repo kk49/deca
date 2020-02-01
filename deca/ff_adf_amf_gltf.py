@@ -73,24 +73,24 @@ class Deca3dDatabase:
         self.map_vpath_to_hk_skeleton = {}
         self.flat_file_layout = flat_file_layout
 
-    def gltf_add_texture(self, gltf, vpath):
-        item = self.map_vpath_to_texture.get(vpath, Deca3dTexture(vpath))
-        self.map_vpath_to_texture[vpath] = item
+    def gltf_add_texture(self, gltf, v_path):
+        item = self.map_vpath_to_texture.get(v_path, Deca3dTexture(v_path))
+        self.map_vpath_to_texture[v_path] = item
         return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
-    def gltf_add_meshc(self, gltf, vpath):
-        item = self.map_vpath_to_meshc.get(vpath, Deca3dMeshc(vpath))
-        self.map_vpath_to_meshc[vpath] = item
+    def gltf_add_meshc(self, gltf, v_path):
+        item = self.map_vpath_to_meshc.get(v_path, Deca3dMeshc(v_path))
+        self.map_vpath_to_meshc[v_path] = item
         return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
-    def gltf_add_modelc(self, gltf, vpath, material_properties=None):
-        item = self.map_vpath_to_modelc.get(vpath, Deca3dModelc(vpath, material_properties))
-        self.map_vpath_to_modelc[vpath] = item
+    def gltf_add_modelc(self, gltf, v_path, material_properties=None):
+        item = self.map_vpath_to_modelc.get(v_path, Deca3dModelc(v_path, material_properties))
+        self.map_vpath_to_modelc[v_path] = item
         return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
-    def gltf_add_hk_skeleton(self, gltf, vpath, scene):
-        item = self.map_vpath_to_hk_skeleton.get(vpath, Deca3dHkSkeleton(vpath, scene))
-        self.map_vpath_to_hk_skeleton[vpath] = item
+    def gltf_add_hk_skeleton(self, gltf, v_path, scene):
+        item = self.map_vpath_to_hk_skeleton.get(v_path, Deca3dHkSkeleton(v_path, scene))
+        self.map_vpath_to_hk_skeleton[v_path] = item
         return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
 
     def gltf_finalize_mesh(self, mesh_org: pyg.Mesh, material_map=None):
@@ -103,20 +103,20 @@ class Deca3dDatabase:
 
 
 class Deca3dTexture:
-    def __init__(self, vpath):
-        self.vpath = vpath
+    def __init__(self, v_path):
+        self.v_path = v_path
         self.gltf_id = None
         self.texture_saved = False
 
     def add_to_gltf(self, vfs: VfsDatabase, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if not self.texture_saved:
-            vfs.logger.log('Texture:Setup: {}'.format(self.vpath))
+            vfs.logger.log('Texture:Setup: {}'.format(self.v_path))
             # dump textures
             texture_fn_uri = None
-            if len(self.vpath) > 0:
-                texture_nodes = vfs.nodes_where_vpath(self.vpath)
+            if len(self.v_path) > 0:
+                texture_nodes = vfs.nodes_where_vpath(self.v_path)
                 if len(texture_nodes) > 0:
-                    texture_fn = self.vpath.decode('utf-8') + '.png'
+                    texture_fn = self.v_path.decode('utf-8') + '.png'
                     if db.flat_file_layout:
                         texture_fn = texture_fn.replace('/', '_')
                     texture_fn_uri = os.path.join(db.resource_prefix_uri, texture_fn)
@@ -138,7 +138,7 @@ class Deca3dTexture:
                         npimp = mips.pil_image()
                         npimp.save(texture_fn_absolute)
                 else:
-                    vfs.logger.log('WARNING: Missing Texture file: {}'.format(self.vpath))
+                    vfs.logger.log('WARNING: Missing Texture file: {}'.format(self.v_path))
 
             # Setup GLTF.Image
             if texture_fn_uri is not None:
@@ -166,14 +166,14 @@ class Deca3dMeshc:
     # The mesh is never stored in the gltf directly
     # The mesh stores it's accessors, buffer views, and buffers in the gltf when used
     # The mesh writes out it's support files (buffers) when used
-    def __init__(self, vpath):
-        self.vpath = vpath
+    def __init__(self, v_path):
+        self.v_path = v_path
         self.meshes = None
 
     def add_to_gltf(self, vfs: VfsDatabase, adf_db: AdfDatabase, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.meshes is None:
-            vfs.logger.log('Setup Meshc: {}'.format(self.vpath))
-            mesh_adf = adf_db.read_node(vfs, vfs.nodes_where_vpath(self.vpath)[0])
+            vfs.logger.log('Setup Meshc: {}'.format(self.v_path))
+            mesh_adf = adf_db.read_node(vfs, vfs.nodes_where_vpath(self.v_path)[0])
             assert len(mesh_adf.table_instance) == 2
             assert mesh_adf.table_instance[0].type_hash == 0xea60065d
             # 0x67b3a453 - GenZ, 0xe6834477 - theHunter
@@ -211,7 +211,7 @@ class Deca3dMeshc:
             vertex_buffer_ids = []
 
             for index, buffer in enumerate(mesh_buffers.indexBuffers):
-                fn = self.vpath.decode('utf-8') + '.buffer_index_{:03}.bin'.format(index)
+                fn = self.v_path.decode('utf-8') + '.buffer_index_{:03}.bin'.format(index)
                 if db.flat_file_layout:
                     fn = fn.replace('/', '_')
                 fn_uri = os.path.join(db.resource_prefix_uri, fn)
@@ -225,7 +225,7 @@ class Deca3dMeshc:
                 gltf.buffers.append(pyg.Buffer(uri=fn_uri, byteLength=os.stat(fn_abs).st_size))
 
             for index, buffer in enumerate(mesh_buffers.vertexBuffers):
-                fn = self.vpath.decode('utf-8') + '.buffer_vertex_{:03}.bin'.format(index)
+                fn = self.v_path.decode('utf-8') + '.buffer_vertex_{:03}.bin'.format(index)
                 if db.flat_file_layout:
                     fn = fn.replace('/', '_')
                 fn_uri = os.path.join(db.resource_prefix_uri, fn)
@@ -241,7 +241,7 @@ class Deca3dMeshc:
             self.meshes = {}
             lod_group: AmfLodGroup
             for lod_group in mesh_header.lodGroups:
-                vfs.logger.log('Exporting {}: LOD {}: Started'.format(self.vpath, lod_group.lodIndex))
+                vfs.logger.log('Exporting {}: LOD {}: Started'.format(self.v_path, lod_group.lodIndex))
 
                 meshes = []
                 mesh: AmfMesh
@@ -380,7 +380,7 @@ class Deca3dMeshc:
 
                     meshes.append((submeshes, do_skin))
                 self.meshes[lod_group.lodIndex] = meshes
-                vfs.logger.log('Exporting {}: LOD {}: Complete'.format(self.vpath, lod_group.lodIndex))
+                vfs.logger.log('Exporting {}: LOD {}: Complete'.format(self.v_path, lod_group.lodIndex))
         return self.meshes
 
 
@@ -389,18 +389,18 @@ class Deca3dModelc:
     # The model stores it's material, texture info, ... in the gltf when used
     # The model writes out it's support files (textures) when used
     # The model creates a copy of the DecaMeshc mesh when it "loads" it meshc file
-    def __init__(self, vpath, material_properties=None):
-        self.vpath = vpath
+    def __init__(self, v_path, material_properties=None):
+        self.v_path = v_path
         self.models = None
         self.material_properties = material_properties
 
     def add_to_gltf(self, vfs: VfsDatabase, adf_db: AdfDatabase, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.models is None:
-            vfs.logger.log('Setup Modelc: {}'.format(self.vpath))
+            vfs.logger.log('Setup Modelc: {}'.format(self.v_path))
 
-            nodes = vfs.nodes_where_vpath(self.vpath)
+            nodes = vfs.nodes_where_vpath(self.v_path)
             if len(nodes) == 0:
-                raise EDecaFileMissing('Not Mapped: {}'.format(self.vpath))
+                raise EDecaFileMissing('Not Mapped: {}'.format(self.v_path))
 
             node = nodes[0]
             model_adf = adf_db.read_node(vfs, node)
@@ -497,20 +497,20 @@ class Deca3dModelc:
 
 
 class Deca3dHkSkeleton:
-    def __init__(self, vpath, scene):
-        self.vpath = vpath
+    def __init__(self, v_path, scene):
+        self.v_path = v_path
         self.scene = scene
         self.skeleton = None
 
     def add_to_gltf(self, vfs: VfsDatabase, adf_db: AdfDatabase, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.skeleton is None:
-            vfs.logger.log('Setup Modelc: {}'.format(self.vpath))
+            vfs.logger.log('Setup Modelc: {}'.format(self.v_path))
 
             # get baked skeleton filename
-            vpath = self.vpath
-            vpath = os.path.splitext(vpath)
-            vpath = vpath[0] + b'.bsk'
-            fn = vpath.decode('utf-8')
+            v_path = self.v_path
+            v_path = os.path.splitext(v_path)
+            v_path = v_path[0] + b'.bsk'
+            fn = v_path.decode('utf-8')
             if db.flat_file_layout:
                 fn = fn.replace('/', '_')
             ppath_skel_uri = os.path.join(db.resource_prefix_uri, fn)
@@ -518,10 +518,10 @@ class Deca3dHkSkeleton:
             ppath_skel_xml = ppath_skel_raw + '.xml'
 
             if not os.path.isfile(ppath_skel_raw):
-                vnodes = vfs.nodes_where_vpath(vpath)
+                vnodes = vfs.nodes_where_vpath(v_path)
 
                 if len(vnodes) == 0:
-                    raise EDecaFileMissing('Not Mapped: {}'.format(vpath))
+                    raise EDecaFileMissing('Not Mapped: {}'.format(v_path))
 
                 vnode = vnodes[0]
                 with vfs.file_obj_from(vnode) as f:
@@ -652,7 +652,7 @@ class Deca3dHkSkeleton:
             # create skin
             skin = pyg.Skin()
             skin_joints = [bone_info[0] for bone_info in bone_nodes]
-            skin.name = os.path.basename(self.vpath.decode('utf-8')) + ".armature"
+            skin.name = os.path.basename(self.v_path.decode('utf-8')) + ".armature"
             skin.skeleton = skin_joints[0]
             skin.joints = skin_joints
             skin.inverseBindMatrices = accessor_idx
@@ -771,7 +771,7 @@ class DecaGltf:
         assert self.d_stack[-1] == item
         self.d_stack.pop(-1)
 
-    def export_modelc(self, vpath, transform: Optional[Deca3dMatrix], material_properties=None, skeleton_raw_path=None):
+    def export_modelc(self, v_path, transform: Optional[Deca3dMatrix], material_properties=None, skeleton_raw_path=None):
         if transform is None:
             transform = Deca3dMatrix()
 
@@ -783,9 +783,9 @@ class DecaGltf:
 
         # setup materials
         meshes_all = self.db.gltf_add_modelc(
-            self.gltf, vpath, material_properties=material_properties)
+            self.gltf, v_path, material_properties=material_properties)
 
-        with DecaGltfNode(self, name=os.path.basename(vpath), matrix=transform.col_major_list()):
+        with DecaGltfNode(self, name=os.path.basename(v_path), matrix=transform.col_major_list()):
             for mesh_info in meshes_all[self.lod]:
                 submeshes = mesh_info[0]
 

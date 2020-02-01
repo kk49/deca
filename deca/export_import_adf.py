@@ -1,4 +1,3 @@
-import re
 from .ff_adf import *
 from .xlsxwriter_hack import DecaWorkBook
 from .ff_adf_amf import AABB
@@ -6,11 +5,11 @@ from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 from .vfs_db import VfsDatabase, VfsNode
 
 
-def generate_export_file_path(vfs: VfsDatabase, export_path, vnode):
-    if vnode.vpath is None:
-        ofile = os.path.join(export_path, '{:08X}.dat'.format(vnode.vhash))
+def generate_export_file_path(vfs: VfsDatabase, export_path, vnode: VfsNode):
+    if vnode.v_path is None:
+        ofile = os.path.join(export_path, '{:08X}.dat'.format(vnode.v_hash))
     else:
-        ofile = os.path.join(export_path, '{}'.format(vnode.vpath.decode('utf-8')))
+        ofile = os.path.join(export_path, '{}'.format(vnode.v_path.decode('utf-8')))
     vfs.logger.log('Exporting {}'.format(ofile))
     ofiledir = os.path.dirname(ofile)
     os.makedirs(ofiledir, exist_ok=True)
@@ -85,21 +84,21 @@ def adf_export_xlsx_0x0b73315d(vfs: VfsDatabase, adf_db: AdfDatabase, vnode: Vfs
 
 def adf_export_amf_model_0xf7c20a69(
         vfs: VfsDatabase, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
-    vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
-    gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+    vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
+    gltf = DecaGltf(vfs, export_path, vnode.v_path.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
     with gltf.scene():
-        with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath)):
-            gltf.export_modelc(vnode.vpath, None)
+        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path)):
+            gltf.export_modelc(vnode.v_path, None)
 
     gltf.gltf_save()
-    vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
+    vfs.logger.log('Exporting {}: Complete'.format(vnode.v_path.decode('utf-8')))
 
 
 def adf_export_mdic_0xb5b062f1(
         vfs: VfsDatabase, adf_db: AdfDatabase, vnode: VfsNode, export_path, allow_overwrite, save_to_one_dir=True):
-    vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
-    gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+    vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
+    gltf = DecaGltf(vfs, export_path, vnode.v_path.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
     with gltf.scene():
         adf = adf_db.read_node(vfs, vnode)
@@ -108,14 +107,14 @@ def adf_export_mdic_0xb5b062f1(
         for m in mdic['Models']:
             vpaths = vfs.nodes_select_distinct_vpath_where_vhash(m)
             if vpaths:
-                vpath = vpaths[0]
+                v_path = vpaths[0]
             else:
-                vpath = None
-            models.append(vpath)
+                v_path = None
+            models.append(v_path)
         instances = mdic['Instances']
         aabb = AABB(all6=mdic['AABB'])
         mid = aabb.mid()
-        with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath)) as mdic_node:
+        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path)) as mdic_node:
             mdic_node.translation = list(mid)
             for instance in instances:
                 transform = Deca3dMatrix(col_major=instance['Transform'])
@@ -128,7 +127,7 @@ def adf_export_mdic_0xb5b062f1(
                     gltf.export_modelc(model, transform)
 
     gltf.gltf_save()
-    vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
+    vfs.logger.log('Exporting {}: Complete'.format(vnode.v_path.decode('utf-8')))
 
 
 def adf_export_node(
@@ -156,7 +155,7 @@ def adf_export(
             if save_to_text:
                 adf = adf_db.read_node(vfs, vnode)
 
-                fn = os.path.join(export_path, vnode.vpath.decode('utf-8')) + '.txt'
+                fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
 
                 if not allow_overwrite and os.path.exists(fn):
                     raise EDecaFileExists(fn)

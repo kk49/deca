@@ -119,16 +119,16 @@ class VfsProcessor(VfsDatabase):
         if not os.path.isfile(vpath_file):
             self.logger.log('CREATING: vpaths.txt')
             with open(vpath_file, 'w') as f:
-                for vpath in vpaths:
-                    f.write('{}\n'.format(vpath))
+                for v_path in vpaths:
+                    f.write('{}\n'.format(v_path))
 
     def dump_status(self):
         # possible different vpaths with same hash, uncommon
         q = "SELECT DISTINCT hash32, COUNT(*) c FROM core_hash_strings GROUP BY hash32 HAVING c > 1;"
         dup_hash4 = self.db_query_all(q)
-        for vhash, c in dup_hash4:
+        for v_hash, c in dup_hash4:
             q = "SELECT DISTINCT hash32, string FROM core_hash_strings WHERE hash32 = (?)"
-            hashes = self.db_query_all(q, [vhash])
+            hashes = self.db_query_all(q, [v_hash])
             fcs = []
             gtz_count = 0
             for h, s in hashes:
@@ -148,17 +148,17 @@ class VfsProcessor(VfsDatabase):
         dup_nodes = self.db_query_all(q)
         dup_map = {}
         dup_count = {}
-        for vhash, vpath, c in dup_nodes:
-            if vhash not in dup_map:
-                dup_map[vhash] = {vpath}
+        for v_hash, v_path, c in dup_nodes:
+            if v_hash not in dup_map:
+                dup_map[v_hash] = {v_path}
             else:
-                dup_map[vhash].add(vpath)
-                dup_count[vhash] = len(dup_map[vhash])
+                dup_map[v_hash].add(v_path)
+                dup_count[v_hash] = len(dup_map[v_hash])
 
-        for vhash, count in dup_count.items():
-            vpaths = dup_map[vhash]
-            for vpath in vpaths:
-                self.logger.log(f'SUMMARY: Duplicate Node Hashes: {vhash:08x} {vpath}')
+        for v_hash, count in dup_count.items():
+            vpaths = dup_map[v_hash]
+            for v_path in vpaths:
+                self.logger.log(f'SUMMARY: Duplicate Node Hashes: {v_hash:08x} {v_path}')
 
         # ADF type summary
         adf_db = AdfDatabase()
@@ -167,8 +167,8 @@ class VfsProcessor(VfsDatabase):
         missing_types = set()
         for t, uid in adf_db.type_missing:
             missing_types.add(t)
-            node = self.node_where_uid(uid)
-            self.logger.log('SUMMARY: Missing Type {:08x} in {:08X} {}'.format(t, node.vhash, node.vpath))
+            node: VfsNode = self.node_where_uid(uid)
+            self.logger.log('SUMMARY: Missing Type {:08x} in {:08X} {}'.format(t, node.v_hash, node.v_path))
 
         self.logger.log(f'SUMMARY: Missing Types: {len(missing_types)} ')
 
@@ -191,7 +191,7 @@ class VfsProcessor(VfsDatabase):
 
         # add exe to be parsed in normal way
         exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
-        node = VfsNode(ftype=FTYPE_EXE, pvpath=exe_path)
+        node = VfsNode(file_type=FTYPE_EXE, p_path=exe_path)
         self.node_add_one(node)
 
         while len(dir_in) > 0:
@@ -220,10 +220,10 @@ class VfsProcessor(VfsDatabase):
         for ua_file in self.game_info.unarchived_files():
             with open(ua_file, 'rb') as f:
                 ftype, fsize = determine_file_type_and_size(f, os.stat(ua_file).st_size)
-            vpath = os.path.basename(ua_file).encode('utf-8')
-            vhash = deca.hashes.hash32_func(vpath)
+            v_path = os.path.basename(ua_file).encode('utf-8')
+            v_hash = deca.hashes.hash32_func(v_path)
             node = VfsNode(
-                vhash=vhash, vpath=vpath, pvpath=ua_file, ftype=ftype,
+                v_hash=v_hash, v_path=v_path, p_path=ua_file, file_type=ftype,
                 size_u=fsize, size_c=fsize, offset=0)
             self.determine_ftype(node)
             self.node_add_one(node)
@@ -232,7 +232,7 @@ class VfsProcessor(VfsDatabase):
         for ta_file in input_files:
             inpath = os.path.join(ta_file)
             file_arc = inpath + '.arc'
-            node = VfsNode(ftype=FTYPE_ARC, pvpath=file_arc)
+            node = VfsNode(file_type=FTYPE_ARC, p_path=file_arc)
             self.node_add_one(node)
 
         phase_id = 0
@@ -256,9 +256,9 @@ class VfsProcessor(VfsDatabase):
         done_set = set()
         src_indexes = self.nodes_where_ftype_select_uid(ftype)
         for idx in src_indexes:
-            node = self.node_where_uid(idx)
-            if node.is_valid() and node.ftype == ftype and (process_dups or node.vhash not in done_set):
-                done_set.add(node.vhash)
+            node: VfsNode = self.node_where_uid(idx)
+            if node.is_valid() and node.file_type == ftype and (process_dups or node.v_hash not in done_set):
+                done_set.add(node.v_hash)
                 indexs.append(idx)
         return indexs, done_set
 
@@ -275,7 +275,7 @@ class VfsProcessor(VfsDatabase):
         vhashes = self.nodes_select_distinct_vhash()
         if len(vhashes) > 0:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            commander.do_map(cmd, vhashes, step_id='vhash')
+            commander.do_map(cmd, vhashes, step_id='v_hash')
         self.logger.log('PROCESS: VHASHes: Total VHASHes {}'.format(len(vhashes)))
 
     def find_vpath_exe(self):
@@ -515,15 +515,15 @@ class VfsProcessor(VfsDatabase):
                 elif ext == b'.hmddsc':
                     ftype = FTYPE_HMDDSC
 
-            vpath = filename.replace(':', '/')
-            vpath = vpath.replace('\\', '/')
-            vpath = ('__EXTERNAL_FILES__' + vpath).encode('ascii')
-            vhash = deca.hashes.hash32_func(vpath)
+            v_path = filename.replace(':', '/')
+            v_path = v_path.replace('\\', '/')
+            v_path = ('__EXTERNAL_FILES__' + v_path).encode('ascii')
+            v_hash = deca.hashes.hash32_func(v_path)
 
             # tag atx file type since they have no header info
 
             vnode = VfsNode(
-                vhash=vhash, vpath=vpath, pvpath=filename, ftype=ftype,
+                v_hash=v_hash, v_path=v_path, p_path=filename, file_type=ftype,
                 size_u=fsize, size_c=fsize, offset=0, is_temporary_file=True)
             self.node_add_one(vnode)
 

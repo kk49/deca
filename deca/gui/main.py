@@ -86,7 +86,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         # elif column == 2:  # Type
         #     if self.remap_type is None:
         #         rm = list(range(len(self.vfs.table_vfsnode)))
-        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].file_type())
+        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].file_type)
         #         self.remap_type = rm
         #     self.remap = self.remap_type
         # elif column == 3:  # Hash
@@ -141,12 +141,12 @@ class VfsNodeTableModel(QAbstractTableModel):
                 elif column == 1:
                     return '{}'.format(node.pid)
                 elif column == 2:
-                    return '{}'.format(node.file_type())
+                    return '{}'.format(node.file_type)
                 elif column == 3:
-                    if node.vhash is None:
+                    if node.v_hash is None:
                         return ''
                     else:
-                        return '{:08X}'.format(node.vhash)
+                        return '{:08X}'.format(node.v_hash)
                 elif column == 4:
                     if node.ext_hash is None:
                         return ''
@@ -162,10 +162,10 @@ class VfsNodeTableModel(QAbstractTableModel):
                 elif column == 7:
                     return '{}'.format(node.size_c)
                 elif column == 8:
-                    if node.vpath is not None:
-                        return 'V: {}'.format(node.vpath.decode('utf-8'))
-                    elif node.pvpath is not None:
-                        return 'P: {}'.format(node.pvpath)
+                    if node.v_path is not None:
+                        return 'V: {}'.format(node.v_path.decode('utf-8'))
+                    elif node.p_path is not None:
+                        return 'P: {}'.format(node.p_path)
                     else:
                         return ''
 
@@ -253,10 +253,10 @@ class VfsDirLeaf(object):
         self.row = 0
         self.uid = uid
 
-    def vpath(self):
+    def v_path(self):
         pn = b''
         if self.parent is not None:
-            pn = self.parent.vpath(True)
+            pn = self.parent.v_path(True)
         return pn + self.name
 
     def child_count(self):
@@ -271,10 +271,10 @@ class VfsDirBranch(object):
         self.children = []
         self.child_name_map = {}
 
-    def vpath(self, child_called=False):
+    def v_path(self, child_called=False):
         s = ''
         if self.parent is not None:
-            s = self.parent.vpath(True)
+            s = self.parent.v_path(True)
             s = s + self.name + '/'
         if not child_called:
             s = s + r'%'
@@ -314,12 +314,12 @@ class VfsDirModel(QAbstractItemModel):
 
         self.root_node = None
         self.root_node = VfsDirBranch('/')
-        for vpath, uid in vpaths.items():
-            if vpath.find('\\') >= 0:
-                print(f'GUI: Warning: Windows Path {vpath}')
-                path = vpath.split('\\')
+        for v_path, uid in vpaths.items():
+            if v_path.find('\\') >= 0:
+                print(f'GUI: Warning: Windows Path {v_path}')
+                path = v_path.split('\\')
             else:
-                path = vpath.split('/')
+                path = v_path.split('/')
 
             name = path[-1]
             path = path[0:-1]
@@ -383,12 +383,12 @@ class VfsDirModel(QAbstractItemModel):
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
-                    return '{}'.format(vnode.file_type())
+                    return '{}'.format(vnode.file_type)
                 elif column == 3:
-                    if vnode.vhash is None:
+                    if vnode.v_hash is None:
                         return ''
                     else:
-                        return '{:08X}'.format(vnode.vhash)
+                        return '{:08X}'.format(vnode.v_hash)
                 elif column == 4:
                     if vnode.ext_hash is None:
                         return ''
@@ -510,7 +510,7 @@ class VfsDirWidget(QWidget):
                 items = self.view.selectedIndexes()
                 items = [self.proxy_model.mapToSource(idx) for idx in items]
                 items = list(set([idx.internalPointer() for idx in items]))
-                items = [idx.vpath() for idx in items if isinstance(idx, VfsDirLeaf) or isinstance(idx, VfsDirBranch)]
+                items = [idx.v_path() for idx in items if isinstance(idx, VfsDirLeaf) or isinstance(idx, VfsDirBranch)]
                 self.vnode_selection_changed(items)
 
     def double_clicked(self, index):
@@ -585,27 +585,27 @@ class DataViewWidget(QWidget):
         self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
         self.tab_widget.setTabEnabled(self.tab_obc_index, False)
 
-        if vnode.ftype in {FTYPE_TXT}:
+        if vnode.file_type in {FTYPE_TXT}:
             self.tab_widget.setTabEnabled(self.tab_text_index, True)
             self.tab_text.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_text_index)
-        elif vnode.ftype in {FTYPE_SARC}:
+        elif vnode.file_type in {FTYPE_SARC}:
             self.tab_widget.setTabEnabled(self.tab_sarc_index, True)
             self.tab_sarc.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_sarc_index)
-        elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC, FTYPE_DDS, FTYPE_BMP}:
+        elif vnode.file_type in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC, FTYPE_DDS, FTYPE_BMP}:
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
             self.tab_image.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_image_index)
-        elif vnode.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
+        elif vnode.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
             self.tab_widget.setTabEnabled(self.tab_adf_index, True)
             self.tab_adf.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_adf_index)
-        elif vnode.ftype in {FTYPE_RTPC}:
+        elif vnode.file_type in {FTYPE_RTPC}:
             self.tab_widget.setTabEnabled(self.tab_rtpc_index, True)
             self.tab_rtpc.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_rtpc_index)
-        elif vnode.ftype in {FTYPE_OBC}:
+        elif vnode.file_type in {FTYPE_OBC}:
             self.tab_widget.setTabEnabled(self.tab_obc_index, True)
             self.tab_obc.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_obc_index)
@@ -826,7 +826,7 @@ class MainWidget(QWidget):
         self.current_vnode = vnode
         self.data_view.vnode_2click_selected(vnode)
         # if self.current_vnode is not None:
-        #     self.bt_extract.setText('EXTRACT: {}'.format(vnode.vpath))
+        #     self.bt_extract.setText('EXTRACT: {}'.format(vnode.v_path))
         #     self.bt_extract.setEnabled(True)
 
     def extract(self, eid, extract_dir):
@@ -887,8 +887,8 @@ class MainWidget(QWidget):
                 val_in = int(txt_in, 0)
                 nodes = self.vfs.nodes_where_hash32(val_in)
                 for node in nodes:
-                    if len(node.vpath) > 0:
-                        txt_out = node.vpath.decode('utf-8')
+                    if len(node.v_path) > 0:
+                        txt_out = node.v_path.decode('utf-8')
             except ValueError:
                 pass
 

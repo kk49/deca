@@ -224,7 +224,7 @@ class DataViewerImage(DataViewer):
         self.ddsc = None
         self.select_dropdown.clear()
 
-        if vnode.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+        if vnode.file_type in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
             self.ddsc = deca.ff_avtx.image_load(vfs, vnode)
 
         if self.ddsc is not None and self.ddsc.mips is not None:

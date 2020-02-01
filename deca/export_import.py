@@ -21,10 +21,10 @@ def fsb5c_export_processed(vfs: VfsDatabase, node, extract_dir, allow_overwrite=
     # TODO hack just trim 16 byte header
     buffer = buffer[16:]
 
-    if node.vpath is None:
-        ofile = extract_dir + '{:08X}.dat.DECA.fsb'.format(node.vhash)
+    if node.v_path is None:
+        ofile = extract_dir + '{:08X}.dat.DECA.fsb'.format(node.v_hash)
     else:
-        ofile = extract_dir + '{}.DECA.fsb'.format(node.vpath.decode('utf-8'))
+        ofile = extract_dir + '{}.DECA.fsb'.format(node.v_path.decode('utf-8'))
 
     vfs.logger.log('Exporting {}'.format(ofile))
 
@@ -45,7 +45,7 @@ def expand_vpaths(vfs: VfsDatabase, vs, mask):
 
         if isinstance(id_pat, bytes):
             nodes = vfs.nodes_where_vpath_like_regex(id_pat, mask)
-            nodes = dict([(n.vpath, n) for n in nodes])
+            nodes = dict([(n.v_path, n) for n in nodes])
             nodes = list(nodes.values())
             vos += nodes
         else:
@@ -62,16 +62,16 @@ def extract_node_raw(
     if node.is_valid():
         if node.offset is not None:
             with ArchiveFile(vfs.file_obj_from(node)) as f:
-                if node.vpath is None:
-                    ofile = extract_dir + '{:08X}.dat'.format(node.vhash)
+                if node.v_path is None:
+                    ofile = extract_dir + '{:08X}.dat'.format(node.v_hash)
                 else:
-                    ofile = extract_dir + '{}'.format(node.vpath.decode('utf-8'))
+                    ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
 
                 vfs.logger.log('Exporting {}'.format(ofile))
 
                 make_dir_for_file(ofile)
 
-                if node.ftype == FTYPE_ADF_BARE:
+                if node.file_type == FTYPE_ADF_BARE:
                     do_export_raw = False
                     vfs.logger.log(
                         'WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(
@@ -93,23 +93,23 @@ def extract_node_raw(
 
 def find_vnode(vfs: VfsDatabase, v):
     vnode = None
-    vpath = None
+    v_path = None
     if isinstance(v, bytes):
-        vpath = v
+        v_path = v
     elif isinstance(v, VfsNode):
         vnode = v
     else:
         raise NotImplementedError('find_vnode: Could not extract {}'.format(v))
 
-    if vpath is not None:
-        nodes = vfs.nodes_where_vpath(vpath)
+    if v_path is not None:
+        nodes = vfs.nodes_where_vpath(v_path)
         vnode = None
         for node in nodes:
             if node.offset is not None:
                 vnode = node
                 break
         if vnode is None:
-            raise EDecaFileMissing('find_vnode: Missing {}'.format(vpath.decode('utf-8')))
+            raise EDecaFileMissing('find_vnode: Missing {}'.format(v_path.decode('utf-8')))
 
     return vnode
 
@@ -144,17 +144,17 @@ def extract_contents(
 
         if vnode is not None:
             try:
-                if vnode.ftype == FTYPE_SARC:
+                if vnode.file_type == FTYPE_SARC:
                     sarc = FileSarc()
                     with vfs.file_obj_from(vnode) as f:
                         sarc.header_deserialize(f)
                         # extract_node_raw(vfs, vnode, extract_dir, allow_overwrite)
-                    entry_vpaths = [v.vpath for v in sarc.entries]
+                    entry_vpaths = [v.v_path for v in sarc.entries]
                     entry_is_symlinks = [v.offset == 0 for v in sarc.entries]
 
                     extract_raw(vfs, entry_vpaths, b'^.*$', extract_dir, allow_overwrite)
 
-                    file_list_name = os.path.join(extract_dir, vnode.vpath.decode('utf-8') + '.DECA.FILE_LIST.txt')
+                    file_list_name = os.path.join(extract_dir, vnode.v_path.decode('utf-8') + '.DECA.FILE_LIST.txt')
 
                     with open(file_list_name, 'w') as f:
                         f.write('sarc.clear();')
@@ -190,13 +190,13 @@ def extract_processed(
 
         if vnode is not None and vnode.is_valid() and vnode.offset is not None:
             try:
-                if vnode.ftype in {FTYPE_ADF, FTYPE_ADF_BARE}:
+                if vnode.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
                     vs_adf.append(vnode)
-                elif vnode.ftype in {FTYPE_RTPC}:
+                elif vnode.file_type in {FTYPE_RTPC}:
                     vs_rtpc.append(vnode)
-                elif vnode.ftype in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+                elif vnode.file_type in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
                     vs_images.append(vnode)
-                elif vnode.ftype in {FTYPE_FSB5C}:
+                elif vnode.file_type in {FTYPE_FSB5C}:
                     vs_fsb5cs.append(vnode)
                 else:
                     vs_other.append(vnode)
@@ -207,10 +207,10 @@ def extract_processed(
 
     if save_to_processed:
         for vnode in vs_fsb5cs:
-            if vnode.vpath is None:
-                ofile = extract_dir + '{:08X}.dat'.format(vnode.vhash)
+            if vnode.v_path is None:
+                ofile = extract_dir + '{:08X}.dat'.format(vnode.v_hash)
             else:
-                ofile = extract_dir + '{}'.format(vnode.vpath.decode('utf-8'))
+                ofile = extract_dir + '{}'.format(vnode.v_path.decode('utf-8'))
 
             vfs.logger.log('Exporting {}'.format(ofile))
 
@@ -223,10 +223,10 @@ def extract_processed(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
         for vnode in vs_images:
-            if vnode.vpath is None:
-                ofile = extract_dir + '{:08X}.dat'.format(vnode.vhash)
+            if vnode.v_path is None:
+                ofile = extract_dir + '{:08X}.dat'.format(vnode.v_hash)
             else:
-                ofile = extract_dir + '{}'.format(vnode.vpath.decode('utf-8'))
+                ofile = extract_dir + '{}'.format(vnode.v_path.decode('utf-8'))
 
             vfs.logger.log('Exporting {}'.format(ofile))
 

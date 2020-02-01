@@ -19,18 +19,18 @@ class DataViewerInfo(DataViewer):
         self.main_layout.addWidget(self.text_box)
         self.setLayout(self.main_layout)
 
-    def _dump_ancestors(self, vfs, vhash, indent=0):
+    def _dump_ancestors(self, vfs, v_hash, indent=0):
         sbuf = ''
-        # if vhash is not None:
-        #     vpaths = list(vfs.map_hash_to_vpath[vhash])
+        # if v_hash is not None:
+        #     vpaths = list(vfs.map_hash_to_vpath[v_hash])
         #     vnodes = vfs.map_vpath_to_vfsnodes[vpaths[0]]
         #     for vnode in vnodes:
         #         sbuf += '\n' + '  ' * indent
-        #         sbuf += '0x{:08x}: "{}" "{}"'.format(vhash, vnode.vpath, vnode.pvpath)
-        #         sbuf += self._dump_ancestors(vfs, vfs.table_vfsnode[vnode.pid].vhash, indent + 1)
+        #         sbuf += '0x{:08x}: "{}" "{}"'.format(v_hash, vnode.v_path, vnode.p_path)
+        #         sbuf += self._dump_ancestors(vfs, vfs.table_vfsnode[vnode.pid].v_hash, indent + 1)
         return sbuf
 
     def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
-        sbuf = self._dump_ancestors(vfs, vnode.vhash, 0)
+        sbuf = self._dump_ancestors(vfs, vnode.v_hash, 0)
 
         self.text_box.setText(sbuf)

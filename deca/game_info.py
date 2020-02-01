@@ -9,6 +9,7 @@ class GameInfo:
         self.exe_name = exe_name
         self.game_id = game_id
         self.archive_version = 3
+        self.oo_decompress_dll = None
         self.area_prefixs = ['']
 
         self.worlds = [
@@ -361,6 +362,7 @@ class GameInfoJC4(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'jc4')
         self.archive_version = 4
+        self.oo_decompress_dll = os.path.join(game_dir, 'oo2core_7_win64.dll')
         self.map_prefixes += [
             'dlc/agency/textures/ui/map0/',
             'dlc/agency/textures/ui/map1/',

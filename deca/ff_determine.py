@@ -75,6 +75,8 @@ def determine_file_type_and_size(f, file_size):
         ftype = FTYPE_PFX
     elif b'\x05\x00\x00\x00RBMDL' == magic[0:9]:
         ftype = FTYPE_RBMDL
+    elif b'KB2' == magic[0:3]:
+        ftype = FTYPE_BINK
     # ATX file format was a guess by size
     # elif file_size in raw_image_size:
     #     ftype = FTYPE_ATX

@@ -15,12 +15,11 @@ from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
 from .ff_rtpc import Rtpc, k_type_str
-from .ff_arc_tab import TabFileV3, TabFileV4, TabEntryFileBase, compression_00_none, compression_04_oo
+from .ff_arc_tab import TabFileV3, TabFileV4, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
 from .util import remove_prefix_if_present, remove_suffix_if_present
 from .hashes import hash32_func
 from .kaitai.gfx import Gfx
-from .compress import apex_oo_decompress
 
 
 class LogWrapper:
@@ -85,6 +84,7 @@ class MultiProcessControl:
             processor = Processor(vfs, LogWrapper(self.logger))
             for command in command_todo:
                 processor.process_command(command[0], command[1])
+            vfs.shutdown()
         else:
             mp_q_results = multiprocessing.Queue()
 
@@ -224,9 +224,9 @@ class Processor:
     def process_by_vhash_wrapper(self, vhashes, func):
         n_indexes = len(vhashes)
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
-            for i, vhash in enumerate(vhashes):
+            for i, v_hash in enumerate(vhashes):
                 self._comm.status(i, n_indexes)
-                func(vhash, i, n_indexes, db)
+                func(v_hash, i, n_indexes, db)
             self._comm.status(n_indexes, n_indexes)
 
     def process_archives_initial(
@@ -234,21 +234,21 @@ class Processor:
         debug = False
         ver = db.game_info().archive_version
 
-        if node.ftype == FTYPE_EXE:
+        if node.file_type == FTYPE_EXE:
             node.processed_file_set(True)
-            db.extract_types_from_exe(node.pvpath)
+            db.extract_types_from_exe(node.p_path)
 
-        elif node.ftype == FTYPE_ARC:
+        elif node.file_type == FTYPE_ARC:
             # here we add the tab file as a child of the ARC, a trick to make it work with our data model
             node.processed_file_set(True)
-            tab_path = os.path.splitext(node.pvpath)
+            tab_path = os.path.splitext(node.p_path)
             tab_path = tab_path[0] + '.tab'
-            cnode = VfsNode(ftype=FTYPE_TAB, pvpath=tab_path, pid=node.uid)
+            cnode = VfsNode(file_type=FTYPE_TAB, p_path=tab_path, pid=node.uid)
             db.node_add(cnode)
-        elif node.ftype == FTYPE_TAB:
-            self._comm.trace('Processing TAB: {}'.format(node.pvpath))
+        elif node.file_type == FTYPE_TAB:
+            self._comm.trace('Processing TAB: {}'.format(node.p_path))
             node.processed_file_set(True)
-            with ArchiveFile(open(node.pvpath, 'rb'), debug=debug) as f:
+            with ArchiveFile(open(node.p_path, 'rb'), debug=debug) as f:
                 if 3 == ver:
                     tab_file = TabFileV3()
                 elif 4 == ver:
@@ -260,30 +260,26 @@ class Processor:
 
                 te: TabEntryFileBase
                 for i, te in enumerate(tab_file.file_table):
-                    if te.size_c > 0 and te.size_u > 0:
+                    if te.size_c == 0 or te.size_u == 0:
+                        # handle zero length items as symlinks?
+                        blocks = None
+                        te.offset = None
+                    else:
+                        blocks = [(0, 0, 0)] * len(te.file_block_table)
+                        offset = te.offset
+                        for bi, block in enumerate(te.file_block_table):
+                            blocks[bi] = (offset, block[0], block[1])
+                            offset += block[0]
+
+                        # for now don't include the nameless top level symlinks
                         cnode = VfsNode(
-                            vhash=te.hashname, pid=node.uid, index=i,
+                            v_hash=te.hashname, pid=node.uid, index=i,
                             offset=te.offset, size_c=te.size_c, size_u=te.size_u,
-                            is_compressed_file=(te.compression_type != compression_00_none))
+                            compression_type=te.compression_type, blocks=blocks)
+
                         db.node_add(cnode)
 
-                        if 4 == ver and cnode.compressed_file_get():
-                            file_name = db.generate_cache_file_name(cnode)
-                            if not os.path.isfile(file_name):
-                                if te.compression_type == compression_04_oo:
-                                    deca.util.make_dir_for_file(file_name)
-                                    with db.file_obj_from(node) as f_in:
-                                        with open(file_name, 'wb') as f_out:
-                                            f_in.seek(cnode.offset)
-                                            for in_len, out_len in te.file_block_table:
-                                                in_buffer = f_in.read(in_len)
-                                                out_buffer, ret = apex_oo_decompress(in_buffer, in_len, out_len)
-                                                f_out.write(out_buffer)
-                                else:
-                                    raise NotImplementedError('Unknown Compression Flag: {} = {}, {}'.format(
-                                        file_name, te.compression_type, te.compression_flags))
-
-        elif node.ftype == FTYPE_SARC:
+        elif node.file_type == FTYPE_SARC:
             node.processed_file_set(True)
             sarc_file = FileSarc()
             sarc_file.header_deserialize(db.file_obj_from(node))
@@ -294,61 +290,61 @@ class Processor:
                 if offset == 0:
                     offset = None  # sarc files with zero offset are not in file, but reference hash value
                 cnode = VfsNode(
-                    vhash=se.vhash, pid=node.uid, index=se.index,
-                    offset=offset, size_c=se.length, size_u=se.length, vpath=se.vpath,
-                    ext_hash=se.file_extention_hash)
+                    v_hash=se.v_hash, pid=node.uid, index=se.index,
+                    offset=offset, size_c=se.length, size_u=se.length, v_path=se.v_path,
+                    ext_hash=se.file_ext_hash)
 
                 db.node_add(cnode)
-                db.propose_string(cnode.vpath, node)
+                db.propose_string(cnode.v_path, node)
 
-        elif node.vhash == deca.hashes.hash32_func(b'gdc/global.gdcc'):
+        elif node.v_hash == deca.hashes.hash32_func(b'gdc/global.gdcc'):
             # special case starting point for runtime
             node.processed_file_set(True)
             adf = db.node_read_adf(node)
 
             cnode_name = b'gdc/global.gdc.DECA'
             cnode = VfsNode(
-                vhash=deca.hashes.hash32_func(cnode_name),
-                vpath=cnode_name,
-                ftype=FTYPE_GDCBODY, pid=node.uid,
+                v_hash=deca.hashes.hash32_func(cnode_name),
+                v_path=cnode_name,
+                file_type=FTYPE_GDCBODY, pid=node.uid,
                 offset=adf.table_instance[0].offset,
                 size_c=adf.table_instance[0].size,
                 size_u=adf.table_instance[0].size)
             db.node_add(cnode)
 
-        elif node.ftype in {FTYPE_GDCBODY}:
+        elif node.file_type in {FTYPE_GDCBODY}:
             pnode = db.node_where_uid(node.pid)
             adf = db.node_read_adf(pnode)
 
             for entry in adf.table_instance_values[0]:
                 if isinstance(entry, GdcArchiveEntry):
-                    # self.logger.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.vpath))
+                    # self.logger.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.v_path))
                     adf_type = entry.adf_type_hash
-                    ftype = None
+                    file_type = None
                     if adf_type is not None:
-                        ftype = FTYPE_ADF_BARE
-                        # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.vpath))
+                        file_type = FTYPE_ADF_BARE
+                        # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.v_path))
                     cnode = VfsNode(
-                        vhash=entry.vpath_hash, pid=node.uid, index=entry.index,
-                        offset=entry.offset, size_c=entry.size, size_u=entry.size, vpath=entry.vpath,
-                        ftype=ftype, adf_type=adf_type)
+                        v_hash=entry.vpath_hash, pid=node.uid, index=entry.index,
+                        offset=entry.offset, size_c=entry.size, size_u=entry.size, v_path=entry.v_path,
+                        file_type=file_type, adf_type=adf_type)
                     db.node_add(cnode)
-                    db.propose_string(cnode.vpath, node)
+                    db.propose_string(cnode.v_path, node)
 
-        elif node.ftype != FTYPE_SYMLINK and \
-                (node.ext_hash == 0xb4c9109e or (node.vpath is not None and node.vpath.endswith(b'.resourcebundle'))):
+        elif node.file_type != FTYPE_SYMLINK and \
+                (node.ext_hash == 0xb4c9109e or (node.v_path is not None and node.v_path.endswith(b'.resourcebundle'))):
             node.processed_file_set(True)
             with ArchiveFile(db.file_obj_from(node)) as f:
                 index = 0
                 while f.tell() < node.size_u:
-                    vhash = f.read_u32()
+                    v_hash = f.read_u32()
                     ext_hash = f.read_u32()
                     size = f.read_u32()
                     offset = f.tell()
                     buffer = f.read(size)
 
                     cnode = VfsNode(
-                        vhash=vhash, pid=node.uid, index=index,
+                        v_hash=v_hash, pid=node.uid, index=index,
                         offset=offset, size_c=size, size_u=size,
                         ext_hash=ext_hash)
                     index += 1
@@ -431,15 +427,15 @@ class Processor:
                         fn = fne[0]
                         fnh = fne[1]
 
-                    if node.vhash == fnh:
-                        if node.vpath is None:
-                            node.vpath = fn
+                    if node.v_hash == fnh:
+                        if node.v_path is None:
+                            node.v_path = fn
                             updated = True
                         db.propose_string(fn, node, possible_file_types=[FTYPE_ADF, FTYPE_ADF_BARE])
                         found_any = True
 
                 if len(fns) > 0 and not found_any:
-                    self._comm.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.vhash, fns[0]))
+                    self._comm.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.v_hash, fns[0]))
 
             # for ientry in adf.table_typedef:
             #     adf_type_hash = ientry.type_hash
@@ -451,7 +447,7 @@ class Processor:
 
         except AdfTypeMissing as ae:
             self._comm.log('Missing Type {:08x} in {:08X} {} {}'.format(
-                ae.type_id, node.vhash, node.vpath, node.pvpath))
+                ae.type_id, node.v_hash, node.v_path, node.p_path))
 
         if updated:
             db.node_update(node)
@@ -558,69 +554,70 @@ class Processor:
 
         missed_vpaths = set()
         h4ref_map = {}
-        for rowid, hash32, hash48, vpath in hash_strings:
-            missed_vpaths.add(vpath)
+        for rowid, hash32, hash48, v_path in hash_strings:
+            missed_vpaths.add(v_path)
             h4ref_map[rowid] = db.hash_string_references_where_hs_rowid_select_all(rowid)
 
         # h4rowid, src_node, is_adf_field_name, used_at_runtime, possible_ftypes in h4ref
 
         if len(nodes) > 0:
+            node: VfsNode
             for node in nodes:
                 if node.is_valid():
                     updated = False
 
-                    if node.ftype is None:
+                    if node.file_type is None:
                         ftype_int = ftype_list[FTYPE_NO_TYPE]
                     else:
-                        ftype_int = ftype_list[node.ftype]
+                        ftype_int = ftype_list[node.file_type]
 
-                    for rowid, hash32, _, vpath in hash_strings:
+                    for rowid, hash32, _, v_path in hash_strings:
                         h4ref = h4ref_map[rowid]
 
-                        if node.vpath is None:
+                        if node.v_path is None:
                             for _, src_node, _, _, possible_ftypes in h4ref:
                                 if possible_ftypes is None or possible_ftypes == 0:
                                     possible_ftypes = ftype_list[FTYPE_ANY_TYPE]
 
                                 if (ftype_int & possible_ftypes) != 0:
-                                    self._comm.trace('vpath:add  {} {:08X} {} {} {}'.format(
-                                        vpath, hash32, src_node, possible_ftypes, node.ftype))
-                                    node.vpath = vpath
+                                    self._comm.trace('v_path:add  {} {:08X} {} {} {}'.format(
+                                        v_path, hash32, src_node, possible_ftypes, node.file_type))
+                                    node.v_path = v_path
                                     updated = True
                                     break
                                 else:
-                                    self._comm.log('vpath:skip {} {:08X} {} {} {}'.format(
-                                        vpath, hash32, src_node, possible_ftypes, node.ftype))
+                                    self._comm.log('v_path:skip {} {:08X} {} {} {}'.format(
+                                        v_path, hash32, src_node, possible_ftypes, node.file_type))
 
-                        if node.vpath == vpath:
+                        if node.v_path == v_path:
                             for _, _, _, used_at_runtime, _ in h4ref:
                                 if used_at_runtime:
                                     node.used_at_runtime_depth = 0
                                     updated = True
                                     break
 
-                    if node.ftype is None and node.vpath is not None:
-                        file, ext = os.path.splitext(node.vpath)
+                    if node.file_type is None and node.v_path is not None:
+                        file, ext = os.path.splitext(node.v_path)
                         if ext[0:4] == b'.atx':
-                            node.ftype = FTYPE_ATX
+                            node.file_type = FTYPE_ATX
                             updated = True
                         elif ext == b'.hmddsc':
-                            node.ftype = FTYPE_HMDDSC
+                            node.file_type = FTYPE_HMDDSC
                             updated = True
 
-                    missed_vpaths.discard(node.vpath)
+                    missed_vpaths.discard(node.v_path)
 
-                    if node.ext_hash is None and node.vpath is not None:
-                        file, ext = os.path.splitext(node.vpath)
+                    if node.ext_hash is None and node.v_path is not None:
+                        file, ext = os.path.splitext(node.v_path)
                         node.ext_hash = hash32_func(ext)
                         updated = True
 
                     if updated:
                         db.node_update(node)
 
-        for vpath in missed_vpaths:
-            hash32 = hash32_func(vpath)
-            self._comm.trace('vpath:miss {} {:08X}'.format(vpath, hash32))
+        for v_path in missed_vpaths:
+            hash32 = hash32_func(v_path)
+            self._comm.trace('v_path:miss {} {:08X}'.format(v_path, hash32))
 
         # found_vpaths = list(found_vpaths)
         # found_vpaths.sort()
@@ -642,48 +639,48 @@ class Processor:
         #                     self.map_vpath_to_hash[s] = hid
         #                     found = found + 1
         #
-        # self.logger.log('fill in v_paths, mark extensions identified files as ftype')
+        # self.logger.log('fill in v_paths, mark extensions identified files as file_type')
         #
         # self.logger.log('PROCESS BASELINE VNODE INFORMATION')
         # for idx in range(len(self.table_vfsnode)):
         #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.vhash is not None:
-        #         hid = node.vhash
-        #         if node.vpath is not None:
+        #     if node.is_valid() and node.v_hash is not None:
+        #         hid = node.v_hash
+        #         if node.v_path is not None:
         #             if hid in self.map_hash_to_vpath:
-        #                 if self.map_hash_to_vpath[hid] != node.vpath:
-        #                     self.logger.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.vpath))
-        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.vpath)
+        #                 if self.map_hash_to_vpath[hid] != node.v_path:
+        #                     self.logger.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.v_path))
+        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.v_path)
         #             else:
-        #                 self.map_hash_to_vpath[hid] = node.vpath
-        #                 self.map_vpath_to_hash[node.vpath] = hid
+        #                 self.map_hash_to_vpath[hid] = node.v_path
+        #                 self.map_vpath_to_hash[node.v_path] = hid
         # self.logger.log('PROCESS BASELINE VNODE INFORMATION: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
         #
         # for idx in range(len(self.table_vfsnode)):
         #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.vhash is not None and node.vpath is None:
-        #         if node.vhash in self.map_hash_to_vpath:
-        #             node.vpath = self.map_hash_to_vpath[node.vhash]
+        #     if node.is_valid() and node.v_hash is not None and node.v_path is None:
+        #         if node.v_hash in self.map_hash_to_vpath:
+        #             node.v_path = self.map_hash_to_vpath[node.v_hash]
         #
-        #     if node.is_valid() and node.vhash is not None:
-        #         if node.ftype not in {FTYPE_ARC, FTYPE_TAB}:
-        #             if node.vhash in self.map_hash_to_vpath:
-        #                 self.hash_map_present.add(node.vhash)
+        #     if node.is_valid() and node.v_hash is not None:
+        #         if node.file_type not in {FTYPE_ARC, FTYPE_TAB}:
+        #             if node.v_hash in self.map_hash_to_vpath:
+        #                 self.hash_map_present.add(node.v_hash)
         #             else:
-        #                 self.hash_map_missing.add(node.vhash)
+        #                 self.hash_map_missing.add(node.v_hash)
         #
-        #     if node.is_valid() and node.vpath is not None:
-        #         if os.path.splitext(node.vpath)[1][0:4] == b'.atx':
-        #             if node.ftype is not None:
-        #                 raise Exception('ATX marked as non ATX: {}'.format(node.vpath))
-        #             node.ftype = FTYPE_ATX
+        #     if node.is_valid() and node.v_path is not None:
+        #         if os.path.splitext(node.v_path)[1][0:4] == b'.atx':
+        #             if node.file_type is not None:
+        #                 raise Exception('ATX marked as non ATX: {}'.format(node.v_path))
+        #             node.file_type = FTYPE_ATX
         #
-        #         lst = self.map_vpath_to_vfsnodes.get(node.vpath, [])
+        #         lst = self.map_vpath_to_vfsnodes.get(node.v_path, [])
         #         if len(lst) > 0 and lst[0].offset is None:  # Do not let symlink be first is list # TODO Sort by accessibility
         #             lst = [node] + lst
         #         else:
         #             lst.append(node)
-        #         self.map_vpath_to_vfsnodes[node.vpath] = lst
+        #         self.map_vpath_to_vfsnodes[node.v_path] = lst
 
 
 class MultiProcessVfsBase:
@@ -733,6 +730,7 @@ def run_mp_vfs_base(name, project_file, working_dir, q_in, q_out):
         vfs = VfsDatabase(project_file, working_dir, p)
         processor = Processor(vfs, p)
         p.run(processor)
+        vfs.shutdown()
     except:
         ei = sys.exc_info()
         q_out.put((name, 'exception', [ei[0], ei[1], traceback.format_tb(ei[2])], ))

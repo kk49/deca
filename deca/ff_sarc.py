@@ -6,36 +6,36 @@ import numpy as np
 
 
 class EntrySarc:
-    def __init__(self, index=None, vpath=None):
+    def __init__(self, index=None, v_path=None):
         self.META_entry_ptr = None
         self.META_entry_offset_ptr = None
         self.META_entry_size_ptr = None
         self.index = index
-        self.vpath = vpath
+        self.v_path = v_path
         self.string_offset = None
         self.offset = None
         self.length = None
-        self.file_extention_hash = None
-        self.vhash = None
+        self.file_ext_hash = None
+        self.v_hash = None
         self.is_symlink = None
 
     def deserialize_v2(self, f: ArchiveFile):
         self.META_entry_ptr = f.tell()
-        self.vpath = f.read_strl_u32()  # string raw length in multiples of 4 bytes (based on theHunter:COTW)
-        self.vpath = self.vpath.strip(b'\00')
+        self.v_path = f.read_strl_u32()  # string raw length in multiples of 4 bytes (based on theHunter:COTW)
+        self.v_path = self.v_path.strip(b'\00')
         self.META_entry_offset_ptr = f.tell()
         self.offset = f.read_u32()
         self.META_entry_size_ptr = f.tell()
         self.length = f.read_u32()
 
-        self.vhash = hash32_func(self.vpath)
+        self.v_hash = hash32_func(self.v_path)
         self.is_symlink = self.offset == 0
 
     def serialize_v2(self, f: ArchiveFile):
-        # prepare data that will be written, vpath should be a multiple of 4 in length
-        vpath = self.vpath + b'\00' * (((len(self.vpath) + 3) // 4 * 4) - len(self.vpath))
-        f.write_u32(len(vpath))
-        f.write(vpath)
+        # prepare data that will be written, v_path should be a multiple of 4 in length
+        v_path = self.v_path + b'\00' * (((len(self.v_path) + 3) // 4 * 4) - len(self.v_path))
+        f.write_u32(len(v_path))
+        f.write(v_path)
 
         f.write_u32(self.offset)
 
@@ -48,36 +48,36 @@ class EntrySarc:
         self.offset = f.read_u32()
         self.META_entry_size_ptr = f.tell()
         self.length = f.read_u32()
-        self.vhash = f.read_u32()
-        self.file_extention_hash = f.read_u32()  # This has is the extension including the period
+        self.v_hash = f.read_u32()
+        self.file_ext_hash = f.read_u32()  # This has is the extension including the period
 
         self.is_symlink = self.offset == 0
 
-        assert(self.vhash == hash32_func(self.vpath))
-        assert(self.file_extention_hash == hash32_func(os.path.splitext(self.vpath)[1]))
+        assert(self.v_hash == hash32_func(self.v_path))
+        assert(self.file_ext_hash == hash32_func(os.path.splitext(self.v_path)[1]))
 
     def serialize_v3(self, f):
-        # update entry based on vpath
-        self.vhash = hash32_func(self.vpath)
-        self.file_extention_hash = hash32_func(os.path.splitext(self.vpath)[1])
+        # update entry based on v_path
+        self.v_hash = hash32_func(self.v_path)
+        self.file_ext_hash = hash32_func(os.path.splitext(self.v_path)[1])
 
         f.write_u32(self.string_offset)
         f.write_u32(self.offset)
         f.write_u32(self.length)
-        f.write_u32(self.vhash)
-        f.write_u32(self.file_extention_hash)
+        f.write_u32(self.v_hash)
+        f.write_u32(self.file_ext_hash)
 
     def __repr__(self):
         str_vhash = ''
-        if self.vhash is not None:
-            str_vhash = ' h:{:08X}'.format(self.vhash)
+        if self.v_hash is not None:
+            str_vhash = ' h:{:08X}'.format(self.v_hash)
 
         str_fthash = ''
-        if self.file_extention_hash is not None:
-            str_fthash = ' ft:{:08X}'.format(self.file_extention_hash)
+        if self.file_ext_hash is not None:
+            str_fthash = ' ft:{:08X}'.format(self.file_ext_hash)
 
         return 'o:{:9d} s:{:9d}{}{} vp:{}'.format(
-            self.offset, self.length, str_vhash, str_fthash, self.vpath.decode('utf-8'))
+            self.offset, self.length, str_vhash, str_fthash, self.v_path.decode('utf-8'))
 
     def dump_str(self):
         return self.__repr__()
@@ -126,7 +126,7 @@ class FileSarc:
                 self.strings = [s for s in self.strings if len(s) > 0]
 
                 self.entries_begin = f.tell()
-                self.entries = [EntrySarc(index=i, vpath=s) for i, s in enumerate(self.strings)]
+                self.entries = [EntrySarc(index=i, v_path=s) for i, s in enumerate(self.strings)]
                 for ent in self.entries:
                     ent.deserialize_v3(f)
 
@@ -143,7 +143,7 @@ class FileSarc:
             dir_block_len = 0
             entry: EntrySarc
             for entry in self.entries:
-                dir_block_len += 12 + align_to(len(entry.vpath), 4)
+                dir_block_len += 12 + align_to(len(entry.v_path), 4)
             dir_block_len = align_to(dir_block_len, 16)
 
         elif self.ver2 == 3:
@@ -151,7 +151,7 @@ class FileSarc:
             entry: EntrySarc
             for entry in self.entries:
                 entry.string_offset = len(vpath_string)
-                vpath_string = vpath_string + entry.vpath + b'\00'
+                vpath_string = vpath_string + entry.v_path + b'\00'
 
             # vpath_string = vpath_string + b'\00'
 
@@ -173,7 +173,7 @@ class FileSarc:
                 # IMPORTANT SARCS apparently don't want data to cross 32MB boundary (maybe small boundary?)
                 max_block_size = 32 * 1024 * 1024
                 if sz > max_block_size:
-                    raise NotImplementedError('Excessive file size: {}'.format(entry.vpath))
+                    raise NotImplementedError('Excessive file size: {}'.format(entry.v_path))
 
                 block_pos_diff = \
                     np.floor((data_write_pos + sz) / max_block_size) - np.floor(data_write_pos / max_block_size)

@@ -86,15 +86,15 @@ def rtpc_export_node(vfs: VfsDatabase, vnode: VfsNode, export_path, allow_overwr
     with vfs.file_obj_from(vnode) as f:
         rtpc.deserialize(f)
 
-    vfs.logger.log('Exporting {}: Started'.format(vnode.vpath.decode('utf-8')))
-    gltf = DecaGltf(vfs, export_path, vnode.vpath.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+    vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
+    gltf = DecaGltf(vfs, export_path, vnode.v_path.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
     with gltf.scene():
-        with DecaGltfNode(gltf, name=os.path.basename(vnode.vpath.decode('utf-8'))):
+        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path.decode('utf-8'))):
             rtpc_export_node_recurse(rtpc.root_node, gltf, vfs)
 
     gltf.gltf_save()
-    vfs.logger.log('Exporting {}: Complete'.format(vnode.vpath.decode('utf-8')))
+    vfs.logger.log('Exporting {}: Complete'.format(vnode.v_path.decode('utf-8')))
 
 
 def rtpc_export(vfs: VfsDatabase, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
@@ -107,7 +107,7 @@ def rtpc_export(vfs: VfsDatabase, vnodes: List[VfsNode], export_path, allow_over
                 with vfs.file_obj_from(vnode) as fi:
                     rtpc = Rtpc().deserialize(fi)
 
-                    fn = os.path.join(export_path, vnode.vpath.decode('utf-8')) + '.txt'
+                    fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
 
                     if not allow_overwrite and os.path.exists(fn):
                         raise EDecaFileExists(fn)

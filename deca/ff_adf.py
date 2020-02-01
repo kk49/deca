@@ -23,11 +23,11 @@ class AdfTypeMissing(Exception):
 
 
 class GdcArchiveEntry:
-    def __init__(self, index, offset, size, vpath_hash, filetype_hash, adf_type_hash, vpath):
+    def __init__(self, index, offset, size, vpath_hash, filetype_hash, adf_type_hash, v_path):
         self.index = index
         self.offset = offset
         self.size = size
-        self.vpath = vpath
+        self.v_path = v_path
         self.vpath_hash = vpath_hash
         self.filetype_hash = filetype_hash
         self.adf_type_hash = adf_type_hash
@@ -50,7 +50,7 @@ class GdcArchiveEntry:
             str_size = 's:{:9d}'.format(self.size)
 
         return 'i:{:4d} o:{:9d} {}{}{}{} vp:{}'.format(
-            self.index, self.offset, str_size, str_vhash, str_fthash, str_adfhash, self.vpath.decode('utf-8'))
+            self.index, self.offset, str_size, str_vhash, str_fthash, str_adfhash, self.v_path.decode('utf-8'))
 
 
 class StringHash:
@@ -551,8 +551,8 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 ftype_hash = e1[2]
 
                 gdf.seek(string_offset)
-                vpath = gdf.read_strz()
-                vhash = hash32_func(vpath)
+                v_path = gdf.read_strz()
+                v_hash = hash32_func(v_path)
 
                 if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
                     # TODO this follows the data structure for an array of some type, 0xD74CC4CB is probably it's hash
@@ -570,10 +570,10 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                     index=idx,
                     offset=actual_offset,
                     size=actual_size,
-                    vpath_hash=vhash,
+                    vpath_hash=v_hash,
                     filetype_hash=ftype_hash,
                     adf_type_hash=adf_type_hash,
-                    vpath=vpath)
+                    v_path=v_path)
                 dir_contents.append(entry)
                 idx += 1
             v = dir_contents
@@ -1007,7 +1007,7 @@ class AdfDatabase:
             buffer = f.read()
 
         try:
-            if node.ftype == FTYPE_ADF_BARE:
+            if node.file_type == FTYPE_ADF_BARE:
                 adf = self._load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
             else:
                 adf = self._load_adf(buffer)

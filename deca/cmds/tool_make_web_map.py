@@ -485,8 +485,8 @@ class ToolMakeWebMap:
                 'type': 'Feature',
                 'properties': {
                     'type': 'mdic',
-                    'uid': vnode.vhash,
-                    'uid_str': vnode.vpath.decode('utf-8'),
+                    'uid': vnode.v_hash,
+                    'uid_str': vnode.v_path.decode('utf-8'),
                     'comment': '',
                     'position': [aabb.min.tolist(), aabb.max.tolist()],
                 },

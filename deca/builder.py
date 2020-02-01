@@ -17,10 +17,10 @@ class Builder:
 
     def build_node_sarc(
             self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
-        assert(vnode.ftype == FTYPE_SARC)
+        assert(vnode.file_type == FTYPE_SARC)
 
-        vpath = vnode.vpath
-        print('BUILD SARC {}'.format(vnode.vpath))
+        v_path = vnode.v_path
+        print('BUILD SARC {}'.format(vnode.v_path))
 
         # parse existing file
         sarc_file = FileSarc()
@@ -43,23 +43,23 @@ class Builder:
                             'BUILD ERROR: {}: Parser error in command "{}"'.format(src_context, src_line))
 
                     mr = re.match(r'^"([^"]*)"$', param)
-                    vpath = None
+                    v_path = None
                     if mr is not None:
-                        vpath = mr.group(1).encode('ascii')
+                        v_path = mr.group(1).encode('ascii')
 
                     if cmd == 'sarc.clear':
                         sarc_file.entries.clear()
                     elif cmd in {'sarc.add', 'sarc.symlink'}:
                         # Check to make sure entry does not exist
                         for entry in sarc_file.entries:
-                            if entry.vpath == vpath:
+                            if entry.v_path == v_path:
                                 raise EDecaBuildError(
-                                    'BUILD ERROR: {}: Tried to re-add vpath'.format(src_context, vpath.decode('UTF-8')))
+                                    'BUILD ERROR: {}: Tried to re-add v_path'.format(src_context, v_path.decode('UTF-8')))
 
                         # Add to end
-                        entry = EntrySarc(vpath=vpath)
+                        entry = EntrySarc(v_path=v_path)
                         entry.is_symlink = cmd == 'sarc.symlink'
-                        src_node = vfs.nodes_where_vpath(vpath)[0]
+                        src_node = vfs.nodes_where_vpath(v_path)[0]
                         entry.length = src_node.size_u
                         sarc_file.entries.append(entry)
                     # elif cmd == 'sarc.remove':
@@ -73,13 +73,13 @@ class Builder:
         src_files: List[Union[None, str]] = [None] * len(sarc_file.entries)
         entry: EntrySarc
         for i, entry in enumerate(sarc_file.entries):
-            if entry.vpath in vpath_complete_map:
-                src_file = vpath_complete_map[entry.vpath]
+            if entry.v_path in vpath_complete_map:
+                src_file = vpath_complete_map[entry.v_path]
                 src_files[i] = src_file
                 entry.length = os.stat(src_file).st_size
 
         # extract existing file
-        fn_dst = os.path.join(dst_path, vnode.vpath.decode('utf-8'))
+        fn_dst = os.path.join(dst_path, vnode.v_path.decode('utf-8'))
         pt, fn = os.path.split(fn_dst)
         os.makedirs(pt, exist_ok=True)
 
@@ -90,14 +90,14 @@ class Builder:
                 buf = None
                 src_file = src_files[i]
                 if entry.is_symlink:
-                    print('  SYMLINK {}'.format(entry.vpath))
+                    print('  SYMLINK {}'.format(entry.v_path))
                 elif src_file is not None:
-                    print('  INSERTING {} src file to new file'.format(entry.vpath))
+                    print('  INSERTING {} src file to new file'.format(entry.v_path))
                     with open(src_file, 'rb') as f:
                         buf = f.read(entry.length)
                 else:
-                    print('  COPYING {} from old file to new file'.format(entry.vpath))
-                    vn = vfs.nodes_where_vpath(entry.vpath)[0]
+                    print('  COPYING {} from old file to new file'.format(entry.v_path))
+                    vn = vfs.nodes_where_vpath(entry.v_path)[0]
                     with vfs.file_obj_from(vn) as fsi:
                         buf = fsi.read(entry.length)
 
@@ -105,13 +105,13 @@ class Builder:
                     fso.seek(entry.offset)
                     fso.write(buf)
 
-        vpath_complete_map[vpath] = fn_dst
+        vpath_complete_map[v_path] = fn_dst
 
     def build_node(
             self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
-        vpath = vnode.vpath
+        v_path = vnode.v_path
 
-        if vnode.ftype == FTYPE_SARC:
+        if vnode.file_type == FTYPE_SARC:
             self.build_node_sarc(dst_path, src_path, vnode, vfs, vpath_complete_map)
         elif src_path is None:
             pass  # no source path,
@@ -123,21 +123,21 @@ class Builder:
             pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
         elif src_path.endswith('.ddsc.dds'):
             # Build texture
-            vnode = vfs.nodes_where_vpath(vpath)[0]
+            vnode = vfs.nodes_where_vpath(v_path)[0]
 
             # make ddsc.dds into ddsc and avtxs
             compiled_files = image_import(vfs, vnode, src_path, dst_path)
             for cfile in compiled_files:
-                vpath = cfile[0]
+                v_path = cfile[0]
                 dst = cfile[1]
-                vpath_complete_map[vpath] = dst
+                vpath_complete_map[v_path] = dst
         else:
             # copy from source
-            dst = os.path.join(dst_path, vpath.decode('utf-8'))
+            dst = os.path.join(dst_path, v_path.decode('utf-8'))
             dst_dir = os.path.dirname(dst)
             os.makedirs(dst_dir, exist_ok=True)
             shutil.copy2(src_path, dst)
-            vpath_complete_map[vpath] = dst
+            vpath_complete_map[v_path] = dst
 
     def build_dir(self, vfs: VfsDatabase, src_path: str, dst_path: str):
         # find all changed src files
@@ -161,57 +161,57 @@ class Builder:
                 if ext == '.deca_sha1sum':
                     pass
                 elif cpath.endswith('.DECA.FILE_LIST.txt'):
-                    vpath = cpath[len(src_path):-len('.DECA.FILE_LIST.txt')].encode('ascii')
-                    vpath = vpath.replace(b'\\', b'/')
-                    src_files[vpath] = cpath
-                    print('DEPEND: DECA.FILE_LIST.txt: {} = {}'.format(vpath, cpath))
+                    v_path = cpath[len(src_path):-len('.DECA.FILE_LIST.txt')].encode('ascii')
+                    v_path = v_path.replace(b'\\', b'/')
+                    src_files[v_path] = cpath
+                    print('DEPEND: DECA.FILE_LIST.txt: {} = {}'.format(v_path, cpath))
                 elif cpath.endswith('.ddsc.dds'):
-                    vpath = cpath[len(src_path):-len('.dds')].encode('ascii')
-                    vpath = vpath.replace(b'\\', b'/')
-                    src_files[vpath] = cpath
-                    print('DEPEND: ddsc.dds: {} = {}'.format(vpath, cpath))
+                    v_path = cpath[len(src_path):-len('.dds')].encode('ascii')
+                    v_path = v_path.replace(b'\\', b'/')
+                    src_files[v_path] = cpath
+                    print('DEPEND: ddsc.dds: {} = {}'.format(v_path, cpath))
                 elif cpath.find('DECA') >= 0:  # ignore other deca files
                     pass
                 else:
-                    vpath = cpath[len(src_path):].encode('ascii')
-                    vpath = vpath.replace(b'\\', b'/')
-                    src_files[vpath] = cpath
-                    print('DEPEND: default: {} = {}'.format(vpath, cpath)) 
+                    v_path = cpath[len(src_path):].encode('ascii')
+                    v_path = v_path.replace(b'\\', b'/')
+                    src_files[v_path] = cpath
+                    print('DEPEND: default: {} = {}'.format(v_path, cpath))
 
         # calculate dependencies
         pack_list = list(src_files.keys())
         depends = {}
         completed = set()
         while len(pack_list) > 0:
-            vpath = pack_list.pop(0)
-            if vpath not in completed:
-                completed.add(vpath)
-                depends[vpath] = depends.get(vpath, set())
+            v_path = pack_list.pop(0)
+            if v_path not in completed:
+                completed.add(v_path)
+                depends[v_path] = depends.get(v_path, set())
 
-                vnodes = vfs.nodes_where_vpath(vpath)
+                vnodes = vfs.nodes_where_vpath(v_path)
 
                 if len(vnodes) == 0:
-                    print('TODO: WARNING: FILE {} NOT HANDLED'.format(vpath))
+                    print('TODO: WARNING: FILE {} NOT HANDLED'.format(v_path))
                 else:
                     vnode: VfsNode
                     for vnode in vnodes:
                         pid = vnode.pid
                         if pid is not None:
-                            pnode = vfs.node_where_uid(pid)
+                            pnode: VfsNode = vfs.node_where_uid(pid)
 
-                            if pnode.ftype == FTYPE_GDCBODY:
+                            if pnode.file_type == FTYPE_GDCBODY:
                                 # handle case of gdcc files
                                 pid = pnode.pid
                                 pnode = vfs.node_where_uid(pid)
 
-                            if pnode.ftype != FTYPE_ARC and pnode.ftype != FTYPE_TAB:
-                                if pnode.vpath is None:
+                            if pnode.file_type != FTYPE_ARC and pnode.file_type != FTYPE_TAB:
+                                if pnode.file_type is None:
                                     raise EDecaBuildError(
                                         'MISSING VPATH FOR uid:{} hash:{:08X}, when packing {}'.format(
-                                            pnode.uid, pnode.vhash, vnode.vpath))
+                                            pnode.uid, pnode.v_hash, vnode.v_path))
                                 else:
-                                    depends[pnode.vpath] = depends.get(pnode.vpath, set()).union({vnode.vpath})
-                                    pack_list.append(pnode.vpath)
+                                    depends[pnode.v_path] = depends.get(pnode.v_path, set()).union({vnode.v_path})
+                                    pack_list.append(pnode.v_path)
 
         # pprint(depends, width=128)
 
@@ -220,20 +220,20 @@ class Builder:
         while len(depends) > 0:
             any_change = False
             depends_keys = list(depends.keys())
-            for vpath in depends_keys:
-                if len(depends[vpath]) == 0:  # all sources ready?
+            for v_path in depends_keys:
+                if len(depends[v_path]) == 0:  # all sources ready?
                     any_change = True
-                    depends.pop(vpath)
+                    depends.pop(v_path)
                     v: set
                     for k, v in depends.items():
-                        v.discard(vpath)
+                        v.discard(v_path)
 
-                    fpath = src_files.get(vpath, None)
-                    vnodes = vfs.nodes_where_vpath(vpath)
+                    fpath = src_files.get(v_path, None)
+                    vnodes = vfs.nodes_where_vpath(v_path)
 
                     if len(vnodes) == 0:
-                        raise EDecaBuildError('MISSING VPATH when building vpath={} using fpath='.format(
-                            vpath, fpath))
+                        raise EDecaBuildError('MISSING VPATH when building v_path={} using fpath={}'.format(
+                            v_path, fpath))
                     else:
                         self.build_node(
                             dst_path=dst_path,

@@ -6,7 +6,7 @@ from PIL import Image
 from deca.file import ArchiveFile
 from deca.errors import *
 from deca.ff_types import *
-from deca.vfs_db import VfsDatabase
+from deca.vfs_db import VfsDatabase, VfsNode
 import deca.dxgi
 
 
@@ -316,24 +316,24 @@ class Ddsc:
                     print('dwPFFlags: {}'.format(test[1]))
 
 
-def image_load(vfs: VfsDatabase, vnode, save_raw_data=False):
-    if vnode.ftype == FTYPE_BMP:
+def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
+    if vnode.file_type == FTYPE_BMP:
         f_ddsc = vfs.file_obj_from(vnode)
         ddsc = Ddsc()
         ddsc.load_bmp(f_ddsc)
-    elif vnode.ftype == FTYPE_DDS:
+    elif vnode.file_type == FTYPE_DDS:
         f_ddsc = vfs.file_obj_from(vnode)
         ddsc = Ddsc()
         ddsc.load_dds(f_ddsc)
-    elif vnode.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-        if vnode.vpath is None:
+    elif vnode.file_type in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+        if vnode.v_path is None:
             f_ddsc = vfs.file_obj_from(vnode)
             ddsc = Ddsc()
             ddsc.load_ddsc(f_ddsc)
         else:
-            filename = os.path.splitext(vnode.vpath)
-            if len(filename[1]) == 0 and vnode.ftype == FTYPE_AVTX:
-                filename_ddsc = vnode.vpath
+            filename = os.path.splitext(vnode.v_path)
+            if len(filename[1]) == 0 and vnode.file_type == FTYPE_AVTX:
+                filename_ddsc = vnode.v_path
             else:
                 filename_ddsc = filename[0] + b'.ddsc'
 
@@ -362,17 +362,17 @@ def image_load(vfs: VfsDatabase, vnode, save_raw_data=False):
             else:
                 raise EDecaFileMissing('File {} is missing.'.format(filename_ddsc))
     else:
-        raise EDecaIncorrectFileFormat('Cannot handle format {} in {}'.format(vnode.ftype, vnode.vpath))
+        raise EDecaIncorrectFileFormat('Cannot handle format {} in {}'.format(vnode.file_type, vnode.v_path))
 
     return ddsc
 
 
-def image_export(vfs: VfsDatabase, node, extract_dir, export_raw, export_processed, allow_overwrite=False):
+def image_export(vfs: VfsDatabase, node: VfsNode, extract_dir, export_raw, export_processed, allow_overwrite=False):
     existing_files = []
     ddsc = image_load(vfs, node, save_raw_data=True)
 
     if ddsc is not None:
-        multifile = node.ftype in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}
+        multifile = node.file_type in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}
 
         if export_raw or not multifile:
             if multifile:
@@ -383,10 +383,10 @@ def image_export(vfs: VfsDatabase, node, extract_dir, export_raw, export_process
                 cnodes = [node]
 
             for cnode in cnodes:
-                if cnode.vpath is None:
-                    ofile = extract_dir + '{:08X}.dat'.format(cnode.vhash)
+                if cnode.v_path is None:
+                    ofile = extract_dir + '{:08X}.dat'.format(cnode.v_hash)
                 else:
-                    ofile = extract_dir + '{}'.format(cnode.vpath.decode('utf-8'))
+                    ofile = extract_dir + '{}'.format(cnode.v_path.decode('utf-8'))
 
                 ofiledir = os.path.dirname(ofile)
                 os.makedirs(ofiledir, exist_ok=True)
@@ -400,10 +400,10 @@ def image_export(vfs: VfsDatabase, node, extract_dir, export_raw, export_process
                             fo.write(buffer)
 
         if export_processed and multifile:
-            if node.vpath is None:
-                ofile = extract_dir + '{:08X}.dat'.format(node.vhash)
+            if node.v_path is None:
+                ofile = extract_dir + '{:08X}.dat'.format(node.v_hash)
             else:
-                ofile = extract_dir + '{}'.format(node.vpath.decode('utf-8'))
+                ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
 
             ofiledir = os.path.dirname(ofile)
             os.makedirs(ofiledir, exist_ok=True)
@@ -496,8 +496,8 @@ def image_export(vfs: VfsDatabase, node, extract_dir, export_raw, export_process
             raise EDecaFileExists(existing_files)
 
 
-def image_import(vfs: VfsDatabase, node, ifile: str, opath: str):
-    print('Importing Image: {}\n  input {}\n  opath {}'.format(node.vpath, ifile, opath))
+def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
+    print('Importing Image: {}\n  input {}\n  opath {}'.format(node.v_path, ifile, opath))
     ddsc = image_load(vfs, node, save_raw_data=True)
 
     compiled_files = []

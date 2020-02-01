@@ -275,7 +275,9 @@ class Processor:
                         cnode = VfsNode(
                             v_hash=te.hashname, pid=node.uid, index=i,
                             offset=te.offset, size_c=te.size_c, size_u=te.size_u,
-                            compression_type=te.compression_type, blocks=blocks)
+                            compression_type=te.compression_type,
+                            compression_flag=te.compression_flags,
+                            blocks=blocks)
 
                         db.node_add(cnode)
 

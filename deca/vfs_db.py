@@ -59,8 +59,11 @@ def common_prefix(s0, s1):
 
 
 compression_type_mask = 0xFF
-is_processed_file_mask = 1 << 8
-is_temporary_file_mask = 1 << 9
+compression_type_shift = 0
+compression_flag_mask = 0xFF00
+compression_flag_shift = 8
+is_processed_file_mask = 1 << 16
+is_temporary_file_mask = 1 << 17
 
 
 class VfsNode:
@@ -73,6 +76,7 @@ class VfsNode:
             is_processed_file=False,
             is_temporary_file=False,
             compression_type=0,
+            compression_flag=0,
             blocks=None,
             flags=None,
             used_at_runtime_depth=None,
@@ -90,12 +94,15 @@ class VfsNode:
         self.offset = offset  # offset in parent
         self.size_c = size_c  # compressed size in client
         self.size_u = size_u  # extracted size
+
         self.blocks = blocks
 
         self.used_at_runtime_depth = used_at_runtime_depth
 
         if flags is None:
-            self.flags = compression_type & compression_type_mask
+            self.flags = 0
+            self.flags |= (compression_type << compression_type_shift) & compression_type_mask
+            self.flags |= (compression_flag << compression_flag_shift) & compression_flag_mask
             if is_processed_file:
                 self.flags = self.flags | is_processed_file_mask
             if is_temporary_file:
@@ -114,12 +121,20 @@ class VfsNode:
         self.flags = (self.flags & ~bit) | value
 
     def compression_type_get(self):
-        return self.flags & compression_type_mask
+        return (self.flags & compression_type_mask) >> compression_type_shift
 
     def compression_type_set(self, value):
         self.flags = \
             (self.flags & ~compression_type_mask) | \
-            (value & compression_type_mask)
+            ((value << compression_type_shift) & compression_type_mask)
+
+    def compression_flag_get(self):
+        return (self.flags & compression_flag_mask) >> compression_flag_shift
+
+    def compression_flag_set(self, value):
+        self.flags = \
+            (self.flags & ~compression_flag_mask) | \
+            ((value << compression_flag_shift) & compression_flag_mask)
 
     def processed_file_get(self):
         return self.flags_get(is_processed_file_mask)
@@ -673,6 +688,13 @@ class VfsDatabase:
                             f_in.seek(block_offset)
                             in_buffer = f_in.read(compressed_len)
                             out_buffer, ret = self.decompress_oodle_lz.decompress(in_buffer, compressed_len, uncompressed_len)
+                            if ret != uncompressed_len:
+                                self.logger.trace('BAD: {}: ct:{}, cf:{}, ret:{}, bl:{}, sc:{}, su:{}'.format(
+                                    file_name, node.compression_type_get(), node.compression_flag_get(), ret,
+                                    node.blocks, node.size_c, node.size_u,
+                                ))
+                                out_buffer = in_buffer
+
                             f_out.write(out_buffer)
 
             return open(file_name, mode)

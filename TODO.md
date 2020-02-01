@@ -17,6 +17,9 @@
 * object_id_usage -> node
 * object_id_define -> node
 
+* add image format 98: jc4 50A1C344
+* pil missing format 71: switch to custom loader code for DDS? 
+
 * track audio files to events, determine how translatable audio files are used  
   * Example file hash == 00FFFE21 file number 15604
   * Mission pm_03_southcoast, 218561533  (flicka translated to english)

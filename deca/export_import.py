@@ -15,7 +15,7 @@ NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
 def fsb5c_export_processed(vfs: VfsDatabase, node, extract_dir, allow_overwrite=False):
-    with vfs.file_obj_from(node, 'rb') as f:
+    with vfs.file_obj_from(node) as f:
         buffer = f.read(node.size_u)
 
     # TODO hack just trim 16 byte header

@@ -508,7 +508,7 @@ class ToolMakeWebMap:
             print('PROCESSING: {}'.format(fn))
             vnodes = self.vfs.nodes_where_vpath(fn)
             vnode = vnodes[0]
-            with self.vfs.file_obj_from(vnode, 'rb') as f:
+            with self.vfs.file_obj_from(vnode) as f:
                 rtpc = Rtpc()
                 rtpc.deserialize(f)
             rtpc.visit(visitor)

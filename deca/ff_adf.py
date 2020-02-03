@@ -5,6 +5,7 @@ from typing import List, Dict
 from io import BytesIO
 from deca.errors import *
 from deca.file import ArchiveFile
+from deca.fast_file import *
 from deca.hashes import hash32_func
 from deca.ff_types import FTYPE_ADF_BARE
 from deca.vfs_db import VfsDatabase, VfsNode
@@ -23,19 +24,19 @@ class AdfTypeMissing(Exception):
 
 
 class GdcArchiveEntry:
-    def __init__(self, index, offset, size, vpath_hash, filetype_hash, adf_type_hash, v_path):
+    def __init__(self, index, offset, size, v_hash, filetype_hash, adf_type_hash, v_path):
         self.index = index
         self.offset = offset
         self.size = size
         self.v_path = v_path
-        self.vpath_hash = vpath_hash
+        self.v_hash = v_hash
         self.filetype_hash = filetype_hash
         self.adf_type_hash = adf_type_hash
 
     def __repr__(self):
         str_vhash = ''
-        if self.vpath_hash is not None:
-            str_vhash = ' h:{:08X}'.format(self.vpath_hash)
+        if self.v_hash is not None:
+            str_vhash = ' h:{:08X}'.format(self.v_hash)
 
         str_fthash = ''
         if self.filetype_hash is not None:
@@ -66,6 +67,7 @@ class StringHash:
 class MemberDef:
     def __init__(self):
         self.name = None
+        self.name_utf8 = None
         self.type_hash = None
         self.size = None
         self.offset = None
@@ -75,6 +77,7 @@ class MemberDef:
 
     def deserialize(self, f, nt):
         self.name = nt[f.read_u64()][1]
+        self.name_utf8 = self.name.decode('utf-8')
         self.type_hash = f.read_u32()
         self.size = f.read_u32()
         offset = f.read_u32()
@@ -258,7 +261,8 @@ def dump_type(type_id, type_map, offset=0, displayed_types=None):
         pass
     elif type_def.metatype == 1:  # Structure
         for m in type_def.members:
-            sbuf = sbuf + '{}{} o:{}({:08x})[{}] s:{} t:{:08x} dt:{:08x} dv:{:016x}\n'.format(' ' * (offset + 2), m.name.decode('utf-8'), m.offset, m.offset, m.bit_offset, m.size, m.type_hash, m.default_type, m.default_value)
+            sbuf = sbuf + '{}{} o:{}({:08x})[{}] s:{} t:{:08x} dt:{:08x} dv:{:016x}\n'.format(
+                ' ' * (offset + 2), m.name_utf8, m.offset, m.offset, m.bit_offset, m.size, m.type_hash, m.default_type, m.default_value)
             sbuf = sbuf + dump_type(m.type_hash, type_map, offset + 4, displayed_types=displayed_types + [type_id])
     elif type_def.metatype == 2:  # Pointer
         pass
@@ -442,141 +446,140 @@ def adf_value_extract(v):
         return v
 
 
-def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset=None, found_strings=None):
-    dpos = f.tell()
+def read_instance(
+        buffer, n_buffer, buffer_pos, type_id, map_typdef, map_stringhash, abs_offset,
+        bit_offset=None, found_strings=None):
+
+    dpos = buffer_pos
     if type_id == typedef_s8:
-        v = f.read_s8()
+        v, buffer_pos = ff_read_s8(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u8:
-        v = f.read_u8()
+        v, buffer_pos = ff_read_u8(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_s16:
-        v = f.read_s16()
+        v, buffer_pos = ff_read_s16(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u16:
-        v = f.read_u16()
+        v, buffer_pos = ff_read_u16(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_s32:
-        v = f.read_s32()
+        v, buffer_pos = ff_read_s32(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u32:
-        v = f.read_u32()
+        v, buffer_pos = ff_read_u32(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_s64:
-        v = f.read_s64()
+        v, buffer_pos = ff_read_s64(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_u64:
-        v = f.read_u64()
+        v, buffer_pos = ff_read_u64(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_f32:
-        v = f.read_f32()
+        v, buffer_pos = ff_read_f32(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
     elif type_id == typedef_f64:
-        v = f.read_f64()
+        v, buffer_pos = ff_read_f64(buffer, n_buffer, buffer_pos)
         v = AdfValue(v, type_id, dpos + abs_offset)
 
     elif type_id == 0x8955583e:
-        offset = f.read_u32()
-        length = f.read_u32()
-        opos = f.tell()
-        f.seek(offset)
+        offset, buffer_pos = ff_read_u32(buffer, n_buffer, buffer_pos)
+        length, buffer_pos = ff_read_u32(buffer, n_buffer, buffer_pos)
+        opos = buffer_pos
+        buffer_pos = offset
         # TODO Size may be needed for byte codes?
 
         # v = f.read_c8(length)
         # v = b''.join(v)
-        v = f.read_strz()
+        v, buffer_pos = ff_read_strz(buffer, n_buffer, buffer_pos)
 
         if found_strings is not None:
             found_strings.add(v)
 
-        f.seek(opos)
+        buffer_pos = opos
 
         v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
 
     # TODO: this seems to be missing in some cases, i.e. the case of meshc files for CharacterMesh1UVMesh
     elif type_id == 0xdefe88ed:  # deferred value
-        v0 = f.read_u32(4)
+        v0, buffer_pos = ff_read_u32s(buffer, n_buffer, buffer_pos, 4)
         if v0[0] == 0 or v0[2] == 0:
             v = None
         else:
-            opos = f.tell()
-            f.seek(v0[0])
-            v = read_instance(f, v0[2], map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
-            f.seek(opos)
+            opos = buffer_pos
+            buffer_pos = v0[0]
+            v, buffer_pos = read_instance(buffer, n_buffer, buffer_pos, v0[2], map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
+            buffer_pos = opos
             v = AdfValue(v, type_id, dpos + abs_offset, v0[0] + abs_offset)
 
     elif type_id == 0x178842fe:  # gdc/global.gdcc
         # TODO this should probably be it's own file type and the adf should be considered a wrapper
-        v = []
-        while True:
-            t = f.read_u8()
-            if t is None:
-                break
-            v.append(t)
-        v = bytearray(v)
-        with ArchiveFile(io.BytesIO(v)) as gdf:
-            count = gdf.read_u32(8)
-            assert(count[0] == 32)
-            assert(count[1] == 16)
-            assert(count[2] == count[6])
-            assert(count[3] == 0)
-            # assert(count[4] == filesize +- k)
-            assert(count[5] == 16)
-            assert(count[6] == count[2])
-            assert(count[7] == 0)
-            dir_list = []
-            for i in range(count[2]):
-                d00_offset = gdf.read_u32()
-                d04_unk = gdf.read_u32()
-                d08_filetype_hash = gdf.read_u32()
-                d12_unk = gdf.read_u32()
-                d16_vpath_offset = gdf.read_u32()
-                d20_unk = gdf.read_u32()
-                d24_unk = gdf.read_u32()
-                d28_unk = gdf.read_u32()
-                assert(d04_unk == 16)
-                assert(d12_unk == 0)
-                assert(d20_unk == 16)
-                assert(d24_unk == 0)
-                assert(d28_unk == 0)
-                entry = [d00_offset, d16_vpath_offset, d08_filetype_hash, d04_unk, d12_unk, d20_unk, d24_unk, d28_unk]
-                dir_list.append(entry)
+        gdf_buffer = buffer[buffer_pos:]
+        gdf_n_buffer = len(gdf_buffer)
+        gdf_buffer_pos = 0
 
-            dir_contents = []
-            idx = 0
-            for e1 in dir_list:
-                # TODO something weird is going on with this second header, sometimes it makes sense, sometimes it may
-                # have floats? or indicate that is should be 24 byte long?
-                string_offset = e1[1]
-                ftype_hash = e1[2]
+        count, gdf_buffer_pos = ff_read_u32s(gdf_buffer, gdf_n_buffer, gdf_buffer_pos, 8)
+        assert(count[0] == 32)
+        assert(count[1] == 16)
+        assert(count[2] == count[6])
+        assert(count[3] == 0)
+        # assert(count[4] == filesize +- k)
+        assert(count[5] == 16)
+        assert(count[6] == count[2])
+        assert(count[7] == 0)
+        dir_list = []
+        for i in range(count[2]):
+            d00_offset, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            d04_unk, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            d08_filetype_hash, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            d12_unk, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            d16_vpath_offset, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            d20_unk, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            d24_unk, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            d28_unk, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            assert(d04_unk == 16)
+            assert(d12_unk == 0)
+            assert(d20_unk == 16)
+            assert(d24_unk == 0)
+            assert(d28_unk == 0)
+            entry = [d00_offset, d16_vpath_offset, d08_filetype_hash, d04_unk, d12_unk, d20_unk, d24_unk, d28_unk]
+            dir_list.append(entry)
 
-                gdf.seek(string_offset)
-                v_path = gdf.read_strz()
-                v_hash = hash32_func(v_path)
+        dir_contents = []
+        idx = 0
+        for e1 in dir_list:
+            # TODO something weird is going on with this second header, sometimes it makes sense, sometimes it may
+            # have floats? or indicate that is should be 24 byte long?
+            string_offset = e1[1]
+            ftype_hash = e1[2]
 
-                if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
-                    # TODO this follows the data structure for an array of some type, 0xD74CC4CB is probably it's hash
-                    gdf.seek(e1[0])
-                    header2 = gdf.read_u32(4)
-                    actual_offset = header2[0]
-                    actual_size = header2[2]
-                    adf_type_hash = None
-                else:  # TODO current guess is that it is a bare ADF instance
-                    actual_offset = e1[0]
-                    actual_size = None
-                    adf_type_hash = ftype_hash
+            gdf_buffer_pos = string_offset
+            v_path, gdf_buffer_pos = ff_read_strz(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)
+            v_hash = hash32_func(v_path)
 
-                entry = GdcArchiveEntry(
-                    index=idx,
-                    offset=actual_offset,
-                    size=actual_size,
-                    vpath_hash=v_hash,
-                    filetype_hash=ftype_hash,
-                    adf_type_hash=adf_type_hash,
-                    v_path=v_path)
-                dir_contents.append(entry)
-                idx += 1
-            v = dir_contents
+            if ftype_hash in {0xD74CC4CB}:  # RTPC read directly
+                # TODO this follows the data structure for an array of some type, 0xD74CC4CB is probably it's hash
+                gdf_buffer_pos = e1[0]
+                header2, gdf_buffer_pos = ff_read_u32s(gdf_buffer, gdf_n_buffer, gdf_buffer_pos, 4)
+                actual_offset = header2[0]
+                actual_size = header2[2]
+                adf_type_hash = None
+            else:  # TODO current guess is that it is a bare ADF instance
+                actual_offset = e1[0]
+                actual_size = None
+                adf_type_hash = ftype_hash
+
+            entry = GdcArchiveEntry(
+                index=idx,
+                offset=actual_offset,
+                size=actual_size,
+                v_hash=v_hash,
+                filetype_hash=ftype_hash,
+                adf_type_hash=adf_type_hash,
+                v_path=v_path)
+            dir_contents.append(entry)
+            idx += 1
+        v = dir_contents
 
     else:
         if type_id not in map_typdef:
@@ -587,27 +590,27 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
             raise AdfTypeMissing(type_id)
         elif type_def.metatype == 1:  # Structure
             v = {}
-            p0 = f.tell()
+            p0 = buffer_pos
             for m in type_def.members:
-                f.seek(p0 + m.offset)
-                nm = m.name.decode('utf-8')
-                vt = read_instance(f, m.type_hash, map_typdef, map_stringhash, abs_offset, bit_offset=m.bit_offset, found_strings=found_strings)
+                buffer_pos = p0 + m.offset
+                nm = m.name_utf8
+                vt, buffer_pos = read_instance(buffer, n_buffer, buffer_pos, m.type_hash, map_typdef, map_stringhash, abs_offset, bit_offset=m.bit_offset, found_strings=found_strings)
                 v[nm] = vt
                 # print(nm, vt)
-            p1 = f.tell()
-            f.seek(p0 + type_def.size)
+            p1 = buffer_pos
+            buffer_pos = p0 + type_def.size
 
             v = AdfValue(v, type_id, p0 + abs_offset)
 
         elif type_def.metatype == 2:  # Pointer
-            v0 = f.read_u64()
+            v0, buffer_pos = ff_read_u64(buffer, n_buffer, buffer_pos)
             v = (v0, 'NOTE: {}: {:016x} to {:08x}'.format(type_def.name, v0, type_def.element_type_hash))
             # TODO not sure how this is used yet, but it's used by effects so lower priority
             # raise AdfTypeMissing(type_id)
         elif type_def.metatype == 3 or type_def.metatype == 4:  # Array or Inline Array
             if type_def.metatype == 3:
-                v0 = f.read_u32(4)
-                opos = f.tell()
+                v0, buffer_pos = ff_read_u32s(buffer, n_buffer, buffer_pos, 4)
+                opos = buffer_pos
 
                 offset = v0[0]
                 flags = v0[1]
@@ -617,61 +620,63 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 # aligning based on element size info
                 # if type_def.element_type_hash not in prim_types:
                 #     align = 4
-                f.seek(offset)
+                buffer_pos = offset
             else:
                 opos = None
-                offset = f.tell()
+                offset = buffer_pos
                 length = type_def.element_length
                 align = None
 
             if type_def.element_type_hash == typedef_u8:
-                # v = list(f.read_u8(length))
-                v = f.read(length)
+                # v, buffer_pos = ff_read_u8s(buffer, n_buffer, buffer_pos, length)
+                v, buffer_pos = ff_read(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_s8:
-                # v = list(f.read_s8(length))
-                v = f.read(length)
+                # v, buffer_pos = ff_read_s8s(buffer, n_buffer, buffer_pos, length)
+                v, buffer_pos = ff_read(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_u16:
-                v = list(f.read_u16(length))
+                v, buffer_pos = ff_read_u16s(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_s16:
-                v = list(f.read_s16(length))
+                v, buffer_pos = ff_read_s16s(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_u32:
-                v = list(f.read_u32(length))
+                v, buffer_pos = ff_read_u32s(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_s32:
-                v = list(f.read_s32(length))
+                v, buffer_pos = ff_read_s32s(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_u64:
-                v = list(f.read_u64(length))
+                v, buffer_pos = ff_read_u64s(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_s64:
-                v = list(f.read_s64(length))
+                v, buffer_pos = ff_read_s64s(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_f32:
-                v = list(f.read_f32(length))
+                v, buffer_pos = ff_read_f32s(buffer, n_buffer, buffer_pos, length)
             elif type_def.element_type_hash == typedef_f64:
-                v = list(f.read_f64(length))
+                v, buffer_pos = ff_read_f64s(buffer, n_buffer, buffer_pos, length)
             else:
-                # if length > 1000:
-                #     print('OPTIMIZE {:08x}'.format(type_def.element_type_hash))
                 v = [None] * length
                 for i in range(length):
-                    p0 = f.tell()
+                    p0 = buffer_pos
                     if align is not None:
                         nudge = (align - p0 % align) % align
-                        f.seek(p0 + nudge)  # v0[0] offset ele 0, v0[1] stride?
-                    v[i] = read_instance(f, type_def.element_type_hash, map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
-                    p1 = f.tell()
+                        buffer_pos = p0 + nudge  # v0[0] offset ele 0, v0[1] stride?
+
+                    v[i], buffer_pos = read_instance(
+                        buffer, n_buffer, buffer_pos,
+                        type_def.element_type_hash, map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
+
+                    p1 = buffer_pos
                     # print(p0, p1, p1-p0)
 
             if opos is not None:
-                f.seek(opos)
+                buffer_pos = opos
 
             v = AdfValue(v, type_id, dpos + abs_offset, offset + abs_offset)
         elif type_def.metatype == 7:  # BitField
             if type_def.size == 1:
-                v = f.read_u8()
+                v, buffer_pos = ff_read_u8(buffer, n_buffer, buffer_pos)
             elif type_def.size == 2:
-                v = f.read_u16()
+                v, buffer_pos = ff_read_u16(buffer, n_buffer, buffer_pos)
             elif type_def.size == 4:
-                v = f.read_u32()
+                v, buffer_pos = ff_read_u32(buffer, n_buffer, buffer_pos)
             elif type_def.size == 8:
-                v = f.read_u64()
+                v, buffer_pos = ff_read_u64(buffer, n_buffer, buffer_pos)
             else:
                 raise Exception('Unknown bitfield size')
 
@@ -685,7 +690,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
         elif type_def.metatype == 8:  # Enumeration
             if type_def.size != 4:
                 raise Exception('Unknown enum size')
-            v = f.read_u32()
+            v, buffer_pos = ff_read_u32(buffer, n_buffer, buffer_pos)
             if v < len(type_def.members):
                 vs = type_def.members[v].name
             else:
@@ -694,7 +699,7 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
             v = AdfValue(v, type_id, dpos + abs_offset, enum_string=vs)
         elif type_def.metatype == 9:  # String Hash
             if type_def.size == 4:
-                v = f.read_u32()
+                v, buffer_pos = ff_read_u32(buffer, n_buffer, buffer_pos)
                 if v in map_stringhash:
                     vs = map_stringhash[v].value
                 elif v == 0xDEADBEEF:
@@ -702,26 +707,26 @@ def read_instance(f, type_id, map_typdef, map_stringhash, abs_offset, bit_offset
                 else:
                     vs = None
             elif type_def.size == 6:
-                v0 = f.read_u16()
-                v1 = f.read_u16()
-                v2 = f.read_u16()
+                v0, buffer_pos = ff_read_u16(buffer, n_buffer, buffer_pos)
+                v1, buffer_pos = ff_read_u16(buffer, n_buffer, buffer_pos)
+                v2, buffer_pos = ff_read_u16(buffer, n_buffer, buffer_pos)
                 v = v0 << 32 | v1 << 16 | v2
                 if v in map_stringhash:
                     vs = map_stringhash[v].value
                 else:
                     vs = None
             elif type_def.size == 8:
-                v = f.read_u64()
+                v, buffer_pos = ff_read_u64(buffer, n_buffer, buffer_pos)
                 vs = None
             else:
-                v = f.read(type_def.size)
+                v, buffer_pos = ff_read(buffer, n_buffer, buffer_pos, type_def.size)
                 vs = None
 
             v = AdfValue(v, type_id, dpos + abs_offset, hash_string=vs)
         else:
             raise Exception('Unknown Typedef Type {}'.format(type_def.metatype))
 
-    return v
+    return v, buffer_pos
 
 
 class Adf:
@@ -891,14 +896,14 @@ class Adf:
             for i in range(len(self.table_instance)):
                 ins = self.table_instance[i]
                 fp.seek(ins.offset)
-                # try:
-                buf = fp.read(ins.size)
-                with ArchiveFile(io.BytesIO(buf)) as f:
-                    v = read_instance(
-                        f, ins.type_hash, self.extended_map_typedef, self.map_stringhash, ins.offset,
-                        found_strings=self.found_strings)
-                    self.table_instance_full_values[i] = v
-                    self.table_instance_values[i] = adf_value_extract(v)
+                buffer = fp.read(ins.size)
+                n_buffer = len(buffer)
+                buffer_pos = 0
+                v, buffer_pos = read_instance(
+                    buffer, n_buffer, buffer_pos,
+                    ins.type_hash, self.extended_map_typedef, self.map_stringhash, ins.offset, found_strings=self.found_strings)
+                self.table_instance_full_values[i] = v
+                self.table_instance_values[i] = adf_value_extract(v)
                 # except AdfTypeMissing as ae:
                 #     print('Missing HASHID {:08x}'.format(ae.hashid))
                 # except Exception as exp:
@@ -986,17 +991,13 @@ class AdfDatabase:
             obj.table_instance_full_values = [None] * len(obj.table_instance)
             for i in range(len(obj.table_instance)):
                 ins = obj.table_instance[i]
-                # try:
-                with ArchiveFile(io.BytesIO(buffer)) as f:
-                    f.seek(ins.offset)
-                    v = read_instance(
-                        f, ins.type_hash, obj.extended_map_typedef, obj.map_stringhash, 0, found_strings=obj.found_strings)
-                    obj.table_instance_full_values[i] = v
-                    obj.table_instance_values[i] = adf_value_extract(v)
-                # except AdfTypeMissing as ae:
-                #     print('Missing HASHID {:08x}'.format(ae.hashid))
-                # except Exception as exp:
-                #     print(exp)
+                n_buffer = len(buffer)
+                buffer_pos = ins.offset
+                v, buffer_pos = read_instance(
+                    buffer, n_buffer, buffer_pos,
+                    ins.type_hash, obj.extended_map_typedef, obj.map_stringhash, 0, found_strings=obj.found_strings)
+                obj.table_instance_full_values[i] = v
+                obj.table_instance_values[i] = adf_value_extract(v)
 
             return obj
         except EDecaErrorParse:

@@ -1,3 +1,10 @@
+* Not sure how many good compressions have a flag of 1. Will need to check
+* add image format 98: jc4 50A1C344
+* pil missing format 71: switch to custom loader code for DDS? 
+* add hash to vnode info, process nodes with same name but different hashes
+* handle patching system
+* does GenZero use the archives as a defacto base tha dropzone patches against?
+
 * unify string hash tables
 * theHunter uses 4byte hash for event ids?
 * try all hash ideas when resolving unknown hash, give lookup number of known bytes
@@ -17,8 +24,6 @@
 * object_id_usage -> node
 * object_id_define -> node
 
-* add image format 98: jc4 50A1C344
-* pil missing format 71: switch to custom loader code for DDS? 
 
 * track audio files to events, determine how translatable audio files are used  
   * Example file hash == 00FFFE21 file number 15604

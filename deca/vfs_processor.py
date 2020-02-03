@@ -3,16 +3,16 @@ import re
 import csv
 import time
 
-from deca.vfs_db import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
-from .db_wrap import DbWrap
-from deca.vfs_commands import MultiProcessControl
-from deca.game_info import GameInfoGZ, GameInfoGZB, GameInfoTHCOTW, GameInfoJC3, GameInfoJC4
-from deca.ff_types import *
 import deca.ff_rtpc
-from deca.ff_adf import AdfDatabase
-from deca.util import Logger, make_dir_for_file
-from deca.hashes import hash32_func
-from deca.ff_determine import determine_file_type_and_size
+
+from .vfs_db import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
+from .db_wrap import DbWrap
+from .vfs_commands import MultiProcessControl
+from .game_info import determine_game
+from .ff_types import *
+from .ff_adf import AdfDatabase
+from .util import Logger, make_dir_for_file
+from .hashes import hash32_func
 
 
 def vfs_structure_new(filename):
@@ -20,20 +20,8 @@ def vfs_structure_new(filename):
     game_dir, exe_name = os.path.split(exe_path)
     game_dir = os.path.join(game_dir, '')
 
-    game_info = None
+    game_info = determine_game(game_dir, exe_name)
     vfs = None
-    if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-        game_info = GameInfoGZB(game_dir, exe_name)
-    elif exe_name.find('GenerationZero') >= 0:
-        game_info = GameInfoGZ(game_dir, exe_name)
-    elif exe_name.find('theHunterCotW') >= 0:
-        game_info = GameInfoTHCOTW(game_dir, exe_name)
-    elif exe_name.find('JustCause3') >= 0:
-        game_info = GameInfoJC3(game_dir, exe_name)
-    elif exe_name.find('JustCause4') >= 0:
-        game_info = GameInfoJC4(game_dir, exe_name)
-    else:
-        pass
 
     if game_info is not None:
         working_dir = '../work/{}/'.format(game_info.game_id)
@@ -84,31 +72,125 @@ class VfsProcessor(VfsDatabase):
             self.last_status_update = curr_time
             self.log('Completed {} of {}'.format(i, n))
 
+    def find_initial_files(self, debug=False):
+        self.logger.log('Add EXE files')
+        exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
+        f_size = os.stat(exe_path).st_size
+        node = VfsNode(file_type=FTYPE_EXE, p_path=exe_path, size_u=f_size, size_c=f_size, offset=0)
+        self.determine_ftype(node)
+        self.node_add_one(node)
+
+        self.logger.log('Add unarchived files')
+        for ua_file in self.game_info.unarchived_files():
+            f_size = os.stat(ua_file).st_size
+            v_path = os.path.basename(ua_file).encode('utf-8')
+            v_hash = deca.hashes.hash32_func(v_path)
+            node = VfsNode(v_hash=v_hash, v_path=v_path, p_path=ua_file, size_u=f_size, size_c=f_size, offset=0)
+            self.determine_ftype(node)
+            self.node_add_one(node)
+
+        self.logger.log('Add TAB / ARC files')
+        input_files = []
+        dir_in = self.game_info.archive_path()
+        dir_found = []
+
+        while len(dir_in) > 0:
+            d = dir_in.pop(0)
+            if os.path.isdir(d):
+                dir_found.append(d)
+                files = os.listdir(d)
+                for file in files:
+                    ff = os.path.join(d, file)
+                    if os.path.isdir(ff):
+                        dir_in.append(ff)
+
+        for fcat in dir_found:
+            self.logger.log('Processing Directory: {}'.format(fcat))
+            if os.path.isdir(fcat):
+                files = os.listdir(fcat)
+                ifns = []
+                for file in files:
+                    if file.endswith('.tab'):
+                        ifns.append(file[0:-4])
+                ifns.sort(key=game_file_to_sortable_string)
+                for ifn in ifns:
+                    input_files.append(os.path.join(fcat, ifn))
+
+        for ta_file in input_files:
+            inpath = os.path.join(ta_file)
+            file_arc = inpath + '.arc'
+            f_size = os.stat(file_arc).st_size
+            node = VfsNode(file_type=FTYPE_ARC, p_path=file_arc, size_u=f_size, size_c=f_size, offset=0)
+            self.determine_ftype(node)
+            self.node_add_one(node)
+
     def process(self, debug=False):
+        inner_loop = [
+            [self.process_by_ftype_match, (FTYPE_EXE, 'process_exe')],
+            [self.process_by_ftype_match, (FTYPE_ARC, 'process_arc')],
+            [self.process_by_ftype_match, (FTYPE_TAB, 'process_tab')],
+            [self.process_by_ftype_match, (FTYPE_SARC, 'process_sarc')],
+            [self.process_by_vhash_match, (deca.hashes.hash32_func(b'gdc/global.gdcc'), 'process_global_gdcc')],
+            [self.process_by_ftype_match, (FTYPE_GDCBODY, 'process_global_gdcc_body')],
+            [self.process_by_ext_hash_match, (deca.hashes.hash32_func(b'.resourcebundle'), 'process_resource_bundle')],
+            [self.process_by_vpath_endswith, (b'.resourcebundle', 'process_resource_bundle')],
+            [self.process_by_ftype_match, (FTYPE_ADF, 'process_adf_initial')],
+            [self.process_by_ftype_match, (FTYPE_ADF_BARE, 'process_adf_initial')],
+            [self.process_by_ftype_match, (FTYPE_RTPC, 'process_rtpc_initial')],
+            [self.process_by_ftype_match, (FTYPE_GFX, 'process_gfx_initial')],
+            [self.process_by_ftype_match, (FTYPE_TXT, 'process_txt_initial')],
+            [self.process_by_ftype_match, (FTYPE_SYMLINK, 'process_symlink')],
+        ]
+
         version = self.db_query_one("PRAGMA user_version")[0]
         if version < 1:
             self.db_reset()
-            self.load_from_archives(debug=debug)
-            self.process_by_ftype(FTYPE_ADF, 'process_adf_initial')
-            self.process_by_ftype(FTYPE_ADF_BARE, 'process_adf_initial')
-            self.process_by_ftype(FTYPE_RTPC, 'process_rtpc_initial')
-            self.process_by_ftype(FTYPE_GFX, 'process_gfx_initial')
-            self.process_by_ftype(FTYPE_TXT, 'process_txt_initial')
-            self.find_vpath_exe()
-            self.find_vpath_procmon_dir()
-            self.find_vpath_resources()
-            self.find_vpath_guess()
-            self.find_vpath_by_assoc()
-            self.process_by_vhash('process_vhash_final')
-            self.update_used_depths()
-            self.dump_vpaths()
             self.db_execute_one("PRAGMA user_version = 1;")
-
-        # TODO process any hashless strings in vhash4 and vhash6 table, assume outside program added them for testing
+            self.find_initial_files(debug=debug)
 
         self.process_remove_temporary_nodes()
 
+        self.find_vpath_procmon_dir()
+        self.find_vpath_resources()
+        self.find_vpath_guess()
+
+        outer_phase_id = 0
+        inner_loop_count = 2
+        while inner_loop_count > 1:
+            outer_phase_id = outer_phase_id + 1
+            self.logger.log('Phase {}: Begin'.format(outer_phase_id))
+
+            inner_processed_nodes = set()
+            inner_phase_id = 0
+            changed = True
+            inner_loop_count = 0
+            while changed:
+                inner_loop_count += 1
+                inner_phase_id = inner_phase_id + 1
+
+                self.logger.log('Phase {}.{}: File Process Begin'.format(outer_phase_id, inner_phase_id))
+
+                processed_nodes = set()
+
+                for ops in inner_loop:
+                    result = ops[0](*(ops[1]))
+                    processed_nodes = processed_nodes.union(result)
+
+                self.logger.log('Phase {}.{}: File Process End'.format(outer_phase_id, inner_phase_id))
+
+                changed = processed_nodes != inner_processed_nodes
+                inner_processed_nodes = processed_nodes
+
+            if inner_loop_count > 1:
+                self.find_vpath_by_assoc()
+                self.process_all_vhashes('process_vhash_final')
+
+            self.logger.log('Phase {}: End'.format(outer_phase_id))
+
+        self.update_used_depths()
+        self.dump_vpaths()
         self.dump_status()
+
         self.logger.log('PROCESSING: COMPLETE')
 
     def dump_vpaths(self):
@@ -132,7 +214,7 @@ class VfsProcessor(VfsDatabase):
             fcs = []
             gtz_count = 0
             for h, s in hashes:
-                q = "SELECT DISTINCT uid FROM core_vnodes WHERE vpath = (?)"
+                q = "SELECT DISTINCT uid FROM core_vnodes WHERE v_path = (?)"
                 nodes = self.db_query_all(q, [s])
                 fc = len(nodes)
                 self.logger.log(f'SUMMARY: Duplicate String4 Hashes: {h:08x} {s}: {fc} nodes')
@@ -144,7 +226,7 @@ class VfsProcessor(VfsDatabase):
                     self.logger.log(f'WARNING: Duplicate String4 Hashes: {h:08x} {s}: {fc} nodes')
 
         # nodes with same hash but different paths, rare
-        q = "SELECT DISTINCT vpath_hash, vpath, COUNT(*) c FROM core_vnodes GROUP BY vpath_hash, vpath_hash HAVING c > 1;"
+        q = "SELECT DISTINCT v_hash, v_path, COUNT(*) c FROM core_vnodes GROUP BY v_hash, v_hash HAVING c > 1;"
         dup_nodes = self.db_query_all(q)
         dup_map = {}
         dup_count = {}
@@ -173,126 +255,101 @@ class VfsProcessor(VfsDatabase):
         self.logger.log(f'SUMMARY: Missing Types: {len(missing_types)} ')
 
         # unmatched summary, common
-        q = "SELECT vpath_hash FROM core_vnodes WHERE vpath IS NULL"
+        q = "SELECT v_hash FROM core_vnodes WHERE v_path IS NULL"
         nodes_no_vpath = self.db_query_all(q)
         nodes_no_vpath = [r[0] for r in nodes_no_vpath]
         nodes_no_vpath_set = set(nodes_no_vpath)
         self.logger.log(f'SUMMARY: Unmatched Nodes: {len(nodes_no_vpath)}')
         self.logger.log(f'SUMMARY: Unmatched Path Hashes: {len(nodes_no_vpath_set)}')
 
-    def load_from_archives(self, debug=False):
-        self.logger.log('Process EXE file')
-
-        self.logger.log('find all tab/arc files')
-        input_files = []
-
-        dir_in = self.game_info.archive_path()
-        dir_found = []
-
-        # add exe to be parsed in normal way
-        exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
-        node = VfsNode(file_type=FTYPE_EXE, p_path=exe_path)
-        self.node_add_one(node)
-
-        while len(dir_in) > 0:
-            d = dir_in.pop(0)
-            if os.path.isdir(d):
-                dir_found.append(d)
-                files = os.listdir(d)
-                for file in files:
-                    ff = os.path.join(d, file)
-                    if os.path.isdir(ff):
-                        dir_in.append(ff)
-
-        for fcat in dir_found:
-            self.logger.log('Processing Directory: {}'.format(fcat))
-            if os.path.isdir(fcat):
-                files = os.listdir(fcat)
-                ifns = []
-                for file in files:
-                    if 'tab' == file[-3:]:
-                        ifns.append(file[0:-4])
-                ifns.sort(key=game_file_to_sortable_string)
-                for ifn in ifns:
-                    input_files.append(os.path.join(fcat, ifn))
-
-        self.logger.log('process unarchived files')
-        for ua_file in self.game_info.unarchived_files():
-            with open(ua_file, 'rb') as f:
-                ftype, fsize = determine_file_type_and_size(f, os.stat(ua_file).st_size)
-            v_path = os.path.basename(ua_file).encode('utf-8')
-            v_hash = deca.hashes.hash32_func(v_path)
-            node = VfsNode(
-                v_hash=v_hash, v_path=v_path, p_path=ua_file, file_type=ftype,
-                size_u=fsize, size_c=fsize, offset=0)
-            self.determine_ftype(node)
-            self.node_add_one(node)
-
-        self.logger.log('process all game tab / arc files')
-        for ta_file in input_files:
-            inpath = os.path.join(ta_file)
-            file_arc = inpath + '.arc'
-            node = VfsNode(file_type=FTYPE_ARC, p_path=file_arc)
-            self.node_add_one(node)
-
-        phase_id = 0
-        processed_nodes = set()
-        while True:
-            phase_id = phase_id + 1
-            new_nodes = set(self.nodes_where_processed_select_uid(0))
-            new_nodes = new_nodes - processed_nodes
-
-            if len(new_nodes) > 0:
-                self.logger.log('Expand Archives Phase {}: Begin'.format(phase_id))
-                commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-                commander.do_map('process_archives_initial', list(new_nodes), step_id='Archives')
-                processed_nodes = processed_nodes.union(new_nodes)
-                self.logger.log('Expand Archives Phase {}: End'.format(phase_id))
+    def src_indexes_process(self, src_indexes):
+        indexes = []
+        nodes = {}
+        for uid, v_hash, processed in src_indexes:
+            if v_hash is None and not processed:
+                # handle physical only files with no vpath (EXE, ARC, TAB, EXTERNALS)
+                indexes.append(uid)
             else:
-                break
+                # normal case of files that have v_hashes and v_paths (possibly)
+                info = nodes.get(v_hash, None)
+                if info is None:
+                    nodes[v_hash] = (uid, processed)
+                elif processed and not info[1]:
+                    nodes[v_hash] = (uid, processed)
 
-    def get_vnode_indexs_from_ftype(self, ftype, process_dups=False):
-        indexs = []
         done_set = set()
-        src_indexes = self.nodes_where_ftype_select_uid(ftype)
-        for idx in src_indexes:
-            node: VfsNode = self.node_where_uid(idx)
-            if node.is_valid() and node.file_type == ftype and (process_dups or node.v_hash not in done_set):
-                done_set.add(node.v_hash)
-                indexs.append(idx)
-        return indexs, done_set
+        for k, v in nodes.items():
+            uid, processed = v
+            if processed:
+                done_set.add(k)
+            else:
+                indexes.append(uid)
 
-    def process_by_ftype(self, ftype, cmd, process_dups=False):
-        self.logger.log('PROCESS: FTYPE = {}'.format(ftype))
-        indexes, nodes_done = self.get_vnode_indexs_from_ftype(ftype, process_dups)
-        if len(indexes) > 0:
+        return indexes, done_set
+
+    def process_by_ftype_match(self, f_type, cmd):
+        self.logger.log('PROCESS: F_TYPE = {}: Begin'.format(f_type))
+
+        src_indexes = self.nodes_where_f_type_select_uid_v_hash_processed(f_type)
+        indexes, done_set = self.src_indexes_process(src_indexes)
+        if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            commander.do_map(cmd, indexes, step_id=ftype)
-        self.logger.log('PROCESS: FTYPE = {}: Total files {}'.format(ftype, len(nodes_done)))
+            commander.do_map(cmd, indexes, step_id=f_type)
 
-    def process_by_vhash(self, cmd):
-        self.logger.log('PROCESS: VHASHes')
+        self.logger.log('PROCESS: F_TYPE = {}: End: Already Processed: {}, Additional: {}'.format(
+            f_type, len(done_set), len(indexes)))
+
+        return indexes
+
+    def process_by_vhash_match(self, v_hash, cmd):
+        self.logger.log('PROCESS: V_HASH = 0x{:08X}: Begin'.format(v_hash))
+
+        src_indexes = self.nodes_where_v_hash_select_uid_v_hash_processed(v_hash)
+        indexes, done_set = self.src_indexes_process(src_indexes)
+        if indexes:
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            commander.do_map(cmd, indexes, step_id=f'v_hash = {v_hash}')
+
+        self.logger.log('PROCESS: V_HASH = 0x{:08X}: End: Already Processed: {}, Additional: {}'.format(
+            v_hash, len(done_set), len(indexes)))
+
+        return indexes
+
+    def process_by_ext_hash_match(self, ext_hash, cmd):
+        self.logger.log('PROCESS: EXT_HASH = 0x{:08X}: Begin'.format(ext_hash))
+
+        src_indexes = self.nodes_where_ext_hash_select_uid_v_hash_processed(ext_hash)
+        indexes, done_set = self.src_indexes_process(src_indexes)
+        if indexes:
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            commander.do_map(cmd, indexes, step_id=f'ext_hash = {ext_hash}')
+
+        self.logger.log('PROCESS: EXT_HASH = 0x{:08X}: End: Already Processed: {}, Additional: {}'.format(
+            ext_hash, len(done_set), len(indexes)))
+
+        return indexes
+
+    def process_by_vpath_endswith(self, suffix, cmd):
+        self.logger.log('PROCESS: ENDS_WITH = {}: Begin'.format(suffix))
+
+        src_indexes = self.nodes_where_vpath_endswith_select_uid_v_hash_processed(suffix)
+        indexes, done_set = self.src_indexes_process(src_indexes)
+        if indexes:
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            commander.do_map(cmd, indexes, step_id=f'endswith = {suffix}')
+
+        self.logger.log('PROCESS: ENDS_WITH = {}: End: Already Processed: {}, Additional: {}'.format(
+            suffix, len(done_set), len(indexes)))
+
+        return indexes
+
+    def process_all_vhashes(self, cmd):
+        self.logger.log('PROCESS: VHASHes: Begin')
         vhashes = self.nodes_select_distinct_vhash()
         if len(vhashes) > 0:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
             commander.do_map(cmd, vhashes, step_id='v_hash')
-        self.logger.log('PROCESS: VHASHes: Total VHASHes {}'.format(len(vhashes)))
-
-    def find_vpath_exe(self):
-        fn = './resources/{}/all_strings.tsv'.format(self.game_info.game_id)
-        if os.path.isfile(fn):
-            self.logger.log('STRINGS FROM EXE: look for hashable strings in EXE strings from IDA in ./resources/{}/all_strings.tsv'.format(self.game_info.game_id))
-            with open(fn, 'rb') as f:
-                exe_strings = f.readlines()
-            exe_strings = [line.split(b'\t') for line in exe_strings]
-            exe_strings = [line[3].strip() for line in exe_strings if len(line) >= 4]
-            exe_strings = list(set(exe_strings))
-
-            with DbWrap(self, logger=self) as db:
-                for s in exe_strings:
-                    db.propose_string(s, None)
-
-            self.logger.log('STRINGS FROM EXE: Found {} strings'.format(len(exe_strings)))
+        self.logger.log('PROCESS: VHASHes: End: Total VHASHes {}'.format(len(vhashes)))
 
     def find_vpath_procmon_dir(self):
         path_name = './procmon_csv/{}'.format(self.game_info.game_id)
@@ -445,28 +502,6 @@ class VfsProcessor(VfsDatabase):
 
         self.logger.log('STRINGS BY FILE NAME ASSOCIATION: Found {}'.format(len(assoc_strings)))
 
-    # def find_adf_types_exe_noheader(self):
-    #     exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
-    #
-    #     with open(exe_path, 'rb') as f:
-    #         buffer = f.read(os.stat(exe_path).st_size)
-    #
-    #     for k, v in self.adf_missing_types.items():
-    #         lid = struct.pack('<L', k)
-    #         offset = 0
-    #         while True:
-    #             offset = buffer.find(lid, offset)
-    #             if offset < 0:
-    #                 break
-    #             print('Found {:08X} @ {}'.format(k, offset))
-    #
-    #             t = TypeDef()
-    #             with ArchiveFile(io.BytesIO(buffer)) as f:
-    #                 f.seek(offset - 12)  # rewind to begining of type
-    #                 t.deserialize(f, {})
-    #
-    #             offset += 1
-
     def update_used_depths(self):
         level = 0
         keep_going = True
@@ -503,17 +538,9 @@ class VfsProcessor(VfsDatabase):
         if uids:
             self.nodes_delete_where_uid(uids)
 
-    def external_file_add(self, filename):
+    def external_file_add(self, filename, is_temporary_file=True):
         if os.path.isfile(filename):
-            with open(filename, 'rb') as f:
-                ftype, fsize = determine_file_type_and_size(f, os.stat(filename).st_size)
-
-            if ftype is None:
-                file, ext = os.path.splitext(filename)
-                if ext[0:4] == b'.atx':
-                    ftype = FTYPE_ATX
-                elif ext == b'.hmddsc':
-                    ftype = FTYPE_HMDDSC
+            f_size = os.stat(filename).st_size
 
             v_path = filename.replace(':', '/')
             v_path = v_path.replace('\\', '/')
@@ -523,8 +550,9 @@ class VfsProcessor(VfsDatabase):
             # tag atx file type since they have no header info
 
             vnode = VfsNode(
-                v_hash=v_hash, v_path=v_path, p_path=filename, file_type=ftype,
-                size_u=fsize, size_c=fsize, offset=0, is_temporary_file=True)
+                v_hash=v_hash, v_path=v_path, p_path=filename,
+                size_u=f_size, size_c=f_size, offset=0, is_temporary_file=is_temporary_file)
+            self.determine_ftype(vnode)
             self.node_add_one(vnode)
 
             self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))

@@ -33,7 +33,6 @@ class Logger:
         self.log_base(3, s)
 
 
-
 def dump_line(line, width, format='hex'):
     if format is 'hex' or len(line) != width:
         line = ''.join(['{:02x}'.format(v) for v in bytearray(line)])

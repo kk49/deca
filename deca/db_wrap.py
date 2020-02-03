@@ -31,8 +31,8 @@ class DbWrap:
     def generate_cache_file_name(self, node):
         return self._db.generate_cache_file_name(node)
 
-    def file_obj_from(self, node, mode='rb'):
-        return self._db.file_obj_from(node, mode)
+    def file_obj_from(self, node):
+        return self._db.file_obj_from(node)
 
     def node_where_uid(self, uid):
         return self._db.node_where_uid(uid)

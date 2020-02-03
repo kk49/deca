@@ -3,6 +3,49 @@ import os
 import json
 
 
+def determine_game(game_dir, exe_name):
+    game_info = None
+    if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
+        game_info = GameInfoGZB(game_dir, exe_name)
+    elif exe_name.find('GenerationZero') >= 0:
+        game_info = GameInfoGZ(game_dir, exe_name)
+    elif exe_name.find('theHunterCotW') >= 0:
+        game_info = GameInfoTHCOTW(game_dir, exe_name)
+    elif exe_name.find('JustCause3') >= 0:
+        game_info = GameInfoJC3(game_dir, exe_name)
+    elif exe_name.find('JustCause4') >= 0:
+        game_info = GameInfoJC4(game_dir, exe_name)
+    elif exe_name.find('RAGE2') >= 0:
+        game_info = GameInfoRage2(game_dir, exe_name)
+    else:
+        pass
+
+    return game_info
+
+
+def game_info_load(project_file):
+    with open(project_file) as f:
+        settings = json.load(f)
+    game_dir = settings['game_dir']
+    exe_name = settings['exe_name']
+    game_id = settings['game_id']
+
+    if game_id == 'gz':
+        return GameInfoGZ(game_dir, exe_name)
+    elif game_id == 'hp':
+        return GameInfoTHCOTW(game_dir, exe_name)
+    elif game_id == 'jc3':
+        return GameInfoJC3(game_dir, exe_name)
+    elif game_id == 'jc4':
+        return GameInfoJC4(game_dir, exe_name)
+    elif game_id == 'gzb':
+        return GameInfoGZB(game_dir, exe_name)
+    elif game_id == 'rg2':
+        return GameInfoRage2(game_dir, exe_name)
+    else:
+        raise NotImplementedError()
+
+
 class GameInfo:
     def __init__(self, game_dir, exe_name, game_id):
         self.game_dir = game_dir
@@ -378,7 +421,7 @@ class GameInfoJC4(GameInfo):
         return archive_paths
 
     def mdic_ftype(self):
-        return FTYPE_MDI
+        return FTYPE_ADF
 
     def navmesh_ftype(self):
         return FTYPE_H2014
@@ -418,13 +461,7 @@ class GameInfoJC4(GameInfo):
                 b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
                 b'.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
                 b'.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
             },
             {
                 b'.fmod_sbankc': FTYPE_TXT,
@@ -438,22 +475,70 @@ class GameInfoJC4(GameInfo):
         ]
 
 
-def game_info_load(project_file):
-    with open(project_file) as f:
-        settings = json.load(f)
-    game_dir = settings['game_dir']
-    exe_name = settings['exe_name']
-    game_id = settings['game_id']
+class GameInfoRage2(GameInfo):
+    def __init__(self, game_dir, exe_name):
+        GameInfo.__init__(self, game_dir, exe_name, 'rg2')
+        self.archive_version = 5
+        self.oo_decompress_dll = os.path.join(game_dir, 'oo2core_7_win64.dll')
+        self.map_prefixes += [
+        ]
 
-    if game_id == 'gz':
-        return GameInfoGZ(game_dir, exe_name)
-    elif game_id == 'hp':
-        return GameInfoTHCOTW(game_dir, exe_name)
-    elif game_id == 'jc3':
-        return GameInfoJC3(game_dir, exe_name)
-    elif game_id == 'jc4':
-        return GameInfoJC4(game_dir, exe_name)
-    elif game_id == 'gzb':
-        return GameInfoGZB(game_dir, exe_name)
-    else:
-        raise NotImplementedError()
+    def archive_path(self):
+        archive_paths = [
+            os.path.join(self.game_dir, 'archives_win64'),
+        ]
+        return archive_paths
+
+    def mdic_ftype(self):
+        return FTYPE_ADF
+
+    def navmesh_ftype(self):
+        return FTYPE_H2014
+
+    def obc_ftype(self):
+        return None
+
+    def pfs_ftype(self):
+        return FTYPE_PFX
+
+    def file_assoc(self):
+        return [
+            {
+                b'.ee': FTYPE_SARC,
+                b'.epe': FTYPE_RTPC,
+            },
+            {
+                b'.bl': FTYPE_SARC,
+                b'.nl': FTYPE_SARC,
+                b'.fl': FTYPE_SARC,
+                b'.blo': FTYPE_RTPC,
+                b'.nl.mdic': self.mdic_ftype(),
+                b'.fl.mdic': self.mdic_ftype(),
+                b'.pfs': self.pfs_ftype(),
+                b'.obc': FTYPE_OBC,
+            },
+            {
+                b'.meshc': FTYPE_ADF,
+                b'.hrmeshc': FTYPE_ADF,
+                b'.modelc': FTYPE_ADF,
+                b'.model_deps': FTYPE_TXT,
+                b'.pfxc': self.pfs_ftype(),
+            },
+            {
+                b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
+                b'.hmddsc': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
+                b'.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
+                # b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
+            },
+            {
+                b'.fmod_sbankc': FTYPE_TXT,
+                b'.fmod_bankc': FTYPE_RIFF,
+            },
+            {
+                b'.swf': FTYPE_GFX,
+                b'.cfx': FTYPE_GFX,
+                b'.gfx': FTYPE_GFX,
+            },
+        ]

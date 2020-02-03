@@ -107,6 +107,10 @@ class VfsNode:
                 self.flags = self.flags | is_processed_file_mask
             if is_temporary_file:
                 self.flags = self.flags | is_temporary_file_mask
+
+            # make sure type and flag was saved properly
+            assert self.compression_type_get() == compression_type
+            assert self.compression_flag_get() == compression_flag
         else:
             self.flags = flags
 
@@ -185,7 +189,7 @@ def db_from_vfs_node(node: VfsNode):
 
 
 class VfsDatabase:
-    def __init__(self, project_file, working_dir, logger, init_display=False):
+    def __init__(self, project_file, working_dir, logger, init_display=False, max_uncompressed_cache_size=(2 * 1024**3)):
         self.project_file = project_file
         self.working_dir = working_dir
         self.logger = logger
@@ -197,6 +201,7 @@ class VfsDatabase:
         if init_display:
             logger.log('OPENING: {} {}'.format(self.game_info.game_dir, working_dir))
 
+        # setup data base
         self.db_filename = os.path.join(self.working_dir, 'db', 'core.db')
         make_dir_for_file(self.db_filename)
 
@@ -207,9 +212,10 @@ class VfsDatabase:
 
         self.db_setup()
 
-        # track info from ADFs
-        self.map_adftype_usage = {}
-        self.adf_missing_types = {}
+        # setup in memory uncompressed cache
+        # self.uncompressed_cache_max_size = max_uncompressed_cache_size
+        # self.uncompressed_cache_map = {}
+        # self.uncompressed_cache_lru = []
 
     def shutdown(self):
         self.decompress_oodle_lz.shutdown()
@@ -301,9 +307,9 @@ class VfsDatabase:
             CREATE TABLE IF NOT EXISTS "core_vnodes" (
                 "uid" INTEGER NOT NULL UNIQUE,
                 "ftype" TEXT,
-                "vpath" TEXT,
-                "vpath_hash" INTEGER,
-                "ppath" TEXT,
+                "v_path" TEXT,
+                "v_hash" INTEGER,
+                "p_path" TEXT,
                 "parent_id" INTEGER,
                 "index_in_parent" INTEGER,
                 "flags" INTEGER,
@@ -363,12 +369,12 @@ class VfsDatabase:
         )
         self.db_execute_one(
             '''
-            CREATE INDEX IF NOT EXISTS "core_vpath_to_vnode" ON "core_vnodes" ("vpath"	ASC);
+            CREATE INDEX IF NOT EXISTS "core_vpath_to_vnode" ON "core_vnodes" ("v_path"	ASC);
             '''
         )
         self.db_execute_one(
             '''
-            CREATE INDEX IF NOT EXISTS "core_vhash_to_vnode" ON "core_vnodes" ("vpath_hash"	ASC);
+            CREATE INDEX IF NOT EXISTS "core_vhash_to_vnode" ON "core_vnodes" ("v_hash"	ASC);
             '''
         )
         self.db_execute_one(
@@ -401,13 +407,13 @@ class VfsDatabase:
 
     def nodes_select_vpath_uid_where_vpath_not_null_type_not_symlink(self):
         result = self.db_query_all(
-            "SELECT vpath, uid FROM core_vnodes WHERE vpath IS NOT NULL AND (ftype != 'symlink' OR ftype IS NULL)",
+            "SELECT v_path, uid FROM core_vnodes WHERE v_path IS NOT NULL AND (ftype != 'symlink' OR ftype IS NULL)",
             dbg='nodes_select_vpath_uid_where_vpath_not_null_type_not_symlink')
         return result
 
     def nodes_where_unmapped_select_uid(self):
         result = self.db_query_all(
-            "SELECT uid FROM core_vnodes WHERE (ftype is NULL or (ftype != (?) AND ftype != (?))) AND vpath IS NULL AND ppath IS NULL",
+            "SELECT uid FROM core_vnodes WHERE (ftype is NULL or (ftype != (?) AND ftype != (?))) AND v_path IS NULL AND p_path IS NULL",
             [FTYPE_ARC, FTYPE_TAB], dbg='nodes_where_unmapped_select_uid')
         return [v[0] for v in result]
 
@@ -438,21 +444,48 @@ class VfsDatabase:
             value = 0
         return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_temporary_select_uid')
 
-    def nodes_where_ftype_select_uid(self, ftype):
-        uids = self.db_query_all(
-            "select uid from core_vnodes where ftype == (?)", [ftype], dbg='nodes_where_ftype_select_uid')
-        return [uid[0] for uid in uids]
+    def nodes_where_f_type_select_uid_v_hash_processed(self, ftype):
+        results = self.db_query_all(
+            "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where ftype == (?)",
+            [is_processed_file_mask, is_processed_file_mask, ftype],
+            dbg='nodes_where_f_type_select_uid_v_hash_processed')
+        return results
+
+    def nodes_where_v_hash_select_uid_v_hash_processed(self, v_hash):
+        results = self.db_query_all(
+            "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where (v_hash == (?)) and (offset not null)",
+            [is_processed_file_mask, is_processed_file_mask, v_hash],
+            dbg='nodes_where_v_hash_select_uid_v_hash_processed')
+        return results
+
+    def nodes_where_ext_hash_select_uid_v_hash_processed(self, ext_hash):
+        results = self.db_query_all(
+            "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where (ext_hash == (?)) and (offset not null)",
+            [is_processed_file_mask, is_processed_file_mask, ext_hash],
+            dbg='nodes_where_ext_hash_select_uid_v_hash_processed')
+        return results
+
+    def nodes_where_vpath_endswith_select_uid_v_hash_processed(self, suffix):
+        if isinstance(suffix, bytes):
+            suffix = suffix.decode('utf-8')
+        suffix = '%' + suffix
+        results = self.db_query_all(
+            "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where (v_path LIKE (?)) and (offset not null)",
+            [is_processed_file_mask, is_processed_file_mask, suffix],
+            dbg='nodes_where_vpath_endswith_select_uid_v_hash_processed')
+        return results
+
 
     def nodes_where_hash32(self, v_hash):
         nodes = self.db_query_all(
-            "select * from core_vnodes where vpath_hash == (?)", [v_hash], dbg='nodes_where_vhash')
+            "select * from core_vnodes where v_hash == (?)", [v_hash], dbg='nodes_where_vhash')
         return [db_to_vfs_node(node) for node in nodes]
 
     def nodes_where_vpath(self, v_path):
         if isinstance(v_path, bytes):
             v_path = v_path.decode('utf-8')
         nodes = self.db_query_all(
-            "select * from core_vnodes where vpath == (?)", [v_path], dbg='nodes_where_vpath_like')
+            "select * from core_vnodes where v_path == (?)", [v_path], dbg='nodes_where_vpath_like')
         return [db_to_vfs_node(node) for node in nodes]
 
     def nodes_where_vpath_like_regex(self, p0, p1):
@@ -461,7 +494,7 @@ class VfsDatabase:
         if isinstance(p1, bytes):
             p1 = p1.decode('utf-8')
         nodes = self.db_query_all(
-            "select * from core_vnodes where (vpath LIKE (?)) AND (vpath REGEXP (?))",
+            "select * from core_vnodes where (v_path LIKE (?)) AND (v_path REGEXP (?))",
             [p0, p1],
             dbg='nodes_where_vpath_like_regex'
         )
@@ -469,19 +502,19 @@ class VfsDatabase:
 
     def nodes_select_distinct_vhash(self):
         result = self.db_query_all(
-            "SELECT DISTINCT vpath_hash FROM core_vnodes", dbg='nodes_select_distinct_vhash')
+            "SELECT DISTINCT v_hash FROM core_vnodes", dbg='nodes_select_distinct_vhash')
         result = [r[0] for r in result if r[0] is not None]
         return result
 
     def nodes_select_distinct_vpath(self):
         result = self.db_query_all(
-            "SELECT DISTINCT vpath FROM core_vnodes", dbg='nodes_select_distinct_vpath')
+            "SELECT DISTINCT v_path FROM core_vnodes", dbg='nodes_select_distinct_vpath')
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
         return result
 
     def nodes_select_distinct_vpath_where_vhash(self, v_hash):
         result = self.db_query_all(
-            "SELECT DISTINCT vpath FROM core_vnodes WHERE vpath_hash == (?)", [v_hash], dbg='nodes_select_distinct_vpath')
+            "SELECT DISTINCT v_path FROM core_vnodes WHERE v_hash == (?)", [v_hash], dbg='nodes_select_distinct_vpath')
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
         return result
 
@@ -561,9 +594,9 @@ class VfsDatabase:
             """
             UPDATE core_vnodes SET 
             ftype=(?),
-            vpath=(?),
-            vpath_hash=(?),
-            ppath=(?),
+            v_path=(?),
+            v_hash=(?),
+            p_path=(?),
             parent_id=(?),
             index_in_parent=(?),
             flags=(?),
@@ -658,59 +691,86 @@ class VfsDatabase:
         file_name = os.path.join(cache_dir, '{:08X}.dat'.format(node.v_hash))
         return file_name
 
-    def file_obj_from(self, node: VfsNode, mode='rb'):
+    def file_obj_from(self, node: VfsNode):
         compression_type = node.compression_type_get()
 
         if node.file_type == FTYPE_ARC:
-            return open(node.p_path, mode)
+            return open(node.p_path, 'rb')
         elif node.file_type == FTYPE_TAB:
             return self.file_obj_from(self.node_where_uid(node.pid))
         elif compression_v3_zlib == node.compression_type_get():
             file_name = self.generate_cache_file_name(node)
-
             if not os.path.isfile(file_name):
                 parent_node = self.node_where_uid(node.pid)
-                make_dir_for_file(file_name)
-                with ArchiveFile(self.file_obj_from(parent_node, 'rb')) as pf:
+                with ArchiveFile(self.file_obj_from(parent_node)) as pf:
                     pf.seek(node.offset)
-                    extract_aaf(pf, file_name)
+                    buffer_in = pf.read(node.size_c)
 
-            return open(file_name, mode)
+                buffer_out = extract_aaf(ArchiveFile(io.BytesIO(buffer_in)))
+
+                make_dir_for_file(file_name)
+                with open(file_name, 'wb') as fo:
+                    fo.write(buffer_out)
+
+                return io.BytesIO(buffer_out)
+            else:
+                return open(file_name, 'rb')
+
         elif compression_type in {compression_v4_03_oo, compression_v4_04_oo}:
             file_name = self.generate_cache_file_name(node)
 
             if not os.path.isfile(file_name):
                 parent_node = self.node_where_uid(node.pid)
                 make_dir_for_file(file_name)
-                with self.file_obj_from(parent_node, 'rb') as f_in:
-                    with open(file_name, 'wb') as f_out:
-                        for block_offset, compressed_len, uncompressed_len in node.blocks:
-                            f_in.seek(block_offset)
-                            in_buffer = f_in.read(compressed_len)
-                            out_buffer, ret = self.decompress_oodle_lz.decompress(in_buffer, compressed_len, uncompressed_len)
-                            if ret != uncompressed_len:
-                                self.logger.trace('BAD: {}: ct:{}, cf:{}, ret:{}, bl:{}, sc:{}, su:{}'.format(
-                                    file_name, node.compression_type_get(), node.compression_flag_get(), ret,
-                                    node.blocks, node.size_c, node.size_u,
-                                ))
-                                out_buffer = in_buffer
+                good_blocks = []
+                bad_blocks = []
+                buffer_out = b''
 
-                            f_out.write(out_buffer)
+                with self.file_obj_from(parent_node) as f_in:
+                    for bi, (block_offset, compressed_len, uncompressed_len) in enumerate(node.blocks):
+                        f_in.seek(block_offset)
+                        in_buffer = f_in.read(compressed_len)
+                        buffer_ret, ret = self.decompress_oodle_lz.decompress(in_buffer, compressed_len, uncompressed_len)
+                        if ret == uncompressed_len:
+                            good_blocks.append((bi, ret, block_offset, compressed_len, uncompressed_len))
+                            buffer_out = buffer_out + buffer_ret
+                        else:
+                            bad_blocks.append((bi, ret, block_offset, compressed_len, uncompressed_len))
+                            buffer_out = buffer_out + in_buffer
 
-            return open(file_name, mode)
+                with open(file_name, 'wb') as f_out:
+                    f_out.write(buffer_out)
+
+                all_blocks = good_blocks + bad_blocks
+                all_blocks.sort()
+                if bad_blocks:
+                    label = 'BAAD'
+                else:
+                    label = 'GOOD'
+
+                if bad_blocks:
+                    self.logger.trace('{}: ct:{}, cf:{}, sc:{}, su:{}, bl:{}, f:{}'.format(
+                        label, node.compression_type_get(), node.compression_flag_get(), node.size_c, node.size_u,
+                        all_blocks, file_name,
+                    ))
+
+                return io.BytesIO(buffer_out)
+            else:
+                return open(file_name, 'rb')
+
         elif compression_type != compression_00_none:
             raise Exception(f'NOT IMPLEMENTED: COMPRESSION TYPE {compression_type}')
         elif node.file_type == FTYPE_ADF_BARE:
             parent_node = self.node_where_uid(node.pid)
-            return self.file_obj_from(parent_node, mode)
+            return self.file_obj_from(parent_node)
         elif node.pid is not None:
             parent_node = self.node_where_uid(node.pid)
-            pf = self.file_obj_from(parent_node, mode)
+            pf = self.file_obj_from(parent_node)
             pf.seek(node.offset)
             pf = SubsetFile(pf, node.size_u)
             return pf
         elif node.p_path is not None:
-            return open(node.p_path, mode)
+            return open(node.p_path, 'rb')
         else:
             raise Exception('NOT IMPLEMENTED: DEFAULT')
 
@@ -719,10 +779,23 @@ class VfsDatabase:
             if node.offset is None:
                 node.file_type = FTYPE_SYMLINK
             else:
+                filename = None
+                if node.v_path is not None:
+                    filename = node.v_path
+                elif node.p_path is not None:
+                    filename = node.p_path
+
+                if filename is not None:
+                    file, ext = os.path.splitext(filename)
+                    if ext.startswith(b'.atx'):
+                        node.file_type = FTYPE_ATX
+                    elif ext == b'.hmddsc':
+                        node.file_type = FTYPE_HMDDSC
+
                 if node.compression_type_get() in {compression_v4_03_oo, compression_v4_04_oo}:
                     # todo special case for jc4 /rage2 compression needs to be cleaned up
                     with self.file_obj_from(node) as f:
-                        node.file_type, _ = determine_file_type_and_size(f, node.size_c)
+                        node.file_type, _ = determine_file_type_and_size(f, node.size_u)
                 else:
                     with self.file_obj_from(node) as f:
                         node.file_type, node.size_u = determine_file_type_and_size(f, node.size_c)

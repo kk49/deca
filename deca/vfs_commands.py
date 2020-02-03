@@ -15,11 +15,14 @@ from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
 from .ff_rtpc import Rtpc, k_type_str
-from .ff_arc_tab import TabFileV3, TabFileV4, TabEntryFileBase
+from .ff_arc_tab import TabFileV3, TabFileV4, TabFileV5, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
 from .util import remove_prefix_if_present, remove_suffix_if_present
 from .hashes import hash32_func
 from .kaitai.gfx import Gfx
+
+
+print_node_info = False
 
 
 class LogWrapper:
@@ -188,12 +191,20 @@ class Processor:
         self._comm = comm
 
         self.commands = {
-            'process_archives_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_archives_initial),
-            'process_adf_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_adf_initial),
-            'process_rtpc_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_rtpc_initial),
-            'process_gfx_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_gfx_initial),
-            'process_txt_initial': lambda idxs: self.process_by_uid_wrapper(idxs, self.process_txt_initial),
-            'process_vhash_final': lambda idxs: self.process_by_vhash_wrapper(idxs, self.process_vhash_final),
+            'process_symlink': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_symlink),
+            'process_exe': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_exe),
+            'process_arc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_arc),
+            'process_tab': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_tab),
+            'process_sarc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_sarc),
+            'process_global_gdcc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_global_gdcc),
+            'process_global_gdcc_body': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_global_gdcc_body),
+            'process_resource_bundle': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_resource_bundle),
+            'process_adf_initial': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_adf_initial),
+            'process_rtpc_initial': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_rtpc_initial),
+            'process_gfx_initial': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_gfx_initial),
+            'process_txt_initial': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_txt_initial),
+
+            'process_vhash_final': lambda idxs: self.loop_over_vhash_wrapper(idxs, self.process_vhash_final),
         }
 
         nhf = []
@@ -211,158 +222,184 @@ class Processor:
             raise NotImplementedError(f'Command not implemented: {cmd}')
         command(*params)
 
-    def process_by_uid_wrapper(self, indexes, func):
+    def loop_over_uid_wrapper(self, indexes, func):
         n_indexes = len(indexes)
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, index in enumerate(indexes):
                 self._comm.status(i, n_indexes)
                 node = db.node_where_uid(index)
                 if node.is_valid():
-                    func(node, i, n_indexes, db)
+                    func(node, db)
             self._comm.status(n_indexes, n_indexes)
 
-    def process_by_vhash_wrapper(self, vhashes, func):
+    def loop_over_vhash_wrapper(self, vhashes, func):
         n_indexes = len(vhashes)
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, v_hash in enumerate(vhashes):
                 self._comm.status(i, n_indexes)
-                func(v_hash, i, n_indexes, db)
+                func(v_hash, db)
             self._comm.status(n_indexes, n_indexes)
 
-    def process_archives_initial(
-            self, node: VfsNode, i, n_indexes, db: DbWrap):
-        debug = False
+    def process_symlink(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing SYMLINK: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+
+        node.processed_file_set(True)
+        db.node_update(node)
+
+    def process_exe(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing EXE: {} {}'.format(node.uid, node.p_path))
+
+        db.extract_types_from_exe(node.p_path)
+        node.processed_file_set(True)
+        db.node_update(node)
+
+    def process_arc(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing ARC: {} {}'.format(node.uid, node.p_path))
+
+        # here we add the tab file as a child of the ARC, a trick to make it work with our data model
+        tab_path = os.path.splitext(node.p_path)
+        tab_path = tab_path[0] + '.tab'
+        cnode = VfsNode(file_type=FTYPE_TAB, p_path=tab_path, pid=node.uid)
+        db.node_add(cnode)
+        node.processed_file_set(True)
+        db.node_update(node)
+
+    def process_tab(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing TAB: {} {}'.format(node.uid, node.p_path))
+
         ver = db.game_info().archive_version
+        debug = False
 
-        if node.file_type == FTYPE_EXE:
-            node.processed_file_set(True)
-            db.extract_types_from_exe(node.p_path)
+        with ArchiveFile(open(node.p_path, 'rb'), debug=debug) as f:
+            if 3 == ver:
+                tab_file = TabFileV3()
+            elif 4 == ver:
+                tab_file = TabFileV4()
+            elif 5 == ver:
+                tab_file = TabFileV5()
+            else:
+                raise NotImplementedError('Unknown TAB file version {}'.format(ver))
 
-        elif node.file_type == FTYPE_ARC:
-            # here we add the tab file as a child of the ARC, a trick to make it work with our data model
-            node.processed_file_set(True)
-            tab_path = os.path.splitext(node.p_path)
-            tab_path = tab_path[0] + '.tab'
-            cnode = VfsNode(file_type=FTYPE_TAB, p_path=tab_path, pid=node.uid)
-            db.node_add(cnode)
-        elif node.file_type == FTYPE_TAB:
-            self._comm.trace('Processing TAB: {}'.format(node.p_path))
-            node.processed_file_set(True)
-            with ArchiveFile(open(node.p_path, 'rb'), debug=debug) as f:
-                if 3 == ver:
-                    tab_file = TabFileV3()
-                elif 4 == ver:
-                    tab_file = TabFileV4()
+            tab_file.deserialize(f)
+
+            te: TabEntryFileBase
+            for i, te in enumerate(tab_file.file_table):
+                if te.size_c == 0 or te.size_u == 0:
+                    # handle zero length items as symlinks?
+                    blocks = None
+                    te.offset = None
                 else:
-                    raise NotImplementedError('Unknown TAB file version {}'.format(ver))
+                    blocks = [(0, 0, 0)] * len(te.file_block_table)
+                    offset = te.offset
+                    for bi, block in enumerate(te.file_block_table):
+                        blocks[bi] = (offset, block[0], block[1])
+                        offset += block[0]
 
-                tab_file.deserialize(f)
+                    # for now don't include the nameless top level symlinks
+                    cnode = VfsNode(
+                        v_hash=te.hashname, pid=node.uid, index=i,
+                        offset=te.offset, size_c=te.size_c, size_u=te.size_u,
+                        compression_type=te.compression_type,
+                        compression_flag=te.compression_flags,
+                        blocks=blocks)
 
-                te: TabEntryFileBase
-                for i, te in enumerate(tab_file.file_table):
-                    if te.size_c == 0 or te.size_u == 0:
-                        # handle zero length items as symlinks?
-                        blocks = None
-                        te.offset = None
-                    else:
-                        blocks = [(0, 0, 0)] * len(te.file_block_table)
-                        offset = te.offset
-                        for bi, block in enumerate(te.file_block_table):
-                            blocks[bi] = (offset, block[0], block[1])
-                            offset += block[0]
+                    db.node_add(cnode)
+        node.processed_file_set(True)
+        db.node_update(node)
 
-                        # for now don't include the nameless top level symlinks
-                        cnode = VfsNode(
-                            v_hash=te.hashname, pid=node.uid, index=i,
-                            offset=te.offset, size_c=te.size_c, size_u=te.size_u,
-                            compression_type=te.compression_type,
-                            compression_flag=te.compression_flags,
-                            blocks=blocks)
+    def process_sarc(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing SARC: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
 
-                        db.node_add(cnode)
+        sarc_file = FileSarc()
+        sarc_file.header_deserialize(db.file_obj_from(node))
 
-        elif node.file_type == FTYPE_SARC:
-            node.processed_file_set(True)
-            sarc_file = FileSarc()
-            sarc_file.header_deserialize(db.file_obj_from(node))
+        for se in sarc_file.entries:
+            se: EntrySarc = se
+            offset = se.offset
+            if offset == 0:
+                offset = None  # sarc files with zero offset are not in file, but reference hash value
+            cnode = VfsNode(
+                v_hash=se.v_hash, v_path=se.v_path, ext_hash=se.file_ext_hash,
+                pid=node.uid, index=se.index,
+                offset=offset, size_c=se.length, size_u=se.length,
+            )
 
-            for se in sarc_file.entries:
-                se: EntrySarc = se
-                offset = se.offset
-                if offset == 0:
-                    offset = None  # sarc files with zero offset are not in file, but reference hash value
+            db.node_add(cnode)
+            db.propose_string(cnode.v_path, node)
+
+        node.processed_file_set(True)
+        db.node_update(node)
+
+    def process_global_gdcc(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing global gdcc": gdc/global.gdcc')
+
+        # special case starting point for runtime
+        adf = db.node_read_adf(node)
+
+        cnode_name = b'gdc/global.gdc.DECA'
+        cnode = VfsNode(
+            v_hash=deca.hashes.hash32_func(cnode_name),
+            v_path=cnode_name,
+            file_type=FTYPE_GDCBODY, pid=node.uid,
+            offset=adf.table_instance[0].offset,
+            size_c=adf.table_instance[0].size,
+            size_u=adf.table_instance[0].size)
+        db.node_add(cnode)
+
+        node.processed_file_set(True)
+        db.node_update(node)
+
+    def process_global_gdcc_body(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing global gdcc body": gdc/global.gdcc.DECA')
+
+        pnode = db.node_where_uid(node.pid)
+        adf = db.node_read_adf(pnode)
+
+        for entry in adf.table_instance_values[0]:
+            if isinstance(entry, GdcArchiveEntry):
+                # self.logger.log('GDCC: {:08X} {}'.format(entry.v_hash, entry.v_path))
+                adf_type = entry.adf_type_hash
+                file_type = None
+                if adf_type is not None:
+                    file_type = FTYPE_ADF_BARE
+                    # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.v_path))
                 cnode = VfsNode(
-                    v_hash=se.v_hash, pid=node.uid, index=se.index,
-                    offset=offset, size_c=se.length, size_u=se.length, v_path=se.v_path,
-                    ext_hash=se.file_ext_hash)
-
+                    v_hash=entry.v_hash, pid=node.uid, index=entry.index,
+                    offset=entry.offset, size_c=entry.size, size_u=entry.size, v_path=entry.v_path,
+                    file_type=file_type, adf_type=adf_type)
                 db.node_add(cnode)
                 db.propose_string(cnode.v_path, node)
 
-        elif node.v_hash == deca.hashes.hash32_func(b'gdc/global.gdcc'):
-            # special case starting point for runtime
-            node.processed_file_set(True)
-            adf = db.node_read_adf(node)
+        node.processed_file_set(True)
+        db.node_update(node)
 
-            cnode_name = b'gdc/global.gdc.DECA'
-            cnode = VfsNode(
-                v_hash=deca.hashes.hash32_func(cnode_name),
-                v_path=cnode_name,
-                file_type=FTYPE_GDCBODY, pid=node.uid,
-                offset=adf.table_instance[0].offset,
-                size_c=adf.table_instance[0].size,
-                size_u=adf.table_instance[0].size)
-            db.node_add(cnode)
+    def process_resource_bundle(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing ResourceBundle: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
 
-        elif node.file_type in {FTYPE_GDCBODY}:
-            pnode = db.node_where_uid(node.pid)
-            adf = db.node_read_adf(pnode)
+        with ArchiveFile(db.file_obj_from(node)) as f:
+            index = 0
+            while f.tell() < node.size_u:
+                v_hash = f.read_u32()
+                ext_hash = f.read_u32()
+                size = f.read_u32()
+                offset = f.tell()
+                buffer = f.read(size)
 
-            for entry in adf.table_instance_values[0]:
-                if isinstance(entry, GdcArchiveEntry):
-                    # self.logger.log('GDCC: {:08X} {}'.format(entry.vpath_hash, entry.v_path))
-                    adf_type = entry.adf_type_hash
-                    file_type = None
-                    if adf_type is not None:
-                        file_type = FTYPE_ADF_BARE
-                        # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.v_path))
-                    cnode = VfsNode(
-                        v_hash=entry.vpath_hash, pid=node.uid, index=entry.index,
-                        offset=entry.offset, size_c=entry.size, size_u=entry.size, v_path=entry.v_path,
-                        file_type=file_type, adf_type=adf_type)
-                    db.node_add(cnode)
-                    db.propose_string(cnode.v_path, node)
+                cnode = VfsNode(
+                    v_hash=v_hash, pid=node.uid, index=index,
+                    offset=offset, size_c=size, size_u=size,
+                    ext_hash=ext_hash)
+                index += 1
 
-        elif node.file_type != FTYPE_SYMLINK and \
-                (node.ext_hash == 0xb4c9109e or (node.v_path is not None and node.v_path.endswith(b'.resourcebundle'))):
-            node.processed_file_set(True)
-            with ArchiveFile(db.file_obj_from(node)) as f:
-                index = 0
-                while f.tell() < node.size_u:
-                    v_hash = f.read_u32()
-                    ext_hash = f.read_u32()
-                    size = f.read_u32()
-                    offset = f.tell()
-                    buffer = f.read(size)
+                db.node_add(cnode)
 
-                    cnode = VfsNode(
-                        v_hash=v_hash, pid=node.uid, index=index,
-                        offset=offset, size_c=size, size_u=size,
-                        ext_hash=ext_hash)
-                    index += 1
+        node.processed_file_set(True)
+        db.node_update(node)
 
-                    db.node_add(cnode)
+    def process_adf_initial(self, node: VfsNode, db: DbWrap):
+        if print_node_info:
+            self._comm.trace('Processing Adf Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
 
-        else:
-            pass
-
-        updated = node.processed_file_get()
-        if updated:
-            db.node_update(node)
-
-    def process_adf_initial(
-            self, node: VfsNode, i, n_indexes, db: DbWrap):
-        updated = False
         try:
             adf = db.node_read_adf(node)
 
@@ -432,31 +469,24 @@ class Processor:
                     if node.v_hash == fnh:
                         if node.v_path is None:
                             node.v_path = fn
-                            updated = True
                         db.propose_string(fn, node, possible_file_types=[FTYPE_ADF, FTYPE_ADF_BARE])
                         found_any = True
 
                 if len(fns) > 0 and not found_any:
                     self._comm.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.v_hash, fns[0]))
 
-            # for ientry in adf.table_typedef:
-            #     adf_type_hash = ientry.type_hash
-            #     ev = map_adftype_usage.get(adf_type_hash, set())
-            #     ev.add(node.uid)
-            #     map_adftype_usage[adf_type_hash] = ev
-            #     if ientry.type_hash not in map_typedefs:
-            #         map_typedefs[ientry.type_hash] = ientry
+            # only mark as processed if AdfTypeMissing exception did not happen
+            node.processed_file_set(True)
+            db.node_update(node)
 
         except AdfTypeMissing as ae:
             self._comm.log('Missing Type {:08x} in {:08X} {} {}'.format(
                 ae.type_id, node.v_hash, node.v_path, node.p_path))
 
-        if updated:
-            db.node_update(node)
+    def process_rtpc_initial(self, node: VfsNode, db: DbWrap):
+        if print_node_info:
+            self._comm.trace('Processing RTPC Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
 
-    def process_rtpc_initial(self, node: VfsNode, i, n_indexes, db: DbWrap):
-        updated = False
-        # try:
         with db.file_obj_from(node) as f:
             buf = f.read(node.size_u)
 
@@ -498,11 +528,12 @@ class Processor:
                     elif len(ext) > 0:
                         db.propose_string(s + b'c', node, possible_file_types=[FTYPE_ADF])
 
-        if updated:
-            db.node_update(node)
+        node.processed_file_set(True)
+        db.node_update(node)
 
-    def process_gfx_initial(self, node: VfsNode, i, n_indexes, db: DbWrap):
-        updated = False
+    def process_gfx_initial(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing GFX Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+
         with db.file_obj_from(node) as f:
             buffer = f.read(node.size_u)
 
@@ -530,11 +561,11 @@ class Processor:
                 db.propose_string(f'ui/{tag.tag_body.url}', node, possible_file_types=[FTYPE_GFX])
                 db.propose_string(f'ui/{fn}.gfx', node, possible_file_types=[FTYPE_GFX])
 
-        if updated:
-            db.node_update(node)
+        node.processed_file_set(True)
+        db.node_update(node)
 
-    def process_txt_initial(self, node: VfsNode, i, n_indexes, db: DbWrap):
-        updated = False
+    def process_txt_initial(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing TXT Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
 
         with db.file_obj_from(node) as f:
             buffer = f.read(node.size_u)
@@ -547,10 +578,10 @@ class Processor:
                 for item in v:
                     db.propose_string(item, node)
 
-        if updated:
-            db.node_update(node)
+        node.processed_file_set(True)
+        db.node_update(node)
 
-    def process_vhash_final(self, hash32_in, i, n_indexes, db: DbWrap):
+    def process_vhash_final(self, hash32_in, db: DbWrap):
         nodes = db.nodes_where_hash32(hash32_in)
         hash_strings = db.hash_string_where_hash32_select_all(hash32_in)
 

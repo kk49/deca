@@ -106,9 +106,9 @@ class RtpcProperty:
             name4 = vfs.hash_string_where_hash32_select_all(data)
             name = 'id:0x{:012X}'.format(data)
             if len(name6):
-                name = 'id:DB:H6:"{}"[{}]'.format(name6[0][3].decode('utf-8'), name)
+                name = 'id:DB:H6:"{}"[{}]'.format(name6[0][4].decode('utf-8'), name)
             elif len(name4):
-                name = 'id:DB:H4:"{}"[{}]'.format(name4[0][3].decode('utf-8'), name)
+                name = 'id:DB:H4:"{}"[{}]'.format(name4[0][4].decode('utf-8'), name)
             data = name
 
         elif self.type == k_type_event:
@@ -118,15 +118,15 @@ class RtpcProperty:
                 name4 = vfs.hash_string_where_hash32_select_all(d)
                 name = 'ev:0x{:012X}'.format(d)
                 if len(name6):
-                    name = 'ev:DB:H6:"{}"[{}]'.format(name6[0][3].decode('utf-8'), name)
+                    name = 'ev:DB:H6:"{}"[{}]'.format(name6[0][4].decode('utf-8'), name)
                 elif len(name4):
-                    name = 'ev:DB:H4:"{}"[{}]'.format(name4[0][3].decode('utf-8'), name)
+                    name = 'ev:DB:H4:"{}"[{}]'.format(name4[0][4].decode('utf-8'), name)
                 data_new.append(name)
             data = data_new
 
         name = vfs.hash_string_where_hash32_select_all(self.name_hash)
         if len(name):
-            name = '"{}"'.format(name[0][3].decode('utf-8'))
+            name = '"{}"'.format(name[0][4].decode('utf-8'))
         else:
             name = f'0x{self.name_hash:08x}'
 
@@ -258,7 +258,7 @@ class RtpcNode:
         name = f'0x{self.name_hash:08x}'
 
         if len(name4):
-            name = 'DB:H4:"{}"[{}]'.format(name4[0][3].decode('utf-8'), name)
+            name = 'DB:H4:"{}"[{}]'.format(name4[0][4].decode('utf-8'), name)
 
         return 'n:{} pc:{} cc:{} @ {} {:08x}'.format(
             name, self.prop_count, self.child_count, self.data_offset, self.data_offset)

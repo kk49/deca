@@ -63,7 +63,7 @@ def extract_node_raw(
         if node.offset is not None:
             with ArchiveFile(vfs.file_obj_from(node)) as f:
                 if node.v_path is None:
-                    ofile = extract_dir + '{:08X}.dat'.format(node.v_hash)
+                    ofile = extract_dir + node.v_hash_to_str() + '.dat'
                 else:
                     ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
 

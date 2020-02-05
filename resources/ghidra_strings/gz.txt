@@ -34669,7 +34669,7 @@ TYPE_WORLD
 tyremarkPoints
 tyreMarks
 tyremarksWheel
-tZ;ff&?terrain/global_heightfield.rawc
+terrain/global_heightfield.rawc
 Tzu-Ying "Diana" Wang
 UAV_CREATION_FAILED
 UB_ACT_CANCEL_PLANT_EXPLOSIVE_MODE

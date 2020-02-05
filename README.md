@@ -13,9 +13,18 @@ Written in Python, tested only on Linux, code is a mess, because this is an expe
 * Export (modelc, meshc, hrmeshc) to GLTF 2.0 (material models not complete/missing, no bones)
 * Export ADF encoded spreadsheets
 * Export textures to PNG
-* Parsing all ADF files (Gen Zero)
+* Parsing most ADF files (Gen Zero)
 * GUI to explore archive files
 * Basic rebuilding of archive files to update textures, Characters/Machines work. Set pieces do not.
+
+## Supported Games
+|GAME|STATUS|Nodes Total|Nodes Named|Hashes Total|Hashes Found|ADF Types Found / Missing|Last Update|
+|---|---|---|---|---|---|---|---|
+|Avalanche Studios' Generation Zero®|Loading most/all files|860879|857305|63375|59897|888 / 7|2019/02/04|
+|Avalanche Studios' theHunter™: Call of the Wild|Loading most/all files|---|---|---|---|---|---|
+|Avalanche Studios' Just Cause 3|Loading most/all files|---|---|---|---|---|---|
+|Avalanche Studios' Just Cause 4|Loading most/all files|---|---|---|---|---|---|
+|Avalanche Studios' RAGE 2|Partial/In-Development|---|---|---|---|---|---|
 
 ## Discord
 For deca specific and general GenZero (and theHunter?) modding.
@@ -46,10 +55,6 @@ places the results into the "build" sub-directory. The build directory contents 
 game does not crash before it gets to BETA over screen)
 
 ## Game Support
-|GAME|STATUS|
-|---|---|
-|Avalanche Studios' Generation Zero® BETA|Loading files|
-|Avalanche Studios' theHunter™: Call of the Wild|Loading files|
 
 ## File Type Status (Numbers are arbitrary)
 |FILES|Game|Status|Notes|

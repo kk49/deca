@@ -3,6 +3,7 @@ import io
 import sqlite3
 import pickle
 import re
+import numpy as np
 
 import deca.util
 from deca.file import ArchiveFile, SubsetFile
@@ -12,6 +13,7 @@ from deca.ff_aaf import extract_aaf
 from deca.decompress import DecompressorOodleLZ
 from deca.util import make_dir_for_file
 from deca.game_info import game_info_load
+from deca.hashes import hash32_func, hash48_func, hash64_func
 
 
 language_codes = [
@@ -62,8 +64,24 @@ compression_type_mask = 0xFF
 compression_type_shift = 0
 compression_flag_mask = 0xFF00
 compression_flag_shift = 8
-is_processed_file_mask = 1 << 16
-is_temporary_file_mask = 1 << 17
+v_hash_type_mask = 0x0030000
+v_hash_type_4 = 0x0010000
+v_hash_type_6 = 0x0020000
+v_hash_type_8 = 0x0030000
+is_processed_file_mask = 1 << 20
+is_temporary_file_mask = 1 << 21
+
+
+def format_hash32(v_hash):
+    return '{:08x}'.format(np.uint64(v_hash))
+
+
+def format_hash48(v_hash):
+    return '{:012x}'.format(np.uint64(v_hash))
+
+
+def format_hash64(v_hash):
+    return '{:016x}'.format(np.uint64(v_hash))
 
 
 class VfsNode:
@@ -80,6 +98,7 @@ class VfsNode:
             blocks=None,
             flags=None,
             used_at_runtime_depth=None,
+            v_hash_type=v_hash_type_4,
     ):
         self.uid = uid
         self.v_hash = v_hash
@@ -107,6 +126,8 @@ class VfsNode:
                 self.flags = self.flags | is_processed_file_mask
             if is_temporary_file:
                 self.flags = self.flags | is_temporary_file_mask
+
+            self.flags = (self.flags & ~v_hash_type_mask) | v_hash_type
 
             # make sure type and flag was saved properly
             assert self.compression_type_get() == compression_type
@@ -160,7 +181,7 @@ class VfsNode:
         if self.file_type is not None:
             info.append('ft:{}'.format(self.file_type))
         if self.v_hash is not None:
-            info.append('h:{:08X}'.format(self.v_hash))
+            info.append('h:{}'.format(self.v_hash_to_str()))
         if self.v_path is not None:
             info.append('v:{}'.format(self.v_path))
         if self.p_path is not None:
@@ -168,6 +189,17 @@ class VfsNode:
         if len(info) == 0:
             info.append('child({},{})'.format(self.pid, self.index))
         return ' '.join(info)
+
+    def v_hash_to_str(self):
+        hash_type = self.flags & v_hash_type_mask
+        if hash_type == v_hash_type_4:
+            return format_hash32(self.v_hash)
+        elif hash_type == v_hash_type_6:
+            return format_hash48(self.v_hash)
+        elif hash_type == v_hash_type_8:
+            return format_hash64(self.v_hash)
+        else:
+            raise NotImplementedError('hash_type not handled: {:016x}'.format(np.uint64(self.flags)))
 
 
 def db_to_vfs_node(v):
@@ -195,6 +227,20 @@ class VfsDatabase:
         self.logger = logger
         self.game_info = game_info_load(project_file)
         self.decompress_oodle_lz = DecompressorOodleLZ(self.game_info.oo_decompress_dll)
+        if 4 == self.game_info.file_hash_size:
+            self.file_hash_db_id = 'hash32'
+            self.file_hash = hash32_func
+            self.file_hash_format = format_hash32
+            self.file_hash_type = v_hash_type_4
+            self.ext_hash = hash32_func
+        elif 8 == self.game_info.file_hash_size:
+            self.file_hash_db_id = 'hash64'
+            self.file_hash = hash64_func
+            self.file_hash_format = format_hash64
+            self.file_hash_type = v_hash_type_8
+            self.ext_hash = hash32_func
+        else:
+            raise NotImplementedError('File Hash Size of {} Not Implemented'.format(self.game_info.file_hash_size))
 
         os.makedirs(working_dir, exist_ok=True)
 
@@ -340,8 +386,9 @@ class VfsDatabase:
             CREATE TABLE IF NOT EXISTS "core_hash_strings" (
                 "hash32" INTEGER NOT NULL,
                 "hash48" INTEGER NOT NULL,
+                "hash64" INTEGER NOT NULL,
                 "string" TEXT,
-                PRIMARY KEY ("hash32", "hash48", "string")
+                PRIMARY KEY ("hash32", "hash48", "hash64", "string")
             );
             '''
         )
@@ -392,12 +439,55 @@ class VfsDatabase:
             CREATE INDEX IF NOT EXISTS "core_hash48_asc" ON "core_hash_strings" ("hash48"	ASC);
             '''
         )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "core_hash64_asc" ON "core_hash_strings" ("hash64"	ASC);
+            '''
+        )
 
         self.db_conn.commit()
+
+    def node_where_uid(self, uid):
+        r1 = self.db_query_one(
+            "select * from core_vnodes where uid == (?)", [uid], dbg='node_where_uid')
+        # todo load blocks
+        r1 = db_to_vfs_node(r1)
+        return r1
 
     def nodes_select_all(self):
         nodes = self.db_query_all(
             "select * from core_vnodes", dbg='nodes_select_uids')
+        # todo load blocks
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_where_v_hash(self, v_hash):
+        nodes = self.db_query_all(
+            "select * from core_vnodes where v_hash == (?)", [v_hash], dbg='nodes_where_vhash')
+
+        # todo load blocks
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_where_vpath(self, v_path):
+        if isinstance(v_path, bytes):
+            v_path = v_path.decode('utf-8')
+        nodes = self.db_query_all(
+            "select * from core_vnodes where v_path == (?)", [v_path], dbg='nodes_where_vpath_like')
+
+        # todo load blocks
+        return [db_to_vfs_node(node) for node in nodes]
+
+    def nodes_where_vpath_like_regex(self, p0, p1):
+        if isinstance(p0, bytes):
+            p0 = p0.decode('utf-8')
+        if isinstance(p1, bytes):
+            p1 = p1.decode('utf-8')
+        nodes = self.db_query_all(
+            "select * from core_vnodes where (v_path LIKE (?)) AND (v_path REGEXP (?))",
+            [p0, p1],
+            dbg='nodes_where_vpath_like_regex'
+        )
+
+        # todo load blocks
         return [db_to_vfs_node(node) for node in nodes]
 
     def nodes_select_uid(self):
@@ -416,12 +506,6 @@ class VfsDatabase:
             "SELECT uid FROM core_vnodes WHERE (ftype is NULL or (ftype != (?) AND ftype != (?))) AND v_path IS NULL AND p_path IS NULL",
             [FTYPE_ARC, FTYPE_TAB], dbg='nodes_where_unmapped_select_uid')
         return [v[0] for v in result]
-
-    def node_where_uid(self, uid):
-        r1 = self.db_query_one(
-            "select * from core_vnodes where uid == (?)", [uid], dbg='node_where_uid')
-        r1 = db_to_vfs_node(r1)
-        return r1
 
     def nodes_where_flag_select_uid(self, mask, value, dbg='nodes_where_flag_select_uid'):
         uids = self.db_query_all(
@@ -475,31 +559,6 @@ class VfsDatabase:
             dbg='nodes_where_vpath_endswith_select_uid_v_hash_processed')
         return results
 
-
-    def nodes_where_hash32(self, v_hash):
-        nodes = self.db_query_all(
-            "select * from core_vnodes where v_hash == (?)", [v_hash], dbg='nodes_where_vhash')
-        return [db_to_vfs_node(node) for node in nodes]
-
-    def nodes_where_vpath(self, v_path):
-        if isinstance(v_path, bytes):
-            v_path = v_path.decode('utf-8')
-        nodes = self.db_query_all(
-            "select * from core_vnodes where v_path == (?)", [v_path], dbg='nodes_where_vpath_like')
-        return [db_to_vfs_node(node) for node in nodes]
-
-    def nodes_where_vpath_like_regex(self, p0, p1):
-        if isinstance(p0, bytes):
-            p0 = p0.decode('utf-8')
-        if isinstance(p1, bytes):
-            p1 = p1.decode('utf-8')
-        nodes = self.db_query_all(
-            "select * from core_vnodes where (v_path LIKE (?)) AND (v_path REGEXP (?))",
-            [p0, p1],
-            dbg='nodes_where_vpath_like_regex'
-        )
-        return [db_to_vfs_node(node) for node in nodes]
-
     def nodes_select_distinct_vhash(self):
         result = self.db_query_all(
             "SELECT DISTINCT v_hash FROM core_vnodes", dbg='nodes_select_distinct_vhash')
@@ -526,8 +585,8 @@ class VfsDatabase:
 
     def hash_string_select_all_to_dict(self):
         result = self.db_query_all(
-            "SELECT rowid, hash32, hash48, string FROM core_hash_strings", dbg='hash_string_select_all_to_dict')
-        result = [(r[0], (r[1], r[2], to_bytes(r[3]))) for r in result]
+            "SELECT rowid, hash32, hash48, hash64, string FROM core_hash_strings", dbg='hash_string_select_all_to_dict')
+        result = [(r[0], (r[1], r[2], r[3], to_bytes(r[4]))) for r in result]
         result = dict(result)
         return result
 
@@ -536,16 +595,24 @@ class VfsDatabase:
             return []
         else:
             result = self.db_query_all(
-                "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash32 == (?)", [hash32], dbg='hash_string_where_hash32_select_all')
-            return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
+                "SELECT rowid, hash32, hash48, hash64, string FROM core_hash_strings WHERE hash32 == (?)", [hash32], dbg='hash_string_where_hash32_select_all')
+            return [(r[0], r[1], r[2], r[3], to_bytes(r[4])) for r in result]
 
     def hash_string_where_hash48_select_all(self, hash48):
         if hash48 & 0xFFFFFFFFFFFF != hash48:
             return []
         else:
             result = self.db_query_all(
-                "SELECT rowid, hash32, hash48, string FROM core_hash_strings WHERE hash48 == (?)", [hash48], dbg='hash_string_where_hash48_select_all')
-            return [(r[0], r[1], r[2], to_bytes(r[3])) for r in result]
+                "SELECT rowid, hash32, hash48, hash64, string FROM core_hash_strings WHERE hash48 == (?)", [hash48], dbg='hash_string_where_hash48_select_all')
+            return [(r[0], r[1], r[2], r[3], to_bytes(r[4])) for r in result]
+
+    def hash_string_where_hash64_select_all(self, hash64):
+        if hash64 & 0xFFFFFFFFFFFFFFFF != hash64:
+            return []
+        else:
+            result = self.db_query_all(
+                "SELECT rowid, hash32, hash48, hash64, string FROM core_hash_strings WHERE hash64 == (?)", [hash64], dbg='hash_string_where_hash64_select_all')
+            return [(r[0], r[1], r[2], r[3], to_bytes(r[4])) for r in result]
 
     def hash_string_references_select_all(self):
         result = self.db_query_all(
@@ -563,28 +630,37 @@ class VfsDatabase:
         )
         self.db_conn.commit()
 
-    def node_add_one(self, node: VfsNode):
-        result = self.db_execute_one(
-            "INSERT INTO core_vnodes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            db_from_vfs_node(node),
-            dbg='node_add_one')
-
-        self.db_conn.commit()
-
-        node.uid = result.lastrowid
-
-        return node
-
-    def node_add_many(self, nodes):
+    def nodes_add_many(self, nodes):
         db_nodes = [db_from_vfs_node(node) for node in nodes]
 
         result = self.db_execute_many(
             "insert into core_vnodes values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             db_nodes,
-            dbg='node_add_many'
+            dbg='nodes_add_many:insert_nodes'
         )
-
         self.db_conn.commit()
+
+        blocks = []
+        for node in nodes:
+            if node.blocks:
+                result = self.db_query_all(
+                    "SELECT uid FROM core_vnodes WHERE parent_id=(?) and index_in_parent=(?)",
+                    [node.pid, node.index],
+                    dbg='nodes_add_many:select_nodes'
+                )
+
+                node.uid = result[0][0]
+
+                for bi, block in enumerate(node.blocks):
+                    blocks.append((node.uid, bi, block[0], block[1], block[2]))
+
+        if blocks:
+            result = self.db_execute_many(
+                "insert into core_vnode_blocks values (?,?,?,?,?)",
+                blocks,
+                dbg='nodes_add_many:insert_blocks'
+            )
+            self.db_conn.commit()
 
     def node_update_many(self, nodes: set):
         db_nodes = [db_from_vfs_node(node) for node in nodes]
@@ -614,16 +690,19 @@ class VfsDatabase:
         self.db_conn.commit()
 
     def hash_string_add_many(self, hash_list):
-        hash_list_str = [(h[0], h[1], to_str(h[2])) for h in hash_list]
+        # (h4, h6, h8, string, parent_uid, is_field_name, used_at_runtime, p_types)
+        hash_list_str = [(h[0], h[1], h[2], to_str(h[3])) for h in hash_list]
         hash_list_str_unique = list(set(hash_list_str))
         result = self.db_execute_many(
-            "INSERT OR IGNORE INTO core_hash_strings VALUES (?,?,?)", hash_list_str_unique, dbg='hash_string_add_many:insert:0')
+            "INSERT OR IGNORE INTO core_hash_strings VALUES (?,?,?,?)", hash_list_str_unique, dbg='hash_string_add_many:insert:0')
         self.db_conn.commit()
 
         hash_list_map = {}
         for rec in hash_list_str_unique:
             result = self.db_query_all(
-                "SELECT rowid FROM core_hash_strings WHERE hash32==(?) and hash48==(?) and string==(?)", rec, dbg='hash_string_add_many:select:0')
+                "SELECT rowid FROM core_hash_strings WHERE hash32==(?) and hash48==(?) and hash64==(?) and string==(?)",
+                rec,
+                dbg='hash_string_add_many:select:0')
 
             # we expect one and only one match for a hash+string
             assert len(result) == 1
@@ -631,7 +710,7 @@ class VfsDatabase:
             hash_list_map[rec] = row_id
 
         row_ids = [hash_list_map[rec] for rec in hash_list_str]
-        ref_list = [(r, h[3], h[4], h[5], h[6]) for r, h in zip(row_ids, hash_list)]
+        ref_list = [(r, h[4], h[5], h[6], h[7]) for r, h in zip(row_ids, hash_list)]
         ref_list = list(set(ref_list))
         result = self.db_execute_many(
             "INSERT OR IGNORE INTO core_hash_string_references VALUES (?,?,?,?,?)", ref_list, dbg='hash_string_add_many:insert:1')
@@ -684,11 +763,11 @@ class VfsDatabase:
                 if e != '.tab':
                     pp = end0
             else:
-                pp = '{:08X}.dat'.format(parent_node.v_hash)
+                pp = parent_node.v_hash_to_str() + '.dat'
             if pp is not None:
                 parent_paths.append(pp)
         cache_dir = os.path.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
-        file_name = os.path.join(cache_dir, '{:08X}.dat'.format(node.v_hash))
+        file_name = os.path.join(cache_dir, node.v_hash_to_str() + '.dat')
         return file_name
 
     def file_obj_from(self, node: VfsNode):
@@ -726,8 +805,13 @@ class VfsDatabase:
                 bad_blocks = []
                 buffer_out = b''
 
+                if node.blocks is None:
+                    blocks = [(node.offset, node.size_c, node.size_u)]
+                else:
+                    blocks = node.blocks
+
                 with self.file_obj_from(parent_node) as f_in:
-                    for bi, (block_offset, compressed_len, uncompressed_len) in enumerate(node.blocks):
+                    for bi, (block_offset, compressed_len, uncompressed_len) in enumerate(blocks):
                         f_in.seek(block_offset)
                         in_buffer = f_in.read(compressed_len)
                         buffer_ret, ret = self.decompress_oodle_lz.decompress(in_buffer, compressed_len, uncompressed_len)
@@ -749,9 +833,9 @@ class VfsDatabase:
                     label = 'GOOD'
 
                 if bad_blocks:
-                    self.logger.trace('{}: ct:{}, cf:{}, sc:{}, su:{}, bl:{}, f:{}'.format(
+                    self.logger.trace('{}: ct:{}, cf:{}, sc:{}, su:{}, bnn:{}, bl:{}, f:{}'.format(
                         label, node.compression_type_get(), node.compression_flag_get(), node.size_c, node.size_u,
-                        all_blocks, file_name,
+                        node.blocks is not None, all_blocks, file_name,
                     ))
 
                 return io.BytesIO(buffer_out)

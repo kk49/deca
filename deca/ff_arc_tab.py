@@ -1,5 +1,38 @@
 from deca.errors import EDecaOutOfData
 from deca.ff_types import *
+from .file import ArchiveFile
+
+
+def tab_file_load(filename, ver):
+    with ArchiveFile(open(filename, 'rb')) as f:
+        magic = f.read(4)
+        ver_0 = f.read_u16()
+        ver_1 = f.read_u16()
+        ver_2 = f.read_u32()
+
+        assert magic == b'TAB\x00'
+        if 3 == ver:
+            assert ver_0 == 2
+            assert ver_1 == 1
+            assert ver_2 == 2048
+            tab_file = TabFileV3()
+        elif 4 == ver:
+            assert ver_0 == 2
+            assert ver_1 == 1
+            assert ver_2 == 4096
+            tab_file = TabFileV4()
+        elif 5 == ver:
+            assert ver_0 == 3
+            assert ver_1 == 1
+            assert ver_2 == 4096
+            tab_file = TabFileV5()
+        else:
+            raise NotImplementedError('Unknown TAB file version {}'.format(ver))
+
+    with ArchiveFile(open(filename, 'rb')) as f:
+        tab_file.deserialize(f)
+
+    return tab_file
 
 
 class TabFileBase:
@@ -44,6 +77,26 @@ class TabFileV3(TabFileBase):
         raise NotImplementedError('Interface Class')
 
 
+def process_file_blocks(file_table, file_block_table):
+    # give each file entry its info about its file blocks
+    no_block = [0xffffffff, 0xffffffff]
+    fbt = [None] * len(file_block_table)
+    for i, fte in enumerate(file_table):
+        fbi = fte.file_block_index
+        if file_block_table[fbi] != no_block:
+            fte.file_block_table = []
+            d_count = 0
+            while d_count < fte.size_c:
+                fb = file_block_table[fbi]
+                sc = fb[0]
+                assert fbt[fbi] is None  # make sure we are not clobbering other files
+                fbt[fbi] = i
+                d_count += sc
+                fbi += 1
+                fte.file_block_table.append(fb)
+            assert d_count == fte.size_c
+
+
 class TabFileV4(TabFileBase):
     def __init__(self):
         TabFileBase.__init__(self)
@@ -74,27 +127,7 @@ class TabFileV4(TabFileBase):
             self.file_hash_map[entry.hashname] = entry
             entry = TabEntryFileV4()
 
-        # give each file entry its info about its file blocks
-        no_block = [0xffffffff, 0xffffffff]
-        fbt = [None] * len(self.file_block_table)
-        for i, fte in enumerate(self.file_table):
-            fbi = fte.file_block_index
-            if self.file_block_table[fbi] != no_block:
-                fbt[fbi] = i
-                fte.file_block_table = []
-
-        for i, fb in enumerate(self.file_block_table):
-            if fb == no_block:
-                fbt[i] = None
-
-        for i in range(2, len(fbt)-1):
-            if fbt[i] is None:
-                fbt[i] = fbt[i-1]
-        for i in range(1, len(fbt)-1):
-            if fbt[i] is not None:
-                self.file_table[fbt[i]].file_block_table.append(self.file_block_table[i])
-            else:
-                pass
+        process_file_blocks(self.file_table, self.file_block_table)
 
         return True
 
@@ -108,10 +141,9 @@ class TabFileV5(TabFileBase):
 
     def deserialize(self, f):
         self.magic = f.read(4)
-        self.file_version = f.read_u16()  # just cause 4 was still 2, rage 2 is 3
-        assert 3 == self.file_version
-        self.unk += [f.read_u16()]
-        self.unk += [f.read_u32()]
+        self.file_version = f.read_u16()  # 3
+        self.unk += [f.read_u16()]  # 1
+        self.unk += [f.read_u32()]  # 4096
         file_count = f.read_u32()
         block_count = f.read_u32()
         self.unk += [f.read_u32()]
@@ -127,33 +159,13 @@ class TabFileV5(TabFileBase):
 
         self.file_table = []
         self.file_hash_map = {}
-        entry = TabEntryFileV5()
-        while entry.deserialize(f):
+        for i in range(file_count):
+            entry = TabEntryFileV5()
+            entry.deserialize(f)
             self.file_table.append(entry)
             self.file_hash_map[entry.hashname] = entry
-            entry = TabEntryFileV4()
 
-        # give each file entry its info about its file blocks
-        no_block = [0xffffffff, 0xffffffff]
-        fbt = [None] * len(self.file_block_table)
-        for i, fte in enumerate(self.file_table):
-            fbi = fte.file_block_index
-            if self.file_block_table[fbi] != no_block:
-                fbt[fbi] = i
-                fte.file_block_table = []
-
-        for i, fb in enumerate(self.file_block_table):
-            if fb == no_block:
-                fbt[i] = None
-
-        for i in range(2, len(fbt)-1):
-            if fbt[i] is None:
-                fbt[i] = fbt[i-1]
-        for i in range(1, len(fbt)-1):
-            if fbt[i] is not None:
-                self.file_table[fbt[i]].file_block_table.append(self.file_block_table[i])
-            else:
-                pass
+        process_file_blocks(self.file_table, self.file_block_table)
 
         return True
 
@@ -170,7 +182,7 @@ class TabEntryFileBase:
         self.file_block_index = None
         self.compression_type = None
         self.compression_flags = None
-        self.file_block_table = []
+        self.file_block_table = None
 
     def deserialize(self, f):
         raise NotImplementedError('Interface Class')
@@ -201,7 +213,6 @@ class TabEntryFileV3(TabEntryFileBase):
             self.offset = f.read_u32(raise_on_no_data=True)
             self.size_c = f.read_u32(raise_on_no_data=True)
             self.size_u = self.size_c
-            self.file_block_table = [[self.size_c, self.size_u]]
             self.compression_flags = 0
             if self.size_c == self.size_u:
                 self.compression_type = compression_00_none
@@ -232,7 +243,6 @@ class TabEntryFileV4(TabEntryFileBase):
             self.file_block_index = f.read_u16(raise_on_no_data=True)
             self.compression_type = f.read_u8(raise_on_no_data=True)
             self.compression_flags = f.read_u8(raise_on_no_data=True)
-            self.file_block_table = [[self.size_c, self.size_u]]
 
             if f.debug:
                 print(self.debug())
@@ -251,15 +261,13 @@ class TabEntryFileV5(TabEntryFileBase):
 
     def deserialize(self, f):
         try:
-            self.hashname = f.read_u32(raise_on_no_data=True)
+            self.hashname = f.read_s64(raise_on_no_data=True)  # s64 because python uses those for ints
             self.offset = f.read_u32(raise_on_no_data=True)
-            self.xxx = f.read_u32(raise_on_no_data=True)
-            self.file_block_index = f.read_u16(raise_on_no_data=True)
             self.size_c = f.read_u32(raise_on_no_data=True)
             self.size_u = f.read_u32(raise_on_no_data=True)
+            self.file_block_index = f.read_u16(raise_on_no_data=True)
             self.compression_type = f.read_u8(raise_on_no_data=True)
             self.compression_flags = f.read_u8(raise_on_no_data=True)
-            self.file_block_table = [[self.size_c, self.size_u]]
 
             if f.debug:
                 print(self.debug())

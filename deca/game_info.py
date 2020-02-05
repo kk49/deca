@@ -52,23 +52,33 @@ class GameInfo:
         self.exe_name = exe_name
         self.game_id = game_id
         self.archive_version = 3
+        self.file_hash_size = 4
         self.oo_decompress_dll = None
         self.area_prefixs = ['']
 
-        self.worlds = [
-            ('', 'terrain/', 'terrain/hp/'),
-            ('', 'terrain/', 'terrain/jc3/'),
-            ('', 'terrain/', 'terrain/jc4/'),
-            ('worlds/base/', 'worlds/base/terrain/', 'worlds/base/terrain/hp/'),
+        self.world_patches = [
+            'terrain/hp/patches/',
+            'terrain/jc3/patches/'
         ]
-        for i in range(4):
-            self.worlds.append(
-                (
-                    f'worlds/world{i}/',
-                    f'worlds/world{i}/terrain/',
-                    f'worlds/world{i}/terrain/world{i}/',
-                )
-            )
+
+        self.world_occluders = [
+            'terrain/hp/occluder/',
+            'terrain/jc3/occluder/'
+        ]
+
+        self.world_navheightfields = [
+            'terrain/hp/navheightfield/globalhires/',
+            'terrain/jc3/navheightfield/globalhires/'
+        ]
+
+        self.world_hm = [
+            'terrain/hp/horizonmap/horizon_'            
+            'terrain/jc3/horizonmap/horizon_'
+        ]
+
+        self.world_ai = [
+            'ai/tiles/'
+        ]
 
         self.map_zooms = [0, 1, 2, 3]
         self.map_max_count = 500
@@ -272,6 +282,32 @@ class GameInfoTHCOTW(GameInfo):
             
             'hp_iberia_',
         ]
+
+        self.world_patches += [
+            'worlds/base/terrain/hp/patches/'
+        ]
+
+        self.world_occluders += [
+            'worlds/base/terrain/hp/occluder/'
+        ]
+
+        self.world_navheightfields += [
+            'worlds/base/terrain/hp/navheightfield/globalhires/'
+        ]
+
+        self.world_ai += [
+            'worlds/base/ai/tiles/'
+        ]
+
+        for i in range(4):
+            self.world_patches.append(f'worlds/world{i}/terrain/world{i}/patches/')
+            self.world_occluders.append(f'worlds/world{i}/terrain/world{i}/occluder/')
+            self.world_navheightfields.append(f'worlds/world{i}/terrain/world{i}/navheightfield/globalhires/')
+            self.world_ai.append(f'worlds/world{i}/ai/tiles/')
+
+            for area in self.area_prefixs:
+                self.world_hm.append(f'worlds/base/terrain/hp/horizonmap/horizon_hp_{area}')
+                self.world_hm.append(f'worlds/world{i}/terrain/world{i}/horizonmap/horizon_hp_{area}')
 
     def archive_path(self):
         archive_paths = []
@@ -479,8 +515,28 @@ class GameInfoRage2(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'rg2')
         self.archive_version = 5
+        self.file_hash_size = 8
         self.oo_decompress_dll = os.path.join(game_dir, 'oo2core_7_win64.dll')
         self.map_prefixes += [
+        ]
+
+        self.world_patches = [
+            'terrain/heatwave/patches/width_3/',
+            'terrain/heatwave/patches/width_4/',
+            'terrain/heatwave/patches/width_8/',
+        ]
+
+        self.world_occluders = [
+            'terrain/heatwave/occluder/',
+        ]
+
+        self.world_navheightfields = [
+            'terrain/hp/navheightfield/globalhires/',
+        ]
+
+        self.world_hm = [
+            'terrain/heatwave/horizonmap/horizonmap_tessellation_disabled_'
+            'terrain/heatwave/horizonmap/horizonmap_moon_tessellation_disabled_'
         ]
 
     def archive_path(self):

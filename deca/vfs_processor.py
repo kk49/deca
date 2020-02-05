@@ -74,20 +74,27 @@ class VfsProcessor(VfsDatabase):
 
     def find_initial_files(self, debug=False):
         self.logger.log('Add EXE files')
+
+        initial_nodes = []
+
         exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
         f_size = os.stat(exe_path).st_size
-        node = VfsNode(file_type=FTYPE_EXE, p_path=exe_path, size_u=f_size, size_c=f_size, offset=0)
+        node = VfsNode(
+            v_hash_type=self.file_hash_type,
+            file_type=FTYPE_EXE, p_path=exe_path, size_u=f_size, size_c=f_size, offset=0)
         self.determine_ftype(node)
-        self.node_add_one(node)
+        initial_nodes.append(node)
 
         self.logger.log('Add unarchived files')
         for ua_file in self.game_info.unarchived_files():
             f_size = os.stat(ua_file).st_size
             v_path = os.path.basename(ua_file).encode('utf-8')
-            v_hash = deca.hashes.hash32_func(v_path)
-            node = VfsNode(v_hash=v_hash, v_path=v_path, p_path=ua_file, size_u=f_size, size_c=f_size, offset=0)
+            v_hash = self.file_hash(v_path)
+            node = VfsNode(
+                v_hash_type=self.file_hash_type,
+                v_hash=v_hash, v_path=v_path, p_path=ua_file, size_u=f_size, size_c=f_size, offset=0)
             self.determine_ftype(node)
-            self.node_add_one(node)
+            initial_nodes.append(node)
 
         self.logger.log('Add TAB / ARC files')
         input_files = []
@@ -120,9 +127,13 @@ class VfsProcessor(VfsDatabase):
             inpath = os.path.join(ta_file)
             file_arc = inpath + '.arc'
             f_size = os.stat(file_arc).st_size
-            node = VfsNode(file_type=FTYPE_ARC, p_path=file_arc, size_u=f_size, size_c=f_size, offset=0)
+            node = VfsNode(
+                v_hash_type=self.file_hash_type,
+                file_type=FTYPE_ARC, p_path=file_arc, size_u=f_size, size_c=f_size, offset=0)
             self.determine_ftype(node)
-            self.node_add_one(node)
+            initial_nodes.append(node)
+
+        self.nodes_add_many(initial_nodes)
 
     def process(self, debug=False):
         inner_loop = [
@@ -130,9 +141,9 @@ class VfsProcessor(VfsDatabase):
             [self.process_by_ftype_match, (FTYPE_ARC, 'process_arc')],
             [self.process_by_ftype_match, (FTYPE_TAB, 'process_tab')],
             [self.process_by_ftype_match, (FTYPE_SARC, 'process_sarc')],
-            [self.process_by_vhash_match, (deca.hashes.hash32_func(b'gdc/global.gdcc'), 'process_global_gdcc')],
+            [self.process_by_v_hash_match, (self.file_hash(b'gdc/global.gdcc'), 'process_global_gdcc')],
             [self.process_by_ftype_match, (FTYPE_GDCBODY, 'process_global_gdcc_body')],
-            [self.process_by_ext_hash_match, (deca.hashes.hash32_func(b'.resourcebundle'), 'process_resource_bundle')],
+            [self.process_by_ext_hash_match, (self.ext_hash(b'.resourcebundle'), 'process_resource_bundle')],
             [self.process_by_vpath_endswith, (b'.resourcebundle', 'process_resource_bundle')],
             [self.process_by_ftype_match, (FTYPE_ADF, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_ADF_BARE, 'process_adf_initial')],
@@ -150,45 +161,53 @@ class VfsProcessor(VfsDatabase):
 
         self.process_remove_temporary_nodes()
 
-        self.find_vpath_procmon_dir()
-        self.find_vpath_resources()
-        self.find_vpath_guess()
+        if version < 2:
+            self.find_vpath_procmon_dir()
+            self.find_vpath_resources()
+            self.find_vpath_guess()
 
-        outer_phase_id = 0
-        inner_loop_count = 2
-        while inner_loop_count > 1:
-            outer_phase_id = outer_phase_id + 1
-            self.logger.log('Phase {}: Begin'.format(outer_phase_id))
+            # success = [set() for _ in inner_loop]
+            # failed = [set() for _ in inner_loop]
 
-            inner_processed_nodes = set()
-            inner_phase_id = 0
-            changed = True
-            inner_loop_count = 0
-            while changed:
-                inner_loop_count += 1
-                inner_phase_id = inner_phase_id + 1
+            outer_phase_id = 0
 
-                self.logger.log('Phase {}.{}: File Process Begin'.format(outer_phase_id, inner_phase_id))
+            do_process_v_hashes = True
+            while True:
+                outer_phase_id = outer_phase_id + 1
+                self.logger.log('Phase {}: Begin'.format(outer_phase_id))
 
-                processed_nodes = set()
+                inner_phase_id = 0
+                changed = True
+                while changed:
+                    changed = False
+                    inner_phase_id = inner_phase_id + 1
 
-                for ops in inner_loop:
-                    result = ops[0](*(ops[1]))
-                    processed_nodes = processed_nodes.union(result)
+                    self.logger.log('Phase {}.{}: File Process Begin'.format(outer_phase_id, inner_phase_id))
 
-                self.logger.log('Phase {}.{}: File Process End'.format(outer_phase_id, inner_phase_id))
+                    for iop, ops in enumerate(inner_loop):
+                        idx_processed, idx_success, idx_failed = ops[0](*(ops[1]))
+                        if idx_success:  # new successes
+                            changed = True
+                            do_process_v_hashes = True
+                        # success[iop] = success[iop].union(idx_success)
+                        # failed[iop] = set(idx_failed)
 
-                changed = processed_nodes != inner_processed_nodes
-                inner_processed_nodes = processed_nodes
+                    self.logger.log('Phase {}.{}: File Process End'.format(outer_phase_id, inner_phase_id))
 
-            if inner_loop_count > 1:
-                self.find_vpath_by_assoc()
-                self.process_all_vhashes('process_vhash_final')
+                if do_process_v_hashes:
+                    do_process_v_hashes = False
+                    self.find_vpath_by_assoc()
+                    self.process_all_vhashes('process_vhash_final')
+                    self.logger.log('Phase {}: End'.format(outer_phase_id))
+                else:
+                    self.logger.log('Phase {}: End'.format(outer_phase_id))
+                    break
 
-            self.logger.log('Phase {}: End'.format(outer_phase_id))
+            self.update_used_depths()
+            self.db_execute_one("PRAGMA user_version = 2;")
 
-        self.update_used_depths()
-        self.dump_vpaths()
+            self.dump_vpaths()
+
         self.dump_status()
 
         self.logger.log('PROCESSING: COMPLETE')
@@ -206,10 +225,11 @@ class VfsProcessor(VfsDatabase):
 
     def dump_status(self):
         # possible different vpaths with same hash, uncommon
-        q = "SELECT DISTINCT hash32, COUNT(*) c FROM core_hash_strings GROUP BY hash32 HAVING c > 1;"
-        dup_hash4 = self.db_query_all(q)
-        for v_hash, c in dup_hash4:
-            q = "SELECT DISTINCT hash32, string FROM core_hash_strings WHERE hash32 = (?)"
+
+        q = f"SELECT DISTINCT {self.file_hash_db_id}, COUNT(*) c FROM core_hash_strings GROUP BY {self.file_hash_db_id} HAVING c > 1;"
+        dup_hash = self.db_query_all(q)
+        for v_hash, c in dup_hash:
+            q = f"SELECT DISTINCT {self.file_hash_db_id}, string FROM core_hash_strings WHERE {self.file_hash_db_id} = (?)"
             hashes = self.db_query_all(q, [v_hash])
             fcs = []
             gtz_count = 0
@@ -217,13 +237,17 @@ class VfsProcessor(VfsDatabase):
                 q = "SELECT DISTINCT uid FROM core_vnodes WHERE v_path = (?)"
                 nodes = self.db_query_all(q, [s])
                 fc = len(nodes)
-                self.logger.log(f'SUMMARY: Duplicate String4 Hashes: {h:08x} {s}: {fc} nodes')
+                self.logger.log('SUMMARY: Duplicate FileName Hashes: {} {}: {} nodes'.format(
+                    self.file_hash_format(h), s, fc
+                ))
                 fcs.append(len(nodes))
                 if fc > 0:
                     gtz_count += 1
             if gtz_count > 1:
                 for (h, s), fc in zip(hashes, fcs):
-                    self.logger.log(f'WARNING: Duplicate String4 Hashes: {h:08x} {s}: {fc} nodes')
+                    self.logger.log('WARNING: Duplicate FileName Hashes: {} {}: {} nodes'.format(
+                        self.file_hash_format(h), s, fc
+                    ))
 
         # nodes with same hash but different paths, rare
         q = "SELECT DISTINCT v_hash, v_path, COUNT(*) c FROM core_vnodes GROUP BY v_hash, v_hash HAVING c > 1;"
@@ -240,7 +264,9 @@ class VfsProcessor(VfsDatabase):
         for v_hash, count in dup_count.items():
             vpaths = dup_map[v_hash]
             for v_path in vpaths:
-                self.logger.log(f'SUMMARY: Duplicate Node Hashes: {v_hash:08x} {v_path}')
+                self.logger.log('SUMMARY: Duplicate Node Hashes: {} {}'.format(
+                    self.file_hash_format(v_hash), v_path
+                ))
 
         # ADF type summary
         adf_db = AdfDatabase()
@@ -250,15 +276,28 @@ class VfsProcessor(VfsDatabase):
         for t, uid in adf_db.type_missing:
             missing_types.add(t)
             node: VfsNode = self.node_where_uid(uid)
-            self.logger.log('SUMMARY: Missing Type {:08x} in {:08X} {}'.format(t, node.v_hash, node.v_path))
+            self.logger.log('SUMMARY: Missing Type {:08x} in {} {}'.format(t, node.v_hash_to_str(), node.v_path))
 
-        self.logger.log(f'SUMMARY: Missing Types: {len(missing_types)} ')
+        present_types = set()
+        for t, uid in adf_db.type_map_def.items():
+            present_types.add(t)
+
+        self.logger.log(f'SUMMARY: ADF Types Present: {len(present_types)}')
+        self.logger.log(f'SUMMARY: ADF Types Missing: {len(missing_types)} ')
 
         # unmatched summary, common
+        q = "SELECT v_hash FROM core_vnodes WHERE v_path IS NOT NULL"
+        nodes_with_vpath = self.db_query_all(q)
+        nodes_with_vpath = [r[0] for r in nodes_with_vpath]
+        nodes_with_vpath_set = set(nodes_with_vpath)
         q = "SELECT v_hash FROM core_vnodes WHERE v_path IS NULL"
         nodes_no_vpath = self.db_query_all(q)
         nodes_no_vpath = [r[0] for r in nodes_no_vpath]
         nodes_no_vpath_set = set(nodes_no_vpath)
+        self.logger.log('SUMMARY: Total Nodes|Named Nodes|Total Hashes|Found Hashes: {}|{}|{}|{}'.format(
+            len(nodes_no_vpath) + len(nodes_with_vpath), len(nodes_with_vpath),
+            len(nodes_no_vpath_set) + len(nodes_with_vpath_set), len(nodes_with_vpath_set)
+        ))
         self.logger.log(f'SUMMARY: Unmatched Nodes: {len(nodes_no_vpath)}')
         self.logger.log(f'SUMMARY: Unmatched Path Hashes: {len(nodes_no_vpath_set)}')
 
@@ -292,56 +331,92 @@ class VfsProcessor(VfsDatabase):
 
         src_indexes = self.nodes_where_f_type_select_uid_v_hash_processed(f_type)
         indexes, done_set = self.src_indexes_process(src_indexes)
+
+        indexes_processed = []
+        indexes_success = []
+        indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            commander.do_map(cmd, indexes, step_id=f_type)
+            results = commander.do_map(cmd, indexes, step_id=f_type)
 
-        self.logger.log('PROCESS: F_TYPE = {}: End: Already Processed: {}, Additional: {}'.format(
-            f_type, len(done_set), len(indexes)))
+            indexes_processed = [k for k, v in results]
+            indexes_success = [k for k, v in results if v]
+            indexes_failed = [k for k, v in results if not v]
 
-        return indexes
+        self.logger.log(
+            'PROCESS: F_TYPE = {}: End: Already Processed: {}, Additional: {}, Success: {}, Failed: {}'.format(
+                f_type, len(done_set), len(indexes_processed), len(indexes_success), len(indexes_failed)
+            )
+        )
 
-    def process_by_vhash_match(self, v_hash, cmd):
+        return indexes_processed, indexes_success, indexes_failed
+
+    def process_by_v_hash_match(self, v_hash, cmd):
         self.logger.log('PROCESS: V_HASH = 0x{:08X}: Begin'.format(v_hash))
 
         src_indexes = self.nodes_where_v_hash_select_uid_v_hash_processed(v_hash)
         indexes, done_set = self.src_indexes_process(src_indexes)
+        indexes_processed = []
+        indexes_success = []
+        indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            commander.do_map(cmd, indexes, step_id=f'v_hash = {v_hash}')
+            results = commander.do_map(cmd, indexes, step_id=f'v_hash = {v_hash}')
 
-        self.logger.log('PROCESS: V_HASH = 0x{:08X}: End: Already Processed: {}, Additional: {}'.format(
-            v_hash, len(done_set), len(indexes)))
+            indexes_processed = [k for k, v in results]
+            indexes_success = [k for k, v in results if v]
+            indexes_failed = [k for k, v in results if not v]
 
-        return indexes
+        self.logger.log(
+            'PROCESS: V_HASH = 0x{}: End: Already Processed: {}, Additional: {}, Success: {}, Failed: {}'.format(
+                self.file_hash_format(v_hash), len(done_set), len(indexes_processed),
+                len(indexes_success), len(indexes_failed)
+            )
+        )
+
+        return indexes_processed, indexes_success, indexes_failed
 
     def process_by_ext_hash_match(self, ext_hash, cmd):
         self.logger.log('PROCESS: EXT_HASH = 0x{:08X}: Begin'.format(ext_hash))
 
         src_indexes = self.nodes_where_ext_hash_select_uid_v_hash_processed(ext_hash)
         indexes, done_set = self.src_indexes_process(src_indexes)
+        indexes_processed = []
+        indexes_success = []
+        indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            commander.do_map(cmd, indexes, step_id=f'ext_hash = {ext_hash}')
+            results = commander.do_map(cmd, indexes, step_id=f'ext_hash = {ext_hash}')
+
+            indexes_processed = [k for k, v in results]
+            indexes_success = [k for k, v in results if v]
+            indexes_failed = [k for k, v in results if not v]
 
         self.logger.log('PROCESS: EXT_HASH = 0x{:08X}: End: Already Processed: {}, Additional: {}'.format(
             ext_hash, len(done_set), len(indexes)))
 
-        return indexes
+        return indexes_processed, indexes_success, indexes_failed
 
     def process_by_vpath_endswith(self, suffix, cmd):
         self.logger.log('PROCESS: ENDS_WITH = {}: Begin'.format(suffix))
 
         src_indexes = self.nodes_where_vpath_endswith_select_uid_v_hash_processed(suffix)
         indexes, done_set = self.src_indexes_process(src_indexes)
+        indexes_processed = []
+        indexes_success = []
+        indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            commander.do_map(cmd, indexes, step_id=f'endswith = {suffix}')
+            results = commander.do_map(cmd, indexes, step_id=f'endswith = {suffix}')
+
+            indexes_processed = [k for k, v in results]
+            indexes_success = [k for k, v in results if v]
+            indexes_failed = [k for k, v in results if not v]
 
         self.logger.log('PROCESS: ENDS_WITH = {}: End: Already Processed: {}, Additional: {}'.format(
             suffix, len(done_set), len(indexes)))
 
-        return indexes
+        return indexes_processed, indexes_success, indexes_failed
 
     def process_all_vhashes(self, cmd):
         self.logger.log('PROCESS: VHASHes: Begin')
@@ -422,15 +497,17 @@ class VfsProcessor(VfsDatabase):
                 for index in range(self.game_info.map_max_count):
                     guess_strings[map_prefix + f'zoom{zoom_i}/{index}.ddsc'] = [FTYPE_AVTX, FTYPE_DDS]
 
-        for world_rec in self.game_info.worlds:
-            for area_prefix in self.game_info.area_prefixs:
-                for i in range(64):
-                    fn = world_rec[2] + 'horizonmap/horizon_{}{}.ddsc'.format(area_prefix, i)
-                    guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
+        for prefix in self.game_info.world_hm:
+            for i in range(64):
+                fn = prefix + '{}.ddsc'.format(i)
+                guess_strings[fn] = [FTYPE_AVTX, FTYPE_DDS]
 
+        for prefix in self.game_info.world_ai:
             for i in range(64):
                 for j in range(64):
-                    fn = world_rec[0] + 'ai/tiles/{:02d}_{:02d}.navmeshc'.format(i, j)
+                    fn = prefix + '{:02d}_{:02d}.navmeshc'.format(i, j)
+                    guess_strings[fn] = [FTYPE_TAG0, FTYPE_H2014]
+                    fn = prefix + '{}_{}.navmeshc'.format(i, j)
                     guess_strings[fn] = [FTYPE_TAG0, FTYPE_H2014]
 
         prefixs = [
@@ -496,7 +573,7 @@ class VfsProcessor(VfsDatabase):
         with DbWrap(self, logger=self) as db:
             for k, v in assoc_strings.items():
                 fn = k
-                fh = hash32_func(fn)
+                fh = self.file_hash(fn)
                 if fh in hash_present:
                     db.propose_string(fn, None, possible_file_types=v)
 
@@ -545,15 +622,16 @@ class VfsProcessor(VfsDatabase):
             v_path = filename.replace(':', '/')
             v_path = v_path.replace('\\', '/')
             v_path = ('__EXTERNAL_FILES__' + v_path).encode('ascii')
-            v_hash = deca.hashes.hash32_func(v_path)
+            v_hash = self.file_hash(v_path)
 
             # tag atx file type since they have no header info
 
             vnode = VfsNode(
+                v_hash_type=self.file_hash_type,
                 v_hash=v_hash, v_path=v_path, p_path=filename,
                 size_u=f_size, size_c=f_size, offset=0, is_temporary_file=is_temporary_file)
             self.determine_ftype(vnode)
-            self.node_add_one(vnode)
+            self.nodes_add_many([vnode])
 
             self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))
         else:

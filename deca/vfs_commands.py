@@ -5,20 +5,20 @@ import queue
 import time
 import sys
 import traceback
+import numpy as np
 
 import deca.ff_rtpc
 
 from .file import ArchiveFile
-from .vfs_db import VfsDatabase, VfsNode, language_codes
+from .vfs_db import VfsDatabase, VfsNode, language_codes, v_hash_type_4, v_hash_type_8
 from .db_wrap import DbWrap
 from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
 from .ff_rtpc import Rtpc, k_type_str
-from .ff_arc_tab import TabFileV3, TabFileV4, TabFileV5, TabEntryFileBase
+from .ff_arc_tab import tab_file_load, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
 from .util import remove_prefix_if_present, remove_suffix_if_present
-from .hashes import hash32_func
 from .kaitai.gfx import Gfx
 
 
@@ -63,12 +63,19 @@ class MultiProcessControl:
         for ii in indexes:
             command_list.append([cmd, [ii]])
 
-        self.mp_issue_commands(command_list, step_id=step_id)
+        results = self.mp_issue_commands(command_list, step_id=step_id)
+
+        all_results = []
+        for r in results:
+            all_results += r
+
+        return all_results
 
     def mp_issue_commands(self, command_list: list, step_id=None):
-        command_todo = command_list.copy()
+        command_todo = [(i, cmd) for i, cmd in enumerate(command_list)]
         command_active = {}
         command_complete = []
+        command_results = [None] * len(command_list)
 
         exception_list = []
 
@@ -85,8 +92,8 @@ class MultiProcessControl:
         if local:
             vfs = VfsDatabase(self.project_file, self.working_dir, self.logger)
             processor = Processor(vfs, LogWrapper(self.logger))
-            for command in command_todo:
-                processor.process_command(command[0], command[1])
+            for i, command in command_todo:
+                command_results[i] = processor.process_command(command[0], command[1])
             vfs.shutdown()
         else:
             mp_q_results = multiprocessing.Queue()
@@ -129,7 +136,7 @@ class MultiProcessControl:
                     q_command: queue.Queue = proc[2]
                     command = command_todo.pop(0)
                     command_active[name] = command
-                    q_command.put(command)
+                    q_command.put(command[1])
                 else:
                     try:
                         msg = mp_q_results.get(block=False, timeout=1)
@@ -156,9 +163,10 @@ class MultiProcessControl:
                         elif proc_cmd == 'status':
                             status[proc_name] = proc_params
                         elif proc_cmd == 'cmd_done':
-                            command_active.pop(proc_name)
-                            command_complete.append([proc_name, proc_params])
-                            self.logger.debug('Manager: {} completed {}'.format(proc_name, proc_params))
+                            command = command_active.pop(proc_name)
+                            command_complete.append([proc_name, proc_params[0]])
+                            command_results[command[0]] = proc_params[1]
+                            self.logger.debug('Manager: {} completed {} {}'.format(proc_name, proc_params[0], len(proc_params[1])))
                         elif proc_cmd == 'process_done':
                             self.logger.debug('Manager: {} DONE'.format(proc_name))
                             command_active.pop(proc_name)
@@ -184,9 +192,11 @@ class MultiProcessControl:
 
             self.logger.log('Manager: Done')
 
+            return command_results
+
 
 class Processor:
-    def __init__(self, vfs, comm):
+    def __init__(self, vfs: VfsDatabase, comm):
         self._vfs = vfs
         self._comm = comm
 
@@ -208,11 +218,11 @@ class Processor:
         }
 
         nhf = []
-        for world_rec in self._vfs.game_info.worlds:
+        for prefix in self._vfs.game_info.world_navheightfields:
             for v0 in range(64):
                 for v1 in range(64):
-                    fn = world_rec[2] + 'navheightfield/globalhires/{:02d}_{:02d}.nhf'.format(v0, v1)
-                    nhf.append((fn, hash32_func(fn)))
+                    fn = prefix + '{:02d}_{:02d}.nhf'.format(v0, v1)
+                    nhf.append((fn, self._vfs.file_hash(fn)))
 
         self.nav_height_field_possible_names = nhf
 
@@ -220,31 +230,39 @@ class Processor:
         command = self.commands.get(cmd, None)
         if command is None:
             raise NotImplementedError(f'Command not implemented: {cmd}')
-        command(*params)
+        result = command(*params)
+        return result
 
     def loop_over_uid_wrapper(self, indexes, func):
         n_indexes = len(indexes)
+        results = [None] * n_indexes
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, index in enumerate(indexes):
                 self._comm.status(i, n_indexes)
                 node = db.node_where_uid(index)
-                if node.is_valid():
-                    func(node, db)
+                results[i] = (index, func(node, db))
             self._comm.status(n_indexes, n_indexes)
+
+        return results
 
     def loop_over_vhash_wrapper(self, vhashes, func):
         n_indexes = len(vhashes)
+        results = [None] * n_indexes
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, v_hash in enumerate(vhashes):
                 self._comm.status(i, n_indexes)
-                func(v_hash, db)
+                results[i] = (v_hash, func(v_hash, db))
             self._comm.status(n_indexes, n_indexes)
 
+        return results
+
     def process_symlink(self, node: VfsNode, db: DbWrap):
-        self._comm.trace('Processing SYMLINK: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+        self._comm.trace('Processing SYMLINK: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         node.processed_file_set(True)
         db.node_update(node)
+
+        return True
 
     def process_exe(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing EXE: {} {}'.format(node.uid, node.p_path))
@@ -253,16 +271,20 @@ class Processor:
         node.processed_file_set(True)
         db.node_update(node)
 
+        return True
+
     def process_arc(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing ARC: {} {}'.format(node.uid, node.p_path))
 
         # here we add the tab file as a child of the ARC, a trick to make it work with our data model
         tab_path = os.path.splitext(node.p_path)
         tab_path = tab_path[0] + '.tab'
-        cnode = VfsNode(file_type=FTYPE_TAB, p_path=tab_path, pid=node.uid)
+        cnode = VfsNode(file_type=FTYPE_TAB, p_path=tab_path, pid=node.uid, v_hash_type=db.file_hash_type)
         db.node_add(cnode)
         node.processed_file_set(True)
         db.node_update(node)
+
+        return True
 
     def process_tab(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing TAB: {} {}'.format(node.uid, node.p_path))
@@ -270,45 +292,41 @@ class Processor:
         ver = db.game_info().archive_version
         debug = False
 
-        with ArchiveFile(open(node.p_path, 'rb'), debug=debug) as f:
-            if 3 == ver:
-                tab_file = TabFileV3()
-            elif 4 == ver:
-                tab_file = TabFileV4()
-            elif 5 == ver:
-                tab_file = TabFileV5()
+        tab_file = tab_file_load(node.p_path, ver)
+
+        te: TabEntryFileBase
+        for i, te in enumerate(tab_file.file_table):
+            if te.size_c == 0 or te.size_u == 0:
+                # handle zero length items as symlinks?
+                blocks = None
+                te.offset = None
             else:
-                raise NotImplementedError('Unknown TAB file version {}'.format(ver))
-
-            tab_file.deserialize(f)
-
-            te: TabEntryFileBase
-            for i, te in enumerate(tab_file.file_table):
-                if te.size_c == 0 or te.size_u == 0:
-                    # handle zero length items as symlinks?
+                if te.file_block_table is None:
                     blocks = None
-                    te.offset = None
                 else:
-                    blocks = [(0, 0, 0)] * len(te.file_block_table)
+                    blocks = []
                     offset = te.offset
                     for bi, block in enumerate(te.file_block_table):
-                        blocks[bi] = (offset, block[0], block[1])
+                        blocks.append((offset, block[0], block[1]))
                         offset += block[0]
 
-                    # for now don't include the nameless top level symlinks
-                    cnode = VfsNode(
-                        v_hash=te.hashname, pid=node.uid, index=i,
-                        offset=te.offset, size_c=te.size_c, size_u=te.size_u,
-                        compression_type=te.compression_type,
-                        compression_flag=te.compression_flags,
-                        blocks=blocks)
+                # for now don't include the nameless top level symlinks
+                cnode = VfsNode(
+                    v_hash_type=db.file_hash_type,
+                    v_hash=te.hashname, pid=node.uid, index=i,
+                    offset=te.offset, size_c=te.size_c, size_u=te.size_u,
+                    compression_type=te.compression_type,
+                    compression_flag=te.compression_flags,
+                    blocks=blocks)
 
-                    db.node_add(cnode)
+                db.node_add(cnode)
+
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
     def process_sarc(self, node: VfsNode, db: DbWrap):
-        self._comm.trace('Processing SARC: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+        self._comm.trace('Processing SARC: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         sarc_file = FileSarc()
         sarc_file.header_deserialize(db.file_obj_from(node))
@@ -319,6 +337,7 @@ class Processor:
             if offset == 0:
                 offset = None  # sarc files with zero offset are not in file, but reference hash value
             cnode = VfsNode(
+                v_hash_type=db.file_hash_type,
                 v_hash=se.v_hash, v_path=se.v_path, ext_hash=se.file_ext_hash,
                 pid=node.uid, index=se.index,
                 offset=offset, size_c=se.length, size_u=se.length,
@@ -329,6 +348,7 @@ class Processor:
 
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
     def process_global_gdcc(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing global gdcc": gdc/global.gdcc')
@@ -338,16 +358,19 @@ class Processor:
 
         cnode_name = b'gdc/global.gdc.DECA'
         cnode = VfsNode(
-            v_hash=deca.hashes.hash32_func(cnode_name),
+            v_hash=db.file_hash(cnode_name),
+            v_hash_type=db.file_hash_type,
             v_path=cnode_name,
             file_type=FTYPE_GDCBODY, pid=node.uid,
             offset=adf.table_instance[0].offset,
             size_c=adf.table_instance[0].size,
-            size_u=adf.table_instance[0].size)
+            size_u=adf.table_instance[0].size,
+        )
         db.node_add(cnode)
 
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
     def process_global_gdcc_body(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing global gdcc body": gdc/global.gdcc.DECA')
@@ -357,13 +380,14 @@ class Processor:
 
         for entry in adf.table_instance_values[0]:
             if isinstance(entry, GdcArchiveEntry):
-                # self.logger.log('GDCC: {:08X} {}'.format(entry.v_hash, entry.v_path))
+                # self.logger.log('GDCC: {} {}'.format(entry.v_hash_to_str(), entry.v_path))
                 adf_type = entry.adf_type_hash
                 file_type = None
                 if adf_type is not None:
                     file_type = FTYPE_ADF_BARE
                     # self.logger.log('ADF_BARE: Need Type: {:08x} {}'.format(adf_type, entry.v_path))
                 cnode = VfsNode(
+                    v_hash_type=db.file_hash_type,
                     v_hash=entry.v_hash, pid=node.uid, index=entry.index,
                     offset=entry.offset, size_c=entry.size, size_u=entry.size, v_path=entry.v_path,
                     file_type=file_type, adf_type=adf_type)
@@ -372,9 +396,10 @@ class Processor:
 
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
     def process_resource_bundle(self, node: VfsNode, db: DbWrap):
-        self._comm.trace('Processing ResourceBundle: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+        self._comm.trace('Processing ResourceBundle: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         with ArchiveFile(db.file_obj_from(node)) as f:
             index = 0
@@ -386,6 +411,7 @@ class Processor:
                 buffer = f.read(size)
 
                 cnode = VfsNode(
+                    v_hash_type=db.file_hash_type,
                     v_hash=v_hash, pid=node.uid, index=index,
                     offset=offset, size_c=size, size_u=size,
                     ext_hash=ext_hash)
@@ -395,10 +421,11 @@ class Processor:
 
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
     def process_adf_initial(self, node: VfsNode, db: DbWrap):
         if print_node_info:
-            self._comm.trace('Processing Adf Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+            self._comm.trace('Processing Adf Initial: {} {} {}'.format(node.uid, node.v_hash_to_str, node.v_path))
 
         try:
             adf = db.node_read_adf(node)
@@ -437,11 +464,13 @@ class Processor:
                 fns = []
                 # self name patch files
                 if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
-                    for world_rec in db.game_info().worlds:
-                        fn = world_rec[2] + 'patches/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+                    for prefix in db.game_info().world_patches:
+                        fn = prefix + 'patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
                             obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
                         fns.append(fn)
-                        fn = world_rec[2] + 'occluder/patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
+
+                    for prefix in db.game_info().world_occluders:
+                        fn = prefix + 'patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
                             obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
                         fns.append(fn)
 
@@ -461,7 +490,7 @@ class Processor:
                 for fne in fns:
                     if isinstance(fne, str):
                         fn = fne
-                        fnh = hash32_func(fn)
+                        fnh = self._vfs.file_hash(fn)
                     else:
                         fn = fne[0]
                         fnh = fne[1]
@@ -473,19 +502,21 @@ class Processor:
                         found_any = True
 
                 if len(fns) > 0 and not found_any:
-                    self._comm.log('COULD NOT MATCH GENERATED FILE NAME {:08X} {}'.format(node.v_hash, fns[0]))
+                    self._comm.log('COULD NOT MATCH GENERATED FILE NAME {} {}'.format(node.v_hash_to_str(), fns[0]))
 
             # only mark as processed if AdfTypeMissing exception did not happen
             node.processed_file_set(True)
             db.node_update(node)
+            return True
 
         except AdfTypeMissing as ae:
-            self._comm.log('Missing Type {:08x} in {:08X} {} {}'.format(
-                ae.type_id, node.v_hash, node.v_path, node.p_path))
+            self._comm.log('Missing Type {:08x} in {} {} {}'.format(
+                ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+        return False
 
     def process_rtpc_initial(self, node: VfsNode, db: DbWrap):
         if print_node_info:
-            self._comm.trace('Processing RTPC Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+            self._comm.trace('Processing RTPC Initial: {} {:} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         with db.file_obj_from(node) as f:
             buf = f.read(node.size_u)
@@ -530,9 +561,10 @@ class Processor:
 
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
     def process_gfx_initial(self, node: VfsNode, db: DbWrap):
-        self._comm.trace('Processing GFX Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+        self._comm.trace('Processing GFX Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         with db.file_obj_from(node) as f:
             buffer = f.read(node.size_u)
@@ -563,9 +595,10 @@ class Processor:
 
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
     def process_txt_initial(self, node: VfsNode, db: DbWrap):
-        self._comm.trace('Processing TXT Initial: {} {:08X} {}'.format(node.uid, node.v_hash, node.v_path))
+        self._comm.trace('Processing TXT Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         with db.file_obj_from(node) as f:
             buffer = f.read(node.size_u)
@@ -580,14 +613,21 @@ class Processor:
 
         node.processed_file_set(True)
         db.node_update(node)
+        return True
 
-    def process_vhash_final(self, hash32_in, db: DbWrap):
-        nodes = db.nodes_where_hash32(hash32_in)
-        hash_strings = db.hash_string_where_hash32_select_all(hash32_in)
+    def process_vhash_final(self, v_hash_in, db: DbWrap):
+        nodes = db.nodes_where_v_hash(v_hash_in)
+
+        if db.file_hash_type == v_hash_type_4:
+            hash_strings = db.hash_string_where_hash32_select_all(v_hash_in)
+        elif db.file_hash_type == v_hash_type_8:
+            hash_strings = db.hash_string_where_hash64_select_all(v_hash_in)
+        else:
+            raise NotImplementedError('Unhandled Hash Type {}'.format(db.file_hash_type))
 
         missed_vpaths = set()
         h4ref_map = {}
-        for rowid, hash32, hash48, v_path in hash_strings:
+        for rowid, _, _, _, v_path in hash_strings:
             missed_vpaths.add(v_path)
             h4ref_map[rowid] = db.hash_string_references_where_hs_rowid_select_all(rowid)
 
@@ -604,7 +644,7 @@ class Processor:
                     else:
                         ftype_int = ftype_list[node.file_type]
 
-                    for rowid, hash32, _, v_path in hash_strings:
+                    for rowid, _, _, _, v_path in hash_strings:
                         h4ref = h4ref_map[rowid]
 
                         if node.v_path is None:
@@ -613,14 +653,14 @@ class Processor:
                                     possible_ftypes = ftype_list[FTYPE_ANY_TYPE]
 
                                 if (ftype_int & possible_ftypes) != 0:
-                                    self._comm.trace('v_path:add  {} {:08X} {} {} {}'.format(
-                                        v_path, hash32, src_node, possible_ftypes, node.file_type))
+                                    self._comm.trace('v_path:add  {} {} {} {} {}'.format(
+                                        v_path, node.v_hash_to_str(), src_node, possible_ftypes, node.file_type))
                                     node.v_path = v_path
                                     updated = True
                                     break
                                 else:
-                                    self._comm.log('v_path:skip {} {:08X} {} {} {}'.format(
-                                        v_path, hash32, src_node, possible_ftypes, node.file_type))
+                                    self._comm.log('v_path:skip {} {} {} {} {}'.format(
+                                        v_path, node.v_hash_to_str(), src_node, possible_ftypes, node.file_type))
 
                         if node.v_path == v_path:
                             for _, _, _, used_at_runtime, _ in h4ref:
@@ -642,15 +682,17 @@ class Processor:
 
                     if node.ext_hash is None and node.v_path is not None:
                         file, ext = os.path.splitext(node.v_path)
-                        node.ext_hash = hash32_func(ext)
+                        node.ext_hash = self._vfs.ext_hash(ext)
                         updated = True
 
                     if updated:
                         db.node_update(node)
 
         for v_path in missed_vpaths:
-            hash32 = hash32_func(v_path)
-            self._comm.trace('v_path:miss {} {:08X}'.format(v_path, hash32))
+            v_hash = db.file_hash(v_path)
+            self._comm.trace('v_path:miss {} {:016X}'.format(v_path, np.uint64(v_hash)))
+
+        return True
 
         # found_vpaths = list(found_vpaths)
         # found_vpaths.sort()
@@ -751,8 +793,8 @@ class MultiProcessVfsBase:
                     if cmd == 'exit':
                         keep_running = False
                     else:
-                        processor.process_command(cmd, params)
-                        self.send('cmd_done', cmd)
+                        result = processor.process_command(cmd, params)
+                        self.send('cmd_done', cmd, result)
             except queue.Empty:
                 pass
 

@@ -1,6 +1,6 @@
-from .vfs_db import VfsDatabase
+from .vfs_db import VfsDatabase, v_hash_type_8, v_hash_type_6
 from .ff_adf import AdfDatabase
-from .hashes import hash32_func, hash48_func
+from .hashes import hash_all_func
 from .ff_types import *
 
 
@@ -16,6 +16,9 @@ class DbWrap:
         self._string_hash_to_add = []
 
         self._adf_db.load_from_database(self._db)
+
+        self.file_hash_type = self._db.file_hash_type
+        self.file_hash = self._db.file_hash
 
     def log(self, msg):
         if self._logger is not None:
@@ -37,11 +40,14 @@ class DbWrap:
     def node_where_uid(self, uid):
         return self._db.node_where_uid(uid)
 
-    def nodes_where_hash32(self, hash32):
-        return self._db.nodes_where_hash32(hash32)
+    def nodes_where_v_hash(self, v_hash):
+        return self._db.nodes_where_v_hash(v_hash)
 
     def hash_string_where_hash32_select_all(self, hash32):
         return self._db.hash_string_where_hash32_select_all(hash32)
+
+    def hash_string_where_hash64_select_all(self, hash32):
+        return self._db.hash_string_where_hash64_select_all(hash32)
 
     def hash_string_references_where_hs_rowid_select_all(self, rowid):
         return self._db.hash_string_references_where_hs_rowid_select_all(rowid)
@@ -70,7 +76,7 @@ class DbWrap:
                 self.status(n_nodes_to_add + self._index_offset, n_nodes_to_add + self._index_offset)
 
                 self.log('DATABASE: Inserting {} nodes'.format(len(self._nodes_to_add)))
-                self._db.node_add_many(self._nodes_to_add)
+                self._db.nodes_add_many(self._nodes_to_add)
 
             if len(self._nodes_to_update) > 0:
                 self.log('DATABASE: Updating {} nodes'.format(len(self._nodes_to_update)))
@@ -81,7 +87,7 @@ class DbWrap:
                 self.log('DATABASE: Inserting {} hash strings'.format(len(hash_strings_to_add)))
                 self._db.hash_string_add_many(hash_strings_to_add)
 
-            self.log('DATABASE: Saving ADF Types')
+            self.log('DATABASE: Saving ADF Types: {} Types'.format(len(self._adf_db.type_map_def)))
             self._adf_db.save_to_database(self._db)
 
     def node_add(self, node):
@@ -112,9 +118,9 @@ class DbWrap:
         if fix_paths:
             string = string.replace(b'\\\\', b'/').replace(b'\\', b'/')
 
-        p = None
+        parent_uid = None
         if parent_node is not None:
-            p = parent_node.uid
+            parent_uid = parent_node.uid
 
         if possible_file_types is None:
             pass
@@ -124,9 +130,8 @@ class DbWrap:
         else:
             p_types = p_types | ftype_list[possible_file_types]
 
-        h4 = hash32_func(string)
-        h6 = hash48_func(string)
-        rec = (h4, h6, string, p, is_field_name, used_at_runtime, p_types)
+        h4, h6, h8 = hash_all_func(string)
+        rec = (h4, h6, h8, string, parent_uid, is_field_name, used_at_runtime, p_types)
 
         self._string_hash_to_add.append(rec)
 

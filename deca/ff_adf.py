@@ -1,13 +1,14 @@
 import io
 import os
 import enum
+import struct
 from typing import List, Dict
 from io import BytesIO
 from deca.errors import *
 from deca.file import ArchiveFile
 from deca.fast_file import *
 from deca.hashes import hash32_func
-from deca.ff_types import FTYPE_ADF_BARE
+from deca.ff_types import FTYPE_ADF_BARE, FTYPE_ADF0
 from deca.vfs_db import VfsDatabase, VfsNode
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
@@ -627,7 +628,7 @@ def read_instance(
             v = (v0, 'NOTE: {}: {:016x} to {:08x}'.format(type_def.name, v0, type_def.element_type_hash))
             # TODO not sure how this is used yet, but it's used by effects so lower priority
             # raise AdfTypeMissing(type_id)
-        elif type_def.metatype == 3 or type_def.metatype == 4:  # Array or Inline Array
+        elif type_def.metatype in {3, 4}:  # Array or Inline Array
             if type_def.metatype == 3:
                 v0, buffer_pos = ff_read_u32s(buffer, n_buffer, buffer_pos, 4)
                 opos = buffer_pos
@@ -1031,6 +1032,14 @@ class AdfDatabase:
         try:
             if node.file_type == FTYPE_ADF_BARE:
                 adf = self._load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+            elif node.file_type == FTYPE_ADF0:
+                if node.adf_type is None:
+                    adf_type = struct.unpack('I', buffer[4:8])[0]
+                else:
+                    adf_type = node.adf_type
+                skip = 8
+                offset = 0
+                adf = self._load_adf_bare(buffer[skip:], adf_type, offset, node.size_u - skip)
             else:
                 adf = self._load_adf(buffer)
         except AdfTypeMissing as ae:

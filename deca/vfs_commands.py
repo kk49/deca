@@ -202,11 +202,13 @@ class Processor:
         self._comm = comm
 
         self.commands = {
+            'process_file_type_find': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find),
             'process_symlink': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_symlink),
             'process_exe': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_exe),
             'process_arc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_arc),
             'process_tab': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_tab),
-            'process_gtoc_tocs': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_gtoc_tocs),
+            'process_gtoc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_gtoc),
+            'process_garc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_garc),
             'process_sarc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_sarc),
             'process_global_gdcc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_global_gdcc),
             'process_global_gdcc_body': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_global_gdcc_body),
@@ -256,6 +258,15 @@ class Processor:
             self._comm.status(n_indexes, n_indexes)
 
         return results
+
+    def process_file_type_find(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+        db.db().determine_file_type(node)
+        if node.file_type is None:
+            return False
+        else:
+            db.node_update(node)
+            return True
 
     def process_symlink(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing SYMLINK: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
@@ -517,7 +528,7 @@ class Processor:
 
     def process_rtpc_initial(self, node: VfsNode, db: DbWrap):
         if print_node_info:
-            self._comm.trace('Processing RTPC Initial: {} {:} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+            self._comm.trace('Processing RTPC Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         with db.db().file_obj_from(node) as f:
             buf = f.read(node.size_u)
@@ -557,6 +568,8 @@ class Processor:
                         db.propose_string(fn + b'.xml', node)
                         db.propose_string(fn + b'.xmlc', node)
                         db.propose_string(fn + b'.modelc', node)
+                    elif ext == b'.bik':
+                        db.propose_string(s + b'c', node, possible_file_types=[FTYPE_BINK_BIK, FTYPE_BINK_KB2])
                     elif len(ext) > 0:
                         db.propose_string(s + b'c', node, possible_file_types=[FTYPE_ADF])
 
@@ -616,7 +629,7 @@ class Processor:
         db.node_update(node)
         return True
 
-    def process_gtoc_tocs(self, node: VfsNode, db: DbWrap):
+    def process_gtoc(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing gt0c Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         with db.db().file_obj_from(node) as f:
@@ -632,6 +645,61 @@ class Processor:
         node.processed_file_set(True)
         db.node_update(node)
         return True
+
+    def process_garc(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing garc Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+
+        hash32 = None
+        hash64 = None
+        string = node.v_path
+        if db.db().game_info.file_hash_size == 4:
+            hash32 = node.v_hash
+        elif db.db().game_info.file_hash_size == 8:
+            hash64 = node.v_hash
+        else:
+            raise NotImplementedError(f'process_garc: Hash size of {db.db().game_info.file_hash_size} not handled')
+
+        # find possible hash strings for node
+        hash_strings = db.db().hash_string_match(hash32=hash32, hash64=hash64, string=string)
+
+        gtoc_archives = []
+        for rowid, string, hash32, hash48, hash64, ext_hash32 in hash_strings:
+            results = db.db().gtoc_archive_where_hash32_magic(path_hash32=hash32, magic=node.magic)
+            gtoc_archives = gtoc_archives + results
+
+        if len(gtoc_archives) == 0:
+            self._comm.trace('No gtoc archives found for {} {} {}'.format(
+                node.uid, node.v_hash_to_str(), node.v_path))
+        elif len(gtoc_archives) > 1:
+            self._comm.log('TOO MANY!!! {} gtoc archives found for {} {} {}'.format(
+                len(gtoc_archives), node.uid, node.v_hash_to_str(), node.v_path))
+        else:
+            node.file_type = FTYPE_GARC
+
+            gtoc_archive: GtocArchiveEntry = gtoc_archives[0]
+
+            file_entry: GtocFileEntry
+            for fei, file_entry in enumerate(gtoc_archive.file_entries):
+                v_hash = db.db().file_hash(file_entry.path)
+                child = VfsNode(
+                    v_hash_type=db.file_hash_type,
+                    v_hash=v_hash,
+                    v_path=file_entry.path,
+                    ext_hash=file_entry.ext_hash32,
+                    size_c=file_entry.file_size,
+                    size_u=file_entry.file_size,
+                    pid=node.uid,
+                    offset=file_entry.offset_in_archive,
+                    index=fei,
+                )
+
+                db.node_add(child)
+
+            node.processed_file_set(True)
+            db.node_update(node)
+            return True
+
+        return False
 
     def process_vhash_final(self, v_hash_in, db: DbWrap):
         nodes = db.db().nodes_where_match(v_hash=v_hash_in)

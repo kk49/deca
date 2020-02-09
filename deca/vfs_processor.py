@@ -137,10 +137,13 @@ class VfsProcessor(VfsDatabase):
 
     def process(self, debug=False):
         inner_loop = [
+            [self.process_by_ftype_match, (None, 'process_file_type_find')],
             [self.process_by_ftype_match, (FTYPE_EXE, 'process_exe')],
             [self.process_by_ftype_match, (FTYPE_ARC, 'process_arc')],
             [self.process_by_ftype_match, (FTYPE_TAB, 'process_tab')],
-            [self.process_by_ftype_match, (FTYPE_GT0C, 'process_gtoc_tocs')],
+            [self.process_by_ftype_match, (FTYPE_GT0C, 'process_gtoc')],
+            [self.process_by_ftype_match, (FTYPE_GARC, 'process_garc')],
+            [self.process_by_ftype_match, (None, 'process_garc')],
             [self.process_by_ftype_match, (FTYPE_SARC, 'process_sarc')],
             [self.process_by_v_hash_match, (self.file_hash(b'gdc/global.gdcc'), 'process_global_gdcc')],
             [self.process_by_ftype_match, (FTYPE_GDCBODY, 'process_global_gdcc_body')],
@@ -148,6 +151,7 @@ class VfsProcessor(VfsDatabase):
             [self.process_by_vpath_endswith, (b'.resourcebundle', 'process_resource_bundle')],
             [self.process_by_ftype_match, (FTYPE_ADF, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_ADF_BARE, 'process_adf_initial')],
+            [self.process_by_ftype_match, (FTYPE_ADF0, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_RTPC, 'process_rtpc_initial')],
             [self.process_by_ftype_match, (FTYPE_GFX, 'process_gfx_initial')],
             [self.process_by_ftype_match, (FTYPE_TXT, 'process_txt_initial')],

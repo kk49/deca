@@ -152,7 +152,6 @@ class VfsNode:
 
         self.used_at_runtime_depth = used_at_runtime_depth
 
-
     def flags_get(self, bit):
         return (self.flags & bit) == bit
 
@@ -551,6 +550,12 @@ class VfsDatabase:
             '''
         )
 
+        self.db_execute_one(
+            'CREATE INDEX IF NOT EXISTS "core_gtoc_file_entry_def_row_id_asc" ON "core_gtoc_file_entry" ("def_row_id" ASC)')
+
+        self.db_execute_one(
+            'CREATE INDEX IF NOT EXISTS "core_gtoc_file_entry_def_index_asc" ON "core_gtoc_file_entry" ("def_index" ASC)')
+
         self.db_conn.commit()
 
     def node_where_uid(self, uid):
@@ -645,10 +650,17 @@ class VfsDatabase:
         return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_temporary_select_uid')
 
     def nodes_where_f_type_select_uid_v_hash_processed(self, file_type):
-        results = self.db_query_all(
-            "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where file_type == (?)",
-            [is_processed_file_mask, is_processed_file_mask, file_type],
-            dbg='nodes_where_f_type_select_uid_v_hash_processed')
+        if file_type is None:
+            results = self.db_query_all(
+                "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where file_type IS NULL",
+                [is_processed_file_mask, is_processed_file_mask],
+                dbg='nodes_where_f_type_select_uid_v_hash_processed')
+
+        else:
+            results = self.db_query_all(
+                "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where file_type == (?)",
+                [is_processed_file_mask, is_processed_file_mask, file_type],
+                dbg='nodes_where_f_type_select_uid_v_hash_processed')
         return results
 
     def nodes_where_v_hash_select_uid_v_hash_processed(self, v_hash):
@@ -699,7 +711,7 @@ class VfsDatabase:
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
         return result
 
-    def hash_string_match(self, hash32=None, hash48=None, hash64=None, ext_hash32=None, to_dict=False):
+    def hash_string_match(self, hash32=None, hash48=None, hash64=None, ext_hash32=None, string=None, to_dict=False):
 
         params = []
         wheres = []
@@ -724,6 +736,11 @@ class VfsDatabase:
                 return []
             params.append(ext_hash32)
             wheres.append('(ext_hash32 == (?))')
+
+        if string is not None:
+            string = to_str(string)
+            params.append(string)
+            wheres.append('(string == (?))')
 
         if len(wheres) > 0:
             where_str = ' WHERE ' + wheres[0]
@@ -869,7 +886,7 @@ class VfsDatabase:
     def gtoc_archive_add_many(self, archives: List[GtocArchiveEntry]):
         # write gtoc archive definitions
         a: GtocArchiveEntry
-        entries = [(a.parent_uid, a.path_hash32, a.archive_magic) for a in archives]
+        entries = [(a.src_uid, a.path_hash32, a.archive_magic) for a in archives]
         self.db_execute_many(
             "INSERT OR IGNORE INTO core_gtoc_archive_def VALUES (?,?,?)",
             entries,
@@ -927,7 +944,77 @@ class VfsDatabase:
         self.db_conn.commit()
 
     def gtoc_archive_where_hash32_magic(self, path_hash32=None, magic=None):
-        archive = GtocArchiveEntry()
+        params = []
+        wheres = []
+        if path_hash32 is not None:
+            if path_hash32 & 0xFFFFFFFF != path_hash32:
+                return []
+            params.append(path_hash32)
+            wheres.append('(path_hash32 == (?))')
+
+        if magic is not None:
+            params.append(magic)
+            wheres.append('(archive_magic == (?))')
+
+        if len(wheres) > 0:
+            where_str = ' WHERE ' + wheres[0]
+            for ws in wheres[1:]:
+                where_str = where_str + ' AND ' + ws
+        else:
+            where_str = ''
+
+        if params:
+            result = self.db_query_all(
+                "SELECT rowid, src_uid, path_hash32, archive_magic FROM core_gtoc_archive_def " + where_str,
+                params,
+                dbg='gtoc_archive_where_hash32_magic:0:select'
+            )
+        else:
+            result = self.db_query_all(
+                "SELECT rowid, src_uid, path_hash32, archive_magic FROM core_gtoc_archive_def",
+                dbg='gtoc_archive_where_hash32_magic:0:select_all'
+            )
+
+        archives = []
+        for rowid, src_uid, path_hash32, archive_magic in result:
+            archive = GtocArchiveEntry()
+            archive.src_uid = src_uid
+            archive.path_hash32 = path_hash32
+            archive.archive_magic = archive_magic
+
+            file_entry_db = self.db_query_all(
+                """
+                SELECT 
+                    core_gtoc_file_entry.def_index, 
+                    core_gtoc_file_entry.offset, 
+                    core_gtoc_file_entry.file_size, 
+                    core_hash_strings.hash32, 
+                    core_hash_strings.ext_hash32, 
+                    core_hash_strings.string 
+                FROM core_gtoc_file_entry
+                INNER JOIN core_hash_strings ON core_gtoc_file_entry.path_string_row_id=core_hash_strings.ROWID
+                WHERE def_row_id = (?)
+                ORDER BY def_index ASC
+                """,
+                [rowid],
+                dbg='gtoc_archive_where_hash32_magic:1:select'
+            )
+
+            file_entries = []
+            for def_index, offset, file_size, fe_hash32, fe_ext_hash32, fe_string in file_entry_db:
+                file_entry = GtocFileEntry()
+
+                file_entry.offset_in_archive = offset
+                file_entry.path_hash32 = fe_hash32
+                file_entry.ext_hash32 = fe_ext_hash32
+                file_entry.file_size = file_size
+                file_entry.path = to_bytes(fe_string)
+
+                file_entries.append(file_entry)
+
+            archive.file_entries = file_entries
+
+            archives.append(archive)
         '''
                     # find archive uid in db
             pid = archive.parent_uid
@@ -959,7 +1046,7 @@ class VfsDatabase:
 
                 db.node_add(child)
         '''
-        return archive
+        return archives
 
     def adf_type_map_save(self, adf_map, adf_missing):
         adf_list = []
@@ -1133,6 +1220,12 @@ class VfsDatabase:
             node.compression_type_set(compression_v3_zlib)
             with self.file_obj_from(node) as f:
                 node.file_type, node.size_u, node.magic = determine_file_type_and_size(f, node.size_u)
+
+        if node.file_type == FTYPE_ADF0:
+            with ArchiveFile(self.file_obj_from(node)) as f:
+                _ = f.read_u32()  # magic
+                adf_type = f.read_u32()
+            node.adf_type = adf_type
 
 
 '''

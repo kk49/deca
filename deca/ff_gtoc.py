@@ -3,7 +3,7 @@ from .file import ArchiveFile
 
 
 class GtocArchiveEntry:
-    parent_uid = None
+    src_uid = None
     path_hash32 = None
     archive_magic = None
     file_entries = []
@@ -68,7 +68,7 @@ def process_buffer_gtoc(buffer, parent_uid):
     archive_entries = []
     for archive in archives:
         archive_entry = GtocArchiveEntry()
-        archive_entry.parent_uid = parent_uid
+        archive_entry.src_uid = parent_uid
         archive_entry.path_hash32 = archive[0]
         archive_entry.archive_magic = archive[1]
         blocks = archive[2]

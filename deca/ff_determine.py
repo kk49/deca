@@ -40,6 +40,8 @@ def determine_file_type_and_size(f, file_size):
     fsize = file_size
     if b' FDA' == magic[0:4]:
         ftype = FTYPE_ADF
+    elif b'\x00FDA' == magic[0:4]:
+        ftype = FTYPE_ADF0
     elif b'AVTX' == magic[0:4]:
         ftype = FTYPE_AVTX
     elif b'AAF' == magic[0:3].upper():

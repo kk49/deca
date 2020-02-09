@@ -24,6 +24,16 @@ class AdfTypeMissing(Exception):
 
 
 class GdcArchiveEntry:
+    __slots__ = (
+        'index',
+        'offset',
+        'size',
+        'v_path',
+        'v_hash',
+        'filetype_hash',
+        'adf_type_hash',
+    )
+
     def __init__(self, index, offset, size, v_hash, filetype_hash, adf_type_hash, v_path):
         self.index = index
         self.offset = offset

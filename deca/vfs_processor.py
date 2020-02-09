@@ -227,10 +227,12 @@ class VfsProcessor(VfsDatabase):
     def dump_status(self):
         # possible different vpaths with same hash, uncommon
 
-        q = f"SELECT DISTINCT {self.file_hash_db_id}, COUNT(*) c FROM core_hash_strings GROUP BY {self.file_hash_db_id} HAVING c > 1;"
+        db_id = self.file_hash_db_id
+
+        q = f"SELECT DISTINCT {db_id}, COUNT(*) c FROM core_hash_strings GROUP BY {db_id} HAVING c > 1;"
         dup_hash = self.db_query_all(q)
         for v_hash, c in dup_hash:
-            q = f"SELECT DISTINCT {self.file_hash_db_id}, string FROM core_hash_strings WHERE {self.file_hash_db_id} = (?)"
+            q = f"SELECT DISTINCT {db_id}, string FROM core_hash_strings WHERE {db_id} = (?)"
             hashes = self.db_query_all(q, [v_hash])
             fcs = []
             gtz_count = 0
@@ -357,6 +359,7 @@ class VfsProcessor(VfsDatabase):
 
         src_indexes = self.nodes_where_v_hash_select_uid_v_hash_processed(v_hash)
         indexes, done_set = self.src_indexes_process(src_indexes)
+        
         indexes_processed = []
         indexes_success = []
         indexes_failed = []

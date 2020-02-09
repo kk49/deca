@@ -16,6 +16,7 @@ from deca.util import make_dir_for_file
 from deca.game_info import game_info_load
 from deca.hashes import hash32_func, hash48_func, hash64_func, hash_all_func
 from deca.ff_gtoc import GtocArchiveEntry, GtocFileEntry
+from deca.db_types import *
 
 
 language_codes = [
@@ -41,18 +42,6 @@ def regexp(expr, item):
         item = item.encode('ascii')
     reg = re.compile(expr)
     return reg.search(item) is not None
-
-
-def to_bytes(s):
-    if isinstance(s, str):
-        s = s.encode('ascii', 'ignore')
-    return s
-
-
-def to_str(s):
-    if isinstance(s, bytes):
-        s = s.decode('utf-8')
-    return s
 
 
 def common_prefix(s0, s1):
@@ -93,6 +82,25 @@ def format_hash64(v_hash):
 
 
 class VfsNode:
+    __slots__ = (
+        'uid',
+        'v_hash',
+        'v_path',
+        'p_path',
+        'file_type',
+        'adf_type',
+        'ext_hash',
+        'magic',
+        'pid',
+        'index',
+        'offset',
+        'size_c',
+        'size_u',
+        'blocks',
+        'flags',
+        'used_at_runtime_depth',
+    )
+
     def __init__(
             self, uid=None, file_type=None,
             v_hash=None, p_path=None, v_path=None,
@@ -125,8 +133,6 @@ class VfsNode:
 
         self.blocks = blocks
 
-        self.used_at_runtime_depth = used_at_runtime_depth
-
         if flags is None:
             self.flags = 0
             self.flags |= (compression_type << compression_type_shift) & compression_type_mask
@@ -143,6 +149,9 @@ class VfsNode:
             assert self.compression_flag_get() == compression_flag
         else:
             self.flags = flags
+
+        self.used_at_runtime_depth = used_at_runtime_depth
+
 
     def flags_get(self, bit):
         return (self.flags & bit) == bit
@@ -469,7 +478,8 @@ class VfsDatabase:
                 "hash32" INTEGER NOT NULL,
                 "hash48" INTEGER NOT NULL,
                 "hash64" INTEGER NOT NULL,
-                PRIMARY KEY ("string", "hash32", "hash48", "hash64")
+                "ext_hash32" INTEGER NOT NULL,
+                PRIMARY KEY ("string", "hash32", "hash48", "hash64", "ext_hash32")
             );
             '''
         )
@@ -689,7 +699,7 @@ class VfsDatabase:
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
         return result
 
-    def hash_string_match(self, hash32=None, hash48=None, hash64=None, to_dict=False):
+    def hash_string_match(self, hash32=None, hash48=None, hash64=None, ext_hash32=None, to_dict=False):
 
         params = []
         wheres = []
@@ -709,6 +719,12 @@ class VfsDatabase:
             params.append(hash64)
             wheres.append('(hash64 == (?))')
 
+        if ext_hash32 is not None:
+            if ext_hash32 & 0xFFFFFFFF != ext_hash32:
+                return []
+            params.append(ext_hash32)
+            wheres.append('(ext_hash32 == (?))')
+
         if len(wheres) > 0:
             where_str = ' WHERE ' + wheres[0]
             for ws in wheres[1:]:
@@ -718,21 +734,21 @@ class VfsDatabase:
 
         if params:
             result = self.db_query_all(
-                "SELECT rowid, string , hash32, hash48, hash64 FROM core_hash_strings " + where_str,
+                "SELECT rowid, string , hash32, hash48, hash64, ext_hash32 FROM core_hash_strings " + where_str,
                 params,
                 dbg='hash_string_match'
             )
         else:
             result = self.db_query_all(
-                "SELECT rowid, string , hash32, hash48, hash64 FROM core_hash_strings",
+                "SELECT rowid, string , hash32, hash48, hash64, ext_hash32 FROM core_hash_strings",
                 dbg='hash_string_match_all'
             )
 
         if to_dict:
-            result = [(r[0], (to_bytes(r[1]), r[2], r[3], r[4])) for r in result]
+            result = [(r[0], (to_bytes(r[1]), r[2], r[3], r[4], r[5])) for r in result]
             result = dict(result)
         else:
-            result = [(r[0], to_bytes(r[1]), r[2], r[3], r[4]) for r in result]
+            result = [(r[0], to_bytes(r[1]), r[2], r[3], r[4], r[5]) for r in result]
 
         return result
 
@@ -811,11 +827,11 @@ class VfsDatabase:
         self.db_conn.commit()
 
     def hash_string_add_many_basic(self, hash_list):
-        # (string, h4, h6, h8)
-        hash_list_str = [(to_str(h[0]), h[1], h[2], h[3]) for h in hash_list]
+        # (string, h4, h6, h8, ext_hash32)
+        hash_list_str = [(to_str(h[0]), h[1], h[2], h[3], h[4]) for h in hash_list]
         hash_list_str_unique = list(set(hash_list_str))
         self.db_execute_many(
-            "INSERT OR IGNORE INTO core_hash_strings VALUES (?,?,?,?)",
+            "INSERT OR IGNORE INTO core_hash_strings VALUES (?,?,?,?,?)",
             hash_list_str_unique,
             dbg='hash_string_add_many_basic:0:insert'
         )
@@ -825,7 +841,7 @@ class VfsDatabase:
         str_to_row_map = {}
         for rec in hash_list_str_unique:
             result = self.db_query_all(
-                "SELECT rowid FROM core_hash_strings WHERE string==(?) and hash32==(?) and hash48==(?) and hash64==(?)",
+                "SELECT rowid FROM core_hash_strings WHERE string=(?) and hash32=(?) and hash48=(?) and hash64=(?) and ext_hash32=(?)",
                 rec,
                 dbg='hash_string_add_many_basic:1:select')
 
@@ -833,7 +849,7 @@ class VfsDatabase:
             assert len(result) == 1
             row_id = result[0][0]
             hash_list_map[rec] = row_id
-            str_to_row_map[rec[0]] = row_id
+            str_to_row_map[to_bytes(rec[0])] = row_id
 
         return hash_list_str, hash_list_map, str_to_row_map
 
@@ -842,7 +858,7 @@ class VfsDatabase:
         hash_list_str, hash_list_map, _ = self.hash_string_add_many_basic(hash_list)
 
         row_ids = [hash_list_map[rec] for rec in hash_list_str]
-        ref_list = [(r, h[4], h[5], h[6], int(np.int64(np.uint64(h[7])))) for r, h in zip(row_ids, hash_list)]
+        ref_list = [(r, h[5], h[6], h[7], int(np.int64(np.uint64(h[8])))) for r, h in zip(row_ids, hash_list)]
         ref_list = list(set(ref_list))
         self.db_execute_many(
             "INSERT OR IGNORE INTO core_hash_string_references VALUES (?,?,?,?,?)",
@@ -880,7 +896,7 @@ class VfsDatabase:
             for fe in a.file_entries:
                 file_entry_strings.add(fe.path)
 
-        hash_list = [(s, *hash_all_func(s)) for s in file_entry_strings]
+        hash_list = [make_hash_string_tuple(s) for s in file_entry_strings]
         _, _, str_to_row_map = self.hash_string_add_many_basic(hash_list)
 
         # insert file entries into db
@@ -893,7 +909,7 @@ class VfsDatabase:
                 offset_in_archive = file_entry.offset_in_archive
                 file_size = file_entry.file_size
                 path = file_entry.path
-                path_row_id = str_to_row_map[to_str(path)]
+                path_row_id = str_to_row_map[path]
 
                 if offset_in_archive == 0:
                     offset_in_archive = None

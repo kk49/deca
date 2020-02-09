@@ -74,6 +74,8 @@ class PropName(IntEnum):
 
 
 class RtpcProperty:
+    __slots__ = ('pos', 'name_hash', 'data_pos', 'data_raw', 'data', 'type')
+
     def __init__(self):
         self.pos = None
         self.name_hash = None
@@ -239,6 +241,10 @@ class RtpcProperty:
 
 
 class RtpcNode:
+    __slots__ = (
+        'name_hash', 'data_offset', 'prop_count', 'child_count', 'prop_table', 'prop_map', 'child_table', 'child_map'
+    )
+
     def __init__(self):
         self.name_hash = None
         self.data_offset = None

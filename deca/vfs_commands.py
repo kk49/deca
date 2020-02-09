@@ -645,7 +645,7 @@ class Processor:
 
         missed_vpaths = set()
         h4ref_map = {}
-        for rowid, v_path, _, _, _ in hash_strings:
+        for rowid, v_path, _, _, _, _ in hash_strings:
             missed_vpaths.add(v_path)
             h4ref_map[rowid] = db.db().hash_string_references_match(hash_row_id=rowid)
 
@@ -662,7 +662,7 @@ class Processor:
                     else:
                         ftype_int = ftype_list[node.file_type]
 
-                    for rowid, v_path, _, _, _ in hash_strings:
+                    for rowid, v_path, _, _, _, _ in hash_strings:
                         h4ref = h4ref_map[rowid]
 
                         if node.v_path is None:

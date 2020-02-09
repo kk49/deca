@@ -1,7 +1,8 @@
+import os
 from .vfs_db import VfsDatabase, v_hash_type_8, v_hash_type_6, GtocArchiveEntry
 from .ff_adf import AdfDatabase
-from .hashes import hash_all_func
 from .ff_types import *
+from .db_types import *
 
 
 class DbWrap:
@@ -114,8 +115,9 @@ class DbWrap:
         else:
             p_types = p_types | ftype_list[possible_file_types]
 
-        h4, h6, h8 = hash_all_func(string)
-        rec = (string, h4, h6, h8, parent_uid, is_field_name, used_at_runtime, p_types)
+        hash_string_tuple = make_hash_string_tuple(string)
+
+        rec = (*hash_string_tuple, parent_uid, is_field_name, used_at_runtime, p_types)
 
         self._string_hash_to_add.append(rec)
 

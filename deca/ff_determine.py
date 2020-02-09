@@ -1,4 +1,5 @@
 import numpy as np
+import struct
 from deca.file import ArchiveFile
 from deca.ff_aaf import load_aaf_header
 from deca.ff_types import *
@@ -33,6 +34,7 @@ def file_stats(f, file_size):
 def determine_file_type_and_size(f, file_size):
     start_pos = f.tell()
     magic = f.read(32)
+    magic_int = struct.unpack('I', magic[0:4])[0]
 
     ftype = None
     fsize = file_size
@@ -79,6 +81,8 @@ def determine_file_type_and_size(f, file_size):
         ftype = FTYPE_BINK_KB2
     elif b'BIK' == magic[0:3]:
         ftype = FTYPE_BINK_BIK
+    elif b'GT0C' == magic[0:4]:
+        ftype = FTYPE_GT0C
     # ATX file format was a guess by size
     # elif file_size in raw_image_size:
     #     ftype = FTYPE_ATX
@@ -102,4 +106,4 @@ def determine_file_type_and_size(f, file_size):
             if all_sum == pri_sum:
                 ftype = FTYPE_TXT
 
-    return ftype, fsize
+    return ftype, fsize, magic_int

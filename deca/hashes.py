@@ -135,7 +135,7 @@ def main():
     print('hash6 "{}" = {:24} , 0x{:012x}'.format(data, hv, hv))
 
     hv = hash64_func(data)
-    print('hash8 "{}" = {:24} , 0x{:016x}'.format(data, hv, np.uint64(hv)))
+    print('hash8 "{}" = {:24}, {:24}, 0x{:016x}'.format(data,  hv, np.uint64(hv), np.uint64(hv)))
 
 
 if __name__ == "__main__":

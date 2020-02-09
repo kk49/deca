@@ -22,7 +22,7 @@ Written in Python, tested only on Linux, code is a mess, because this is an expe
 |---|---|---|---|---|---|---|---|
 |Avalanche Studios' Generation Zero®|Loading most/all files|860879|857305|63375|59897|888 / 7|2019/02/04|
 |Avalanche Studios' theHunter™: Call of the Wild|Loading most/all files|278223|273556|72268|67717|920 / 0|2019/02/04|
-|Avalanche Studios' Just Cause 3|Loading most/all files|---|---|---|---|---|---|
+|Avalanche Studios' Just Cause 3|Loading most/all files. Lots of FPs|1907029|FPs|277852|FPs|797 / 0|2019/02/05|
 |Avalanche Studios' Just Cause 4|Loading most/all files|1911397|1757124|223864|190329|1055 / 0|2019/02/04|
 |Avalanche Studios' RAGE 2|Partial/In-Development|406834|19126|406682|19126|2081 / 0|2019/02/04|
 

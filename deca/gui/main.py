@@ -63,7 +63,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.adf_db = AdfDatabase(vfs)
 
         if self.show_all:
-            self.uid_table = self.vfs.nodes_select_uid()
+            self.uid_table = self.vfs.nodes_where_match(uid_only=True)
         else:
             self.uid_table = self.vfs.nodes_where_unmapped_select_uid()
         self.uid_table.sort()
@@ -143,10 +143,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                 elif column == 2:
                     return '{}'.format(node.file_type)
                 elif column == 3:
-                    if node.v_hash is None:
-                        return ''
-                    else:
-                        return '{:08X}'.format(node.v_hash)
+                    return node.v_hash_to_str()
                 elif column == 4:
                     if node.ext_hash is None:
                         return ''
@@ -610,7 +607,7 @@ class DataViewWidget(QWidget):
             self.tab_obc.vnode_process(self.vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_obc_index)
         else:
-            self.tab_widget.setCurrentIndex(self.tab_info_index)
+            self.tab_widget.setCurrentIndex(self.tab_raw_index)
 
 
 class MainWidget(QWidget):

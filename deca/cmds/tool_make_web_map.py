@@ -219,7 +219,7 @@ class ToolMakeWebMap:
                 fn = 'textures/ui/map_reserve_0/zoom3/{}.ddsc'.format(i)
                 fn = fn.encode('ascii')
                 
-                vnode = self.vfs.nodes_where_vpath(fn)[0]
+                vnode = self.vfs.nodes_where_match(v_path=fn)[0]
                 img = Ddsc()
                 with self.vfs.file_obj_from(vnode) as f:
                     img.load_ddsc(f)
@@ -244,7 +244,7 @@ class ToolMakeWebMap:
                 y = i // 16
                 fn = 'textures/ui/warboard_map/zoom3/{}.ddsc'.format(i)
                 fn = fn.encode('ascii')
-                vnode = self.vfs.nodes_where_vpath(fn)[0]
+                vnode = self.vfs.nodes_where_match(v_path=fn)[0]
                 img = Ddsc()
                 with self.vfs.file_obj_from(vnode) as f:
                     img.load_ddsc(f)
@@ -260,7 +260,7 @@ class ToolMakeWebMap:
         # BUILD height map
         # extract full res image
         fn = b'terrain/global_heightfield.rawc'
-        vnode = self.vfs.nodes_where_vpath(fn)[0]
+        vnode = self.vfs.nodes_where_match(v_path=fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(1024 * 1024)
@@ -279,7 +279,7 @@ class ToolMakeWebMap:
         # BUILD water nvwaveworks map
         # extract full res image
         fn = b'terrain/water_nvwaveworks_mod.rawc'
-        vnode = self.vfs.nodes_where_vpath(fn)[0]
+        vnode = self.vfs.nodes_where_match(v_path=fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(1024 * 1024)
@@ -298,7 +298,7 @@ class ToolMakeWebMap:
         # BUILD water gerstner map
         # extract full res image
         fn = b'terrain/water_gerstner_mod.rawc'
-        vnode = self.vfs.nodes_where_vpath(fn)[0]
+        vnode = self.vfs.nodes_where_match(v_path=fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(1024 * 1024)
@@ -316,7 +316,7 @@ class ToolMakeWebMap:
 
         # TODO parse terrain/nv_water_cull_mask.rawc ? 1 bit per pixel 512x512 pixels
         fn = b'terrain/nv_water_cull_mask.rawc'
-        vnode = self.vfs.nodes_where_vpath(fn)[0]
+        vnode = self.vfs.nodes_where_match(v_path=fn)[0]
 
         with self.vfs.file_obj_from(vnode) as f:
             buffer = f.read(32 * 1024)
@@ -367,7 +367,7 @@ class ToolMakeWebMap:
 
         for tileo in tile_overlays:
             fn = tileo[0]
-            vnode = self.vfs.nodes_where_vpath(fn)[0]
+            vnode = self.vfs.nodes_where_match(v_path=fn)[0]
 
             bmp_adf = self.adf_db.read_node(self.vfs, vnode)
 
@@ -392,11 +392,11 @@ class ToolMakeWebMap:
             self.tileset_make(img, os.path.join(wdir, 'map', 'z0', '{}'.format(tileo[1])))
 
         # load translation
-        vnode = self.vfs.nodes_where_vpath(b'text/master_eng.stringlookup')[0]
+        vnode = self.vfs.nodes_where_match(v_path=b'text/master_eng.stringlookup')[0]
         tr = process_translation_adf(self.vfs, self.adf_db, vnode)
 
         # load collectable codex
-        vnode = self.vfs.nodes_where_vpath(b'settings/hp_settings/codex_data.bin')[0]
+        vnode = self.vfs.nodes_where_match(v_path=b'settings/hp_settings/codex_data.bin')[0]
         codex_fn = adf_export_xlsx_0x0b73315d(
             self.vfs, self.adf_db, vnode, export_path=export_path, allow_overwrite=True)
         codex_wb = openpyxl.load_workbook(filename=codex_fn)
@@ -422,7 +422,7 @@ class ToolMakeWebMap:
 
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped
-        vnode = self.vfs.nodes_where_vpath(b'global/collection.collectionc')[0]
+        vnode = self.vfs.nodes_where_match(v_path=b'global/collection.collectionc')[0]
         adf = self.adf_db.read_node(self.vfs, vnode)
         collectables = []
         for v in adf.table_instance_values[0]['Collectibles']:
@@ -464,7 +464,7 @@ class ToolMakeWebMap:
 
         for fn in vpaths:
             print('PROCESSING: {}'.format(fn))
-            vnodes = self.vfs.nodes_where_vpath(fn)
+            vnodes = self.vfs.nodes_where_match(v_path=fn)
             vnode = vnodes[0]
             adf = self.adf_db.read_node(self.vfs, vnode)
             aabb = AABB(all6=adf.table_instance_values[0]['AABB'])
@@ -506,7 +506,7 @@ class ToolMakeWebMap:
 
         for fn in vpaths:
             print('PROCESSING: {}'.format(fn))
-            vnodes = self.vfs.nodes_where_vpath(fn)
+            vnodes = self.vfs.nodes_where_match(v_path=fn)
             vnode = vnodes[0]
             with self.vfs.file_obj_from(vnode) as f:
                 rtpc = Rtpc()

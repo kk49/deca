@@ -560,13 +560,13 @@ class GameInfoRage2(GameInfo):
     def file_assoc(self):
         return [
             {
-                b'.ee': FTYPE_SARC,
+                b'.ee': FTYPE_ANY_TYPE,
                 b'.epe': FTYPE_RTPC,
             },
             {
-                b'.bl': FTYPE_SARC,
-                b'.nl': FTYPE_SARC,
-                b'.fl': FTYPE_SARC,
+                b'.bl': FTYPE_ANY_TYPE,
+                b'.nl': FTYPE_ANY_TYPE,
+                b'.fl': FTYPE_ANY_TYPE,
                 b'.blo': FTYPE_RTPC,
                 b'.nl.mdic': self.mdic_ftype(),
                 b'.fl.mdic': self.mdic_ftype(),

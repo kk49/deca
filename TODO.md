@@ -1,3 +1,6 @@
+
+
+
 * Not sure how many good compressions have a flag of 1. Will need to check
 * add image format 98: jc4 50A1C344
 * pil missing format 71: switch to custom loader code for DDS? 
@@ -65,3 +68,17 @@
         1  # uint08(0x0CA2821D), Data Offset: 95928(0x000176b8)
     }
     ```
+    
+# RAGE 2
+Before gtoc processing, not even pull file names out yet
+```
+2020-02-08 01:21:07.770831: UPDATING USE DEPTH: 0
+2020-02-08 01:21:08.007205: DATABASE: Saving ADF Types: 2081 Types
+2020-02-08 01:21:08.142015: CREATING: vpaths.txt
+2020-02-08 01:21:08.801714: SUMMARY: ADF Types Present: 2081
+2020-02-08 01:21:08.801887: SUMMARY: ADF Types Missing: 0 
+2020-02-08 01:21:09.237590: SUMMARY: Total Nodes|Named Nodes|Total Hashes|Found Hashes: 406834|20493|406682|20493
+2020-02-08 01:21:09.237780: SUMMARY: Unmatched Nodes: 386341
+2020-02-08 01:21:09.237845: SUMMARY: Unmatched Path Hashes: 386189
+2020-02-08 01:21:09.264327: PROCESSING: COMPLETE
+```

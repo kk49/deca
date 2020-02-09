@@ -1,4 +1,4 @@
-from .vfs_db import VfsDatabase, v_hash_type_8, v_hash_type_6
+from .vfs_db import VfsDatabase, v_hash_type_8, v_hash_type_6, GtocArchiveEntry
 from .ff_adf import AdfDatabase
 from .hashes import hash_all_func
 from .ff_types import *
@@ -14,11 +14,15 @@ class DbWrap:
         self._nodes_to_add = []
         self._nodes_to_update = set()
         self._string_hash_to_add = []
+        self._gtoc_archive_defs = []
 
         self._adf_db.load_from_database(self._db)
 
         self.file_hash_type = self._db.file_hash_type
         self.file_hash = self._db.file_hash
+
+    def db(self) -> VfsDatabase:
+        return self._db
 
     def log(self, msg):
         if self._logger is not None:
@@ -30,30 +34,6 @@ class DbWrap:
 
     def index_offset_set(self, index_offset):
         self._index_offset = index_offset
-
-    def generate_cache_file_name(self, node):
-        return self._db.generate_cache_file_name(node)
-
-    def file_obj_from(self, node):
-        return self._db.file_obj_from(node)
-
-    def node_where_uid(self, uid):
-        return self._db.node_where_uid(uid)
-
-    def nodes_where_v_hash(self, v_hash):
-        return self._db.nodes_where_v_hash(v_hash)
-
-    def hash_string_where_hash32_select_all(self, hash32):
-        return self._db.hash_string_where_hash32_select_all(hash32)
-
-    def hash_string_where_hash64_select_all(self, hash32):
-        return self._db.hash_string_where_hash64_select_all(hash32)
-
-    def hash_string_references_where_hs_rowid_select_all(self, rowid):
-        return self._db.hash_string_references_where_hs_rowid_select_all(rowid)
-
-    def game_info(self):
-        return self._db.game_info
 
     def node_read_adf(self, node):
         return self._adf_db.read_node(self._db, node)
@@ -71,7 +51,7 @@ class DbWrap:
                 self.log('Determining file types: {} nodes'.format(len(self._nodes_to_add)))
                 for ii, node in enumerate(self._nodes_to_add):
                     self.status(ii + self._index_offset, n_nodes_to_add + self._index_offset)
-                    self._db.determine_ftype(node)
+                    self._db.determine_file_type(node)
 
                 self.status(n_nodes_to_add + self._index_offset, n_nodes_to_add + self._index_offset)
 
@@ -86,6 +66,10 @@ class DbWrap:
             if len(hash_strings_to_add) > 0:
                 self.log('DATABASE: Inserting {} hash strings'.format(len(hash_strings_to_add)))
                 self._db.hash_string_add_many(hash_strings_to_add)
+
+            if len(self._gtoc_archive_defs) > 0:
+                self.log('DATABASE: Inserting {} gt0c archive definitions'.format(len(self._gtoc_archive_defs)))
+                self._db.gtoc_archive_add_many(self._gtoc_archive_defs)
 
             self.log('DATABASE: Saving ADF Types: {} Types'.format(len(self._adf_db.type_map_def)))
             self._adf_db.save_to_database(self._db)
@@ -131,8 +115,16 @@ class DbWrap:
             p_types = p_types | ftype_list[possible_file_types]
 
         h4, h6, h8 = hash_all_func(string)
-        rec = (h4, h6, h8, string, parent_uid, is_field_name, used_at_runtime, p_types)
+        rec = (string, h4, h6, h8, parent_uid, is_field_name, used_at_runtime, p_types)
 
         self._string_hash_to_add.append(rec)
 
         return rec
+
+    def gtoc_archive_add(self, archive):
+        if isinstance(archive, GtocArchiveEntry):
+            self._gtoc_archive_defs.append(archive)
+        else:
+            self._gtoc_archive_defs = self._gtoc_archive_defs + archive
+
+

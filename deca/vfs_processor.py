@@ -82,7 +82,7 @@ class VfsProcessor(VfsDatabase):
         node = VfsNode(
             v_hash_type=self.file_hash_type,
             file_type=FTYPE_EXE, p_path=exe_path, size_u=f_size, size_c=f_size, offset=0)
-        self.determine_ftype(node)
+        self.determine_file_type(node)
         initial_nodes.append(node)
 
         self.logger.log('Add unarchived files')
@@ -93,7 +93,7 @@ class VfsProcessor(VfsDatabase):
             node = VfsNode(
                 v_hash_type=self.file_hash_type,
                 v_hash=v_hash, v_path=v_path, p_path=ua_file, size_u=f_size, size_c=f_size, offset=0)
-            self.determine_ftype(node)
+            self.determine_file_type(node)
             initial_nodes.append(node)
 
         self.logger.log('Add TAB / ARC files')
@@ -130,7 +130,7 @@ class VfsProcessor(VfsDatabase):
             node = VfsNode(
                 v_hash_type=self.file_hash_type,
                 file_type=FTYPE_ARC, p_path=file_arc, size_u=f_size, size_c=f_size, offset=0)
-            self.determine_ftype(node)
+            self.determine_file_type(node)
             initial_nodes.append(node)
 
         self.nodes_add_many(initial_nodes)
@@ -140,6 +140,7 @@ class VfsProcessor(VfsDatabase):
             [self.process_by_ftype_match, (FTYPE_EXE, 'process_exe')],
             [self.process_by_ftype_match, (FTYPE_ARC, 'process_arc')],
             [self.process_by_ftype_match, (FTYPE_TAB, 'process_tab')],
+            [self.process_by_ftype_match, (FTYPE_GT0C, 'process_gtoc_tocs')],
             [self.process_by_ftype_match, (FTYPE_SARC, 'process_sarc')],
             [self.process_by_v_hash_match, (self.file_hash(b'gdc/global.gdcc'), 'process_global_gdcc')],
             [self.process_by_ftype_match, (FTYPE_GDCBODY, 'process_global_gdcc_body')],
@@ -161,7 +162,7 @@ class VfsProcessor(VfsDatabase):
 
         self.process_remove_temporary_nodes()
 
-        if version < 2:
+        if version < 3:
             self.find_vpath_procmon_dir()
             self.find_vpath_resources()
             self.find_vpath_guess()
@@ -352,7 +353,7 @@ class VfsProcessor(VfsDatabase):
         return indexes_processed, indexes_success, indexes_failed
 
     def process_by_v_hash_match(self, v_hash, cmd):
-        self.logger.log('PROCESS: V_HASH = 0x{:08X}: Begin'.format(v_hash))
+        self.logger.log('PROCESS: V_HASH = 0x{}: Begin'.format(self.file_hash_format(v_hash)))
 
         src_indexes = self.nodes_where_v_hash_select_uid_v_hash_processed(v_hash)
         indexes, done_set = self.src_indexes_process(src_indexes)
@@ -630,7 +631,7 @@ class VfsProcessor(VfsDatabase):
                 v_hash_type=self.file_hash_type,
                 v_hash=v_hash, v_path=v_path, p_path=filename,
                 size_u=f_size, size_c=f_size, offset=0, is_temporary_file=is_temporary_file)
-            self.determine_ftype(vnode)
+            self.determine_file_type(vnode)
             self.nodes_add_many([vnode])
 
             self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))

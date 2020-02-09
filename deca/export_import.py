@@ -102,7 +102,7 @@ def find_vnode(vfs: VfsDatabase, v):
         raise NotImplementedError('find_vnode: Could not extract {}'.format(v))
 
     if v_path is not None:
-        nodes = vfs.nodes_where_vpath(v_path)
+        nodes = vfs.nodes_where_match(v_path=v_path)
         vnode = None
         for node in nodes:
             if node.offset is not None:

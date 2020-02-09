@@ -18,6 +18,7 @@ from .ff_adf import AdfTypeMissing, GdcArchiveEntry
 from .ff_rtpc import Rtpc, k_type_str
 from .ff_arc_tab import tab_file_load, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
+from .ff_gtoc import process_buffer_gtoc, GtocArchiveEntry, GtocFileEntry
 from .util import remove_prefix_if_present, remove_suffix_if_present
 from .kaitai.gfx import Gfx
 
@@ -205,6 +206,7 @@ class Processor:
             'process_exe': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_exe),
             'process_arc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_arc),
             'process_tab': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_tab),
+            'process_gtoc_tocs': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_gtoc_tocs),
             'process_sarc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_sarc),
             'process_global_gdcc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_global_gdcc),
             'process_global_gdcc_body': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_global_gdcc_body),
@@ -213,7 +215,6 @@ class Processor:
             'process_rtpc_initial': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_rtpc_initial),
             'process_gfx_initial': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_gfx_initial),
             'process_txt_initial': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_txt_initial),
-
             'process_vhash_final': lambda idxs: self.loop_over_vhash_wrapper(idxs, self.process_vhash_final),
         }
 
@@ -239,7 +240,7 @@ class Processor:
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, index in enumerate(indexes):
                 self._comm.status(i, n_indexes)
-                node = db.node_where_uid(index)
+                node = db.db().node_where_uid(index)
                 results[i] = (index, func(node, db))
             self._comm.status(n_indexes, n_indexes)
 
@@ -289,7 +290,7 @@ class Processor:
     def process_tab(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing TAB: {} {}'.format(node.uid, node.p_path))
 
-        ver = db.game_info().archive_version
+        ver = db.db().game_info.archive_version
         debug = False
 
         tab_file = tab_file_load(node.p_path, ver)
@@ -329,7 +330,7 @@ class Processor:
         self._comm.trace('Processing SARC: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         sarc_file = FileSarc()
-        sarc_file.header_deserialize(db.file_obj_from(node))
+        sarc_file.header_deserialize(db.db().file_obj_from(node))
 
         for se in sarc_file.entries:
             se: EntrySarc = se
@@ -375,7 +376,7 @@ class Processor:
     def process_global_gdcc_body(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing global gdcc body": gdc/global.gdcc.DECA')
 
-        pnode = db.node_where_uid(node.pid)
+        pnode = db.db().node_where_uid(node.pid)
         adf = db.node_read_adf(pnode)
 
         for entry in adf.table_instance_values[0]:
@@ -401,7 +402,7 @@ class Processor:
     def process_resource_bundle(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing ResourceBundle: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
-        with ArchiveFile(db.file_obj_from(node)) as f:
+        with ArchiveFile(db.db().file_obj_from(node)) as f:
             index = 0
             while f.tell() < node.size_u:
                 v_hash = f.read_u32()
@@ -464,12 +465,12 @@ class Processor:
                 fns = []
                 # self name patch files
                 if 'PatchLod' in obj0 and 'PatchPositionX' in obj0 and 'PatchPositionZ' in obj0:
-                    for prefix in db.game_info().world_patches:
+                    for prefix in db.db().game_info.world_patches:
                         fn = prefix + 'patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
                             obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
                         fns.append(fn)
 
-                    for prefix in db.game_info().world_occluders:
+                    for prefix in db.db().game_info.world_occluders:
                         fn = prefix + 'patch_{:02d}_{:02d}_{:02d}.streampatch'.format(
                             obj0['PatchLod'], obj0['PatchPositionX'], obj0['PatchPositionZ'])
                         fns.append(fn)
@@ -518,7 +519,7 @@ class Processor:
         if print_node_info:
             self._comm.trace('Processing RTPC Initial: {} {:} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
-        with db.file_obj_from(node) as f:
+        with db.db().file_obj_from(node) as f:
             buf = f.read(node.size_u)
 
         rtpc = Rtpc()
@@ -566,7 +567,7 @@ class Processor:
     def process_gfx_initial(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing GFX Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
-        with db.file_obj_from(node) as f:
+        with db.db().file_obj_from(node) as f:
             buffer = f.read(node.size_u)
 
         gfx = Gfx.from_bytes(buffer)
@@ -600,7 +601,7 @@ class Processor:
     def process_txt_initial(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing TXT Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
-        with db.file_obj_from(node) as f:
+        with db.db().file_obj_from(node) as f:
             buffer = f.read(node.size_u)
 
         json = load_json(buffer)
@@ -615,21 +616,38 @@ class Processor:
         db.node_update(node)
         return True
 
+    def process_gtoc_tocs(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing gt0c Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+
+        with db.db().file_obj_from(node) as f:
+            buffer = f.read(node.size_u)
+
+        archives, all_paths = process_buffer_gtoc(buffer, node.uid)
+
+        for path in all_paths:
+            db.propose_string(path, parent_node=node)
+
+        db.gtoc_archive_add(archives)
+
+        node.processed_file_set(True)
+        db.node_update(node)
+        return True
+
     def process_vhash_final(self, v_hash_in, db: DbWrap):
-        nodes = db.nodes_where_v_hash(v_hash_in)
+        nodes = db.db().nodes_where_match(v_hash=v_hash_in)
 
         if db.file_hash_type == v_hash_type_4:
-            hash_strings = db.hash_string_where_hash32_select_all(v_hash_in)
+            hash_strings = db.db().hash_string_match(hash32=v_hash_in)
         elif db.file_hash_type == v_hash_type_8:
-            hash_strings = db.hash_string_where_hash64_select_all(v_hash_in)
+            hash_strings = db.db().hash_string_match(hash64=v_hash_in)
         else:
             raise NotImplementedError('Unhandled Hash Type {}'.format(db.file_hash_type))
 
         missed_vpaths = set()
         h4ref_map = {}
-        for rowid, _, _, _, v_path in hash_strings:
+        for rowid, v_path, _, _, _ in hash_strings:
             missed_vpaths.add(v_path)
-            h4ref_map[rowid] = db.hash_string_references_where_hs_rowid_select_all(rowid)
+            h4ref_map[rowid] = db.db().hash_string_references_match(hash_row_id=rowid)
 
         # h4rowid, src_node, is_adf_field_name, used_at_runtime, possible_ftypes in h4ref
 
@@ -644,7 +662,7 @@ class Processor:
                     else:
                         ftype_int = ftype_list[node.file_type]
 
-                    for rowid, _, _, _, v_path in hash_strings:
+                    for rowid, v_path, _, _, _ in hash_strings:
                         h4ref = h4ref_map[rowid]
 
                         if node.v_path is None:
@@ -654,13 +672,13 @@ class Processor:
 
                                 if (ftype_int & possible_ftypes) != 0:
                                     self._comm.trace('v_path:add  {} {} {} {} {}'.format(
-                                        v_path, node.v_hash_to_str(), src_node, possible_ftypes, node.file_type))
+                                        node.v_hash_to_str(), v_path, node.file_type, possible_ftypes, src_node))
                                     node.v_path = v_path
                                     updated = True
                                     break
                                 else:
                                     self._comm.log('v_path:skip {} {} {} {} {}'.format(
-                                        v_path, node.v_hash_to_str(), src_node, possible_ftypes, node.file_type))
+                                        node.v_hash_to_str(), v_path, node.file_type, possible_ftypes, src_node))
 
                         if node.v_path == v_path:
                             for _, _, _, used_at_runtime, _ in h4ref:

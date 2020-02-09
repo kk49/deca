@@ -114,7 +114,7 @@ class Deca3dTexture:
             # dump textures
             texture_fn_uri = None
             if len(self.v_path) > 0:
-                texture_nodes = vfs.nodes_where_vpath(self.v_path)
+                texture_nodes = vfs.nodes_where_match(v_path=self.v_path)
                 if len(texture_nodes) > 0:
                     texture_fn = self.v_path.decode('utf-8') + '.png'
                     if db.flat_file_layout:
@@ -173,7 +173,7 @@ class Deca3dMeshc:
     def add_to_gltf(self, vfs: VfsDatabase, adf_db: AdfDatabase, db: Deca3dDatabase, gltf: pyg.GLTF2):
         if self.meshes is None:
             vfs.logger.log('Setup Meshc: {}'.format(self.v_path))
-            mesh_adf = adf_db.read_node(vfs, vfs.nodes_where_vpath(self.v_path)[0])
+            mesh_adf = adf_db.read_node(vfs, vfs.nodes_where_match(v_path=self.v_path)[0])
             assert len(mesh_adf.table_instance) == 2
             assert mesh_adf.table_instance[0].type_hash == 0xea60065d
             # 0x67b3a453 - GenZ, 0xe6834477 - theHunter
@@ -185,11 +185,11 @@ class Deca3dMeshc:
             hrmesh_vpath2 = remove_prefix_if_present(b'intermediate/', hrmesh_vpath)
             hrmesh_node = None
 
-            hrmesh_nodes = vfs.nodes_where_vpath(hrmesh_vpath)
+            hrmesh_nodes = vfs.nodes_where_match(v_path=hrmesh_vpath)
             if hrmesh_nodes:
                 hrmesh_node = hrmesh_nodes[0]
             elif hrmesh_vpath2 is not None:
-                hrmesh_nodes = vfs.nodes_where_vpath(hrmesh_vpath2)
+                hrmesh_nodes = vfs.nodes_where_match(v_path=hrmesh_vpath2)
                 if hrmesh_nodes:
                     hrmesh_node = hrmesh_nodes[0]
 
@@ -398,7 +398,7 @@ class Deca3dModelc:
         if self.models is None:
             vfs.logger.log('Setup Modelc: {}'.format(self.v_path))
 
-            nodes = vfs.nodes_where_vpath(self.v_path)
+            nodes = vfs.nodes_where_match(v_path=self.v_path)
             if len(nodes) == 0:
                 raise EDecaFileMissing('Not Mapped: {}'.format(self.v_path))
 
@@ -518,7 +518,7 @@ class Deca3dHkSkeleton:
             ppath_skel_xml = ppath_skel_raw + '.xml'
 
             if not os.path.isfile(ppath_skel_raw):
-                vnodes = vfs.nodes_where_vpath(v_path)
+                vnodes = vfs.nodes_where_match(v_path=v_path)
 
                 if len(vnodes) == 0:
                     raise EDecaFileMissing('Not Mapped: {}'.format(v_path))

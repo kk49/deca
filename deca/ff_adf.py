@@ -315,6 +315,8 @@ def adf_type_id_to_str(type_id, type_map):
 
 
 class AdfValue:
+    __slots__ = ('value', 'type_id', 'info_offset', 'data_offset', 'bit_offset', 'enum_string', 'hash_string')
+
     def __init__(self, value, type_id, info_offset, data_offset=None, bit_offset=None, enum_string=None, hash_string=None):
         self.value = value
         self.type_id = type_id
@@ -392,29 +394,33 @@ def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
                 vp = '0x{:08x}'.format(v.value)
                 hash_string = v.hash_string
                 if hash_string is None:
-                    name = vfs.hash_string_where_hash32_select_all(v.value)
+                    name = vfs.hash_string_match(hash32=v.value)
                     if len(name):
-                        hash_string = 'DB:"{}"'.format(name[0][4].decode('utf-8'))
+                        hash_string = 'DB:"{}"'.format(name[0][1].decode('utf-8'))
                     else:
                         hash_string = 'Hash4:0x{:08x}'.format(v.value)
             elif type_def.size == 6:
                 vp = '0x{:012x}'.format(v.value)
                 hash_string = v.hash_string
                 if hash_string is None:
-                    name = vfs.hash_string_where_hash48_select_all(v.value & 0x0000FFFFFFFFFFFF)
+                    name = vfs.hash_string_match(hash48=v.value & 0x0000FFFFFFFFFFFF)
                     if len(name):
-                        hash_string = 'DB:"{}"'.format(name[0][4].decode('utf-8'))
+                        hash_string = 'DB:"{}"'.format(name[0][1].decode('utf-8'))
                     else:
                         hash_string = 'Hash6:0x{:012x}'.format(v.value)
             elif type_def.size == 8:
                 vp = '0x{:016x}'.format(v.value)
                 hash_string = v.hash_string
                 if hash_string is None:
-                    name = vfs.hash_string_where_hash48_select_all(v.value & 0x0000FFFFFFFFFFFF)
-                    if len(name):
-                        hash_string = 'DB:"{}"'.format(name[0][4].decode('utf-8'))
+                    name48 = vfs.hash_string_match(hash48=v.value & 0x0000FFFFFFFFFFFF)
+                    if len(name48):
+                        hash_string = 'DB:H6:"{}"'.format(name48[0][1].decode('utf-8'))
                     else:
-                        hash_string = 'Hash8:0x{:016x}'.format(v.value)
+                        name64 = vfs.hash_string_match(hash48=v.value)
+                        if len(name64):
+                            hash_string = 'DB:H6:"{}"'.format(name64[0][1].decode('utf-8'))
+                        else:
+                            hash_string = 'Hash8:0x{:016x}'.format(v.value)
             else:
                 vp = v.value
                 hash_string = v.hash_string

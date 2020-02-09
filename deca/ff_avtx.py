@@ -337,7 +337,7 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
             else:
                 filename_ddsc = filename[0] + b'.ddsc'
 
-            filename_ddsc_nodes = vfs.nodes_where_vpath(filename_ddsc)
+            filename_ddsc_nodes = vfs.nodes_where_match(v_path=filename_ddsc)
 
             if filename_ddsc_nodes:
                 extras = [b'.hmddsc']
@@ -351,7 +351,7 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
                 ])
                 for extra in extras:
                     filename_atx = filename[0] + extra
-                    filename_atx_nodes = vfs.nodes_where_vpath(filename_atx)
+                    filename_atx_nodes = vfs.nodes_where_match(v_path=filename_atx)
                     if filename_atx_nodes:
                         files.append([
                             filename_atx,
@@ -378,7 +378,7 @@ def image_export(vfs: VfsDatabase, node: VfsNode, extract_dir, export_raw, expor
             if multifile:
                 cnodes = [mip.filename for mip in ddsc.mips]
                 cnodes = set(cnodes)
-                cnodes = [vfs.nodes_where_vpath(cnode)[0] for cnode in cnodes]
+                cnodes = [vfs.nodes_where_match(v_path=cnode)[0] for cnode in cnodes]
             else:
                 cnodes = [node]
 

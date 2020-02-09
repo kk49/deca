@@ -31,6 +31,7 @@ FTYPE_GFX = 'gfx'
 FTYPE_OGG = 'ogg'
 FTYPE_BINK_KB2 = 'kb2'
 FTYPE_BINK_BIK = 'bik'
+FTYPE_GT0C ='gt0c'
 
 FTYPE_SYMLINK = 'symlink'
 
@@ -68,6 +69,7 @@ ftype_list = {
     FTYPE_OGG: 1 << 25,
     FTYPE_BINK_KB2: 1 << 26,
     FTYPE_BINK_BIK: 1 << 27,
+    FTYPE_GT0C: 1 << 28,
     FTYPE_EXE: 1 << 63,
     FTYPE_ANY_TYPE: 0xFFffFFffFFffFFff,
 }

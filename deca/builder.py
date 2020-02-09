@@ -59,7 +59,7 @@ class Builder:
                         # Add to end
                         entry = EntrySarc(v_path=v_path)
                         entry.is_symlink = cmd == 'sarc.symlink'
-                        src_node = vfs.nodes_where_vpath(v_path)[0]
+                        src_node = vfs.nodes_where_match(v_path=v_path)[0]
                         entry.length = src_node.size_u
                         sarc_file.entries.append(entry)
                     # elif cmd == 'sarc.remove':
@@ -97,7 +97,7 @@ class Builder:
                         buf = f.read(entry.length)
                 else:
                     print('  COPYING {} from old file to new file'.format(entry.v_path))
-                    vn = vfs.nodes_where_vpath(entry.v_path)[0]
+                    vn = vfs.nodes_where_match(v_path=entry.v_path)[0]
                     with vfs.file_obj_from(vn) as fsi:
                         buf = fsi.read(entry.length)
 
@@ -123,7 +123,7 @@ class Builder:
             pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
         elif src_path.endswith('.ddsc.dds'):
             # Build texture
-            vnode = vfs.nodes_where_vpath(v_path)[0]
+            vnode = vfs.nodes_where_match(v_path=v_path)[0]
 
             # make ddsc.dds into ddsc and avtxs
             compiled_files = image_import(vfs, vnode, src_path, dst_path)
@@ -188,7 +188,7 @@ class Builder:
                 completed.add(v_path)
                 depends[v_path] = depends.get(v_path, set())
 
-                vnodes = vfs.nodes_where_vpath(v_path)
+                vnodes = vfs.nodes_where_match(v_path=v_path)
 
                 if len(vnodes) == 0:
                     print('TODO: WARNING: FILE {} NOT HANDLED'.format(v_path))
@@ -229,7 +229,7 @@ class Builder:
                         v.discard(v_path)
 
                     fpath = src_files.get(v_path, None)
-                    vnodes = vfs.nodes_where_vpath(v_path)
+                    vnodes = vfs.nodes_where_match(v_path=v_path)
 
                     if len(vnodes) == 0:
                         raise EDecaBuildError('MISSING VPATH when building v_path={} using fpath={}'.format(

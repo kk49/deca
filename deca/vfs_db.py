@@ -20,11 +20,14 @@ from deca.db_types import *
 
 
 language_codes = [
+    'bra',  # Brazil
     'chi',  # Chinese
     'eng',  # English
     'fre',  # French
     'ger',  # German
+    'ita',  # Italy
     'jap',  # Japanese
+    'mex',  # Mexico
     'pol',  # Polish
     'rus',  # Russian
     'sch',  # Simplified Chinese

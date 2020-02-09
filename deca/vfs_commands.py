@@ -12,6 +12,7 @@ import deca.ff_rtpc
 from .file import ArchiveFile
 from .vfs_db import VfsDatabase, VfsNode, language_codes, v_hash_type_4, v_hash_type_8
 from .db_wrap import DbWrap
+from .db_types import *
 from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
@@ -21,7 +22,6 @@ from .ff_sarc import FileSarc, EntrySarc
 from .ff_gtoc import process_buffer_gtoc, GtocArchiveEntry, GtocFileEntry
 from .util import remove_prefix_if_present, remove_suffix_if_present
 from .kaitai.gfx import Gfx
-
 
 print_node_info = False
 
@@ -468,6 +468,7 @@ class Processor:
             for sh in adf.table_name:
                 db.propose_string(sh[1], node, is_field_name=True)
 
+            # self naming
             if len(adf.table_instance_values) > 0 and \
                     adf.table_instance_values[0] is not None and \
                     isinstance(adf.table_instance_values[0], dict):
@@ -515,6 +516,27 @@ class Processor:
 
                 if len(fns) > 0 and not found_any:
                     self._comm.log('COULD NOT MATCH GENERATED FILE NAME {} {}'.format(node.v_hash_to_str(), fns[0]))
+
+            # generate dialog and animation file names from intents table.
+            #  in RAGE 2 it is "sound/conditional_dialog.intentstablec"
+
+            if len(adf.table_instance_values) > 0 and \
+                    adf.table_instance_values[0] is not None and \
+                    adf.table_instance[0].name == b'intenttable':
+                obj0 = adf.table_instance_values[0]
+                intents = obj0['Intents']
+                for intent in intents:
+                    dialogues = intent['Dialogues']
+                    for dialogue in dialogues:
+                        dia_id = to_str(dialogue['DialogueStringId'])
+
+                        for lang in language_codes:
+                            db.propose_string(
+                                f'animations/dialogue/generated/{lang}/{dia_id}.ban',
+                                parent_node=node, possible_file_types=[FTYPE_TAG0])
+                            db.propose_string(
+                                f'sound/dialogue/{lang}/{dia_id}.wavc',
+                                parent_node=node, possible_file_types=[FTYPE_FSB5C])
 
             # only mark as processed if AdfTypeMissing exception did not happen
             node.processed_file_set(True)

@@ -1037,9 +1037,8 @@ class AdfDatabase:
                     adf_type = struct.unpack('I', buffer[4:8])[0]
                 else:
                     adf_type = node.adf_type
-                skip = 8
-                offset = 0
-                adf = self._load_adf_bare(buffer[skip:], adf_type, offset, node.size_u - skip)
+                skip = 8  # skip magic and type id
+                adf = self._load_adf_bare(buffer[skip:], adf_type, 0, node.size_u - skip)
             else:
                 adf = self._load_adf(buffer)
         except AdfTypeMissing as ae:

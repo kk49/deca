@@ -539,6 +539,13 @@ class GameInfoRage2(GameInfo):
             'terrain/heatwave/horizonmap/horizonmap_moon_tessellation_disabled_'
         ]
 
+        self.map_zooms = [1, 2, 3, 4, 5]
+        self.map_max_count = 1024
+        self.map_prefixes = [
+            'textures/ui/world_map/worldmap_',
+            'textures/ui/world_map/',
+        ]
+
     def archive_path(self):
         archive_paths = [
             os.path.join(self.game_dir, 'archives_win64'),

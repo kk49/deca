@@ -6,6 +6,7 @@ import time
 import deca.ff_rtpc
 
 from .vfs_db import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
+from .db_types import *
 from .db_wrap import DbWrap
 from .vfs_commands import MultiProcessControl
 from .game_info import determine_game
@@ -220,7 +221,7 @@ class VfsProcessor(VfsDatabase):
     def dump_vpaths(self):
         vpath_file = os.path.join(self.working_dir, 'vpaths.txt')
         vpaths = self.nodes_select_distinct_vpath()
-        vpaths = list(set([v for v in vpaths if v is not None]))
+        vpaths = list(set([to_str(v) for v in vpaths if v is not None]))
         vpaths.sort()
         if not os.path.isfile(vpath_file):
             self.logger.log('CREATING: vpaths.txt')

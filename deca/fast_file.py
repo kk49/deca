@@ -55,7 +55,7 @@ def make_read_many(data_type):
         if new_pos > n_buffer:
             raise_error()
         v = np.frombuffer(buffer[pos:new_pos], dtype=dt)
-        return v, new_pos
+        return list(v), new_pos
 
     return f
 

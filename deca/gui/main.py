@@ -19,19 +19,18 @@ from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
 from deca.gui.viewer_obc import DataViewerObc
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
-from deca.export_import import extract_raw, extract_processed, extract_contents
+from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
 
 import PySide2
 from PySide2.QtCore import \
-    QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel, QRegExp, \
-    QItemSelection
+    QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel
 
 from PySide2.QtGui import \
-    QColor, QFont
+    QColor
 
 from PySide2.QtWidgets import \
     QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QTextEdit, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel, QCheckBox, \
+    QTabWidget, QTreeView, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel, QCheckBox, \
     QAbstractItemView
 
 
@@ -694,7 +693,7 @@ class MainWidget(QWidget):
         vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_label)
         vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_in_edit)
         vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_out_edit)
-        vhash_to_vpath_layout.setStretch(2,1)
+        vhash_to_vpath_layout.setStretch(2, 1)
 
         self.chkbx_export_raw = QCheckBox()
         self.chkbx_export_raw.setText('Export Raw Files')
@@ -727,22 +726,21 @@ class MainWidget(QWidget):
         self.bt_extract.setEnabled(False)
         self.bt_extract.setText('EXTRACT')
         self.bt_extract.clicked.connect(self.bt_extract_clicked)
-        size = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        # size.setHorizontalStretch(0)
-        # size.setVerticalStretch(0)
-        # self.bt_extract.setSizePolicy(size)
+
+        self.bt_extract_gltf_3d = QPushButton()
+        self.bt_extract_gltf_3d.setEnabled(False)
+        self.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2')
+        self.bt_extract_gltf_3d.clicked.connect(self.slot_extract_gltf_clicked)
 
         self.bt_prep_mod = QPushButton()
         self.bt_prep_mod.setEnabled(False)
         self.bt_prep_mod.setText('PREP MOD')
         self.bt_prep_mod.clicked.connect(self.bt_prep_mod_clicked)
-        size = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         self.bt_mod_build = QPushButton()
         # self.bt_mod_build.setEnabled(False)
         self.bt_mod_build.setText('BUILD MOD')
         self.bt_mod_build.clicked.connect(self.bt_mod_build_clicked)
-        size = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         self.nav_layout = QVBoxLayout()
         self.nav_layout.addWidget(self.nav_widget)
@@ -750,6 +748,7 @@ class MainWidget(QWidget):
         self.nav_layout.addLayout(vhash_to_vpath_layout)
         self.nav_layout.addLayout(export_layout)
         self.nav_layout.addWidget(self.bt_extract)
+        self.nav_layout.addWidget(self.bt_extract_gltf_3d)
         self.nav_layout.addWidget(self.bt_prep_mod)
         self.nav_layout.addWidget(self.bt_mod_build)
 
@@ -800,10 +799,12 @@ class MainWidget(QWidget):
         self.current_vpaths = vpaths
         if self.current_vpaths is None or len(self.current_vpaths) == 0:
             self.bt_extract.setEnabled(False)
+            self.bt_extract_gltf_3d.setEnabled(False)
             self.bt_prep_mod.setEnabled(False)
             str_vpaths = ''
         else:
             self.bt_extract.setEnabled(True)
+            self.bt_extract_gltf_3d.setEnabled(True)
             self.bt_prep_mod.setEnabled(True)
 
             if len(self.current_vpaths) == 1:
@@ -815,6 +816,7 @@ class MainWidget(QWidget):
                 str_vpaths = '**MULTIPLE**'
 
         self.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
+        self.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
         self.bt_prep_mod.setText('PREP MOD: {}'.format(str_vpaths))
 
         self.data_view.vnode_selection_changed(vpaths)
@@ -830,20 +832,33 @@ class MainWidget(QWidget):
         if self.current_vpaths:
             try:
                 if self.chkbx_export_raw.isChecked():
-                    extract_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
+                    nodes_export_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
 
                 if self.chkbx_export_contents.isChecked():
-                    extract_contents(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
+                    nodes_export_contents(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
 
-                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
                 save_to_text = self.chkbx_export_text.isChecked()
                 save_to_processed = self.chkbx_export_processed.isChecked()
 
-                extract_processed(
+                nodes_export_processed(
                     self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
+                    allow_overwrite=False,
                     save_to_processed=save_to_processed,
-                    save_to_text=save_to_text,
+                    save_to_text=save_to_text)
+
+            except EDecaFileExists as exce:
+                self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
+
+    def extract_gltf(self, eid, extract_dir):
+        if self.current_vpaths:
+            try:
+                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
+
+                nodes_export_gltf(
+                    self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
+                    allow_overwrite=False,
                     save_to_one_dir=save_to_one_dir)
+
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
@@ -852,6 +867,9 @@ class MainWidget(QWidget):
 
     def bt_prep_mod_clicked(self, checked):
         self.extract('Mod Prep', self.vfs.working_dir + 'mod/')
+
+    def slot_extract_gltf_clicked(self, checked):
+        self.extract_gltf('GLTF2 / 3D', self.vfs.working_dir + 'gltf2_3d/')
 
     def bt_mod_build_clicked(self, checked):
         try:

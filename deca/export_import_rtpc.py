@@ -81,12 +81,19 @@ def rtpc_export_node_recurse(
             world_matrix=world_matrix, material_properties=material_properties, skeleton_raw_path=skeleton_raw_path)
 
 
-def rtpc_export_node(vfs: VfsDatabase, vnode: VfsNode, export_path, allow_overwrite=False, save_to_one_dir=True):
+def node_export_rtpc_gltf(
+        vfs: VfsDatabase,
+        vnode: VfsNode,
+        export_path,
+        allow_overwrite=False,
+        save_to_one_dir=True
+):
+    vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
+
     rtpc = Rtpc()
     with vfs.file_obj_from(vnode) as f:
         rtpc.deserialize(f)
 
-    vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
     gltf = DecaGltf(vfs, export_path, vnode.v_path.decode('utf-8'), save_to_one_dir=save_to_one_dir)
 
     with gltf.scene():
@@ -94,32 +101,28 @@ def rtpc_export_node(vfs: VfsDatabase, vnode: VfsNode, export_path, allow_overwr
             rtpc_export_node_recurse(rtpc.root_node, gltf, vfs)
 
     gltf.gltf_save()
+
     vfs.logger.log('Exporting {}: Complete'.format(vnode.v_path.decode('utf-8')))
 
 
-def rtpc_export(vfs: VfsDatabase, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
-    for vnode in vnodes:
-        try:
-            if save_to_processed:
-                rtpc_export_node(vfs, vnode, export_path, allow_overwrite=allow_overwrite, save_to_one_dir=save_to_one_dir)
+def node_export_rtpc_text(
+        vfs: VfsDatabase,
+        vnode: VfsNode,
+        export_path,
+        allow_overwrite=False
+):
+    with vfs.file_obj_from(vnode) as f:
+        rtpc = Rtpc().deserialize(f)
 
-            if save_to_text:
-                with vfs.file_obj_from(vnode) as fi:
-                    rtpc = Rtpc().deserialize(fi)
+    fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
 
-                    fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
+    if not allow_overwrite and os.path.exists(fn):
+        raise EDecaFileExists(fn)
 
-                    if not allow_overwrite and os.path.exists(fn):
-                        raise EDecaFileExists(fn)
+    s = rtpc.dump_to_string(vfs)
 
-                    s = rtpc.dump_to_string(vfs)
+    ofiledir = os.path.dirname(fn)
+    os.makedirs(ofiledir, exist_ok=True)
 
-                    ofiledir = os.path.dirname(fn)
-                    os.makedirs(ofiledir, exist_ok=True)
-
-                    with open(fn, 'wt') as fo:
-                        fo.write(s)
-
-        except EDecaFileExists as e:
-            vfs.logger.log(
-                'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+    with open(fn, 'wt') as f:
+        f.write(s)

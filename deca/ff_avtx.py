@@ -3,10 +3,11 @@ import io
 import pprint
 import numpy as np
 from PIL import Image
-from deca.file import ArchiveFile
-from deca.errors import *
-from deca.ff_types import *
-from deca.vfs_db import VfsDatabase, VfsNode
+from .file import ArchiveFile
+from .errors import *
+from .ff_types import *
+from .vfs_db import VfsDatabase, VfsNode
+from .util import make_dir_for_file
 import deca.dxgi
 
 
@@ -388,8 +389,7 @@ def image_export(vfs: VfsDatabase, node: VfsNode, extract_dir, export_raw, expor
                 else:
                     ofile = extract_dir + '{}'.format(cnode.v_path.decode('utf-8'))
 
-                ofiledir = os.path.dirname(ofile)
-                os.makedirs(ofiledir, exist_ok=True)
+                make_dir_for_file(ofile)
 
                 if not allow_overwrite and os.path.isfile(ofile):
                     existing_files.append(ofile)
@@ -405,8 +405,7 @@ def image_export(vfs: VfsDatabase, node: VfsNode, extract_dir, export_raw, expor
             else:
                 ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
 
-            ofiledir = os.path.dirname(ofile)
-            os.makedirs(ofiledir, exist_ok=True)
+            make_dir_for_file(ofile)
 
             ofile = os.path.splitext(ofile)[0]
             ofile = ofile + '.ddsc'
@@ -515,8 +514,9 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
 
         for vpath_out in out_vpaths:
             fout_name = os.path.join(opath, vpath_out.decode('utf-8'))
-            dst_dir = os.path.dirname(fout_name)
-            os.makedirs(dst_dir, exist_ok=True)
+
+            make_dir_for_file(fout_name)
+
             with open(fout_name, 'wb') as file_out:
                 if vpath_out.endswith(b'.ddsc'):
                     file_out.write(ddsc.header_buffer)

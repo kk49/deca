@@ -44,7 +44,11 @@ def expand_vpaths(vfs: VfsDatabase, vs, mask):
             id_pat = v.encode('ascii')
 
         if isinstance(id_pat, bytes):
-            nodes = vfs.nodes_where_match(v_path_like=id_pat, v_path_regexp=mask)
+            nodes_all = vfs.nodes_where_match(v_path_like=id_pat, v_path_regexp=mask)
+            nodes = []
+            for node in nodes_all:
+                if node.file_type != FTYPE_SYMLINK and node.offset is not None:
+                    nodes.append(node)
             nodes = dict([(n.v_path, n) for n in nodes])
             nodes = list(nodes.values())
             vos += nodes

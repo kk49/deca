@@ -167,7 +167,7 @@ class VfsProcessor(VfsDatabase):
 
         self.process_remove_temporary_nodes()
 
-        if version < 3:
+        if version < 2:
             self.find_vpath_procmon_dir()
             self.find_vpath_resources()
             self.find_vpath_guess()

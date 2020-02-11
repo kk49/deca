@@ -144,7 +144,14 @@ def adf_export_node(
 
 
 def adf_export(
-        vfs: VfsDatabase, vnodes: List[VfsNode], export_path, allow_overwrite=False, save_to_processed=False, save_to_text=False, save_to_one_dir=True):
+        vfs: VfsDatabase,
+        vnodes: List[VfsNode],
+        export_path,
+        allow_overwrite=False,
+        save_to_processed=False,
+        save_to_text=False,
+        save_to_one_dir=True):
+
     adf_db = AdfDatabase(vfs)
 
     for vnode in vnodes:

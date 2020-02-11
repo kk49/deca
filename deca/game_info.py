@@ -535,8 +535,8 @@ class GameInfoRage2(GameInfo):
         ]
 
         self.world_hm = [
-            'terrain/heatwave/horizonmap/horizonmap_tessellation_disabled_'
-            'terrain/heatwave/horizonmap/horizonmap_moon_tessellation_disabled_'
+            'terrain/heatwave/horizonmap/horizonmap_tessellation_disabled_',
+            'terrain/heatwave/horizonmap/horizonmap_moon_tessellation_disabled_',
         ]
 
         self.map_zooms = [1, 2, 3, 4, 5]

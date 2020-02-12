@@ -1,777 +1,91 @@
 import sys
 import os
-import re
-import time
-
 from deca.errors import *
-from deca.vfs_db import VfsDatabase
 from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsNode
-from deca.ff_types import *
-from deca.ff_adf import AdfDatabase
 from deca.builder import Builder
 from deca.util import Logger
-from deca.gui.viewer_adf import DataViewerAdf
-from deca.gui.viewer_rtpc import DataViewerRtpc
-from deca.gui.viewer_image import DataViewerImage
-from deca.gui.viewer_raw import DataViewerRaw
-from deca.gui.viewer_info import DataViewerInfo
-from deca.gui.viewer_text import DataViewerText
-from deca.gui.viewer_sarc import DataViewerSarc
-from deca.gui.viewer_obc import DataViewerObc
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
+from .main_window import Ui_MainWindow
+from PySide2.QtCore import Slot
+from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
 
-import PySide2
-from PySide2.QtCore import \
-    QAbstractTableModel, QAbstractItemModel, QModelIndex, Qt, Slot, QSortFilterProxyModel
 
-from PySide2.QtGui import \
-    QColor
-
-from PySide2.QtWidgets import \
-    QAction, QApplication, QHeaderView, QMainWindow, QSizePolicy, QTableView, QWidget, QVBoxLayout, QHBoxLayout, \
-    QTabWidget, QTreeView, QLineEdit, QPushButton, QMessageBox, QFileDialog, QLabel, QCheckBox, \
-    QAbstractItemView
-
-
-# from PySide2.QtWebEngineWidgets import QWebEngineView
-
-
-def used_color_calc(level):
-    return QColor(0x00, max(0x10, 0xff - 0x20 * level), 0x00, 0xff)
-
-
-class VfsNodeTableModel(QAbstractTableModel):
-    def __init__(self, show_all=True):
-        QAbstractTableModel.__init__(self)
-        self.vfs = None
-        self.adf_db = None
-        self.show_all = show_all
-        self.uid_table = None
-
-        self.remap = None
-        self.remap_uid = None
-        self.remap_pid = None
-        self.remap_type = None
-        self.remap_hash = None
-        self.column_ids = ["Index", "PIDX", "Type", "Hash", "EXT_hash", "ADF_type", "Size_U", "Size_C", "Path"]
-
-    def vfs_set(self, vfs: VfsDatabase):
-        self.beginResetModel()
-        self.vfs = vfs
-        self.adf_db = AdfDatabase(vfs)
-
-        if self.show_all:
-            self.uid_table = self.vfs.nodes_where_match(uid_only=True)
-        else:
-            self.uid_table = self.vfs.nodes_where_unmapped_select_uid()
-        self.uid_table.sort()
-
-        self.endResetModel()
-
-    def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
-        # if self.remap_uid is None:
-        #     rm = list(range(len(self.vfs.table_vfsnode)))
-        #     self.remap_uid = rm
-        #
-        # if column == 0:  # IDX
-        #     self.remap = self.remap_uid
-        # elif column == 1:  # PIDX
-        #     if self.remap_pid is None:
-        #         rm = list(range(len(self.vfs.table_vfsnode)))
-        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].pid)
-        #         self.remap_pid = rm
-        #     self.remap = self.remap_pid
-        # elif column == 2:  # Type
-        #     if self.remap_type is None:
-        #         rm = list(range(len(self.vfs.table_vfsnode)))
-        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].file_type)
-        #         self.remap_type = rm
-        #     self.remap = self.remap_type
-        # elif column == 3:  # Hash
-        #     if self.remap_hash is None:
-        #         rm = list(range(len(self.vfs.table_vfsnode)))
-        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].hashid)
-        #         self.remap_hash = rm
-        #     self.remap = self.remap_hash
-        # else:
-        #     self.remap = self.remap_uid
-        #     print('Unhandled Sort {}'.format(self.column_ids[column]))
-        #
-        # if self.remap is not None:
-        #     if order == Qt.AscendingOrder:
-        #         pass
-        #     else:
-        #         self.remap = self.remap[::-1]
-        pass
-
-    def rowCount(self, parent=QModelIndex()):
-        if self.uid_table is None:
-            return 0
-        else:
-            return len(self.uid_table)
-
-    def columnCount(self, parent=QModelIndex()):
-        return 9
-
-    def headerData(self, section, orientation, role):
-        if role != Qt.DisplayRole:
-            return None
-        if orientation == Qt.Horizontal:
-            return self.column_ids[section]
-        else:
-            return None
-
-    def data(self, index, role=Qt.DisplayRole):
-        column = index.column()
-        row = index.row()
-
-        if self.remap is not None:
-            row = self.remap[row]
-
-        if role == Qt.DisplayRole:
-            uid = self.uid_table[row]
-            node: VfsNode = self.vfs.node_where_uid(uid)
-            if node is None:
-                return 'NA'
-            else:
-                if column == 0:
-                    return '{}'.format(node.uid)
-                elif column == 1:
-                    return '{}'.format(node.pid)
-                elif column == 2:
-                    return '{}'.format(node.file_type)
-                elif column == 3:
-                    return node.v_hash_to_str()
-                elif column == 4:
-                    if node.ext_hash is None:
-                        return ''
-                    else:
-                        return '{:08X}'.format(node.ext_hash)
-                elif column == 5:
-                    if node.adf_type is None:
-                        return ''
-                    else:
-                        return '{:08X}'.format(node.adf_type)
-                elif column == 6:
-                    return '{}'.format(node.size_u)
-                elif column == 7:
-                    return '{}'.format(node.size_c)
-                elif column == 8:
-                    if node.v_path is not None:
-                        return 'V: {}'.format(node.v_path.decode('utf-8'))
-                    elif node.p_path is not None:
-                        return 'P: {}'.format(node.p_path)
-                    else:
-                        return ''
-
-        elif role == Qt.BackgroundRole:
-            uid = self.uid_table[row]
-            node: VfsNode = self.vfs.node_where_uid(uid)
-            if node.is_valid():
-                if column == 8:
-                    if node.used_at_runtime_depth is not None:
-                        return used_color_calc(node.used_at_runtime_depth)
-                elif column == 5:
-                    if node.adf_type is not None and node.adf_type not in self.adf_db.type_map_def:
-                        return QColor(Qt.red)
-
-        elif role == Qt.TextAlignmentRole:
-            if column == 8:
-                return Qt.AlignLeft
-            else:
-                return Qt.AlignRight
-
-        return None
-
-
-class VfsNodeTableWidget(QWidget):
-    def __init__(self, show_mapped):
-        QWidget.__init__(self)
-
-        self.vnode_selection_changed = None
-        self.vnode_2click_selected = None
-
-        # Getting the Model
-        self.model = VfsNodeTableModel(show_all=show_mapped)
-
-        # Creating a QTableView
-        self.table_view = QTableView()
-        self.table_view.clicked.connect(self.clicked)
-        self.table_view.doubleClicked.connect(self.double_clicked)
-        font = self.table_view.font()
-        font.setPointSize(8)
-        self.table_view.setFont(font)
-        # self.table_view.setSortingEnabled(True)
-        self.table_view.setModel(self.model)
-
-        # QTableView Headers
-        self.horizontal_header = self.table_view.horizontalHeader()
-        self.vertical_header = self.table_view.verticalHeader()
-        self.horizontal_header.setSectionResizeMode(QHeaderView.Interactive)
-        self.vertical_header.setSectionResizeMode(QHeaderView.Interactive)
-        self.horizontal_header.setStretchLastSection(True)
-
-        # QWidget Layout
-        self.main_layout = QHBoxLayout()
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-
-        # Left layout
-        size.setHorizontalStretch(1)
-        self.table_view.setSizePolicy(size)
-        self.main_layout.addWidget(self.table_view)
-
-        # Set the layout to the QWidget
-        self.setLayout(self.main_layout)
-
-    def vfs_set(self, vfs):
-        self.model.vfs_set(vfs)
-
-    def clicked(self, index):
-        if index.isValid():
-            if self.vnode_selection_changed is not None:
-                items = list(set([self.model.uid_table[idx.row()] for idx in self.table_view.selectedIndexes()]))
-                items = [self.model.vfs.node_where_uid(i) for i in items]
-                self.vnode_selection_changed(items)
-
-    def double_clicked(self, index):
-        if index.isValid():
-            if self.vnode_2click_selected is not None:
-                item = self.model.uid_table[index.row()]
-                item = self.model.vfs.node_where_uid(item)
-                self.vnode_2click_selected(item)
-
-
-class VfsDirLeaf(object):
-    def __init__(self, name, uid):
-        self.name = name
-        self.parent = None
-        self.row = 0
-        self.uid = uid
-
-    def v_path(self):
-        pn = b''
-        if self.parent is not None:
-            pn = self.parent.v_path(True)
-        return pn + self.name
-
-    def child_count(self):
-        return 0
-
-
-class VfsDirBranch(object):
-    def __init__(self, name):
-        self.name = name
-        self.parent = None
-        self.row = 0
-        self.children = []
-        self.child_name_map = {}
-
-    def v_path(self, child_called=False):
-        s = ''
-        if self.parent is not None:
-            s = self.parent.v_path(True)
-            s = s + self.name + '/'
-        if not child_called:
-            s = s + r'%'
-        return s
-
-    def child_count(self):
-        return len(self.children)
-
-    def child_add(self, c):
-        if c.name in self.child_name_map:
-            return self.children[self.child_name_map[c.name]]
-        else:
-            c.parent = self
-            c.row = len(self.children)
-            self.child_name_map[c.name] = c.row
-            self.children.append(c)
-            return c
-
-
-class VfsDirModel(QAbstractItemModel):
-    def __init__(self):
-        QAbstractItemModel.__init__(self)
-        self.vfs = None
-        self.adf_db = None
-        self.root_node = None
-        self.n_rows = 0
-        self.n_cols = 0
-
-    def vfs_set(self, vfs: VfsDatabase):
-        self.beginResetModel()
-        self.vfs = vfs
-        self.adf_db = AdfDatabase(vfs)
-
-        vpaths = self.vfs.nodes_select_vpath_uid_where_vpath_not_null_type_not_symlink()
-        vpaths.sort()
-        vpaths = dict(vpaths)
-
-        self.root_node = None
-        self.root_node = VfsDirBranch('/')
-        for v_path, uid in vpaths.items():
-            if v_path.find('\\') >= 0:
-                print(f'GUI: Warning: Windows Path {v_path}')
-                path = v_path.split('\\')
-            else:
-                path = v_path.split('/')
-
-            name = path[-1]
-            path = path[0:-1]
-            cnode = self.root_node
-            for p in path:
-                cnode = cnode.child_add(VfsDirBranch(p))
-
-            cnode.child_add(VfsDirLeaf(name, uid))
-
-        self.endResetModel()
-
-    def parent(self, index):
-        if not index.isValid():
-            return QModelIndex()
-
-        node = index.internalPointer()
-        if node is None or node.parent is None:
-            return QModelIndex()
-        else:
-            return self.createIndex(node.parent.row, 0, node.parent)
-
-    def index(self, row, column, parent):
-        if not parent.isValid():
-            return self.createIndex(row, column, self.root_node)
-
-        parent_node = parent.internalPointer()
-        return self.createIndex(row, column, parent_node.children[row])
-
-    def rowCount(self, parent):
-        if not parent.isValid():
-            return 1
-
-        node = parent.internalPointer()
-        if node is None:
-            return 0
-
-        return node.child_count()
-
-    def columnCount(self, parent):
-        return 9
-
-    def headerData(self, section, orientation, role):
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ("Path", "Index", "Type", "Hash", "EXT_Hash", "ADF_Type", "Size_U", "Size_C", "Used_Depth")[section]
-        else:
-            return None
-
-    def data(self, index, role):
-        if not index.isValid():
-            return None
-        node = index.internalPointer()
-        if node is None:
-            return None
-        column = index.column()
-        if role == Qt.DisplayRole:
-            if column == 0:
-                return node.name
-            elif isinstance(node, VfsDirLeaf):
-                uid = node.uid
-                vnode: VfsNode = self.vfs.node_where_uid(uid)
-                if column == 1:
-                    return '{}'.format(vnode.uid)
-                elif column == 2:
-                    return '{}'.format(vnode.file_type)
-                elif column == 3:
-                    if vnode.v_hash is None:
-                        return ''
-                    else:
-                        return '{:08X}'.format(vnode.v_hash)
-                elif column == 4:
-                    if vnode.ext_hash is None:
-                        return ''
-                    else:
-                        return '{:08x}'.format(vnode.ext_hash)
-                elif column == 5:
-                    if vnode.adf_type is None:
-                        return ''
-                    else:
-                        return '{:08x}'.format(vnode.adf_type)
-                elif column == 6:
-                    return '{}'.format(vnode.size_u)
-                elif column == 7:
-                    return '{}'.format(vnode.size_c)
-                elif column == 8:
-                    return '{}'.format(vnode.used_at_runtime_depth)
-        elif role == Qt.BackgroundColorRole:
-            if isinstance(node, VfsDirLeaf):
-                uid = node.uid
-                vnode: VfsNode = self.vfs.node_where_uid(uid)
-                if column == 8:
-                    if vnode.used_at_runtime_depth is not None:
-                        return used_color_calc(vnode.used_at_runtime_depth)
-                elif column == 5:
-                    if vnode.adf_type is not None and vnode.adf_type not in self.adf_db.type_map_def:
-                        return QColor(Qt.red)
-        return None
-
-
-class DecaSortFilterProxyModel(QSortFilterProxyModel):
+class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
-        QSortFilterProxyModel.__init__(self, *args, **kwargs)
-        self.filter_expr = re.compile('.*')
-        self.vis_map = {}
+        super(MainWindow, self).__init__(*args, **kwargs)
 
-    def check_node(self, index):
-        if index in self.vis_map:
-            return self.vis_map[index]
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
 
-        tnode = index.internalPointer()
-        vis = False
-        if isinstance(tnode, VfsDirBranch):
-            for r in range(self.sourceModel().rowCount(index)):
-                cindex = self.sourceModel().index(r, 0, index)
-                vis = vis | self.check_node(cindex)
-
-        elif isinstance(tnode, VfsDirLeaf):
-            vis = self.filter_expr.match(tnode.name) is not None
-
-        self.vis_map[index] = vis
-
-        return vis
-
-    def filter_set(self, expr):
-        self.beginResetModel()
-        try:
-            self.filter_expr = re.compile(expr)
-        except Exception as err:
-            self.filter_expr = re.compile('')
-
-        self.vis_map = {}
-        if self.sourceModel() is not None:
-            self.check_node(self.sourceModel().index(0, 0, QModelIndex()))
-        self.endResetModel()
-
-    def filterAcceptsRow(self, source_row: int, source_parent):
-        index = self.sourceModel().index(source_row, 0, source_parent)
-        return self.check_node(index)
-
-
-class VfsDirWidget(QWidget):
-    def __init__(self):
-        QWidget.__init__(self)
-
-        self.vnode_selection_changed = None
-        self.vnode_2click_selected = None
-
-        # Getting the Model
-        self.source_model = VfsDirModel()
-
-        # prepare filter
-        self.proxy_model = DecaSortFilterProxyModel(self)
-
-        # Creating a QTableView
-        self.view = QTreeView()
-        self.view.doubleClicked.connect(self.double_clicked)
-        self.view.clicked.connect(self.clicked)
-        self.view.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.view.setSelectionMode(QAbstractItemView.ExtendedSelection)
-
-        font = self.view.font()
-        font.setPointSize(8)
-        self.view.setFont(font)
-        # self.view.setSortingEnabled(True)
-        self.view.setModel(self.proxy_model)
-
-        # # QTableView Headers
-        self.header = self.view.header()
-        self.header.setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.header.setStretchLastSection(True)
-
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        size.setHorizontalStretch(1)
-        self.view.setSizePolicy(size)
-
-        self.main_layout = QHBoxLayout()
-        self.main_layout.addWidget(self.view)
-        self.setLayout(self.main_layout)
-
-        self.filter_vfspath_set('.*')
-
-    def vfs_set(self, vfs):
-        self.source_model.vfs_set(vfs)
-        self.proxy_model.setSourceModel(self.source_model)
-
-    def clicked(self, index):
-        if index.isValid():
-            if self.vnode_selection_changed is not None:
-                items = self.view.selectedIndexes()
-                items = [self.proxy_model.mapToSource(idx) for idx in items]
-                items = list(set([idx.internalPointer() for idx in items]))
-                items = [idx.v_path() for idx in items if isinstance(idx, VfsDirLeaf) or isinstance(idx, VfsDirBranch)]
-                self.vnode_selection_changed(items)
-
-    def double_clicked(self, index):
-        if index.isValid():
-            index = self.proxy_model.mapToSource(index)
-            tnode = index.internalPointer()
-            if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
-                uid = tnode.uid
-                item = self.source_model.vfs.node_where_uid(uid)
-                self.vnode_2click_selected(item)
-
-    def filter_vfspath_set(self, expr):
-        # self.proxy_model.setFilterRegExp(QRegExp(expr, Qt.CaseInsensitive, QRegExp.RegExp))
-        # self.proxy_model.setFilterKeyColumn(0)
-        self.proxy_model.filter_set(expr)
-
-
-class DataViewWidget(QWidget):
-    def __init__(self):
-        QWidget.__init__(self)
         self.vfs = None
-        self.adf_db = None
+        self.logger = Logger('./')
 
-        self.tab_info = DataViewerInfo()
-        self.tab_raw = DataViewerRaw()
-        self.tab_text = DataViewerText()
-        self.tab_sarc = DataViewerSarc()
-        self.tab_image = DataViewerImage()
-        self.tab_adf = DataViewerAdf()
-        self.tab_rtpc = DataViewerRtpc()
-        self.tab_obc = DataViewerObc()
-
-        self.tab_widget = QTabWidget()
-        self.tab_info_index = self.tab_widget.addTab(self.tab_info, 'Info')
-        self.tab_raw_index = self.tab_widget.addTab(self.tab_raw, 'Raw/Hex')
-        self.tab_text_index = self.tab_widget.addTab(self.tab_text, 'Text')
-        self.tab_sarc_index = self.tab_widget.addTab(self.tab_sarc, 'SARC')
-        self.tab_image_index = self.tab_widget.addTab(self.tab_image, 'Image')
-        self.tab_adf_index = self.tab_widget.addTab(self.tab_adf, 'ADF')
-        self.tab_rtpc_index = self.tab_widget.addTab(self.tab_rtpc, 'RTPC')
-        self.tab_obc_index = self.tab_widget.addTab(self.tab_obc, 'OBC')
-
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        size.setVerticalStretch(1)
-        self.tab_widget.setSizePolicy(size)
-
-        self.main_layout = QVBoxLayout()
-        self.main_layout.addWidget(self.tab_widget)
-        self.setLayout(self.main_layout)
-
-    def vfs_set(self, vfs):
-        self.vfs = vfs
-        self.adf_db = AdfDatabase()
-        self.adf_db.load_from_database(self.vfs)
-
-    def vnode_selection_changed(self, vpaths):
-        print('DataViewWidget:vnode_selection_changed: {}'.format(vpaths))
-
-    def vnode_2click_selected(self, vnode: VfsNode):
-        print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))
-
-        self.tab_widget.setTabEnabled(self.tab_info_index, True)
-        self.tab_info.vnode_process(self.vfs, vnode)
-
-        self.tab_widget.setTabEnabled(self.tab_raw_index, True)
-        self.tab_raw.vnode_process(self.vfs, vnode)
-
-        self.tab_widget.setTabEnabled(self.tab_text_index, False)
-        self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
-        self.tab_widget.setTabEnabled(self.tab_image_index, False)
-        self.tab_widget.setTabEnabled(self.tab_adf_index, False)
-        self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
-        self.tab_widget.setTabEnabled(self.tab_obc_index, False)
-
-        if vnode.file_type in {FTYPE_TXT}:
-            self.tab_widget.setTabEnabled(self.tab_text_index, True)
-            self.tab_text.vnode_process(self.vfs, vnode)
-            self.tab_widget.setCurrentIndex(self.tab_text_index)
-        elif vnode.file_type in {FTYPE_SARC}:
-            self.tab_widget.setTabEnabled(self.tab_sarc_index, True)
-            self.tab_sarc.vnode_process(self.vfs, vnode)
-            self.tab_widget.setCurrentIndex(self.tab_sarc_index)
-        elif vnode.file_type in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC, FTYPE_DDS, FTYPE_BMP}:
-            self.tab_widget.setTabEnabled(self.tab_image_index, True)
-            self.tab_image.vnode_process(self.vfs, vnode)
-            self.tab_widget.setCurrentIndex(self.tab_image_index)
-        elif vnode.file_type in {FTYPE_ADF, FTYPE_ADF_BARE, FTYPE_ADF0}:
-            self.tab_widget.setTabEnabled(self.tab_adf_index, True)
-            self.tab_adf.vnode_process(self.vfs, vnode)
-            self.tab_widget.setCurrentIndex(self.tab_adf_index)
-        elif vnode.file_type in {FTYPE_RTPC}:
-            self.tab_widget.setTabEnabled(self.tab_rtpc_index, True)
-            self.tab_rtpc.vnode_process(self.vfs, vnode)
-            self.tab_widget.setCurrentIndex(self.tab_rtpc_index)
-        elif vnode.file_type in {FTYPE_OBC}:
-            self.tab_widget.setTabEnabled(self.tab_obc_index, True)
-            self.tab_obc.vnode_process(self.vfs, vnode)
-            self.tab_widget.setCurrentIndex(self.tab_obc_index)
-        else:
-            self.tab_widget.setCurrentIndex(self.tab_raw_index)
-
-
-class MainWidget(QWidget):
-    def __init__(self):
-        QWidget.__init__(self)
-        self.vfs = None
         self.builder = Builder()
         self.current_vnode = None
         self.current_vpaths = None
         self.filter_mask = b'^.*$'
 
-        # self.log_widget = QTextEdit()
-        # self.log_widget.setReadOnly(True)
-        # font = QFont("Courier", 8)
-        # self.log_widget.setFont(font)
-        # self.log_widget.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        # self.log_widget.setSizePolicy(size)
+        # Configure Actions
+        self.ui.action_project_new.triggered.connect(self.project_new)
+        self.ui.action_project_open.triggered.connect(self.project_open)
+        self.ui.action_external_add.triggered.connect(self.external_add)
+        self.ui.action_external_add.setEnabled(False)
+        # self.ui.action_external_manage.triggered.connect(self.external_manage)
+        self.ui.action_exit.triggered.connect(self.exit_app)
+        self.ui.action_make_web_map.triggered.connect(self.tool_make_web_map)
 
-        # Create VFS Node table
-        self.vfs_node_widget = VfsNodeTableWidget(show_mapped=True)
-        self.vfs_node_widget.vnode_selection_changed = self.vnode_selection_changed
-        self.vfs_node_widget.vnode_2click_selected = self.vnode_2click_selected
-        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        # size.setHorizontalStretch(1)
-        # self.vfs_node_widget.setSizePolicy(size)
+        # Configure VFS Node table (all nodes)
+        self.ui.vfs_node_widget.show_all_set(True)
+        self.ui.vfs_node_widget.vnode_selection_changed = self.vnode_selection_changed
+        self.ui.vfs_node_widget.vnode_2click_selected = self.vnode_2click_selected
 
-        # Create VFS Node table
-        self.vfs_node_widget_non_mapped = VfsNodeTableWidget(show_mapped=False)
-        self.vfs_node_widget_non_mapped.vnode_selection_changed = self.vnode_selection_changed
-        self.vfs_node_widget_non_mapped.vnode_2click_selected = self.vnode_2click_selected
-        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        # size.setHorizontalStretch(1)
-        # self.vfs_node_widget_non_mapped.setSizePolicy(size)
+        # Configure VFS Node table (non-mapped nodes)
+        self.ui.vfs_node_widget_non_mapped.show_all_set(False)
+        self.ui.vfs_node_widget_non_mapped.vnode_selection_changed = self.vnode_selection_changed
+        self.ui.vfs_node_widget_non_mapped.vnode_2click_selected = self.vnode_2click_selected
 
-        # Create VFS dir table
-        self.vfs_dir_widget = VfsDirWidget()
-        self.vfs_dir_widget.vnode_selection_changed = self.vnode_selection_changed
-        self.vfs_dir_widget.vnode_2click_selected = self.vnode_2click_selected
-        # size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        # size.setHorizontalStretch(1)
-        # self.vfs_dir_widget.setSizePolicy(size)
-
-        # # Create map widget
-        # self.web_map_widget = QWebEngineView(self)
-        # self.web_map_widget.setUrl(working_dir + 'map/z0/index.html')
-        # self.web_map_widget.show()
-
-        self.nav_widget = QTabWidget()
-        # self.nav_widget.addTab(self.log_widget, 'Log')
-        self.nav_widget.addTab(self.vfs_dir_widget, 'Directory')
-        self.nav_widget.addTab(self.vfs_node_widget_non_mapped, 'Non-Mapped List')
-        self.nav_widget.addTab(self.vfs_node_widget, 'Raw List')
-        # self.nav_widget.addTab(self.web_map_widget, 'Map')
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        size.setHorizontalStretch(1)
-        size.setVerticalStretch(1)
-        self.nav_widget.setSizePolicy(size)
-        # self.nav_widget.updateGeometry()
+        # Configure VFS dir table
+        self.ui.vfs_dir_widget.vnode_selection_changed = self.vnode_selection_changed
+        self.ui.vfs_dir_widget.vnode_2click_selected = self.vnode_2click_selected
 
         # filter
-        self.filter_label = QLabel()
-        self.filter_label.setText('Filter (Python Expression Syntax)')
+        self.ui.filter_edit.textChanged.connect(self.filter_text_changed)
 
-        self.filter_edit = QLineEdit()
-        self.filter_edit.setText('.*')
-        self.filter_edit.textChanged.connect(self.filter_text_changed)
+        self.ui.vhash_to_vpath_in_edit.textChanged.connect(self.vhash_to_vpath_text_changed)
 
-        filter_layout = QHBoxLayout()
-        filter_layout.addWidget(self.filter_label)
-        filter_layout.addWidget(self.filter_edit)
+        self.ui.chkbx_export_raw_extract.setChecked(True)
+        self.ui.chkbx_export_contents_extract.setChecked(False)
+        self.ui.chkbx_export_text_extract.setChecked(False)
+        self.ui.chkbx_export_processed_extract.setChecked(False)
 
-        self.vhash_to_vpath_label = QLabel()
-        self.vhash_to_vpath_label.setText('VHash -> VPath')
+        self.ui.chkbx_export_raw_mods.setChecked(True)
+        self.ui.chkbx_export_contents_mods.setChecked(False)
+        self.ui.chkbx_export_processed_mods.setChecked(False)
 
-        self.vhash_to_vpath_in_edit = QLineEdit()
-        self.vhash_to_vpath_in_edit.setText('0')
-        self.vhash_to_vpath_in_edit.textChanged.connect(self.vhash_to_vpath_text_changed)
+        self.ui.chkbx_export_save_to_one_dir.setChecked(False)
 
-        self.vhash_to_vpath_out_edit = QLineEdit()
-        self.vhash_to_vpath_out_edit.setReadOnly(True)
+        self.ui.bt_extract.setEnabled(False)
+        self.ui.bt_extract.clicked.connect(self.slot_extract_clicked)
 
-        vhash_to_vpath_layout = QHBoxLayout()
-        vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_label)
-        vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_in_edit)
-        vhash_to_vpath_layout.addWidget(self.vhash_to_vpath_out_edit)
-        vhash_to_vpath_layout.setStretch(2, 1)
+        self.ui.bt_extract_gltf_3d.setEnabled(False)
+        self.ui.bt_extract_gltf_3d.clicked.connect(self.slot_extract_gltf_clicked)
 
-        self.chkbx_export_raw = QCheckBox()
-        self.chkbx_export_raw.setText('Export Raw Files')
-        self.chkbx_export_raw.setChecked(False)
+        self.ui.bt_mod_prep.setEnabled(False)
+        self.ui.bt_mod_prep.clicked.connect(self.slot_mod_prep_clicked)
 
-        self.chkbx_export_contents = QCheckBox()
-        self.chkbx_export_contents.setText('Export Contents of File')
-        self.chkbx_export_contents.setChecked(False)
-
-        self.chkbx_export_text = QCheckBox()
-        self.chkbx_export_text.setText('Export As Text')
-        self.chkbx_export_text.setChecked(False)
-
-        self.chkbx_export_processed = QCheckBox()
-        self.chkbx_export_processed.setText('Export Processed Files')
-        self.chkbx_export_processed.setChecked(True)
-
-        self.chkbx_export_save_to_one_dir = QCheckBox()
-        self.chkbx_export_save_to_one_dir.setText('Export Gltf To One Dir')
-        self.chkbx_export_save_to_one_dir.setChecked(False)
-
-        export_layout = QHBoxLayout()
-        export_layout.addWidget(self.chkbx_export_raw)
-        export_layout.addWidget(self.chkbx_export_contents)
-        export_layout.addWidget(self.chkbx_export_processed)
-        export_layout.addWidget(self.chkbx_export_text)
-        export_layout.addWidget(self.chkbx_export_save_to_one_dir)
-
-        self.bt_extract = QPushButton()
-        self.bt_extract.setEnabled(False)
-        self.bt_extract.setText('EXTRACT')
-        self.bt_extract.clicked.connect(self.bt_extract_clicked)
-
-        self.bt_extract_gltf_3d = QPushButton()
-        self.bt_extract_gltf_3d.setEnabled(False)
-        self.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2')
-        self.bt_extract_gltf_3d.clicked.connect(self.slot_extract_gltf_clicked)
-
-        self.bt_prep_mod = QPushButton()
-        self.bt_prep_mod.setEnabled(False)
-        self.bt_prep_mod.setText('PREP MOD')
-        self.bt_prep_mod.clicked.connect(self.bt_prep_mod_clicked)
-
-        self.bt_mod_build = QPushButton()
-        # self.bt_mod_build.setEnabled(False)
-        self.bt_mod_build.setText('BUILD MOD')
-        self.bt_mod_build.clicked.connect(self.bt_mod_build_clicked)
-
-        self.nav_layout = QVBoxLayout()
-        self.nav_layout.addWidget(self.nav_widget)
-        self.nav_layout.addLayout(filter_layout)
-        self.nav_layout.addLayout(vhash_to_vpath_layout)
-        self.nav_layout.addLayout(export_layout)
-        self.nav_layout.addWidget(self.bt_extract)
-        self.nav_layout.addWidget(self.bt_extract_gltf_3d)
-        self.nav_layout.addWidget(self.bt_prep_mod)
-        self.nav_layout.addWidget(self.bt_mod_build)
-
-        # Creating Data View
-        self.data_view = DataViewWidget()
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        # size.setHorizontalStretch(1)
-        self.data_view.setSizePolicy(size)
-        # self.data_view.updateGeometry()
-
-        # QWidget Layout
-        self.main_layout = QHBoxLayout()
-        self.main_layout.addLayout(self.nav_layout, stretch=1)
-        self.main_layout.addWidget(self.data_view, stretch=1)
-        self.setLayout(self.main_layout)
-        self.updateGeometry()
+        self.ui.bt_mod_build.clicked.connect(self.slot_mod_build_clicked)
 
     def vfs_set(self, vfs):
         self.vfs = vfs
-        self.vfs_node_widget.vfs_set(self.vfs)
-        self.vfs_node_widget_non_mapped.vfs_set(self.vfs)
-        self.vfs_dir_widget.vfs_set(self.vfs)
-        self.data_view.vfs_set(self.vfs)
+        self.setWindowTitle(
+            "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_info.game_dir))
+        self.ui.statusbar.showMessage("LOAD COMPLETE")
+        self.ui.vfs_node_widget.vfs_set(self.vfs)
+        self.ui.vfs_node_widget_non_mapped.vfs_set(self.vfs)
+        self.ui.vfs_dir_widget.vfs_set(self.vfs)
+        self.ui.data_view.vfs_set(self.vfs)
+        self.ui.action_external_add.setEnabled(True)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -798,14 +112,14 @@ class MainWidget(QWidget):
     def vnode_selection_changed(self, vpaths):
         self.current_vpaths = vpaths
         if self.current_vpaths is None or len(self.current_vpaths) == 0:
-            self.bt_extract.setEnabled(False)
-            self.bt_extract_gltf_3d.setEnabled(False)
-            self.bt_prep_mod.setEnabled(False)
+            self.ui.bt_extract.setEnabled(False)
+            self.ui.bt_extract_gltf_3d.setEnabled(False)
+            self.ui.bt_mod_prep.setEnabled(False)
             str_vpaths = ''
         else:
-            self.bt_extract.setEnabled(True)
-            self.bt_extract_gltf_3d.setEnabled(True)
-            self.bt_prep_mod.setEnabled(True)
+            self.ui.bt_extract.setEnabled(True)
+            self.ui.bt_extract_gltf_3d.setEnabled(True)
+            self.ui.bt_mod_prep.setEnabled(True)
 
             if len(self.current_vpaths) == 1:
                 if isinstance(vpaths[0], bytes):
@@ -815,30 +129,27 @@ class MainWidget(QWidget):
             else:
                 str_vpaths = '**MULTIPLE**'
 
-        self.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
-        self.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
-        self.bt_prep_mod.setText('PREP MOD: {}'.format(str_vpaths))
+        self.ui.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
+        self.ui.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
+        self.ui.bt_mod_prep.setText('PREP MOD: {}'.format(str_vpaths))
 
-        self.data_view.vnode_selection_changed(vpaths)
+        self.ui.data_view.vnode_selection_changed(vpaths)
 
     def vnode_2click_selected(self, vnode: VfsNode):
         self.current_vnode = vnode
-        self.data_view.vnode_2click_selected(vnode)
+        self.ui.data_view.vnode_2click_selected(vnode)
         # if self.current_vnode is not None:
-        #     self.bt_extract.setText('EXTRACT: {}'.format(vnode.v_path))
-        #     self.bt_extract.setEnabled(True)
+        #     self.ui.bt_extract.setText('EXTRACT: {}'.format(vnode.v_path))
+        #     self.ui.bt_extract.setEnabled(True)
 
-    def extract(self, eid, extract_dir):
+    def extract(self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text):
         if self.current_vpaths:
             try:
-                if self.chkbx_export_raw.isChecked():
+                if export_raw:
                     nodes_export_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
 
-                if self.chkbx_export_contents.isChecked():
+                if export_contents:
                     nodes_export_contents(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
-
-                save_to_text = self.chkbx_export_text.isChecked()
-                save_to_processed = self.chkbx_export_processed.isChecked()
 
                 nodes_export_processed(
                     self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
@@ -849,11 +160,9 @@ class MainWidget(QWidget):
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
-    def extract_gltf(self, eid, extract_dir):
+    def extract_gltf(self, eid, extract_dir, save_to_one_dir):
         if self.current_vpaths:
             try:
-                save_to_one_dir = self.chkbx_export_save_to_one_dir.isChecked()
-
                 nodes_export_gltf(
                     self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
                     allow_overwrite=False,
@@ -862,16 +171,33 @@ class MainWidget(QWidget):
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
-    def bt_extract_clicked(self, checked):
-        self.extract('Extraction', self.vfs.working_dir + 'extracted/')
-
-    def bt_prep_mod_clicked(self, checked):
-        self.extract('Mod Prep', self.vfs.working_dir + 'mod/')
+    def slot_extract_clicked(self, checked):
+        self.extract(
+            'Extraction', self.vfs.working_dir + 'extracted/',
+            export_raw=self.ui.chkbx_export_raw_extract.isChecked(),
+            export_contents=self.ui.chkbx_export_contents_extract.isChecked(),
+            save_to_processed=self.ui.chkbx_export_processed_extract.isChecked(),
+            save_to_text=self.ui.chkbx_export_text_extract.isChecked(),
+        )
 
     def slot_extract_gltf_clicked(self, checked):
-        self.extract_gltf('GLTF2 / 3D', self.vfs.working_dir + 'gltf2_3d/')
 
-    def bt_mod_build_clicked(self, checked):
+
+        self.extract_gltf(
+            'GLTF2 / 3D', self.vfs.working_dir + 'gltf2_3d/',
+            save_to_one_dir=self.ui.chkbx_export_save_to_one_dir.isChecked(),
+        )
+
+    def slot_mod_prep_clicked(self, checked):
+        self.extract(
+            'Mod Prep', self.vfs.working_dir + 'mod/',
+            export_raw=self.ui.chkbx_export_raw_mods.isChecked(),
+            export_contents=self.ui.chkbx_export_contents_mods.isChecked(),
+            save_to_processed=self.ui.chkbx_export_processed_mods.isChecked(),
+            save_to_text=False,
+        )
+
+    def slot_mod_build_clicked(self, checked):
         try:
             self.builder.build_dir(self.vfs, self.vfs.working_dir + 'mod/', self.vfs.working_dir + 'build/')
             self.dialog_good('BUILD SUCCESS')
@@ -891,7 +217,7 @@ class MainWidget(QWidget):
                 txt = txt + '$'
 
         self.filter_mask = txt.encode('ascii')
-        self.vfs_dir_widget.filter_vfspath_set(txt)
+        self.ui.vfs_dir_widget.filter_vfspath_set(txt)
 
     def vhash_to_vpath_text_changed(self):
         txt_in = self.vhash_to_vpath_in_edit.text()
@@ -908,78 +234,6 @@ class MainWidget(QWidget):
                 pass
 
         self.vhash_to_vpath_out_edit.setText(txt_out)
-
-
-# ********************
-class MainWindow(QMainWindow):
-    def __init__(self):
-        QMainWindow.__init__(self)
-        self.vfs = None
-
-        # Menu
-        self.menu = self.menuBar()
-        self.file_menu = self.menu.addMenu('&File')
-        self.edit_menu = self.menu.addMenu('&Edit')
-        self.tools_menu = self.menu.addMenu('&Tools')
-
-        self.action_project_new = QAction("&New Project...")
-        self.action_project_new.triggered.connect(self.project_new)
-        self.file_menu.addAction(self.action_project_new)
-
-        self.action_project_open = QAction("&Open Project...")
-        self.action_project_open.triggered.connect(self.project_open)
-        self.file_menu.addAction(self.action_project_open)
-
-        self.action_external_add = QAction("&Add External...")
-        self.action_external_add.triggered.connect(self.external_add)
-        self.action_external_add.setEnabled(False)
-        self.file_menu.addAction(self.action_external_add)
-
-        # self.action_external_manage = QAction("Manage &Externals...")
-        # self.action_external_manage.triggered.connect(self.external_manage)
-        # self.file_menu.addAction(self.action_external_manage)
-
-        self.action_exit = QAction("E&xit", self)
-        self.action_exit.setShortcut("Ctrl+Q")
-        self.action_exit.triggered.connect(self.exit_app)
-        self.file_menu.addAction(self.action_exit)
-
-        self.action_make_web_map = QAction("Make &Web Map")
-        self.action_make_web_map.triggered.connect(self.tool_make_web_map)
-        self.tools_menu.addAction(self.action_make_web_map)
-
-        # Status Bar
-        self.status = self.statusBar()
-
-        # # Window dimensions
-        # geometry = app.desktop().availv_pableGeometry(self)
-        # self.setFixedSize(geometry.width() * 0.8, geometry.height() * 0.7)
-
-        self.main_widget = MainWidget()
-
-        # class WidgetLogger(Logger):
-        #     def __init__(self, wdir, log_widget):
-        #         Logger.__init__(self, wdir)
-        #         self.log_widget = log_widget
-        #
-        #     def log_base(self, level, s):
-        #         msg = Logger.log_base(self, level, s)
-        #         if level <= 0:
-        #             self.log_widget.append(msg)
-        #             self.log_widget.repaint()
-        # self.logger = WidgetLogger('./', self.main_widget.log_widget)
-
-        self.logger = Logger('./')
-
-        self.setCentralWidget(self.main_widget)
-
-    def vfs_set(self, vfs):
-        self.vfs = vfs
-        self.setWindowTitle(
-            "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_info.game_dir))
-        self.status.showMessage("LOAD COMPLETE")
-        self.main_widget.vfs_set(vfs)
-        self.action_external_add.setEnabled(True)
 
     @Slot()
     def project_new(self, checked):
@@ -1036,11 +290,8 @@ def main():
 
     # Qt Application
     app = QApplication(sys.argv)
-
     window = MainWindow()
-
     window.show()
-
     app.exec_()
 
     return window.vfs

@@ -761,8 +761,10 @@ class Processor:
                                     possible_ftypes = ftype_list[FTYPE_ANY_TYPE]
 
                                 if (ftype_int & possible_ftypes) != 0:
-                                    self._comm.trace('v_path:add  {} {} {} {} {}'.format(
-                                        node.v_hash_to_str(), v_path, node.file_type, possible_ftypes, src_node))
+                                    # TODO this is diabled because it can cause a lot of traffic back to the main thread
+                                    #  RAGE2 has 1.7 million nodes
+                                    # self._comm.trace('v_path:add  {} {} {} {} {}'.format(
+                                    #     node.v_hash_to_str(), v_path, node.file_type, possible_ftypes, src_node))
                                     node.v_path = v_path
                                     updated = True
                                     break

@@ -116,10 +116,10 @@ class VfsNodeTableModel(QAbstractTableModel):
                     else:
                         return '{:08X}'.format(node.ext_hash)
                 elif column == 5:
-                    if node.adf_type is None:
+                    if node.file_sub_type is None:
                         return ''
                     else:
-                        return '{:08X}'.format(node.adf_type)
+                        return '{:08X}'.format(node.file_sub_type)
                 elif column == 6:
                     return '{}'.format(node.size_u)
                 elif column == 7:
@@ -140,7 +140,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                     if node.used_at_runtime_depth is not None:
                         return used_color_calc(node.used_at_runtime_depth)
                 elif column == 5:
-                    if node.adf_type is not None and node.adf_type not in self.adf_db.type_map_def:
+                    if node.file_sub_type is not None and node.file_sub_type not in self.adf_db.type_map_def:
                         return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:

@@ -3,7 +3,7 @@
 # Form implementation generated from reading ui file 'main_window.ui',
 # licensing of 'main_window.ui' applies.
 #
-# Created: Wed Feb 12 01:26:06 2020
+# Created: Wed Feb 12 01:52:31 2020
 #      by: pyside2-uic  running on PySide2 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
@@ -13,7 +13,7 @@ from PySide2 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(841, 636)
+        MainWindow.resize(617, 599)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.centralwidget)
@@ -95,6 +95,9 @@ class Ui_MainWindow(object):
         self.chkbx_export_text_extract = QtWidgets.QCheckBox(self.tab_extract)
         self.chkbx_export_text_extract.setObjectName("chkbx_export_text_extract")
         self.gridLayout.addWidget(self.chkbx_export_text_extract, 1, 0, 1, 1)
+        self.chkbx_export_contents_extract = QtWidgets.QCheckBox(self.tab_extract)
+        self.chkbx_export_contents_extract.setObjectName("chkbx_export_contents_extract")
+        self.gridLayout.addWidget(self.chkbx_export_contents_extract, 5, 0, 1, 1)
         self.bt_extract = QtWidgets.QPushButton(self.tab_extract)
         self.bt_extract.setObjectName("bt_extract")
         self.gridLayout.addWidget(self.bt_extract, 0, 1, 1, 1)
@@ -106,16 +109,18 @@ class Ui_MainWindow(object):
         self.chkbx_export_processed_extract = QtWidgets.QCheckBox(self.tab_extract)
         self.chkbx_export_processed_extract.setObjectName("chkbx_export_processed_extract")
         self.gridLayout.addWidget(self.chkbx_export_processed_extract, 4, 0, 1, 1)
-        self.chkbx_export_contents_extract = QtWidgets.QCheckBox(self.tab_extract)
-        self.chkbx_export_contents_extract.setObjectName("chkbx_export_contents_extract")
-        self.gridLayout.addWidget(self.chkbx_export_contents_extract, 5, 0, 1, 1)
+        spacerItem1 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.gridLayout.addItem(spacerItem1, 0, 2, 1, 1)
         self.tabs_control.addTab(self.tab_extract, "")
         self.tab_modding = QtWidgets.QWidget()
         self.tab_modding.setObjectName("tab_modding")
         self.gridLayout_3 = QtWidgets.QGridLayout(self.tab_modding)
         self.gridLayout_3.setObjectName("gridLayout_3")
-        spacerItem1 = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.gridLayout_3.addItem(spacerItem1, 3, 0, 1, 1)
+        self.chkbx_export_contents_mods = QtWidgets.QCheckBox(self.tab_modding)
+        self.chkbx_export_contents_mods.setObjectName("chkbx_export_contents_mods")
+        self.gridLayout_3.addWidget(self.chkbx_export_contents_mods, 2, 0, 1, 1)
+        spacerItem2 = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.gridLayout_3.addItem(spacerItem2, 3, 0, 1, 1)
         self.bt_mod_build = QtWidgets.QPushButton(self.tab_modding)
         self.bt_mod_build.setObjectName("bt_mod_build")
         self.gridLayout_3.addWidget(self.bt_mod_build, 1, 1, 1, 1)
@@ -128,9 +133,8 @@ class Ui_MainWindow(object):
         self.chkbx_export_processed_mods = QtWidgets.QCheckBox(self.tab_modding)
         self.chkbx_export_processed_mods.setObjectName("chkbx_export_processed_mods")
         self.gridLayout_3.addWidget(self.chkbx_export_processed_mods, 1, 0, 1, 1)
-        self.chkbx_export_contents_mods = QtWidgets.QCheckBox(self.tab_modding)
-        self.chkbx_export_contents_mods.setObjectName("chkbx_export_contents_mods")
-        self.gridLayout_3.addWidget(self.chkbx_export_contents_mods, 2, 0, 1, 1)
+        spacerItem3 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.gridLayout_3.addItem(spacerItem3, 0, 2, 1, 1)
         self.tabs_control.addTab(self.tab_modding, "")
         self.tab_2 = QtWidgets.QWidget()
         self.tab_2.setObjectName("tab_2")
@@ -139,11 +143,13 @@ class Ui_MainWindow(object):
         self.chkbx_export_save_to_one_dir = QtWidgets.QCheckBox(self.tab_2)
         self.chkbx_export_save_to_one_dir.setObjectName("chkbx_export_save_to_one_dir")
         self.gridLayout_2.addWidget(self.chkbx_export_save_to_one_dir, 0, 0, 1, 1)
+        spacerItem4 = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.gridLayout_2.addItem(spacerItem4, 1, 0, 1, 1)
         self.bt_extract_gltf_3d = QtWidgets.QPushButton(self.tab_2)
         self.bt_extract_gltf_3d.setObjectName("bt_extract_gltf_3d")
         self.gridLayout_2.addWidget(self.bt_extract_gltf_3d, 0, 1, 1, 1)
-        spacerItem2 = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.gridLayout_2.addItem(spacerItem2, 1, 0, 1, 1)
+        spacerItem5 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.gridLayout_2.addItem(spacerItem5, 0, 2, 1, 1)
         self.tabs_control.addTab(self.tab_2, "")
         self.verticalLayout.addWidget(self.tabs_control)
         self.verticalLayout.setStretch(0, 1)
@@ -152,7 +158,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addWidget(self.splitter)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 841, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 617, 22))
         self.menubar.setObjectName("menubar")
         self.menu_File = QtWidgets.QMenu(self.menubar)
         self.menu_File.setObjectName("menu_File")
@@ -198,16 +204,16 @@ class Ui_MainWindow(object):
         self.vhash_to_vpath_label.setText(QtWidgets.QApplication.translate("MainWindow", "VHash -> VPath", None, -1))
         self.vhash_to_vpath_in_edit.setText(QtWidgets.QApplication.translate("MainWindow", "0", None, -1))
         self.chkbx_export_text_extract.setText(QtWidgets.QApplication.translate("MainWindow", "Export As Text", None, -1))
+        self.chkbx_export_contents_extract.setText(QtWidgets.QApplication.translate("MainWindow", "Export Contents", None, -1))
         self.bt_extract.setText(QtWidgets.QApplication.translate("MainWindow", "EXTRACT", None, -1))
         self.chkbx_export_raw_extract.setText(QtWidgets.QApplication.translate("MainWindow", "Export Raw Files", None, -1))
         self.chkbx_export_processed_extract.setText(QtWidgets.QApplication.translate("MainWindow", "Export As Processed", None, -1))
-        self.chkbx_export_contents_extract.setText(QtWidgets.QApplication.translate("MainWindow", "Export Contents", None, -1))
         self.tabs_control.setTabText(self.tabs_control.indexOf(self.tab_extract), QtWidgets.QApplication.translate("MainWindow", "Extract", None, -1))
+        self.chkbx_export_contents_mods.setText(QtWidgets.QApplication.translate("MainWindow", "Export Contents", None, -1))
         self.bt_mod_build.setText(QtWidgets.QApplication.translate("MainWindow", "Build Modded Files", None, -1))
         self.chkbx_export_raw_mods.setText(QtWidgets.QApplication.translate("MainWindow", "Export Raw Files", None, -1))
         self.bt_mod_prep.setText(QtWidgets.QApplication.translate("MainWindow", "Extract For Modding", None, -1))
         self.chkbx_export_processed_mods.setText(QtWidgets.QApplication.translate("MainWindow", "Export As Processed", None, -1))
-        self.chkbx_export_contents_mods.setText(QtWidgets.QApplication.translate("MainWindow", "Export Contents", None, -1))
         self.tabs_control.setTabText(self.tabs_control.indexOf(self.tab_modding), QtWidgets.QApplication.translate("MainWindow", "Modding", None, -1))
         self.chkbx_export_save_to_one_dir.setText(QtWidgets.QApplication.translate("MainWindow", "Save To One Directory", None, -1))
         self.bt_extract_gltf_3d.setText(QtWidgets.QApplication.translate("MainWindow", "EXPORT 3D/GLTF2", None, -1))
@@ -222,6 +228,6 @@ class Ui_MainWindow(object):
         self.action_exit.setShortcut(QtWidgets.QApplication.translate("MainWindow", "Ctrl+Q", None, -1))
         self.action_make_web_map.setText(QtWidgets.QApplication.translate("MainWindow", "Make &Web Map...", None, -1))
 
-from .vfsnodetablewidget import VfsNodeTableWidget
-from .dataviewwidget import DataViewWidget
 from .vfsdirwidget import VfsDirWidget
+from .dataviewwidget import DataViewWidget
+from .vfsnodetablewidget import VfsNodeTableWidget

@@ -157,10 +157,10 @@ class VfsDirModel(QAbstractItemModel):
                     else:
                         return '{:08x}'.format(vnode.ext_hash)
                 elif column == 5:
-                    if vnode.adf_type is None:
+                    if vnode.file_sub_type is None:
                         return ''
                     else:
-                        return '{:08x}'.format(vnode.adf_type)
+                        return '{:08x}'.format(vnode.file_sub_type)
                 elif column == 6:
                     return '{}'.format(vnode.size_u)
                 elif column == 7:
@@ -175,7 +175,7 @@ class VfsDirModel(QAbstractItemModel):
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
                 elif column == 5:
-                    if vnode.adf_type is not None and vnode.adf_type not in self.adf_db.type_map_def:
+                    if vnode.file_sub_type is not None and vnode.file_sub_type not in self.adf_db.type_map_def:
                         return QColor(Qt.red)
         return None
 

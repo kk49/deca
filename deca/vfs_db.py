@@ -54,16 +54,20 @@ def common_prefix(s0, s1):
     return s0[:cnt], s0[cnt:], s1[cnt:]
 
 
-compression_type_mask = 0xFF
-compression_type_shift = 0
-compression_flag_mask = 0xFF00
-compression_flag_shift = 8
-v_hash_type_mask = 0x0030000
-v_hash_type_4 = 0x0010000
-v_hash_type_6 = 0x0020000
-v_hash_type_8 = 0x0030000
-is_processed_file_mask = 1 << 20
-is_temporary_file_mask = 1 << 21
+node_flag_compression_type_mask = 0xFF
+node_flag_compression_type_shift = 0
+node_flag_compression_flag_mask = 0xFF00
+node_flag_compression_flag_shift = 8
+node_flag_v_hash_type_mask = 0x0030000
+node_flag_v_hash_type_4 = 0x0010000
+node_flag_v_hash_type_6 = 0x0020000
+node_flag_v_hash_type_8 = 0x0030000
+node_flag_temporary_file = 1 << 20
+node_flag_is_processed_file_mask = 1 << 21
+# future
+node_flag_processed_file_determine_type = 1 << 21
+node_flag_processed_file_by_type = 1 << 22
+node_flag_processed_file_specific_file = 1 << 23
 
 
 def format_hash32(v_hash):
@@ -91,7 +95,7 @@ class VfsNode:
         'v_path',
         'p_path',
         'file_type',
-        'adf_type',
+        'file_sub_type',
         'ext_hash',
         'magic',
         'pid',
@@ -109,7 +113,7 @@ class VfsNode:
             v_hash=None, p_path=None, v_path=None,
             pid=None, index=None,
             offset=None, size_c=None, size_u=None,
-            adf_type=None, ext_hash=None, magic=None,
+            file_sub_type=None, ext_hash=None, magic=None,
             is_processed_file=False,
             is_temporary_file=False,
             compression_type=0,
@@ -117,14 +121,14 @@ class VfsNode:
             blocks=None,
             flags=None,
             used_at_runtime_depth=None,
-            v_hash_type=v_hash_type_4,
+            v_hash_type=node_flag_v_hash_type_4,
     ):
         self.uid = uid
         self.v_hash = v_hash
         self.v_path = v_path
         self.p_path = p_path
         self.file_type = file_type
-        self.adf_type = adf_type
+        self.file_sub_type = file_sub_type
         self.ext_hash = ext_hash
         self.magic = magic
 
@@ -138,14 +142,14 @@ class VfsNode:
 
         if flags is None:
             self.flags = 0
-            self.flags |= (compression_type << compression_type_shift) & compression_type_mask
-            self.flags |= (compression_flag << compression_flag_shift) & compression_flag_mask
+            self.flags |= (compression_type << node_flag_compression_type_shift) & node_flag_compression_type_mask
+            self.flags |= (compression_flag << node_flag_compression_flag_shift) & node_flag_compression_flag_mask
             if is_processed_file:
-                self.flags = self.flags | is_processed_file_mask
+                self.flags = self.flags | node_flag_is_processed_file_mask
             if is_temporary_file:
-                self.flags = self.flags | is_temporary_file_mask
+                self.flags = self.flags | node_flag_temporary_file
 
-            self.flags = (self.flags & ~v_hash_type_mask) | v_hash_type
+            self.flags = (self.flags & ~node_flag_v_hash_type_mask) | v_hash_type
 
             # make sure type and flag was saved properly
             assert self.compression_type_get() == compression_type
@@ -166,32 +170,32 @@ class VfsNode:
         self.flags = (self.flags & ~bit) | value
 
     def compression_type_get(self):
-        return (self.flags & compression_type_mask) >> compression_type_shift
+        return (self.flags & node_flag_compression_type_mask) >> node_flag_compression_type_shift
 
     def compression_type_set(self, value):
         self.flags = \
-            (self.flags & ~compression_type_mask) | \
-            ((value << compression_type_shift) & compression_type_mask)
+            (self.flags & ~node_flag_compression_type_mask) | \
+            ((value << node_flag_compression_type_shift) & node_flag_compression_type_mask)
 
     def compression_flag_get(self):
-        return (self.flags & compression_flag_mask) >> compression_flag_shift
+        return (self.flags & node_flag_compression_flag_mask) >> node_flag_compression_flag_shift
 
     def compression_flag_set(self, value):
         self.flags = \
-            (self.flags & ~compression_flag_mask) | \
-            ((value << compression_flag_shift) & compression_flag_mask)
+            (self.flags & ~node_flag_compression_flag_mask) | \
+            ((value << node_flag_compression_flag_shift) & node_flag_compression_flag_mask)
 
     def processed_file_get(self):
-        return self.flags_get(is_processed_file_mask)
+        return self.flags_get(node_flag_is_processed_file_mask)
 
     def processed_file_set(self, value):
-        self.flags_set(is_processed_file_mask, value)
+        self.flags_set(node_flag_is_processed_file_mask, value)
 
     def temporary_file_get(self):
-        return self.flags_get(is_temporary_file_mask)
+        return self.flags_get(node_flag_temporary_file)
 
     def temporary_file_set(self, value):
-        self.flags_set(is_temporary_file_mask, value)
+        self.flags_set(node_flag_temporary_file, value)
 
     def is_valid(self):
         return self.uid is not None and self.uid != 0
@@ -211,12 +215,12 @@ class VfsNode:
         return ' '.join(info)
 
     def v_hash_to_str(self):
-        hash_type = self.flags & v_hash_type_mask
-        if hash_type == v_hash_type_4:
+        hash_type = self.flags & node_flag_v_hash_type_mask
+        if hash_type == node_flag_v_hash_type_4:
             return format_hash32(self.v_hash)
-        elif hash_type == v_hash_type_6:
+        elif hash_type == node_flag_v_hash_type_6:
             return format_hash48(self.v_hash)
-        elif hash_type == v_hash_type_8:
+        elif hash_type == node_flag_v_hash_type_8:
             return format_hash64(self.v_hash)
         else:
             raise NotImplementedError('hash_type not handled: {:016x}'.format(np.uint64(self.flags)))
@@ -238,7 +242,7 @@ core_vnodes_definition = \
         "ext_hash" INTEGER,
         "size_c" INTEGER,
         "size_u" INTEGER,
-        "adf_type" INTEGER,
+        "file_sub_type" INTEGER,
         "used_at_runtime_depth" INTEGER,
         PRIMARY KEY("uid")
     )
@@ -259,7 +263,7 @@ core_vnodes_update_all_where_uid = \
     ext_hash=(?),
     size_c=(?),
     size_u=(?),
-    adf_type=(?),
+    file_sub_type=(?),
     used_at_runtime_depth=(?)
     WHERE uid=(?)
     """
@@ -284,7 +288,7 @@ def db_to_vfs_node(v):
         ext_hash=v[10],
         size_c=v[11],
         size_u=v[12],
-        adf_type=v[13],
+        file_sub_type=v[13],
         used_at_runtime_depth=v[14],
     )
     return node
@@ -305,7 +309,7 @@ def db_from_vfs_node(node: VfsNode):
         node.ext_hash,
         node.size_c,
         node.size_u,
-        node.adf_type,
+        node.file_sub_type,
         node.used_at_runtime_depth,
     )
     return v
@@ -326,13 +330,13 @@ class VfsDatabase:
             self.file_hash_db_id = 'hash32'
             self.file_hash = hash32_func
             self.file_hash_format = format_hash32
-            self.file_hash_type = v_hash_type_4
+            self.file_hash_type = node_flag_v_hash_type_4
             self.ext_hash = hash32_func
         elif 8 == self.game_info.file_hash_size:
             self.file_hash_db_id = 'hash64'
             self.file_hash = hash64_func
             self.file_hash_format = format_hash64
-            self.file_hash_type = v_hash_type_8
+            self.file_hash_type = node_flag_v_hash_type_8
             self.ext_hash = hash32_func
         else:
             raise NotImplementedError('File Hash Size of {} Not Implemented'.format(self.game_info.file_hash_size))
@@ -637,17 +641,17 @@ class VfsDatabase:
         return [uid[0] for uid in uids]
 
     def nodes_where_processed_select_uid(self, processed):
-        mask = is_processed_file_mask
+        mask = node_flag_is_processed_file_mask
         if processed:
-            value = is_processed_file_mask
+            value = node_flag_is_processed_file_mask
         else:
             value = 0
         return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_processed_select_uid')
 
     def nodes_where_temporary_select_uid(self, temporary):
-        mask = is_temporary_file_mask
+        mask = node_flag_temporary_file
         if temporary:
-            value = is_temporary_file_mask
+            value = node_flag_temporary_file
         else:
             value = 0
         return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_temporary_select_uid')
@@ -656,27 +660,27 @@ class VfsDatabase:
         if file_type is None:
             results = self.db_query_all(
                 "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where file_type IS NULL",
-                [is_processed_file_mask, is_processed_file_mask],
+                [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask],
                 dbg='nodes_where_f_type_select_uid_v_hash_processed')
 
         else:
             results = self.db_query_all(
                 "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where file_type == (?)",
-                [is_processed_file_mask, is_processed_file_mask, file_type],
+                [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, file_type],
                 dbg='nodes_where_f_type_select_uid_v_hash_processed')
         return results
 
     def nodes_where_v_hash_select_uid_v_hash_processed(self, v_hash):
         results = self.db_query_all(
             "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where (v_hash == (?)) and (offset not null)",
-            [is_processed_file_mask, is_processed_file_mask, v_hash],
+            [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, v_hash],
             dbg='nodes_where_v_hash_select_uid_v_hash_processed')
         return results
 
     def nodes_where_ext_hash_select_uid_v_hash_processed(self, ext_hash):
         results = self.db_query_all(
             "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where (ext_hash == (?)) and (offset not null)",
-            [is_processed_file_mask, is_processed_file_mask, ext_hash],
+            [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, ext_hash],
             dbg='nodes_where_ext_hash_select_uid_v_hash_processed')
         return results
 
@@ -686,7 +690,7 @@ class VfsDatabase:
         suffix = '%' + suffix
         results = self.db_query_all(
             "select uid, v_hash, ((flags & (?)) == (?)) from core_vnodes where (v_path LIKE (?)) and (offset not null)",
-            [is_processed_file_mask, is_processed_file_mask, suffix],
+            [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, suffix],
             dbg='nodes_where_vpath_endswith_select_uid_v_hash_processed')
         return results
 
@@ -1228,7 +1232,7 @@ class VfsDatabase:
             with ArchiveFile(self.file_obj_from(node)) as f:
                 _ = f.read_u32()  # magic
                 adf_type = f.read_u32()
-            node.adf_type = adf_type
+            node.file_sub_type = adf_type
 
 
 '''

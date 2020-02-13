@@ -10,7 +10,7 @@ import numpy as np
 import deca.ff_rtpc
 
 from .file import ArchiveFile
-from .vfs_db import VfsDatabase, VfsNode, language_codes, v_hash_type_4, v_hash_type_8
+from .vfs_db import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
 from .db_wrap import DbWrap
 from .db_types import *
 from .ff_types import *
@@ -402,7 +402,7 @@ class Processor:
                     v_hash_type=db.file_hash_type,
                     v_hash=entry.v_hash, pid=node.uid, index=entry.index,
                     offset=entry.offset, size_c=entry.size, size_u=entry.size, v_path=entry.v_path,
-                    file_type=file_type, adf_type=adf_type)
+                    file_type=file_type, file_sub_type=adf_type)
                 db.node_add(cnode)
                 db.propose_string(cnode.v_path, node)
 
@@ -726,9 +726,9 @@ class Processor:
     def process_vhash_final(self, v_hash_in, db: DbWrap):
         nodes = db.db().nodes_where_match(v_hash=v_hash_in)
 
-        if db.file_hash_type == v_hash_type_4:
+        if db.file_hash_type == node_flag_v_hash_type_4:
             hash_strings = db.db().hash_string_match(hash32=v_hash_in)
-        elif db.file_hash_type == v_hash_type_8:
+        elif db.file_hash_type == node_flag_v_hash_type_8:
             hash_strings = db.db().hash_string_match(hash64=v_hash_in)
         else:
             raise NotImplementedError('Unhandled Hash Type {}'.format(db.file_hash_type))

@@ -1031,12 +1031,12 @@ class AdfDatabase:
 
         try:
             if node.file_type == FTYPE_ADF_BARE:
-                adf = self._load_adf_bare(buffer, node.adf_type, node.offset, node.size_u)
+                adf = self._load_adf_bare(buffer, node.file_sub_type, node.offset, node.size_u)
             elif node.file_type == FTYPE_ADF0:
-                if node.adf_type is None:
+                if node.file_sub_type is None:
                     adf_type = struct.unpack('I', buffer[4:8])[0]
                 else:
-                    adf_type = node.adf_type
+                    adf_type = node.file_sub_type
                 skip = 8  # skip magic and type id
                 adf = self._load_adf_bare(buffer[skip:], adf_type, 0, node.size_u - skip)
             else:

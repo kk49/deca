@@ -85,9 +85,6 @@ def determine_file_type_and_size(f, file_size):
         ftype = FTYPE_BINK_BIK
     elif b'GT0C' == magic[0:4]:
         ftype = FTYPE_GT0C
-    # ATX file format was a guess by size
-    # elif file_size in raw_image_size:
-    #     ftype = FTYPE_ATX
 
     # need to inspect file structure
 
@@ -100,12 +97,12 @@ def determine_file_type_and_size(f, file_size):
         if ver == 4 and cnt * 80 + 8 == file_size:
             ftype = FTYPE_OBC
 
-        if ftype is None:  # text file only contains text bytes, json, xml, ...
-            fm.seek(start_pos)
-            counts = file_stats(fm, file_size)
-            all_sum = np.sum(counts)
-            pri_sum = np.sum(counts[[9, 10, 13] + list(range(20, 128))])
-            if all_sum == pri_sum:
-                ftype = FTYPE_TXT
+    if ftype is None:  # text file only contains text bytes, json, xml, ...
+        fm.seek(start_pos)
+        counts = file_stats(fm, file_size)
+        all_sum = np.sum(counts)
+        pri_sum = np.sum(counts[[9, 10, 13] + list(range(20, 128))])
+        if all_sum == pri_sum:
+            ftype = FTYPE_TXT
 
     return ftype, fsize, magic_int

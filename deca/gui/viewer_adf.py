@@ -29,7 +29,7 @@ class DataViewerAdf(DataViewer):
             obj = None
 
         if obj is None:
-            sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.adf_type)
+            sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x}'.format(vnode.file_sub_type)
         else:
             sbuf = obj.dump_to_string(vfs)
 

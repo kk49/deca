@@ -1,5 +1,5 @@
 import os
-from .vfs_db import VfsDatabase, v_hash_type_8, v_hash_type_6, GtocArchiveEntry
+from .vfs_db import VfsDatabase, node_flag_v_hash_type_8, node_flag_v_hash_type_6, GtocArchiveEntry
 from .ff_adf import AdfDatabase
 from .ff_types import *
 from .db_types import *

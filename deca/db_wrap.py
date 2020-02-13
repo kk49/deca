@@ -121,6 +121,12 @@ class DbWrap:
 
         self._string_hash_to_add.append(rec)
 
+        # find substrings
+        substrings = string.split(b',')
+        for substring in substrings:
+            if substring != string:
+                self.propose_string(substring.strip(), parent_node, is_field_name, possible_file_types, used_at_runtime, fix_paths)
+
         return rec
 
     def gtoc_archive_add(self, archive):

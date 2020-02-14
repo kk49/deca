@@ -1,5 +1,10 @@
 ```
-select * from core_vnodes where uid in (
-    select src_node from core_hash_string_references where hash_row_id in (
-		select rowid from core_hash_strings where string like "%gnome%")) ORDER by v_path
+SELECT * FROM core_nodes WHERE node_id IN (
+    SELECT node_id_src FROM core_string_references WHERE string_rowid IN (
+		SELECT rowid FROM core_strings WHERE string LIKE "%gnome%")) ORDER BY v_path
+
+
+SELECT v_path FROM core_nodes WHERE node_id IN 
+    (SELECT node_id_src FROM core_string_references WHERE string_rowid IN 
+        (SELECT rowid FROM core_strings WHERE string LIKE "%flash%"))
 ```

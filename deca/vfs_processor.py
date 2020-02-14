@@ -234,15 +234,15 @@ class VfsProcessor(VfsDatabase):
 
         db_id = self.file_hash_db_id
 
-        q = f"SELECT DISTINCT {db_id}, COUNT(*) c FROM core_hash_strings GROUP BY {db_id} HAVING c > 1;"
+        q = f"SELECT DISTINCT {db_id}, COUNT(*) c FROM core_strings GROUP BY {db_id} HAVING c > 1;"
         dup_hash = self.db_query_all(q)
         for v_hash, c in dup_hash:
-            q = f"SELECT DISTINCT {db_id}, string FROM core_hash_strings WHERE {db_id} = (?)"
+            q = f"SELECT DISTINCT {db_id}, string FROM core_strings WHERE {db_id} = (?)"
             hashes = self.db_query_all(q, [v_hash])
             fcs = []
             gtz_count = 0
             for h, s in hashes:
-                q = "SELECT DISTINCT uid FROM core_vnodes WHERE v_path = (?)"
+                q = "SELECT DISTINCT node_id FROM core_nodes WHERE v_path = (?)"
                 nodes = self.db_query_all(q, [s])
                 fc = len(nodes)
                 self.logger.log('SUMMARY: Duplicate FileName Hashes: {} {}: {} nodes'.format(
@@ -258,7 +258,7 @@ class VfsProcessor(VfsDatabase):
                     ))
 
         # nodes with same hash but different paths, rare
-        q = "SELECT DISTINCT v_hash, v_path, COUNT(*) c FROM core_vnodes GROUP BY v_hash, v_hash HAVING c > 1;"
+        q = "SELECT DISTINCT v_hash, v_path, COUNT(*) c FROM core_nodes GROUP BY v_hash, v_hash HAVING c > 1;"
         dup_nodes = self.db_query_all(q)
         dup_map = {}
         dup_count = {}
@@ -294,11 +294,11 @@ class VfsProcessor(VfsDatabase):
         self.logger.log(f'SUMMARY: ADF Types Missing: {len(missing_types)} ')
 
         # unmatched summary, common
-        q = "SELECT v_hash FROM core_vnodes WHERE v_path IS NOT NULL"
+        q = "SELECT v_hash FROM core_nodes WHERE v_path IS NOT NULL"
         nodes_with_vpath = self.db_query_all(q)
         nodes_with_vpath = [r[0] for r in nodes_with_vpath]
         nodes_with_vpath_set = set(nodes_with_vpath)
-        q = "SELECT v_hash FROM core_vnodes WHERE v_path IS NULL"
+        q = "SELECT v_hash FROM core_nodes WHERE v_path IS NULL"
         nodes_no_vpath = self.db_query_all(q)
         nodes_no_vpath = [r[0] for r in nodes_no_vpath]
         nodes_no_vpath_set = set(nodes_no_vpath)
@@ -594,7 +594,7 @@ class VfsProcessor(VfsDatabase):
         while keep_going:
             keep_going = False
             self.logger.log('UPDATING USE DEPTH: {}'.format(level))
-            # puids = self.db_query_all("SELECT uid FROM core_vnodes WHERE used_at_runtime_depth == (?)", [level])
+            # puids = self.db_query_all("SELECT uid FROM core_nodes WHERE used_at_runtime_depth == (?)", [level])
             # puids = [n[0] for n in puids]
             #
             # if len(puids) == 0:
@@ -602,8 +602,8 @@ class VfsProcessor(VfsDatabase):
 
             child_nodes = self.db_query_all(
                 """
-                SELECT * FROM core_vnodes WHERE 
-                    parent_id IN (SELECT uid FROM core_vnodes WHERE used_at_runtime_depth == (?))
+                SELECT * FROM core_nodes WHERE 
+                    parent_id IN (SELECT node_id FROM core_nodes WHERE used_at_runtime_depth == (?))
                 """,
                 [level]
             )

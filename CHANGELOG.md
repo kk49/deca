@@ -1,5 +1,7 @@
 #### v0.2.1 - * INSERT SOMETHING CLEVER *
-* ???
+* Added automatic splitting of strings along commas with removal of spaces to find more possible strings, this helps
+with at least Generation Zero entities
+* Made database fields/column names clearer
 
 #### v0.2.0 - "I don't want to do my taxes"
 * Decent support for JC4 and RAGE2, no build support for RAGE2 at the moment

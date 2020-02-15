@@ -1,6 +1,3 @@
-
-
-
 * Not sure how many good compressions have a flag of 1. Will need to check
 * add image format 98: jc4 50A1C344
 * pil missing format 71: switch to custom loader code for DDS? 
@@ -9,6 +6,27 @@
 * does GenZero use the archives as a defacto base tha dropzone patches against?
 
 * unify string hash tables
+
+#MAP SEARCH
+textures/ui/world_map.ddsc
+textures/ui/zoom0/0.ddsc
+textures/ui/zoom1/0.ddsc
+textures/ui/zoom2/0.ddsc
+textures/ui/zoom3/0.ddsc
+
+dlc/agency/textures/ui/map0/zoom0/10.ddsc
+dlc/agency/textures/ui/map1/zoom0/10.ddsc
+dlc/agency/textures/ui/map2/zoom0/10.ddsc
+dlc/agency/textures/ui/map3/zoom0/10.ddsc
+dlc/daredevil/textures/ui/zoom3/66.ddsc
+dlc/demonios/textures/ui/zoom0/0.ddsc
+
+'textures/ui/map_reserve_{}/world_map.ddsc'
+'textures/ui/map_reserve_{}/zoom{}/{}.ddsc'
+'textures/ui/warboard_map/world_map.ddsc'
+'textures/ui/warboard_map/zoom{}/{}.ddsc'
+
+# List
 * theHunter uses 4byte hash for event ids?
 * try all hash ideas when resolving unknown hash, give lookup number of known bytes
 * get strings from JC3 and the hunter and GZ EXE and make one master list, older games may expose more

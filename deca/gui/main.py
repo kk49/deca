@@ -78,8 +78,7 @@ class MainWindow(QMainWindow):
 
     def vfs_set(self, vfs):
         self.vfs = vfs
-        self.setWindowTitle(
-            "deca GUI, Archive Version: {}, Archive: {}".format('TODO', vfs.game_info.game_dir))
+        self.setWindowTitle("deca GUI, Archive: {}".format(vfs.game_info.game_dir))
         self.ui.statusbar.showMessage("LOAD COMPLETE")
         self.ui.vfs_node_widget.vfs_set(self.vfs)
         self.ui.vfs_node_widget_non_mapped.vfs_set(self.vfs)
@@ -291,6 +290,7 @@ def main():
     # Qt Application
     app = QApplication(sys.argv)
     window = MainWindow()
+    window.setWindowTitle("deca GUI")
     window.show()
     app.exec_()
 

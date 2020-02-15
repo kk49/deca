@@ -3,6 +3,7 @@ from deca.gui.vfs_widgets import used_color_calc
 from deca.vfs_db import VfsDatabase
 from deca.vfs_processor import VfsNode
 from deca.ff_adf import AdfDatabase
+from deca.ff_types import *
 from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QSortFilterProxyModel
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QHeaderView, QSizePolicy, QWidget, QHBoxLayout, QTreeView, QAbstractItemView
@@ -125,7 +126,7 @@ class VfsDirModel(QAbstractItemModel):
 
     def headerData(self, section, orientation, role):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ("Path", "Index", "Type", "Hash", "EXT_Hash", "ADF_Type", "Size_U", "Size_C", "Used_Depth")[section]
+            return ("Path", "Index", "Type", "Sub_Type", "Hash", "EXT_Hash", "Size_U", "Size_C", "Used_Depth")[section]
         else:
             return None
 
@@ -147,20 +148,22 @@ class VfsDirModel(QAbstractItemModel):
                 elif column == 2:
                     return '{}'.format(vnode.file_type)
                 elif column == 3:
+                    if vnode.file_sub_type is None:
+                        return ''
+                    elif vnode.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE}:
+                        return '{:08x}'.format(vnode.file_sub_type)
+                    else:
+                        return '{}'.format(vnode.file_sub_type)
+                elif column == 4:
                     if vnode.v_hash is None:
                         return ''
                     else:
                         return '{:08X}'.format(vnode.v_hash)
-                elif column == 4:
+                elif column == 5:
                     if vnode.ext_hash is None:
                         return ''
                     else:
                         return '{:08x}'.format(vnode.ext_hash)
-                elif column == 5:
-                    if vnode.file_sub_type is None:
-                        return ''
-                    else:
-                        return '{:08x}'.format(vnode.file_sub_type)
                 elif column == 6:
                     return '{}'.format(vnode.size_u)
                 elif column == 7:
@@ -174,8 +177,10 @@ class VfsDirModel(QAbstractItemModel):
                 if column == 8:
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
-                elif column == 5:
-                    if vnode.file_sub_type is not None and vnode.file_sub_type not in self.adf_db.type_map_def:
+                elif column == 3:
+                    if vnode.file_sub_type is not None and \
+                            vnode.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE} and \
+                            vnode.file_sub_type not in self.adf_db.type_map_def:
                         return QColor(Qt.red)
         return None
 

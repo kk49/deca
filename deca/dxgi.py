@@ -5,6 +5,7 @@ import os
 import ctypes
 import sys
 from .fast_file import *
+from .dxgi_97 import process_image_97
 from numba import njit
 
 process_image_func = None
@@ -503,23 +504,6 @@ def process_image_83(image, buffer, n_buffer, nx, ny):
                     gidx = gidx >> 3
 
 
-@njit
-def process_image_98(image, buffer, n_buffer, nx, ny):
-    '''
-
-    :param image:
-    :param f:
-    :param nx:
-    :param ny:
-    :return:
-
-    reference:
-    https://docs.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
-    https://docs.microsoft.com/en-us/windows/win32/direct3d11/bc7-format-mode-reference
-    '''
-    pass
-
-
 def process_image_python(image, raw, nx, ny, pixel_format):
     # print(f'PF = {pixel_format}')
     loaders = {
@@ -532,6 +516,9 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         77: process_image_77,  # DXGI_FORMAT_BC3_UNORM
         80: process_image_80,  # DXGI_FORMAT_BC4_UNORM
         83: process_image_83,  # DXGI_FORMAT_BC5_UNORM
+        97: process_image_97,  # DXGI_FORMAT_BC5_UNORM
+        98: process_image_97,  # DXGI_FORMAT_BC5_UNORM
+        99: process_image_97,  # DXGI_FORMAT_BC5_UNORM
     }
 
     if pixel_format in loaders:
@@ -551,7 +538,9 @@ def raw_data_size(pixel_format, nx, ny):
         77: [False, 16],
         80: [False, 8],
         83: [False, 16],
-
+        97: [False, 16],  # DXGI_FORMAT_BC7_TYPELESS
+        98: [False, 16],  # DXGI_FORMAT_BC7_UNORM
+        99: [False, 16],  # DXGI_FORMAT_BC7_UNORM_SRGB
     }
 
     fi = format_db[pixel_format]

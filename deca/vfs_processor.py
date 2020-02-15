@@ -7,7 +7,7 @@ import deca.ff_rtpc
 
 from .vfs_db import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
 from .db_types import *
-from .db_wrap import DbWrap
+from .db_wrap import DbWrap, determine_file_type
 from .vfs_commands import MultiProcessControl
 from .game_info import determine_game
 from .ff_types import *
@@ -83,7 +83,7 @@ class VfsProcessor(VfsDatabase):
         node = VfsNode(
             v_hash_type=self.file_hash_type,
             file_type=FTYPE_EXE, p_path=exe_path, size_u=f_size, size_c=f_size, offset=0)
-        self.determine_file_type(node)
+        determine_file_type(self, node)
         initial_nodes.append(node)
 
         self.logger.log('Add unarchived files')
@@ -94,7 +94,7 @@ class VfsProcessor(VfsDatabase):
             node = VfsNode(
                 v_hash_type=self.file_hash_type,
                 v_hash=v_hash, v_path=v_path, p_path=ua_file, size_u=f_size, size_c=f_size, offset=0)
-            self.determine_file_type(node)
+            determine_file_type(self, node)
             initial_nodes.append(node)
 
         self.logger.log('Add TAB / ARC files')
@@ -131,7 +131,7 @@ class VfsProcessor(VfsDatabase):
             node = VfsNode(
                 v_hash_type=self.file_hash_type,
                 file_type=FTYPE_ARC, p_path=file_arc, size_u=f_size, size_c=f_size, offset=0)
-            self.determine_file_type(node)
+            determine_file_type(self, node)
             initial_nodes.append(node)
 
         self.nodes_add_many(initial_nodes)
@@ -465,15 +465,16 @@ class VfsProcessor(VfsDatabase):
 
     def find_vpath_resources(self):
         fns = [
-            (False, './resources/strings.txt'),
             (False, './resources/{}/strings.txt'.format(self.game_info.game_id)),
             (True, './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)),
+            (False, './resources/strings.txt'),  # backwords compatibility
+            (False, './resources/common/fields.txt'),  # deca common field names
+            (False, './resources/common/filenames.txt'),  # deca common file names
+            (False, './resources/common/strings.txt'),  # deca common strings
+            (False, '../work/fields.txt'),  # user common field names
+            (False, '../work/filenames.txt'),  # user common file names
+            (False, '../work/strings.txt'),  # user common strings
         ]
-
-        self.logger.log('Looking for custom string file in ../work/custom.txt')
-        custom_strings = '../work/custom.txt'
-        if os.path.isfile(custom_strings):
-            fns.append((False, custom_strings))
 
         search_dir = './resources/ghidra_strings'
         if os.path.isdir(search_dir):
@@ -484,8 +485,6 @@ class VfsProcessor(VfsDatabase):
         if os.path.isdir(search_dir):
             for file in os.listdir(search_dir):
                 fns.append((False, os.path.join(search_dir, file)))
-
-
 
         string_count = 0
         with DbWrap(self, logger=self) as db:
@@ -651,7 +650,7 @@ class VfsProcessor(VfsDatabase):
                 v_hash_type=self.file_hash_type,
                 v_hash=v_hash, v_path=v_path, p_path=filename,
                 size_u=f_size, size_c=f_size, offset=0, is_temporary_file=is_temporary_file)
-            self.determine_file_type(vnode)
+            determine_file_type(self, vnode)
             self.nodes_add_many([vnode])
 
             self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))

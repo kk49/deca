@@ -1,8 +1,51 @@
 import os
-from .vfs_db import VfsDatabase, node_flag_v_hash_type_8, node_flag_v_hash_type_6, GtocArchiveEntry
+from .vfs_db import VfsDatabase, VfsNode, GtocArchiveEntry
 from .ff_adf import AdfDatabase
 from .ff_types import *
 from .db_types import *
+from .ff_determine import determine_file_type_and_size
+from .file import ArchiveFile
+
+
+def determine_file_type(vfs: VfsDatabase, node: VfsNode):
+    if node.file_type is None:
+        if node.offset is None:
+            node.file_type = FTYPE_SYMLINK
+        else:
+            filename = None
+            if node.v_path is not None:
+                filename = node.v_path
+            elif node.p_path is not None:
+                filename = node.p_path
+
+            if filename is not None:
+                file, ext = os.path.splitext(filename)
+                if ext.startswith(b'.atx'):
+                    node.file_type = FTYPE_ATX
+                elif ext == b'.hmddsc':
+                    node.file_type = FTYPE_HMDDSC
+
+            if node.compression_type_get() in {compression_v4_03_oo, compression_v4_04_oo}:
+                # todo special case for jc4 /rage2 compression needs to be cleaned up
+                with vfs.file_obj_from(node) as f:
+                    node.file_type, _, node.magic, node.file_sub_type = \
+                        determine_file_type_and_size(f, node.size_u)
+            else:
+                with vfs.file_obj_from(node) as f:
+                    node.file_type, node.size_u, node.magic, node.file_sub_type = \
+                        determine_file_type_and_size(f, node.size_c)
+
+    if node.file_type == FTYPE_AAF:
+        node.compression_type_set(compression_v3_zlib)
+        with vfs.file_obj_from(node) as f:
+            node.file_type, node.size_u, node.magic, node.file_sub_type = \
+                determine_file_type_and_size(f, node.size_u)
+
+    if node.file_type == FTYPE_ADF0:
+        with ArchiveFile(vfs.file_obj_from(node)) as f:
+            _ = f.read_u32()  # magic
+            adf_type = f.read_u32()
+        node.file_sub_type = adf_type
 
 
 class DbWrap:
@@ -52,7 +95,7 @@ class DbWrap:
                 self.log('Determining file types: {} nodes'.format(len(self._nodes_to_add)))
                 for ii, node in enumerate(self._nodes_to_add):
                     self.status(ii + self._index_offset, n_nodes_to_add + self._index_offset)
-                    self._db.determine_file_type(node)
+                    determine_file_type(self._db, node)
 
                 self.status(n_nodes_to_add + self._index_offset, n_nodes_to_add + self._index_offset)
 

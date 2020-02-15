@@ -11,7 +11,7 @@ import deca.ff_rtpc
 
 from .file import ArchiveFile
 from .vfs_db import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
-from .db_wrap import DbWrap
+from .db_wrap import DbWrap, determine_file_type
 from .db_types import *
 from .ff_types import *
 from .ff_txt import load_json
@@ -261,7 +261,7 @@ class Processor:
 
     def process_file_type_find(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
-        db.db().determine_file_type(node)
+        determine_file_type(db.db(), node)
         if node.file_type is None:
             return False
         else:

@@ -2,6 +2,7 @@ from deca.gui.vfs_widgets import used_color_calc
 from deca.vfs_db import VfsDatabase
 from deca.vfs_processor import VfsNode
 from deca.ff_adf import AdfDatabase
+from deca.ff_types import *
 import PySide2
 from PySide2.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide2.QtGui import QColor
@@ -21,7 +22,7 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.remap_pid = None
         self.remap_type = None
         self.remap_hash = None
-        self.column_ids = ["Index", "PIDX", "Type", "Hash", "EXT_hash", "ADF_type", "Size_U", "Size_C", "Path"]
+        self.column_ids = ["Index", "PIDX", "Type", "Sub Type", "Hash", "EXT_hash", "Size_U", "Size_C", "Path"]
 
     def vfs_set(self, vfs: VfsDatabase):
         self.beginResetModel()
@@ -109,17 +110,19 @@ class VfsNodeTableModel(QAbstractTableModel):
                 elif column == 2:
                     return '{}'.format(node.file_type)
                 elif column == 3:
-                    return node.v_hash_to_str()
+                    if node.file_sub_type is None:
+                        return ''
+                    elif node.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE}:
+                        return '{:08x}'.format(node.file_sub_type)
+                    else:
+                        return '{}'.format(node.file_sub_type)
                 elif column == 4:
+                    return node.v_hash_to_str()
+                elif column == 5:
                     if node.ext_hash is None:
                         return ''
                     else:
                         return '{:08X}'.format(node.ext_hash)
-                elif column == 5:
-                    if node.file_sub_type is None:
-                        return ''
-                    else:
-                        return '{:08X}'.format(node.file_sub_type)
                 elif column == 6:
                     return '{}'.format(node.size_u)
                 elif column == 7:
@@ -139,9 +142,11 @@ class VfsNodeTableModel(QAbstractTableModel):
                 if column == 8:
                     if node.used_at_runtime_depth is not None:
                         return used_color_calc(node.used_at_runtime_depth)
-                elif column == 5:
-                    if node.file_sub_type is not None and node.file_sub_type not in self.adf_db.type_map_def:
-                        return QColor(Qt.red)
+                    elif column == 3:
+                        if node.file_sub_type is not None and \
+                                node.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE} and \
+                                node.file_sub_type not in self.adf_db.type_map_def:
+                            return QColor(Qt.red)
 
         elif role == Qt.TextAlignmentRole:
             if column == 8:

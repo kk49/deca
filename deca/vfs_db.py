@@ -9,7 +9,6 @@ from typing import List
 import deca.util
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
-from deca.ff_determine import determine_file_type_and_size
 from deca.ff_aaf import extract_aaf
 from deca.decompress import DecompressorOodleLZ
 from deca.util import make_dir_for_file
@@ -313,6 +312,13 @@ def db_from_vfs_node(node: VfsNode):
         node.used_at_runtime_depth,
     )
     return v
+
+
+# string references
+ref_flag_is_defined = 1 << 0
+ref_flag_is_referenced = 1 << 1
+ref_flag_is_file_name = 1 << 2
+ref_flag_is_field_name = 1 << 3
 
 
 class VfsDatabase:
@@ -1199,44 +1205,6 @@ class VfsDatabase:
             return open(node.p_path, 'rb')
         else:
             raise Exception('NOT IMPLEMENTED: DEFAULT')
-
-    def determine_file_type(self, node: VfsNode):
-        if node.file_type is None:
-            if node.offset is None:
-                node.file_type = FTYPE_SYMLINK
-            else:
-                filename = None
-                if node.v_path is not None:
-                    filename = node.v_path
-                elif node.p_path is not None:
-                    filename = node.p_path
-
-                if filename is not None:
-                    file, ext = os.path.splitext(filename)
-                    if ext.startswith(b'.atx'):
-                        node.file_type = FTYPE_ATX
-                    elif ext == b'.hmddsc':
-                        node.file_type = FTYPE_HMDDSC
-
-                if node.compression_type_get() in {compression_v4_03_oo, compression_v4_04_oo}:
-                    # todo special case for jc4 /rage2 compression needs to be cleaned up
-                    with self.file_obj_from(node) as f:
-                        node.file_type, _, node.magic = determine_file_type_and_size(f, node.size_u)
-                else:
-                    with self.file_obj_from(node) as f:
-                        node.file_type, node.size_u, node.magic = determine_file_type_and_size(f, node.size_c)
-
-        if node.file_type == FTYPE_AAF:
-            node.compression_type_set(compression_v3_zlib)
-            with self.file_obj_from(node) as f:
-                node.file_type, node.size_u, node.magic = determine_file_type_and_size(f, node.size_u)
-
-        if node.file_type == FTYPE_ADF0:
-            with ArchiveFile(self.file_obj_from(node)) as f:
-                _ = f.read_u32()  # magic
-                adf_type = f.read_u32()
-            node.file_sub_type = adf_type
-
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .

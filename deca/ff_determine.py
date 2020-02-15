@@ -2,6 +2,7 @@ import numpy as np
 import struct
 from deca.file import ArchiveFile
 from deca.ff_aaf import load_aaf_header
+from deca.ff_avtx import DdscHeader
 from deca.ff_types import *
 
 
@@ -31,78 +32,83 @@ def file_stats(f, file_size):
     return counts
 
 
-def determine_file_type_and_size(f, file_size):
+def determine_file_type_and_size(f, file_size0):
+    file_type = None
+    file_sub_type = None
+    file_size = file_size0
+
     start_pos = f.tell()
-    magic = f.read(32)
+    magic = f.read(256)
     magic_int = struct.unpack('I', magic[0:4])[0]
 
-    ftype = None
-    fsize = file_size
     if b' FDA' == magic[0:4]:
-        ftype = FTYPE_ADF
+        file_type = FTYPE_ADF
     elif b'\x00FDA' == magic[0:4]:
-        ftype = FTYPE_ADF0
+        file_type = FTYPE_ADF0
     elif b'AVTX' == magic[0:4]:
-        ftype = FTYPE_AVTX
+        file_type = FTYPE_AVTX
+        header = DdscHeader()
+        header.deserialize(magic)
+        file_sub_type = header.pixel_format
     elif b'AAF' == magic[0:3].upper():
-        ftype = FTYPE_AAF
+        file_type = FTYPE_AAF
         f.seek(start_pos)
         aafh = load_aaf_header(f)
-        fsize = aafh.size_u
+        file_size = aafh.size_u
     elif b'SARC' == magic[4:8]:
-        ftype = FTYPE_SARC
+        file_type = FTYPE_SARC
     elif b'DDS ' == magic[0:4]:
-        ftype = FTYPE_DDS
+        file_type = FTYPE_DDS
     elif b'RTPC' == magic[0:4]:
-        ftype = FTYPE_RTPC
+        file_type = FTYPE_RTPC
     elif b'CFX' == magic[0:3]:
-        ftype = FTYPE_GFX
+        file_type = FTYPE_GFX
     elif b'GFX' == magic[0:3]:
-        ftype = FTYPE_GFX
+        file_type = FTYPE_GFX
     elif b'RIFF' == magic[0:4]:
-        ftype = FTYPE_RIFF
+        file_type = FTYPE_RIFF
     elif b'OggS' == magic[0:4]:
-        ftype = FTYPE_OGG
+        file_type = FTYPE_OGG
     elif b'BM6' == magic[0:3]:
-        ftype = FTYPE_BMP
+        file_type = FTYPE_BMP
     elif b'BM8' == magic[0:3]:
-        ftype = FTYPE_BMP
+        file_type = FTYPE_BMP
     elif b'TAG0' == magic[4:8]:
-        ftype = FTYPE_TAG0
+        file_type = FTYPE_TAG0
     elif b'FSB5' == magic[16:20]:
-        ftype = FTYPE_FSB5C
+        file_type = FTYPE_FSB5C
     elif b'\x57\xE0\xE0\x57\x10\xC0\xC0\x10' == magic[0:8]:
-        ftype = FTYPE_H2014
+        file_type = FTYPE_H2014
     elif b'MDI\x00' == magic[0:4]:
-        ftype = FTYPE_MDI
+        file_type = FTYPE_MDI
     elif b'PFX\x00' == magic[0:4]:
-        ftype = FTYPE_PFX
+        file_type = FTYPE_PFX
     elif b'\x05\x00\x00\x00RBMDL' == magic[0:9]:
-        ftype = FTYPE_RBMDL
+        file_type = FTYPE_RBMDL
     elif b'KB2' == magic[0:3]:
-        ftype = FTYPE_BINK_KB2
+        file_type = FTYPE_BINK_KB2
     elif b'BIK' == magic[0:3]:
-        ftype = FTYPE_BINK_BIK
+        file_type = FTYPE_BINK_BIK
     elif b'GT0C' == magic[0:4]:
-        ftype = FTYPE_GT0C
+        file_type = FTYPE_GT0C
 
     # need to inspect file structure
 
-    if ftype is None:
+    if file_type is None:
         # OBC files with (u32)4, (u32)count , 80 * count bytes, something to do with areas on the map? object placement?
         fm = ArchiveFile(f)
         fm.seek(start_pos)
         ver = fm.read_u32()
         cnt = fm.read_u32()
-        if ver == 4 and cnt * 80 + 8 == file_size:
-            ftype = FTYPE_OBC
+        if ver == 4 and cnt * 80 + 8 == file_size0:
+            file_type = FTYPE_OBC
 
-    if ftype is None:  # text file only contains text bytes, json, xml, ...
+    if file_type is None:  # text file only contains text bytes, json, xml, ...
         fm.seek(start_pos)
-        counts = file_stats(fm, file_size)
+        counts = file_stats(fm, file_size0)
         all_sum = np.sum(counts)
         pri_sum = np.sum(counts[[9, 10, 13] + list(range(20, 128))])
         if all_sum == pri_sum:
-            ftype = FTYPE_TXT
+            file_type = FTYPE_TXT
 
-    return ftype, fsize, magic_int
+    return file_type, file_size, magic_int, file_sub_type

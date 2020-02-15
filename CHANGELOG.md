@@ -1,7 +1,27 @@
+#### v0.2.2 - I forgot to give the last release a name
+* Added custom string file option ../work/custom.txt
+* Added extracted fields from Rage2 for all games, ./resources/field_strings/rg2.txt
+* Added strings from Ciprianno
+* Common string lookup files are now 
+  * 'deca/resources/strings.txt' (old), 
+  * 'deca/resources/common/fields.txt' (new), 
+  * 'deca/resources/common/filenames.txt' (new)
+  * 'deca/resources/common/strings.txt' (new)
+* User string lookup files are now
+  * '../work/fields.txt' (new), 
+  * '../work/filenames.txt' (new)
+  * '../work/strings.txt' (new)
+* Preparing for separation of filename strings from field name strings from miscellaneous strings
+* Incomplete support for new DXGI 97 / BC7 image format
+* DDSC/AVTX files now put their pixel format into the DB and the sub_type field shared with ADF files that expose thier
+    ADF type
+
+
 #### v0.2.1 - * INSERT SOMETHING CLEVER *
 * Added automatic splitting of strings along commas with removal of spaces to find more possible strings, this helps
 with at least Generation Zero entities
 * Made database fields/column names clearer
+
 
 #### v0.2.0 - "I don't want to do my taxes"
 * Decent support for JC4 and RAGE2, no build support for RAGE2 at the moment
@@ -9,6 +29,7 @@ with at least Generation Zero entities
   * ADFs with a single instance and only a hash id of the type
   * "garcs" there are a set of master gt0c files that store info about ee/nl/fl files (which are sarc's in other games)
 * New tab based separation of workflow for "extract", "modding", and "3d/GLTF extraction"
+
 
 #### v0.1.0
 * New back-end Sqlite3, simplified access to deca's gathered data, plus...

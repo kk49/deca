@@ -1,8 +1,11 @@
 import os
 import io
+import openpyxl
+
 from .file import ArchiveFile
 from .vfs_db import VfsDatabase, VfsNode
 from .ff_adf import AdfDatabase
+from .export_import_adf import adf_export_xlsx_0x0b73315d
 
 
 def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode):
@@ -27,3 +30,32 @@ def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode
                 dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>')))
 
     return tr
+
+
+def process_codex_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode, export_path='./digest/'):
+    codex_fn = adf_export_xlsx_0x0b73315d(vfs, adf_db, node, export_path=export_path, allow_overwrite=True)
+    codex_wb = openpyxl.load_workbook(filename=codex_fn)
+    codex_id = []
+    codex_name = []
+    codex_desc = []
+    codex_icon = []
+    codex_category = []
+    for col in codex_wb['Collectables'].columns:
+        c = [v.value for v in col]
+        if c[0] == 'id':
+            codex_id = c[1:]
+        elif c[0] == 'name':
+            codex_name = c[1:]
+        elif c[0] == 'description':
+            codex_desc = c[1:]
+        elif c[0] == 'icon':
+            codex_icon = c[1:]
+        elif c[0] == 'collection_id':
+            codex_category = c[1:]
+
+    codex = {}
+    for cid, name, desc, icon, category in zip(codex_id, codex_name, codex_desc, codex_icon, codex_category):
+        if cid is not None:
+            codex[cid] = (name, desc, icon, category)
+
+    return codex

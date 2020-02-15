@@ -1,5 +1,6 @@
 #### v0.2.3 ...
-* Removed Archive version TODO from title window
+* Removed Archive version TODO from title window (Issue #87)
+* Updated collection info generator (GZ specific) to use the codex spreadsheet. (Issue #67)
 
 #### v0.2.2 - I forgot to give the last release a name
 * Added custom string file option ../work/custom.txt

@@ -5,15 +5,13 @@ from deca.ff_rtpc import Rtpc, PropName, RtpcProperty
 from deca.ff_adf import AdfDatabase
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
-from deca.digest import process_translation_adf
-from deca.export_import_adf import adf_export_xlsx_0x0b73315d
+from deca.digest import process_translation_adf, process_codex_adf
 from PIL import Image
 import numpy as np
 import os
 import json
 import matplotlib.pyplot as plt
 import shutil
-import openpyxl
 import re
 
 
@@ -397,28 +395,7 @@ class ToolMakeWebMap:
 
         # load collectable codex
         vnode = self.vfs.nodes_where_match(v_path=b'settings/hp_settings/codex_data.bin')[0]
-        codex_fn = adf_export_xlsx_0x0b73315d(
-            self.vfs, self.adf_db, vnode, export_path=export_path, allow_overwrite=True)
-        codex_wb = openpyxl.load_workbook(filename=codex_fn)
-        codex_id = []
-        codex_name = []
-        codex_desc = []
-        codex_icon = []
-        for col in codex_wb['Collectables'].columns:
-            c = [v.value for v in col]
-            if c[0] == 'id':
-                codex_id = c[1:]
-            elif c[0] == 'name':
-                codex_name = c[1:]
-            elif c[0] == 'description':
-                codex_desc = c[1:]
-            elif c[0] == 'icon':
-                codex_icon = c[1:]
-
-        codex = {}
-        for cid, name, desc, icon in zip(codex_id, codex_name, codex_desc, codex_icon):
-            if cid is not None:
-                codex[cid] = (name, desc, icon)
+        codex = process_codex_adf(self.vfs, self.adf_db, vnode, export_path=export_path)
 
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped

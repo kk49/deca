@@ -13,4 +13,5 @@ dist/
 build/
 scratch/
 procmon_csv/
+scripts/digest/
 process_image.*

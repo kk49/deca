@@ -2,7 +2,7 @@ import re
 from deca.vfs_db import VfsDatabase
 from deca.vfs_processor import vfs_structure_open
 from deca.ff_adf import AdfDatabase
-from deca.digest import process_translation_adf
+from deca.digest import process_translation_adf, process_codex_adf
 
 do_description = True
 
@@ -13,81 +13,77 @@ adf_db = AdfDatabase(vfs)
 vnode = vfs.nodes_where_match(v_path=b'text/master_eng.stringlookup')[0]
 tr = process_translation_adf(vfs, adf_db, vnode)
 
-# LOAD from global/collection.collectionc
-# todo dump of different vnodes, one in gdcc is stripped
+# LOAD collectable codex information
+vnode = vfs.nodes_where_match(v_path=b'settings/hp_settings/codex_data.bin')[0]
+codex = process_codex_adf(vfs, adf_db, vnode)
+
+# Load collectable info
 vnode = vfs.nodes_where_match(v_path=b'global/collection.collectionc')[0]
 adf = adf_db.read_node(vfs, vnode)
-
-# todo use settings/hp_settings/codex_data.bin instead
-# todo add to digest?
-
-collectable_info = [
-    (re.compile(r'collectable_dalahast_(.*)'), 'collectable_dalahast_{}',  'collectable_dalahast_{}_desc', True),
-    (re.compile(r'collectable_gnome_(.*)'), 'collectable_gnome_{}',  'collectable_gnome_{}_desc', True),
-    (re.compile(r'collectable_mixtape_(.*)'), 'collectable_mixtape_{}_name',  'collectable_mixtape_{}_desc', True),
-    (re.compile(r'collectable_blueprint_(.*)'), 'collectable_blueprint_{}',  'collectable_blueprint_{}_desc', True),
-    (re.compile(r'collectable_location_(.*)'), 'collectable_location_{}',  'collectable_location_{}_desc', False),
-    (re.compile(r'dlc01_collectable_mixtape_([0-9]*)_.*'), 'collectable_lore_{}_.*_name',  'island01_collectable_mixtape_{}_.*_desc', True),
-    (re.compile(r'collectable_biography_([0-9]*)_.*'), '^collectable_biography_{}_.*$(?<!_desc)',  'collectable_biography_{}_.*_desc', True),
-    (re.compile(r'collectable_photo_(.*)'), 'collectable_photo_{}',  'collectable_photo_{}_desc', True),
-    ]
 
 collectables = []
 for v in adf.table_instance_values[0]['Collectibles']:
     obj_id = v['ID']
     cid = v['Name'].decode('utf-8')
 
-    name = None
-    desc = None
-    for ci in collectable_info:
-        mv = ci[0].match(cid)
-        if mv is not None:
-            name = ci[1].format(mv.group(1))
-            desc = ci[2].format(mv.group(1))
-            break
+    if cid in codex:
+        name, desc, icon, cc = codex[cid]
 
-    if name is None:
-        print(cid)
-    else:
-        if name not in tr:
-            rx = re.compile(name)
-            for k in tr.keys():
-                if rx.match(k) is not None:
-                    name = k
-                    break
+        if name is None:
+            print(f'MISSING: {cid}')
+        else:
+            if name not in tr:
+                rx = re.compile(name)
+                for k in tr.keys():
+                    if rx.match(k) is not None:
+                        name = k
+                        break
 
-        if desc not in tr:
-            rx = re.compile(desc)
-            for k in tr.keys():
-                if rx.match(k) is not None:
-                    desc = k
-                    break
+            if desc not in tr:
+                rx = re.compile(desc)
+                for k in tr.keys():
+                    if rx.match(k) is not None:
+                        desc = k
+                        break
 
-        name = tr[name]
-        desc = tr[desc]
-        position = v['Position']
+            name = tr[name]
+            desc = tr[desc]
+            position = v['Position']
 
-        obj = {
-            'type': 'Feature',
-            'properties': {
-                'type': 'collection.collectionc',
-                'uid': obj_id,
-                'uid_str': '0x{:012X}'.format(obj_id),
-                'collectable_id': cid,
-                'collectable_name_tr': name,
-                'collectable_desc_tr': desc,
-                'position': position,
-            },
-        }
-        collectables.append(obj)
+            obj = {
+                'type': 'Feature',
+                'properties': {
+                    'type': 'collection.collectionc',
+                    'uid': obj_id,
+                    'uid_str': '0x{:012X}'.format(obj_id),
+                    'collectable_id': cid,
+                    'collectable_category': cc,
+                    'collectable_name_tr': name,
+                    'collectable_desc_tr': desc,
+                    'position': position,
+                },
+            }
+            collectables.append(obj)
 
-for ci in collectable_info:
-    ex = ci[0]
-    do_location = ci[-1]
+collectibles_order = [
+    ('souvenirs', True),
+    ('gnomes', True),
+    ('mixtapes', True),
+    ('blueprints', True),
+    ('location_lore', False),
+    ('island01_audiologs', True),
+    ('island01_biographies', True),
+    ('island01_photos', True),
+]
+
+
+for ci in collectibles_order:
+    category = ci[0]
+    do_location = ci[1]
     sd = {}
     for c in collectables:
         props = c['properties']
-        if ex.match(props['collectable_id']) is not None:
+        if category == props['collectable_category']:
             sd[props['collectable_id']] = [props['collectable_name_tr'], props['collectable_desc_tr'], props['position']]
 
     sn = list(sd.keys())

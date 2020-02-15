@@ -470,10 +470,22 @@ class VfsProcessor(VfsDatabase):
             (True, './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)),
         ]
 
+        self.logger.log('Looking for custom string file in ../work/custom.txt')
+        custom_strings = '../work/custom.txt'
+        if os.path.isfile(custom_strings):
+            fns.append((False, custom_strings))
+
         search_dir = './resources/ghidra_strings'
         if os.path.isdir(search_dir):
             for file in os.listdir(search_dir):
                 fns.append((False, os.path.join(search_dir, file)))
+
+        search_dir = './resources/field_strings'
+        if os.path.isdir(search_dir):
+            for file in os.listdir(search_dir):
+                fns.append((False, os.path.join(search_dir, file)))
+
+
 
         string_count = 0
         with DbWrap(self, logger=self) as db:

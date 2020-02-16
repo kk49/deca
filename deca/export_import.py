@@ -16,7 +16,7 @@ from .export_import_audio import node_export_fsb5c_processed
 NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
-def expand_vpaths(vfs: VfsDatabase, vs, mask):
+def expand_vfs_paths(vfs: VfsDatabase, vs, mask):
     vos = []
 
     for v in vs:
@@ -48,70 +48,69 @@ def extract_node_raw(
         if node.offset is not None:
             with ArchiveFile(vfs.file_obj_from(node)) as f:
                 if node.v_path is None:
-                    ofile = extract_dir + node.v_hash_to_str() + '.dat'
+                    out_file = extract_dir + node.v_hash_to_str() + '.dat'
                 else:
-                    ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
+                    out_file = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
 
-                vfs.logger.log('Exporting {}'.format(ofile))
+                vfs.logger.log('Exporting {}'.format(out_file))
 
-                make_dir_for_file(ofile)
+                make_dir_for_file(out_file)
 
                 if node.file_type == FTYPE_ADF_BARE:
-                    do_export_raw = False
                     vfs.logger.log(
                         'WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(
-                            ofile))
+                            out_file))
 
-                if not allow_overwrite and os.path.isfile(ofile):
+                if not allow_overwrite and os.path.isfile(out_file):
                     vfs.logger.log(
-                        'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(ofile))
-                    # raise DecaFileExists(ofile)
+                        'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(out_file))
+                    # raise DecaFileExists(out_file)
                 else:
                     buf = f.read(node.size_u)
-                    with ArchiveFile(open(ofile, 'wb')) as fo:
+                    with ArchiveFile(open(out_file, 'wb')) as fo:
                         fo.write(buf)
 
-            return ofile
+            return out_file
 
     return None
 
 
-def find_vnode(vfs: VfsDatabase, v):
-    vnode = None
-    v_path = None
+def find_vfs_node(vfs: VfsDatabase, v):
+    node = None
+    path = None
     if isinstance(v, bytes):
-        v_path = v
+        path = v
     elif isinstance(v, VfsNode):
-        vnode = v
+        node = v
     else:
-        raise NotImplementedError('find_vnode: Could not extract {}'.format(v))
+        raise NotImplementedError('find_vfs_node: Could not extract {}'.format(v))
 
-    if v_path is not None:
-        nodes = vfs.nodes_where_match(v_path=v_path)
-        vnode = None
-        for node in nodes:
-            if node.offset is not None:
-                vnode = node
+    if path is not None:
+        matching_nodes = vfs.nodes_where_match(v_path=path)
+        node = None
+        for matching_node in matching_nodes:
+            if matching_node.offset is not None:
+                node = matching_node
                 break
-        if vnode is None:
-            raise EDecaFileMissing('find_vnode: Missing {}'.format(v_path.decode('utf-8')))
+        if node is None:
+            raise EDecaFileMissing('find_vfs_node: Missing {}'.format(path.decode('utf-8')))
 
-    return vnode
+    return node
 
 
 def nodes_export_raw(
         vfs: VfsDatabase,
-        vnodes: List[NodeListElement],
+        nodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
         allow_overwrite=False):
-    vs = expand_vpaths(vfs, vnodes, mask)
+    vs = expand_vfs_paths(vfs, nodes, mask)
     for i, v in enumerate(vs):
-        vnode = find_vnode(vfs, v)
+        node = find_vfs_node(vfs, v)
 
-        if vnode is not None:
+        if node is not None:
             try:
-                extract_node_raw(vfs, vnode, extract_dir, allow_overwrite)
+                extract_node_raw(vfs, node, extract_dir, allow_overwrite)
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
@@ -119,13 +118,13 @@ def nodes_export_raw(
 
 def nodes_export_contents(
         vfs: VfsDatabase,
-        vnodes: List[NodeListElement],
+        nodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
         allow_overwrite=False):
-    vs = expand_vpaths(vfs, vnodes, mask)
+    vs = expand_vfs_paths(vfs, nodes, mask)
     for i, v in enumerate(vs):
-        vnode = find_vnode(vfs, v)
+        vnode = find_vfs_node(vfs, v)
 
         if vnode is not None:
             try:
@@ -134,18 +133,18 @@ def nodes_export_contents(
                     with vfs.file_obj_from(vnode) as f:
                         sarc.header_deserialize(f)
                         # extract_node_raw(vfs, vnode, extract_dir, allow_overwrite)
-                    entry_vpaths = [v.v_path for v in sarc.entries]
+                    entry_v_paths = [v.v_path for v in sarc.entries]
                     entry_is_symlinks = [v.offset == 0 for v in sarc.entries]
 
-                    extract_raw(vfs, entry_vpaths, b'^.*$', extract_dir, allow_overwrite)
+                    nodes_export_raw(vfs, entry_v_paths, b'^.*$', extract_dir, allow_overwrite)
 
                     file_list_name = os.path.join(extract_dir, vnode.v_path.decode('utf-8') + '.DECA.FILE_LIST.txt')
 
                     with open(file_list_name, 'w') as f:
-                        f.write('sarc.clear();')
-                        for vp, isym in zip(entry_vpaths, entry_is_symlinks):
+                        f.write('sarc.clear();\n')
+                        for vp, is_sym in zip(entry_v_paths, entry_is_symlinks):
                             op = 'sarc.add'
-                            if isym:
+                            if is_sym:
                                 op = 'sarc.symlink'
                             f.write('{}("{}");\n'.format(op, vp.decode('utf-8')))
 
@@ -156,37 +155,37 @@ def nodes_export_contents(
 
 def nodes_export_gltf(
         vfs: VfsDatabase,
-        vnodes: List[NodeListElement],
+        nodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
         allow_overwrite=False,
         save_to_one_dir=True
 ):
-    vs = expand_vpaths(vfs, vnodes, mask)
+    vs = expand_vfs_paths(vfs, nodes, mask)
 
     vs_adf = []
     vs_rtpc = []
     for i, v in enumerate(vs):
-        vnode = find_vnode(vfs, v)
+        node = find_vfs_node(vfs, v)
 
-        if vnode is not None and vnode.is_valid() and vnode.offset is not None:
+        if node is not None and node.is_valid() and node.offset is not None:
             try:
-                if vnode.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
-                    vs_adf.append(vnode)
-                elif vnode.file_type in {FTYPE_RTPC}:
-                    vs_rtpc.append(vnode)
+                if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
+                    vs_adf.append(node)
+                elif node.file_type in {FTYPE_RTPC}:
+                    vs_rtpc.append(node)
 
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
     adf_db = AdfDatabase(vfs)
-    for vnode in vs_adf:
+    for node in vs_adf:
         try:
             node_export_adf_gltf(
                 vfs,
                 adf_db,
-                vnode,
+                node,
                 extract_dir,
                 allow_overwrite=allow_overwrite,
                 save_to_one_dir=save_to_one_dir)
@@ -195,11 +194,11 @@ def nodes_export_gltf(
             vfs.logger.log(
                 'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-    for vnode in vs_rtpc:
+    for node in vs_rtpc:
         try:
             node_export_rtpc_gltf(
                 vfs,
-                vnode,
+                node,
                 extract_dir,
                 allow_overwrite=allow_overwrite,
                 save_to_one_dir=save_to_one_dir
@@ -211,13 +210,13 @@ def nodes_export_gltf(
 
 def nodes_export_processed(
         vfs: VfsDatabase,
-        vnodes: List[NodeListElement],
+        nodes: List[NodeListElement],
         mask: bytes,
         extract_dir: str,
         allow_overwrite=False,
         save_to_processed=False,
         save_to_text=False):
-    vs = expand_vpaths(vfs, vnodes, mask)
+    vs = expand_vfs_paths(vfs, nodes, mask)
 
     vs_adf = []
     vs_rtpc = []
@@ -225,64 +224,60 @@ def nodes_export_processed(
     vs_fsb5cs = []
     vs_other = []
     for i, v in enumerate(vs):
-        vnode = find_vnode(vfs, v)
+        node = find_vfs_node(vfs, v)
 
-        if vnode is not None and vnode.is_valid() and vnode.offset is not None:
+        if node is not None and node.is_valid() and node.offset is not None:
             try:
-                if vnode.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
-                    vs_adf.append(vnode)
-                elif vnode.file_type in {FTYPE_RTPC}:
-                    vs_rtpc.append(vnode)
-                elif vnode.file_type in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
-                    vs_images.append(vnode)
-                elif vnode.file_type in {FTYPE_FSB5C}:
-                    vs_fsb5cs.append(vnode)
+                if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
+                    vs_adf.append(node)
+                elif node.file_type in {FTYPE_RTPC}:
+                    vs_rtpc.append(node)
+                elif node.file_type in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
+                    vs_images.append(node)
+                elif node.file_type in {FTYPE_FSB5C}:
+                    vs_fsb5cs.append(node)
                 else:
-                    vs_other.append(vnode)
+                    vs_other.append(node)
 
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
     if save_to_processed:
-        for vnode in vs_fsb5cs:
+        for node in vs_fsb5cs:
             try:
-                node_export_fsb5c_processed(vfs, vnode, extract_dir, allow_overwrite=allow_overwrite)
+                node_export_fsb5c_processed(vfs, node, extract_dir, allow_overwrite=allow_overwrite)
 
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-        for vnode in vs_images:
+        for node in vs_images:
             try:
-                image_export(vfs, vnode, extract_dir, False, True, allow_overwrite=allow_overwrite)
+                image_export(vfs, node, extract_dir, False, True, allow_overwrite=allow_overwrite)
 
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
     adf_db = AdfDatabase(vfs)
-    for vnode in vs_adf:
+    for node in vs_adf:
         try:
             if save_to_processed:
-                node_export_adf_processed(vfs, adf_db, vnode, extract_dir, allow_overwrite=allow_overwrite)
+                node_export_adf_processed(vfs, adf_db, node, extract_dir, allow_overwrite=allow_overwrite)
 
             if save_to_text:
-                node_export_adf_text(vfs, adf_db, vnode, extract_dir, allow_overwrite=allow_overwrite)
+                node_export_adf_text(vfs, adf_db, node, extract_dir, allow_overwrite=allow_overwrite)
 
         except EDecaFileExists as e:
             vfs.logger.log(
                 'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
 
-    for vnode in vs_rtpc:
+    for node in vs_rtpc:
         try:
             if save_to_text:
-                node_export_rtpc_text(vfs, vnode, extract_dir, allow_overwrite=allow_overwrite)
+                node_export_rtpc_text(vfs, node, extract_dir, allow_overwrite=allow_overwrite)
 
         except EDecaFileExists as e:
             vfs.logger.log(
                 'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
-
-"""
-
-"""

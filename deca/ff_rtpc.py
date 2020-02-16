@@ -73,6 +73,56 @@ class PropName(IntEnum):
     BOOKMARK_NAME = 0x2314c9ea
 
 
+class FieldNameMap:
+    def __init__(self, vfs: VfsDatabase):
+        self._vfs = vfs
+        self._h32_dict = {}
+        self._h48_dict = {}
+        self._h64_dict = {}
+
+    def lookup(self, hash32=None, hash48=None, hash64=None) -> Optional[str]:
+        if hash32 is not None:
+            v = self._h32_dict.get(hash32, ())
+            if v != ():
+                return v
+            else:
+                v = self._vfs.hash_string_match(hash32=hash32)
+                if len(v) > 0:
+                    v = v[0][1].decode('utf-8')
+                else:
+                    v = None
+                self._h32_dict[hash32] = v
+                return v
+
+        if hash48 is not None:
+            v = self._h48_dict.get(hash32, ())
+            if v != ():
+                return v
+            else:
+                v = self._vfs.hash_string_match(hash48=hash48)
+                if len(v) > 0:
+                    v = v[0][1].decode('utf-8')
+                else:
+                    v = None
+                self._h48_dict[hash48] = v
+                return v
+
+        if hash64 is not None:
+            v = self._h64_dict.get(hash64, ())
+            if v != ():
+                return v
+            else:
+                v = self._vfs.hash_string_match(hash64=hash64)
+                if len(v) > 0:
+                    v = v[0][1].decode('utf-8')
+                else:
+                    v = None
+                self._h64_dict[hash64] = v
+                return v
+
+        return None
+
+
 class RtpcProperty:
     __slots__ = ('pos', 'name_hash', 'data_pos', 'data_raw', 'data', 'type')
 
@@ -101,34 +151,38 @@ class RtpcProperty:
             data)
         # return '0x{:08x}: {} = {}'.format(self.name_hash, PropType.type_names[self.type], self.data,)
 
-    def repr_with_name(self, vfs: VfsDatabase):
+    def repr_with_name(self, hash_lookup: FieldNameMap):
         data = self.data
         if self.type == k_type_objid:
-            name6 = vfs.hash_string_match(hash48=data & 0x0000FFFFFFFFFFFF)
-            name4 = vfs.hash_string_match(hash32=data)
+            name6 = hash_lookup.lookup(hash48=data & 0x0000FFFFFFFFFFFF)
             name = 'id:0x{:012X}'.format(data)
-            if len(name6):
-                name = 'id:DB:H6:"{}"[{}]'.format(name6[0][1].decode('utf-8'), name)
-            elif len(name4):
-                name = 'id:DB:H4:"{}"[{}]'.format(name4[0][1].decode('utf-8'), name)
+            if name6:
+                name = 'id:DB:H6:"{}"[{}]'.format(name6, name)
+            else:
+                name4 = hash_lookup.lookup(hash32=data)
+                if name4:
+                    name = 'id:DB:H4:"{}"[{}]'.format(name4, name)
+
             data = name
 
         elif self.type == k_type_event:
             data_new = []
             for d in data:
-                name6 = vfs.hash_string_match(hash48=d & 0x0000FFFFFFFFFFFF)
-                name4 = vfs.hash_string_match(hash32=d)
+                name6 = hash_lookup.lookup(hash48=d & 0x0000FFFFFFFFFFFF)
                 name = 'ev:0x{:012X}'.format(d)
-                if len(name6):
-                    name = 'ev:DB:H6:"{}"[{}]'.format(name6[0][1].decode('utf-8'), name)
-                elif len(name4):
-                    name = 'ev:DB:H4:"{}"[{}]'.format(name4[0][1].decode('utf-8'), name)
+                if name6:
+                    name = 'ev:DB:H6:"{}"[{}]'.format(name6, name)
+                else:
+                    name4 = hash_lookup.lookup(hash32=d)
+                    if name4:
+                        name = 'ev:DB:H4:"{}"[{}]'.format(name4, name)
+
                 data_new.append(name)
             data = data_new
 
-        name = vfs.hash_string_match(hash32=self.name_hash)
-        if len(name):
-            name = '"{}"'.format(name[0][1].decode('utf-8'))
+        name = hash_lookup.lookup(hash32=self.name_hash)
+        if name:
+            name = '"{}"'.format(name)
         else:
             name = f'0x{self.name_hash:08x}'
 
@@ -259,29 +313,29 @@ class RtpcNode:
         return '{:08x} pc:{} cc:{} @ {} {:08x}'.format(
             self.name_hash, self.prop_count, self.child_count, self.data_offset, self.data_offset)
 
-    def repr_with_name(self, vfs):
-        name4 = vfs.hash_string_match(hash32=self.name_hash)
+    def repr_with_name(self, hash_lookup: FieldNameMap):
+        name4 = hash_lookup.lookup(hash32=self.name_hash)
         name = f'0x{self.name_hash:08x}'
 
-        if len(name4):
-            name = 'DB:H4:"{}"[{}]'.format(name4[0][1].decode('utf-8'), name)
+        if name4:
+            name = 'DB:H4:"{}"[{}]'.format(name4, name)
 
         return 'n:{} pc:{} cc:{} @ {} {:08x}'.format(
             name, self.prop_count, self.child_count, self.data_offset, self.data_offset)
 
-    def dump_to_string(self, vfs, indent=0):
+    def dump_to_string(self, hash_lookup: FieldNameMap, indent=0):
         ind0 = ' ' * indent
         ind1 = ' ' * (indent + 2)
         ind2 = ' ' * (indent + 4)
         sbuf = ''
         sbuf = sbuf + ind0 + 'node:\n'
-        sbuf = sbuf + ind1 + self.repr_with_name(vfs) + '\n'
+        sbuf = sbuf + ind1 + self.repr_with_name(hash_lookup) + '\n'
         sbuf = sbuf + ind1 + 'properties ---------------\n'
         for p in self.prop_table:
-            sbuf = sbuf + ind2 + p.repr_with_name(vfs) + '\n'
+            sbuf = sbuf + ind2 + p.repr_with_name(hash_lookup) + '\n'
         sbuf = sbuf + ind1 + 'children -----------------\n'
         for c in self.child_table:
-            sbuf = sbuf + c.dump_to_string(vfs, indent + 4)
+            sbuf = sbuf + c.dump_to_string(hash_lookup, indent + 4)
 
         return sbuf
 
@@ -346,4 +400,5 @@ class Rtpc:
             self.visit(visitor, node=child)
 
     def dump_to_string(self, vfs):
-        return self.root_node.dump_to_string(vfs)
+        hash_lookup = FieldNameMap(vfs)
+        return self.root_node.dump_to_string(hash_lookup)

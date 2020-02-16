@@ -1,6 +1,8 @@
 #### v0.2.3 ...
 * Removed Archive version TODO from title window (Issue #87)
 * Updated collection info generator (GZ specific) to use the codex spreadsheet. (Issue #67)
+* Fixed issue with extract contents functionality
+* Speed up RTPC string dumping speed by caching string hash results and not hitting the DB for every field
 
 #### v0.2.2 - I forgot to give the last release a name
 * Added custom string file option ../work/custom.txt

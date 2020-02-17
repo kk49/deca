@@ -1,5 +1,5 @@
 from .viewer import *
-from ..ff_rtpc import Rtpc
+from ..ff_rtpc import RtpcVisitorDumpToString
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
@@ -21,8 +21,9 @@ class DataViewerRtpc(DataViewer):
         self.setLayout(self.main_layout)
 
     def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
-        rtpc = Rtpc()
         with vfs.file_obj_from(vnode) as f:
-            rtpc.deserialize(f)
-        sbuf = rtpc.dump_to_string(vfs)
+            buffer = f.read(vnode.size_u)
+        dump = RtpcVisitorDumpToString(vfs)
+        dump.visit(buffer)
+        sbuf = dump.result()
         self.text_box.setText(sbuf)

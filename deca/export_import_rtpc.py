@@ -3,7 +3,7 @@ import re
 from typing import List
 from .vfs_db import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
-from .ff_rtpc import Rtpc, PropName, RtpcNode
+from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 
 '''
@@ -112,14 +112,16 @@ def node_export_rtpc_text(
         allow_overwrite=False
 ):
     with vfs.file_obj_from(vnode) as f:
-        rtpc = Rtpc().deserialize(f)
+        buffer = f.read(vnode.size_u)
 
     fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
 
     if not allow_overwrite and os.path.exists(fn):
         raise EDecaFileExists(fn)
 
-    s = rtpc.dump_to_string(vfs)
+    dump = RtpcVisitorDumpToString(vfs)
+    dump.visit(buffer)
+    s = dump.result()
 
     ofiledir = os.path.dirname(fn)
     os.makedirs(ofiledir, exist_ok=True)

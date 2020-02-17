@@ -1,9 +1,9 @@
-#### v0.2.3 ...
+#### v0.2.3 "Gotta go fast"
+* Sped up RTPC string dumping speed by caching string hash results and not hitting the DB for every field
+* Sped up RTPC string dumping and initial search by switching to the visitor pattern (Issue #84)
 * Removed Archive version TODO from title window (Issue #87)
 * Updated collection info generator (GZ specific) to use the codex spreadsheet. (Issue #67)
 * Fixed issue with extract contents functionality
-* Sped up RTPC string dumping speed by caching string hash results and not hitting the DB for every field
-* Sped up RTPC string dumping and initial search by switching to the visitor pattern
 
 #### v0.2.2 - I forgot to give the last release a name
 * Added custom string file option ../work/custom.txt

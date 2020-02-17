@@ -1,4 +1,6 @@
+from io import BytesIO
 from deca.file import ArchiveFile
+from deca.fast_file_2 import *
 from deca.vfs_db import VfsDatabase
 import struct
 from enum import IntEnum
@@ -402,3 +404,299 @@ class Rtpc:
     def dump_to_string(self, vfs):
         hash_lookup = FieldNameMap(vfs)
         return self.root_node.dump_to_string(hash_lookup)
+
+
+"""
+Visitor pattern for RTPC files
+node_start
+    props_start   
+        prop_start
+        prop_end
+        ...
+        prop_start
+        prop_end
+    props_end
+    children_start
+        node_start
+            ...
+        node_end
+        ...
+        node_start
+            ...
+        node_end
+    children_end
+node_end 
+"""
+
+
+# @njit()
+def parse_prop_data_raise_error(prop_type):
+    raise Exception('NOT HANDLED {}'.format(prop_type))
+
+
+# @njit()
+def parse_prop_data(bufn, prop_info):
+    prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
+
+    if prop_type == k_type_none:
+        prop_data = prop_data_raw
+    elif prop_type == k_type_u32:
+        prop_data, pos = ff_read_u32(bufn, prop_data_pos)
+    elif prop_type == k_type_f32:
+        prop_data, pos = ff_read_f32(bufn, prop_data_pos)
+    elif prop_type == k_type_str:
+        prop_data_pos = prop_data_raw
+        prop_data, pos = ff_read_strz(bufn, prop_data_pos)
+    elif prop_type == k_type_vec2:
+        prop_data_pos = prop_data_raw
+        prop_data, pos = ff_read_f32s(bufn, prop_data_pos, 2)
+    elif prop_type == k_type_vec3:
+        prop_data_pos = prop_data_raw
+        prop_data, pos = ff_read_f32s(bufn, prop_data_pos, 3)
+    elif prop_type == k_type_vec4:
+        prop_data_pos = prop_data_raw
+        prop_data, pos = ff_read_f32s(bufn, prop_data_pos, 4)
+    elif prop_type == k_type_mat3x3:
+        prop_data_pos = prop_data_raw
+        prop_data, pos = ff_read_f32s(bufn, prop_data_pos, 9)
+    elif prop_type == k_type_mat4x4:
+        prop_data_pos = prop_data_raw
+        prop_data, pos = ff_read_f32s(bufn, prop_data_pos, 16)
+    elif prop_type == k_type_array_u32:
+        prop_data_pos = prop_data_raw
+        pos = prop_data_pos
+        n, pos = ff_read_u32(bufn, pos)
+        prop_data, pos = ff_read_u32s(bufn, pos, n)
+    elif prop_type == k_type_array_f32:
+        prop_data_pos = prop_data_raw
+        pos = prop_data_pos
+        n, pos = ff_read_u32(bufn, pos)
+        prop_data, pos = ff_read_f32s(bufn, pos, n)
+    elif prop_type == k_type_array_u8:
+        prop_data_pos = prop_data_raw
+        pos = prop_data_pos
+        n, pos = ff_read_u32(bufn, pos)
+        prop_data, pos = ff_read_u8s(bufn, pos, n)
+    elif prop_type == k_type_objid:
+        # todo is the obj id really 64 bits?
+        prop_data_pos = prop_data_raw
+        prop_data, pos = ff_read_u64(bufn, prop_data_pos)
+    elif prop_type == k_type_event:
+        prop_data_pos = prop_data_raw
+        pos = prop_data_pos
+        n, pos = ff_read_u32(bufn, pos)
+        prop_data, pos = ff_read_u64s(bufn, pos, n)
+    else:
+        parse_prop_data_raise_error(prop_type)
+
+    return prop_data, prop_data_pos
+
+
+class RtpcVisitor:
+    def __init__(self):
+        pass
+
+    def node_start(self, bufn, pos, index, node_info):
+        pass
+
+    def node_end(self, bufn, pos, index, node_info):
+        pass
+
+    def props_start(self, bufn, pos, count):
+        pass
+
+    def props_end(self, bufn, pos, count):
+        pass
+
+    def prop_start(self, bufn, pos, index, prop_info):
+        pass
+
+    def children_start(self, bufn, pos, count):
+        pass
+
+    def children_end(self, bufn, pos, count):
+        pass
+
+    def visit_prop(self, bufn, pos, index):
+        prop_pos = pos
+        prop_name_hash, pos = ff_read_u32(bufn, pos)
+        prop_data_pos = pos
+        prop_data_raw, pos = ff_read_u32(bufn, pos)
+        prop_type, pos = ff_read_u8(bufn, pos)
+        prop_info = (prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type)
+        self.prop_start(bufn, prop_pos, index, prop_info)
+
+        return pos
+
+    def visit_node(self, bufn, pos, index):
+        node_start_pos = pos
+
+        name_hash, pos = ff_read_u32(bufn, pos)
+        data_offset, pos = ff_read_u32(bufn, pos)
+        prop_count, pos = ff_read_u16(bufn, pos)
+        child_count, pos = ff_read_u16(bufn, pos)
+        node_info = (name_hash, data_offset, prop_count, child_count)
+
+        end_header_pos = pos
+
+        self.node_start(bufn, node_start_pos, index, node_info)
+
+        # read properties
+        pos = data_offset
+
+        self.props_start(bufn, pos, prop_count)
+        for i in range(prop_count):
+            pos = self.visit_prop(bufn, pos, i)
+        self.props_end(bufn, pos, prop_count)
+
+        # read children
+        #  children 4-byte aligned
+        org_pos = pos
+        pos = pos + (4 - (pos % 4)) % 4
+        self.children_start(bufn, pos, child_count)
+        for i in range(child_count):
+            pos = self.visit_node(bufn, pos, i)
+        self.children_end(bufn, pos, child_count)
+
+        self.node_end(bufn, node_start_pos, index, node_info)
+
+        return end_header_pos
+
+    def visit(self, buffer):
+        pos = 0
+        n_buffer = len(buffer)
+        bufn = (buffer, n_buffer)
+        magic, pos = ff_read(bufn, pos, 4)
+        if magic != b'RTPC':
+            raise Exception('Bad MAGIC {}'.format(magic))
+
+        version, pos = ff_read_u32(bufn, pos)
+
+        self.visit_node(bufn, pos, 0)
+
+
+class RtpcVisitorDumpToString(RtpcVisitor):
+    def __init__(self, vfs: VfsDatabase):
+        super(RtpcVisitorDumpToString, self).__init__()
+        self.hash_lookup = FieldNameMap(vfs)
+        self._result = None
+        self._lines = []
+        self._depth = -1
+        self._ind0 = None
+        self._ind1 = None
+        self._ind2 = None
+
+    def result(self):
+        self._result = '\n'.join(self._lines)
+        return self._result
+
+    def process_depth(self):
+        self._ind0 = ' ' * self._depth
+        self._ind1 = ' ' * (self._depth + 2)
+        self._ind2 = ' ' * (self._depth + 4)
+
+    def visit(self, buffer):
+        self._result = ''
+        self._lines = []
+        self._depth = -2
+        super(RtpcVisitorDumpToString, self).visit(buffer)
+
+    def node_start(self, bufn, pos, index, node_info):
+        self._depth += 2
+        self.process_depth()
+
+        name_hash, data_offset, prop_count, child_count = node_info
+        name4 = self.hash_lookup.lookup(hash32=name_hash)
+        name = f'0x{name_hash:08x}'
+
+        if name4:
+            name = 'DB:H4:"{}"[{}]'.format(name4, name)
+
+        node_info_str = 'n:{} pc:{} cc:{} @ {} {:08x}'.format(
+            name, prop_count, child_count, data_offset, data_offset)
+
+        self._lines.append(self._ind0 + 'node:')
+        self._lines.append(self._ind1 + node_info_str)
+
+    def node_end(self, bufn, pos, index, node_info):
+        self._depth -= 2
+        self.process_depth()
+
+    def children_start(self, bufn, pos, count):
+        self._lines.append(self._ind1 + 'children -----------------')
+        self._depth += 2
+        self.process_depth()
+
+    def children_end(self, bufn, pos, count):
+        self._depth -= 2
+        self.process_depth()
+
+    def props_start(self, bufn, pos, count):
+        self._lines.append(self._ind1 + 'properties ---------------')
+
+    def prop_start(self, bufn, pos, index, prop_info):
+        prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
+
+        prop_data, prop_data_pos = parse_prop_data(bufn, prop_info)
+
+        if prop_type == k_type_objid:
+            name6 = self.hash_lookup.lookup(hash48=prop_data & 0x0000FFFFFFFFFFFF)
+            name = 'id:0x{:012X}'.format(prop_data)
+            if name6:
+                name = 'id:DB:H6:"{}"[{}]'.format(name6, name)
+            else:
+                name4 = self.hash_lookup.lookup(hash32=prop_data)
+                if name4:
+                    name = 'id:DB:H4:"{}"[{}]'.format(name4, name)
+
+            prop_data = name
+
+        elif prop_type == k_type_event:
+            data_new = []
+            for d in prop_data:
+                name6 = self.hash_lookup.lookup(hash48=d & 0x0000FFFFFFFFFFFF)
+                name = 'ev:0x{:012X}'.format(d)
+                if name6:
+                    name = 'ev:DB:H6:"{}"[{}]'.format(name6, name)
+                else:
+                    name4 = self.hash_lookup.lookup(hash32=d)
+                    if name4:
+                        name = 'ev:DB:H4:"{}"[{}]'.format(name4, name)
+
+                data_new.append(name)
+            prop_data = data_new
+
+        name = self.hash_lookup.lookup(hash32=prop_name_hash)
+        if name:
+            name = '"{}"'.format(name)
+        else:
+            name = f'0x{prop_name_hash:08x}'
+
+        self._lines.append(
+            self._ind2 + '@0x{:08x}({: 8d}) {} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {}'.format(
+                prop_pos, prop_pos,
+                name,
+                prop_data_raw,
+                prop_type,
+                PropType_names[prop_type],
+                prop_data_pos, prop_data_pos,
+                prop_data
+            )
+        )
+
+
+class RtpcVisitorGatherStrings(RtpcVisitor):
+    def __init__(self):
+        super(RtpcVisitorGatherStrings, self).__init__()
+        self.strings = set()
+
+    def visit(self, buffer):
+        self.strings = set()
+        super(RtpcVisitorGatherStrings, self).visit(buffer)
+
+    def prop_start(self, bufn, pos, index, prop_info):
+        prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
+
+        if prop_type == k_type_str:
+            prop_data, prop_data_pos = parse_prop_data(bufn, prop_info)
+            self.strings.add(prop_data)

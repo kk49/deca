@@ -16,7 +16,7 @@ from .db_types import *
 from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
-from .ff_rtpc import Rtpc, k_type_str
+from .ff_rtpc import RtpcVisitorGatherStrings
 from .ff_arc_tab import tab_file_load, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
 from .ff_gtoc import process_buffer_gtoc, GtocArchiveEntry, GtocFileEntry
@@ -553,47 +553,36 @@ class Processor:
             self._comm.trace('Processing RTPC Initial: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
         with db.db().file_obj_from(node) as f:
-            buf = f.read(node.size_u)
+            buffer = f.read(node.size_u)
 
-        rtpc = Rtpc()
-        with io.BytesIO(buf) as f:
-            rtpc.deserialize(f)
+        rtpc_gather = RtpcVisitorGatherStrings()
+        rtpc_gather.visit(buffer)
 
-        rnodelist = [rtpc.root_node]
+        for s in rtpc_gather.strings:
+            db.propose_string(s, node)
 
-        while len(rnodelist) > 0:
-            rnode = rnodelist.pop(0)
-
-            for c in rnode.child_table:
-                rnodelist.append(c)
-
-            for p in rnode.prop_table:
-                if p.type == k_type_str:
-                    s = p.data
-                    db.propose_string(s, node)
-
-                    fn, ext = os.path.splitext(s)
-                    if ext in {b'.tga', b'.dds'}:
-                        db.propose_string(fn + b'.ddsc', node, possible_file_types=[FTYPE_AVTX, FTYPE_DDS])
-                    elif ext == b'.skeleton':
-                        db.propose_string(fn + b'.bsk', node, possible_file_types=[FTYPE_TAG0])
-                    elif ext == b'.ragdoll':
-                        db.propose_string(fn + b'.brd', node, possible_file_types=[FTYPE_TAG0])
-                        db.propose_string(fn + b'.ragdolsettingsc', node, possible_file_types=[FTYPE_ADF])
-                    elif ext == b'.al':
-                        db.propose_string(fn + b'.afsmb', node, possible_file_types=[FTYPE_RTPC])
-                        db.propose_string(fn + b'.asb', node, possible_file_types=[FTYPE_RTPC])
-                    elif ext == b'.model_xml':
-                        db.propose_string(fn + b'.model_xmlc', node)
-                        db.propose_string(fn + b'.model.xml', node)
-                        db.propose_string(fn + b'.model.xmlc', node)
-                        db.propose_string(fn + b'.xml', node)
-                        db.propose_string(fn + b'.xmlc', node)
-                        db.propose_string(fn + b'.modelc', node)
-                    elif ext == b'.bik':
-                        db.propose_string(s + b'c', node, possible_file_types=[FTYPE_BINK_BIK, FTYPE_BINK_KB2])
-                    elif len(ext) > 0:
-                        db.propose_string(s + b'c', node, possible_file_types=[FTYPE_ADF])
+            fn, ext = os.path.splitext(s)
+            if ext in {b'.tga', b'.dds'}:
+                db.propose_string(fn + b'.ddsc', node, possible_file_types=[FTYPE_AVTX, FTYPE_DDS])
+            elif ext == b'.skeleton':
+                db.propose_string(fn + b'.bsk', node, possible_file_types=[FTYPE_TAG0])
+            elif ext == b'.ragdoll':
+                db.propose_string(fn + b'.brd', node, possible_file_types=[FTYPE_TAG0])
+                db.propose_string(fn + b'.ragdolsettingsc', node, possible_file_types=[FTYPE_ADF])
+            elif ext == b'.al':
+                db.propose_string(fn + b'.afsmb', node, possible_file_types=[FTYPE_RTPC])
+                db.propose_string(fn + b'.asb', node, possible_file_types=[FTYPE_RTPC])
+            elif ext == b'.model_xml':
+                db.propose_string(fn + b'.model_xmlc', node)
+                db.propose_string(fn + b'.model.xml', node)
+                db.propose_string(fn + b'.model.xmlc', node)
+                db.propose_string(fn + b'.xml', node)
+                db.propose_string(fn + b'.xmlc', node)
+                db.propose_string(fn + b'.modelc', node)
+            elif ext == b'.bik':
+                db.propose_string(s + b'c', node, possible_file_types=[FTYPE_BINK_BIK, FTYPE_BINK_KB2])
+            elif len(ext) > 0:
+                db.propose_string(s + b'c', node, possible_file_types=[FTYPE_ADF])
 
         node.processed_file_set(True)
         db.node_update(node)

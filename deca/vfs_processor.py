@@ -137,19 +137,31 @@ class VfsProcessor(VfsDatabase):
         self.nodes_add_many(initial_nodes)
 
     def process(self, debug=False):
-        inner_loop = [
+        inner_loop = []
+
+        inner_loop += [
             [self.process_by_ftype_match, (None, 'process_file_type_find')],
             [self.process_by_ftype_match, (FTYPE_EXE, 'process_exe')],
             [self.process_by_ftype_match, (FTYPE_ARC, 'process_arc')],
             [self.process_by_ftype_match, (FTYPE_TAB, 'process_tab')],
-            [self.process_by_ftype_match, (FTYPE_GT0C, 'process_gtoc')],
-            [self.process_by_ftype_match, (FTYPE_GARC, 'process_garc')],
-            [self.process_by_ftype_match, (None, 'process_garc')],
+        ]
+
+        if self.game_info.has_garcs():
+            inner_loop += [
+                [self.process_by_ftype_match, (FTYPE_GT0C, 'process_gtoc')],
+                [self.process_by_ftype_match, (FTYPE_GARC, 'process_garc')],
+                [self.process_by_ftype_match, (None, 'process_garc')],
+            ]
+
+        inner_loop += [
             [self.process_by_ftype_match, (FTYPE_SARC, 'process_sarc')],
+
             [self.process_by_v_hash_match, (self.file_hash(b'gdc/global.gdcc'), 'process_global_gdcc')],
             [self.process_by_ftype_match, (FTYPE_GDCBODY, 'process_global_gdcc_body')],
+
             [self.process_by_ext_hash_match, (self.ext_hash(b'.resourcebundle'), 'process_resource_bundle')],
             [self.process_by_vpath_endswith, (b'.resourcebundle', 'process_resource_bundle')],
+
             [self.process_by_ftype_match, (FTYPE_ADF, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_ADF_BARE, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_ADF0, 'process_adf_initial')],

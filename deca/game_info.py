@@ -118,6 +118,9 @@ class GameInfo:
     def file_assoc(self):
         raise NotImplementedError()
 
+    def has_garcs(self):
+        return False
+
 
 class GameInfoGZ(GameInfo):
     def __init__(self, game_dir, exe_name):
@@ -605,3 +608,6 @@ class GameInfoRage2(GameInfo):
                 b'.gfx': FTYPE_GFX,
             },
         ]
+
+    def has_garcs(self):
+        return True

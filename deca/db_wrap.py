@@ -7,7 +7,7 @@ from .ff_determine import determine_file_type_and_size
 from .file import ArchiveFile
 
 
-def determine_file_type(vfs: VfsDatabase, node: VfsNode):
+def determine_file_type_by_name(vfs: VfsDatabase, node: VfsNode):
     if node.file_type is None:
         if node.offset is None:
             node.file_type = FTYPE_SYMLINK
@@ -25,6 +25,40 @@ def determine_file_type(vfs: VfsDatabase, node: VfsNode):
                 elif ext == b'.hmddsc':
                     node.file_type = FTYPE_HMDDSC
 
+            if node.file_type is None:
+                hash32 = None
+                hash64 = None
+                string = node.v_path
+                if vfs.game_info.file_hash_size == 4:
+                    hash32 = node.v_hash
+                elif vfs.game_info.file_hash_size == 8:
+                    hash64 = node.v_hash
+                else:
+                    raise NotImplementedError(f'process_garc: Hash size of {vfs.game_info.file_hash_size} not handled')
+
+                # find possible hash strings for node
+                hash_strings = vfs.hash_string_match(hash32=hash32, hash64=hash64, string=string)
+
+                gtoc_archives = []
+                for rowid, string, hash32, hash48, hash64, ext_hash32 in hash_strings:
+                    results = vfs.gtoc_archive_where_hash32_magic(path_hash32=hash32, magic=node.magic)
+                    gtoc_archives = gtoc_archives + results
+
+                if len(gtoc_archives) == 0:
+                    print('No gtoc archives found for {} {} {}'.format(
+                        node.uid, node.v_hash_to_str(), node.v_path))
+                elif len(gtoc_archives) > 1:
+                    print('TOO MANY!!! {} gtoc archives found for {} {} {}'.format(
+                        len(gtoc_archives), node.uid, node.v_hash_to_str(), node.v_path))
+                else:
+                    node.file_type = FTYPE_GARC
+
+
+def determine_file_type(vfs: VfsDatabase, node: VfsNode):
+    if node.file_type is None:
+        if node.offset is None:
+            node.file_type = FTYPE_SYMLINK
+        else:
             if node.compression_type_get() in {compression_v4_03_oo, compression_v4_04_oo}:
                 # todo special case for jc4 /rage2 compression needs to be cleaned up
                 with vfs.file_obj_from(node) as f:
@@ -92,12 +126,13 @@ class DbWrap:
         if exc_type is None and not self._drop_results:
             n_nodes_to_add = len(self._nodes_to_add)
             if n_nodes_to_add > 0:
-                self.log('Determining file types: {} nodes'.format(len(self._nodes_to_add)))
-                for ii, node in enumerate(self._nodes_to_add):
-                    self.status(ii + self._index_offset, n_nodes_to_add + self._index_offset)
-                    determine_file_type(self._db, node)
+                # self.log('Determining file types: {} nodes'.format(len(self._nodes_to_add)))
+                # for ii, node in enumerate(self._nodes_to_add):
+                #     self.status(ii + self._index_offset, n_nodes_to_add + self._index_offset)
+                #     determine_file_type_by_name(self._db, node)
+                #     determine_file_type(self._db, node)
 
-                self.status(n_nodes_to_add + self._index_offset, n_nodes_to_add + self._index_offset)
+                # self.status(n_nodes_to_add + self._index_offset, n_nodes_to_add + self._index_offset)
 
                 self.log('DATABASE: Inserting {} nodes'.format(len(self._nodes_to_add)))
                 self._db.nodes_add_many(self._nodes_to_add)

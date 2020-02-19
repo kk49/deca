@@ -11,7 +11,7 @@ import deca.ff_rtpc
 
 from .file import ArchiveFile
 from .vfs_db import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
-from .db_wrap import DbWrap, determine_file_type
+from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
 from .db_types import *
 from .ff_types import *
 from .ff_txt import load_json
@@ -202,7 +202,8 @@ class Processor:
         self._comm = comm
 
         self.commands = {
-            'process_file_type_find': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find),
+            'process_file_type_find_no_name': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find_no_name),
+            'process_file_type_find_with_name': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find_with_name),
             'process_symlink': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_symlink),
             'process_exe': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_exe),
             'process_arc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_arc),
@@ -259,19 +260,27 @@ class Processor:
 
         return results
 
-    def process_file_type_find(self, node: VfsNode, db: DbWrap):
+    def process_file_type_find_no_name(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
         determine_file_type(db.db(), node)
-        if node.file_type is None:
-            return False
-        else:
+        node.flags_set(node_flag_processed_file_raw_no_name)
+        db.node_update(node)
+        return True
+
+    def process_file_type_find_with_name(self, node: VfsNode, db: DbWrap):
+        self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+        determine_file_type_by_name(db.db(), node)
+        if node.file_type is not None:
+            node.flags_set(node_flag_processed_file_raw_with_name)
             db.node_update(node)
             return True
+        else:
+            return False
 
     def process_symlink(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing SYMLINK: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
 
         return True
@@ -280,7 +289,7 @@ class Processor:
         self._comm.trace('Processing EXE: {} {}'.format(node.uid, node.p_path))
 
         db.extract_types_from_exe(node.p_path)
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
 
         return True
@@ -293,7 +302,7 @@ class Processor:
         tab_path = tab_path[0] + '.tab'
         cnode = VfsNode(file_type=FTYPE_TAB, p_path=tab_path, pid=node.uid, v_hash_type=db.file_hash_type)
         db.node_add(cnode)
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
 
         return True
@@ -333,7 +342,7 @@ class Processor:
 
                 db.node_add(cnode)
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -358,7 +367,7 @@ class Processor:
             db.node_add(cnode)
             db.propose_string(cnode.v_path, node)
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -380,7 +389,7 @@ class Processor:
         )
         db.node_add(cnode)
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -406,7 +415,7 @@ class Processor:
                 db.node_add(cnode)
                 db.propose_string(cnode.v_path, node)
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -431,7 +440,7 @@ class Processor:
 
                 db.node_add(cnode)
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -539,7 +548,7 @@ class Processor:
                                 parent_node=node, possible_file_types=[FTYPE_FSB5C])
 
             # only mark as processed if AdfTypeMissing exception did not happen
-            node.processed_file_set(True)
+            node.flags_set(node_flag_processed_file_type)
             db.node_update(node)
             return True
 
@@ -584,7 +593,7 @@ class Processor:
             elif len(ext) > 0:
                 db.propose_string(s + b'c', node, possible_file_types=[FTYPE_ADF])
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -618,7 +627,7 @@ class Processor:
                 db.propose_string(f'ui/{tag.tag_body.url}', node, possible_file_types=[FTYPE_GFX])
                 db.propose_string(f'ui/{fn}.gfx', node, possible_file_types=[FTYPE_GFX])
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -636,7 +645,7 @@ class Processor:
                 for item in v:
                     db.propose_string(item, node)
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -653,7 +662,7 @@ class Processor:
 
         db.gtoc_archive_add(archives)
 
-        node.processed_file_set(True)
+        node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
         return True
 
@@ -706,7 +715,7 @@ class Processor:
 
                 db.node_add(child)
 
-            node.processed_file_set(True)
+            node.flags_set(node_flag_processed_file_type)
             db.node_update(node)
             return True
 
@@ -792,69 +801,6 @@ class Processor:
             self._comm.trace('v_path:miss {} {:016X}'.format(v_path, np.uint64(v_hash)))
 
         return True
-
-        # found_vpaths = list(found_vpaths)
-        # found_vpaths.sort()
-        # with open(self.working_dir + 'found_vpaths.txt', 'a') as f:
-        #     for vp in found_vpaths:
-        #         f.write('{}\n'.format(vp.decode('utf-8')))
-
-        #         for s in ss:
-        #             hid = hash_little(s)
-        #             if hid in self.hash_present:
-        #                 if hid in self.map_hash_to_vpath:
-        #                     if s != self.map_hash_to_vpath[hid]:
-        #                         self.logger.trace('HASH CONFLICT STRINGS: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], s))
-        #                         self.hash_bad[hid] = (self.map_hash_to_vpath[hid], s)
-        #                 else:
-        #                     if dump_found_paths:
-        #                         f.write('{:08X}\t{}\n'.format(hid, s))
-        #                     self.map_hash_to_vpath[hid] = s
-        #                     self.map_vpath_to_hash[s] = hid
-        #                     found = found + 1
-        #
-        # self.logger.log('fill in v_paths, mark extensions identified files as file_type')
-        #
-        # self.logger.log('PROCESS BASELINE VNODE INFORMATION')
-        # for idx in range(len(self.table_vfsnode)):
-        #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.v_hash is not None:
-        #         hid = node.v_hash
-        #         if node.v_path is not None:
-        #             if hid in self.map_hash_to_vpath:
-        #                 if self.map_hash_to_vpath[hid] != node.v_path:
-        #                     self.logger.trace('HASH CONFLICT ARCHIVE: {:08X}: {} != {}'.format(hid, self.map_hash_to_vpath[hid], node.v_path))
-        #                     self.hash_bad[hid] = (self.map_hash_to_vpath[hid], node.v_path)
-        #             else:
-        #                 self.map_hash_to_vpath[hid] = node.v_path
-        #                 self.map_vpath_to_hash[node.v_path] = hid
-        # self.logger.log('PROCESS BASELINE VNODE INFORMATION: found {} hashes, {} mapped'.format(len(self.hash_present), len(self.map_hash_to_vpath)))
-        #
-        # for idx in range(len(self.table_vfsnode)):
-        #     node = self.table_vfsnode[idx]
-        #     if node.is_valid() and node.v_hash is not None and node.v_path is None:
-        #         if node.v_hash in self.map_hash_to_vpath:
-        #             node.v_path = self.map_hash_to_vpath[node.v_hash]
-        #
-        #     if node.is_valid() and node.v_hash is not None:
-        #         if node.file_type not in {FTYPE_ARC, FTYPE_TAB}:
-        #             if node.v_hash in self.map_hash_to_vpath:
-        #                 self.hash_map_present.add(node.v_hash)
-        #             else:
-        #                 self.hash_map_missing.add(node.v_hash)
-        #
-        #     if node.is_valid() and node.v_path is not None:
-        #         if os.path.splitext(node.v_path)[1][0:4] == b'.atx':
-        #             if node.file_type is not None:
-        #                 raise Exception('ATX marked as non ATX: {}'.format(node.v_path))
-        #             node.file_type = FTYPE_ATX
-        #
-        #         lst = self.map_vpath_to_vfsnodes.get(node.v_path, [])
-        #         if len(lst) > 0 and lst[0].offset is None:  # Do not let symlink be first is list # TODO Sort by accessibility
-        #             lst = [node] + lst
-        #         else:
-        #             lst.append(node)
-        #         self.map_vpath_to_vfsnodes[node.v_path] = lst
 
 
 class MultiProcessVfsBase:

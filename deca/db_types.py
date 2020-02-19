@@ -1,5 +1,19 @@
-import os
 from .hashes import hash32_func, hash_all_func
+
+node_flag_compression_type_mask = 0xFF
+node_flag_compression_type_shift = 0
+node_flag_compression_flag_mask = 0xFF00
+node_flag_compression_flag_shift = 8
+node_flag_v_hash_type_mask = 0x3 << 16
+node_flag_v_hash_type_4 = 0x1 << 16
+node_flag_v_hash_type_6 = 0x2 << 16
+node_flag_v_hash_type_8 = 0x3 << 16
+
+node_flag_temporary_file = 1 << 20
+node_flag_processed_file_raw_no_name = 1 << 21
+node_flag_processed_file_raw_with_name = 1 << 22
+node_flag_processed_file_type = 1 << 23
+node_flag_processed_file_specific = 1 << 24
 
 
 def to_bytes(s):

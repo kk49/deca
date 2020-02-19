@@ -53,22 +53,6 @@ def common_prefix(s0, s1):
     return s0[:cnt], s0[cnt:], s1[cnt:]
 
 
-node_flag_compression_type_mask = 0xFF
-node_flag_compression_type_shift = 0
-node_flag_compression_flag_mask = 0xFF00
-node_flag_compression_flag_shift = 8
-node_flag_v_hash_type_mask = 0x0030000
-node_flag_v_hash_type_4 = 0x0010000
-node_flag_v_hash_type_6 = 0x0020000
-node_flag_v_hash_type_8 = 0x0030000
-node_flag_temporary_file = 1 << 20
-node_flag_is_processed_file_mask = 1 << 21
-# future
-node_flag_processed_file_determine_type = 1 << 21
-node_flag_processed_file_by_type = 1 << 22
-node_flag_processed_file_specific_file = 1 << 23
-
-
 def format_hash32(v_hash):
     if v_hash is None:
         return v_hash
@@ -113,7 +97,10 @@ class VfsNode:
             pid=None, index=None,
             offset=None, size_c=None, size_u=None,
             file_sub_type=None, ext_hash=None, magic=None,
-            is_processed_file=False,
+            is_processed_file_raw_no_name=False,
+            is_processed_file_raw_with_name=False,
+            is_processed_file_type=False,
+            is_processed_file_specific=False,
             is_temporary_file=False,
             compression_type=0,
             compression_flag=0,
@@ -143,8 +130,14 @@ class VfsNode:
             self.flags = 0
             self.flags |= (compression_type << node_flag_compression_type_shift) & node_flag_compression_type_mask
             self.flags |= (compression_flag << node_flag_compression_flag_shift) & node_flag_compression_flag_mask
-            if is_processed_file:
-                self.flags = self.flags | node_flag_is_processed_file_mask
+            if is_processed_file_raw_no_name:
+                self.flags = self.flags | node_flag_processed_file_raw_no_name
+            if is_processed_file_raw_with_name:
+                self.flags = self.flags | node_flag_processed_file_raw_with_name
+            if is_processed_file_type:
+                self.flags = self.flags | node_flag_processed_file_type
+            if is_processed_file_specific:
+                self.flags = self.flags | node_flag_processed_file_specific
             if is_temporary_file:
                 self.flags = self.flags | node_flag_temporary_file
 
@@ -161,12 +154,18 @@ class VfsNode:
     def flags_get(self, bit):
         return (self.flags & bit) == bit
 
-    def flags_set(self, bit, value):
+    def flags_set_value(self, bit, value):
         if value:
             value = bit
         else:
             value = 0
         self.flags = (self.flags & ~bit) | value
+
+    def flags_set(self, bit):
+        self.flags_set_value(bit, True)
+
+    def flags_clear(self, bit):
+        self.flags_set_value(bit, False)
 
     def compression_type_get(self):
         return (self.flags & node_flag_compression_type_mask) >> node_flag_compression_type_shift
@@ -184,17 +183,11 @@ class VfsNode:
             (self.flags & ~node_flag_compression_flag_mask) | \
             ((value << node_flag_compression_flag_shift) & node_flag_compression_flag_mask)
 
-    def processed_file_get(self):
-        return self.flags_get(node_flag_is_processed_file_mask)
-
-    def processed_file_set(self, value):
-        self.flags_set(node_flag_is_processed_file_mask, value)
-
     def temporary_file_get(self):
         return self.flags_get(node_flag_temporary_file)
 
     def temporary_file_set(self, value):
-        self.flags_set(node_flag_temporary_file, value)
+        self.flags_set_value(node_flag_temporary_file, value)
 
     def is_valid(self):
         return self.uid is not None and self.uid != 0
@@ -586,13 +579,13 @@ class VfsDatabase:
 
         if v_hash is not None:
             params.append(v_hash)
-            wheres.append('v_hash == (?)')
+            wheres.append('(v_hash == (?))')
 
         if v_path is not None:
             if isinstance(v_path, bytes):
                 v_path = v_path.decode('utf-8')
             params.append(v_path)
-            wheres.append('v_path == (?)')
+            wheres.append('(v_path == (?))')
 
         if v_path_like is not None:
             if isinstance(v_path_like, bytes):
@@ -648,14 +641,6 @@ class VfsDatabase:
             "select node_id from core_nodes where flags & (?) == (?)", [mask, value], dbg=dbg)
         return [uid[0] for uid in uids]
 
-    def nodes_where_processed_select_uid(self, processed):
-        mask = node_flag_is_processed_file_mask
-        if processed:
-            value = node_flag_is_processed_file_mask
-        else:
-            value = 0
-        return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_processed_select_uid')
-
     def nodes_where_temporary_select_uid(self, temporary):
         mask = node_flag_temporary_file
         if temporary:
@@ -664,43 +649,64 @@ class VfsDatabase:
             value = 0
         return self.nodes_where_flag_select_uid(mask, value, dbg='nodes_where_temporary_select_uid')
 
-    def nodes_where_f_type_select_uid_v_hash_processed(self, file_type):
+    def nodes_where_f_type_select_uid_v_hash_processed(
+            self, file_type, flag=node_flag_processed_file_type, has_any_path=None):
+        params = []
+        wheres = []
+
         if file_type is None:
-            results = self.db_query_all(
-                "SELECT node_id, v_hash, ((flags & (?)) == (?)) FROM core_nodes WHERE file_type IS NULL",
-                [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask],
-                dbg='nodes_where_f_type_select_uid_v_hash_processed')
-
+            wheres.append('(file_type is NULL)')
         else:
-            results = self.db_query_all(
-                "SELECT node_id, v_hash, ((flags & (?)) == (?)) FROM core_nodes WHERE file_type == (?)",
-                [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, file_type],
-                dbg='nodes_where_f_type_select_uid_v_hash_processed')
+            params.append(file_type)
+            wheres.append('(file_type == (?))')
+
+        if has_any_path is None:
+            pass
+        else:
+            if has_any_path:
+                wheres.append('((v_path is NOT NULL) OR (p_path is NOT NULL))')
+            else:
+                wheres.append('((v_path is NULL) AND (p_path is NULL))')
+
+        q_str = ' AND '.join(wheres)
+
+        results = self.db_query_all(
+            "SELECT node_id, v_hash, ((flags & (?)) == (?)) FROM core_nodes WHERE " + q_str,
+            [flag, flag] + params,
+            dbg='nodes_where_f_type_select_uid_v_hash_processed')
+
         return results
 
-    # TODO combine these functions
-    def nodes_where_v_hash_select_uid_v_hash_processed(self, v_hash):
-        results = self.db_query_all(
-            "SELECT node_id, v_hash, ((flags & (?)) == (?)) FROM core_nodes WHERE (v_hash == (?)) AND (parent_offset not null)",
-            [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, v_hash],
-            dbg='nodes_where_v_hash_select_uid_v_hash_processed')
-        return results
+    def nodes_where_match_select_uid_v_hash_processed(self, flag=node_flag_processed_file_type, v_hash=None, ext_hash=None, suffix_like=None):
+        params = []
+        wheres = []
 
-    def nodes_where_ext_hash_select_uid_v_hash_processed(self, ext_hash):
-        results = self.db_query_all(
-            "SELECT node_id, v_hash, ((flags & (?)) == (?)) FROM core_nodes WHERE (ext_hash == (?)) AND (parent_offset not null)",
-            [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, ext_hash],
-            dbg='nodes_where_ext_hash_select_uid_v_hash_processed')
-        return results
+        if v_hash is not None:
+            params.append(v_hash)
+            wheres.append('(v_hash == (?))')
 
-    def nodes_where_vpath_endswith_select_uid_v_hash_processed(self, suffix):
-        if isinstance(suffix, bytes):
-            suffix = suffix.decode('utf-8')
-        suffix = '%' + suffix
+        if ext_hash is not None:
+            params.append(ext_hash)
+            wheres.append('(ext_hash == (?))')
+
+        if suffix_like is not None:
+            if isinstance(suffix_like, bytes):
+                suffix_like = suffix_like.decode('utf-8')
+            suffix_like = '%' + suffix_like
+
+            params.append(suffix_like)
+            wheres.append('(v_path LIKE (?))')
+
+        if len(params) > 0:
+            q_str = ' ' + ' AND '.join(wheres)
+            q_str += ' AND '
+        else:
+            q_str = ''
+
         results = self.db_query_all(
-            "SELECT node_id, v_hash, ((flags & (?)) == (?)) FROM core_nodes WHERE (v_path LIKE (?)) AND (parent_offset not null)",
-            [node_flag_is_processed_file_mask, node_flag_is_processed_file_mask, suffix],
-            dbg='nodes_where_vpath_endswith_select_uid_v_hash_processed')
+            "SELECT node_id, v_hash, ((flags & (?)) == (?)) FROM core_nodes WHERE " + q_str + "(parent_offset not null)",
+            [flag, flag] + params,
+            dbg='nodes_where_match_select_uid_v_hash_processed')
         return results
 
     def nodes_select_distinct_vhash(self):

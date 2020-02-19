@@ -94,9 +94,10 @@ def determine_file_type_and_size(f, file_size0):
 
     # need to inspect file structure
 
+    fm = ArchiveFile(f)
+
     if file_type is None:
         # OBC files with (u32)4, (u32)count , 80 * count bytes, something to do with areas on the map? object placement?
-        fm = ArchiveFile(f)
         fm.seek(start_pos)
         ver = fm.read_u32()
         cnt = fm.read_u32()

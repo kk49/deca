@@ -7,7 +7,7 @@ import deca.ff_rtpc
 
 from .vfs_db import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
 from .db_types import *
-from .db_wrap import DbWrap, determine_file_type
+from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
 from .vfs_commands import MultiProcessControl
 from .game_info import determine_game
 from .ff_types import *
@@ -83,7 +83,6 @@ class VfsProcessor(VfsDatabase):
         node = VfsNode(
             v_hash_type=self.file_hash_type,
             file_type=FTYPE_EXE, p_path=exe_path, size_u=f_size, size_c=f_size, offset=0)
-        determine_file_type(self, node)
         initial_nodes.append(node)
 
         self.logger.log('Add unarchived files')
@@ -94,7 +93,6 @@ class VfsProcessor(VfsDatabase):
             node = VfsNode(
                 v_hash_type=self.file_hash_type,
                 v_hash=v_hash, v_path=v_path, p_path=ua_file, size_u=f_size, size_c=f_size, offset=0)
-            determine_file_type(self, node)
             initial_nodes.append(node)
 
         self.logger.log('Add TAB / ARC files')
@@ -131,7 +129,6 @@ class VfsProcessor(VfsDatabase):
             node = VfsNode(
                 v_hash_type=self.file_hash_type,
                 file_type=FTYPE_ARC, p_path=file_arc, size_u=f_size, size_c=f_size, offset=0)
-            determine_file_type(self, node)
             initial_nodes.append(node)
 
         self.nodes_add_many(initial_nodes)
@@ -140,20 +137,20 @@ class VfsProcessor(VfsDatabase):
         inner_loop = []
 
         inner_loop += [
-            [self.process_by_ftype_match, (None, 'process_file_type_find')],
+            [self.process_no_ftype, (None, 'process_file_type_find_no_name')],
+            [self.process_no_ftype_with_name, (None, 'process_file_type_find_with_name')],
+
             [self.process_by_ftype_match, (FTYPE_EXE, 'process_exe')],
             [self.process_by_ftype_match, (FTYPE_ARC, 'process_arc')],
             [self.process_by_ftype_match, (FTYPE_TAB, 'process_tab')],
-        ]
+            [self.process_no_ftype, (None, 'process_file_type_find_no_name')],
+            [self.process_no_ftype_with_name, (None, 'process_file_type_find_with_name')],
 
-        if self.game_info.has_garcs():
-            inner_loop += [
-                [self.process_by_ftype_match, (FTYPE_GT0C, 'process_gtoc')],
-                [self.process_by_ftype_match, (FTYPE_GARC, 'process_garc')],
-                [self.process_by_ftype_match, (None, 'process_garc')],
-            ]
+            [self.process_by_ftype_match, (FTYPE_GT0C, 'process_gtoc')],
+            [self.process_by_ftype_match, (FTYPE_GARC, 'process_garc')],
+            [self.process_no_ftype, (None, 'process_file_type_find_no_name')],
+            [self.process_no_ftype_with_name, (None, 'process_file_type_find_with_name')],
 
-        inner_loop += [
             [self.process_by_ftype_match, (FTYPE_SARC, 'process_sarc')],
 
             [self.process_by_v_hash_match, (self.file_hash(b'gdc/global.gdcc'), 'process_global_gdcc')],
@@ -161,6 +158,9 @@ class VfsProcessor(VfsDatabase):
 
             [self.process_by_ext_hash_match, (self.ext_hash(b'.resourcebundle'), 'process_resource_bundle')],
             [self.process_by_vpath_endswith, (b'.resourcebundle', 'process_resource_bundle')],
+
+            [self.process_no_ftype, (None, 'process_file_type_find_no_name')],
+            [self.process_no_ftype_with_name, (None, 'process_file_type_find_with_name')],
 
             [self.process_by_ftype_match, (FTYPE_ADF, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_ADF_BARE, 'process_adf_initial')],
@@ -321,13 +321,19 @@ class VfsProcessor(VfsDatabase):
         self.logger.log(f'SUMMARY: Unmatched Nodes: {len(nodes_no_vpath)}')
         self.logger.log(f'SUMMARY: Unmatched Path Hashes: {len(nodes_no_vpath_set)}')
 
-    def src_indexes_process(self, src_indexes):
+    def src_indexes_process(self, src_indexes, process_all=False):
         indexes = []
         nodes = {}
+        done_set = set()
+
         for uid, v_hash, processed in src_indexes:
-            if v_hash is None and not processed:
+            if v_hash is None or process_all:
                 # handle physical only files with no vpath (EXE, ARC, TAB, EXTERNALS)
-                indexes.append(uid)
+                #   or if processing each node individually
+                if processed:
+                    done_set.add(uid)
+                else:
+                    indexes.append(uid)
             else:
                 # normal case of files that have v_hashes and v_paths (possibly)
                 info = nodes.get(v_hash, None)
@@ -336,7 +342,6 @@ class VfsProcessor(VfsDatabase):
                 elif processed and not info[1]:
                     nodes[v_hash] = (uid, processed)
 
-        done_set = set()
         for k, v in nodes.items():
             uid, processed = v
             if processed:
@@ -345,6 +350,63 @@ class VfsProcessor(VfsDatabase):
                 indexes.append(uid)
 
         return indexes, done_set
+
+    def process_no_ftype(self, f_type, cmd):
+        self.logger.log('PROCESS: Determine file type: Begin'.format())
+
+        src_indexes = self.nodes_where_f_type_select_uid_v_hash_processed(
+            file_type=None,
+            flag=node_flag_processed_file_raw_no_name
+        )
+        indexes, done_set = self.src_indexes_process(src_indexes, process_all=True)
+
+        indexes_processed = []
+        indexes_success = []
+        indexes_failed = []
+        if indexes:
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            results = commander.do_map(cmd, indexes, step_id='Determine file type')
+
+            indexes_processed = [k for k, v in results]
+            indexes_success = [k for k, v in results if v]
+            indexes_failed = [k for k, v in results if not v]
+
+        self.logger.log(
+            'PROCESS: Determine file type: End: Already Processed: {}, Additional: {}, Success: {}, Failed: {}'.format(
+                len(done_set), len(indexes_processed), len(indexes_success), len(indexes_failed)
+            )
+        )
+
+        return indexes_processed, indexes_success, indexes_failed
+
+    def process_no_ftype_with_name(self, f_type, cmd):
+        self.logger.log('PROCESS: Determine file type with name: Begin'.format())
+
+        src_indexes = self.nodes_where_f_type_select_uid_v_hash_processed(
+            file_type=None,
+            flag=node_flag_processed_file_raw_with_name,
+            has_any_path=True
+        )
+        indexes, done_set = self.src_indexes_process(src_indexes, process_all=True)
+
+        indexes_processed = []
+        indexes_success = []
+        indexes_failed = []
+        if indexes:
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            results = commander.do_map(cmd, indexes, step_id='Determine file type with name')
+
+            indexes_processed = [k for k, v in results]
+            indexes_success = [k for k, v in results if v]
+            indexes_failed = [k for k, v in results if not v]
+
+        self.logger.log(
+            'PROCESS: Determine file type with name: End: Already Processed: {}, Additional: {}, Success: {}, Failed: {}'.format(
+                len(done_set), len(indexes_processed), len(indexes_success), len(indexes_failed)
+            )
+        )
+
+        return indexes_processed, indexes_success, indexes_failed
 
     def process_by_ftype_match(self, f_type, cmd):
         self.logger.log('PROCESS: F_TYPE = {}: Begin'.format(f_type))
@@ -374,7 +436,7 @@ class VfsProcessor(VfsDatabase):
     def process_by_v_hash_match(self, v_hash, cmd):
         self.logger.log('PROCESS: V_HASH = 0x{}: Begin'.format(self.file_hash_format(v_hash)))
 
-        src_indexes = self.nodes_where_v_hash_select_uid_v_hash_processed(v_hash)
+        src_indexes = self.nodes_where_match_select_uid_v_hash_processed(v_hash=v_hash)
         indexes, done_set = self.src_indexes_process(src_indexes)
         
         indexes_processed = []
@@ -400,7 +462,7 @@ class VfsProcessor(VfsDatabase):
     def process_by_ext_hash_match(self, ext_hash, cmd):
         self.logger.log('PROCESS: EXT_HASH = 0x{:08X}: Begin'.format(ext_hash))
 
-        src_indexes = self.nodes_where_ext_hash_select_uid_v_hash_processed(ext_hash)
+        src_indexes = self.nodes_where_match_select_uid_v_hash_processed(ext_hash=ext_hash)
         indexes, done_set = self.src_indexes_process(src_indexes)
         indexes_processed = []
         indexes_success = []
@@ -421,7 +483,7 @@ class VfsProcessor(VfsDatabase):
     def process_by_vpath_endswith(self, suffix, cmd):
         self.logger.log('PROCESS: ENDS_WITH = {}: Begin'.format(suffix))
 
-        src_indexes = self.nodes_where_vpath_endswith_select_uid_v_hash_processed(suffix)
+        src_indexes = self.nodes_where_match_select_uid_v_hash_processed(suffix_like=suffix)
         indexes, done_set = self.src_indexes_process(src_indexes)
         indexes_processed = []
         indexes_success = []
@@ -658,12 +720,13 @@ class VfsProcessor(VfsDatabase):
 
             # tag atx file type since they have no header info
 
-            vnode = VfsNode(
+            node = VfsNode(
                 v_hash_type=self.file_hash_type,
                 v_hash=v_hash, v_path=v_path, p_path=filename,
                 size_u=f_size, size_c=f_size, offset=0, is_temporary_file=is_temporary_file)
-            determine_file_type(self, vnode)
-            self.nodes_add_many([vnode])
+            determine_file_type_by_name(self, node)
+            determine_file_type(self, node)
+            self.nodes_add_many([node])
 
             self.logger.log('ADDED {} TO EXTERNAL FILES'.format(filename))
         else:

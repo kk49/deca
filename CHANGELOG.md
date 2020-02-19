@@ -1,5 +1,5 @@
 #### v0.2.4 "Gotta go faster"
-*Refactored way file type determination is done to separate with and without path processing, and tag nodes as being done to prevent duplication of work.
+* Refactored way file type determination is done to separate with and without path processing, and tag nodes as being done to prevent duplication of work.
 * garcs are tagged during the raw processing with path phase
 * Another String update from Ciprianno
 

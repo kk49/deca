@@ -261,14 +261,14 @@ class Processor:
         return results
 
     def process_file_type_find_no_name(self, node: VfsNode, db: DbWrap):
-        self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+        # self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
         determine_file_type(db.db(), node)
         node.flags_set(node_flag_processed_file_raw_no_name)
         db.node_update(node)
         return True
 
     def process_file_type_find_with_name(self, node: VfsNode, db: DbWrap):
-        self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+        # self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
         determine_file_type_by_name(db.db(), node)
         if node.file_type is not None:
             node.flags_set(node_flag_processed_file_raw_with_name)

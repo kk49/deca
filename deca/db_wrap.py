@@ -44,14 +44,12 @@ def determine_file_type_by_name(vfs: VfsDatabase, node: VfsNode):
                     results = vfs.gtoc_archive_where_hash32_magic(path_hash32=hash32, magic=node.magic)
                     gtoc_archives = gtoc_archives + results
 
-                if len(gtoc_archives) == 0:
-                    print('No gtoc archives found for {} {} {}'.format(
-                        node.uid, node.v_hash_to_str(), node.v_path))
-                elif len(gtoc_archives) > 1:
-                    print('TOO MANY!!! {} gtoc archives found for {} {} {}'.format(
-                        len(gtoc_archives), node.uid, node.v_hash_to_str(), node.v_path))
-                else:
+                if len(gtoc_archives) == 1:
                     node.file_type = FTYPE_GARC
+                # elif len(gtoc_archives) == 0:
+                #     print('No gtoc archives found for {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+                # else:
+                #     print('TOO MANY!!! {} gtoc archives found for {} {} {}'.format(len(gtoc_archives), node.uid, node.v_hash_to_str(), node.v_path))
 
 
 def determine_file_type(vfs: VfsDatabase, node: VfsNode):

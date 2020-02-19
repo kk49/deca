@@ -6,7 +6,8 @@ def main():
     if len(sys.argv) > 1:
         filename = sys.argv[1]
     else:
-        filename = '/home/krys/prj/test-deca/images/rg2/269a7a27c601837e.ddsc'
+        filename = '/home/krys/prj/test-deca/images/rg2/01f124a03533a3bb.dat'
+        # filename = '/home/krys/prj/test-deca/images/rg2/269a7a27c601837e.ddsc'
         # filename = '/home/krys/prj/test-deca/images/rg2/26a057f5d16e88f0.ddsc'
 
     with open(filename, 'rb') as f:

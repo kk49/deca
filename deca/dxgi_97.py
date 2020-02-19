@@ -44,7 +44,7 @@ def extract_bits(buffer, byte_offset, bit_offset, n_bits):
         mask_high = (1 << (bit_end - 8)) - 1
         mask_low = (1 << low_bits) - 1
         low = (buffer[byte_offset] >> bit_offset) & mask_low
-        high = (buffer[byte_offset + 1]) & mask_high << low_bits
+        high = ((buffer[byte_offset + 1]) & mask_high) << low_bits
         return low | high
     else:
         low = (buffer[byte_offset] >> bit_offset) & ((1 << n_bits) - 1)
@@ -126,24 +126,24 @@ def process_image_97(image, buffer, n_buffer, nx, ny):
                     for end_point in range(2):
                         pbit0 = extract_bits(buffer, pos, bit_offset, 1)
                         bit_offset += 1
-                        # for color in range(3):
-                        #     end_points[subset, end_point, color] |= pbit0 << (8 - bits[4] - 1) | (end_points[subset, end_point, color] >> (bits[4] + 1))
-                        # if bits[5] > 0:
-                        #     end_points[subset, end_point, 3] |= pbit0 << (8 - bits[5] - 1) | (end_points[subset, end_point, 3] >> (bits[5] + 1))
+                        for color in range(3):
+                            end_points[subset, end_point, color] |= pbit0 << (8 - bits[4] - 1) | (end_points[subset, end_point, color] >> (bits[4] + 1))
+                        if bits[5] > 0:
+                            end_points[subset, end_point, 3] |= pbit0 << (8 - bits[5] - 1) | (end_points[subset, end_point, 3] >> (bits[5] + 1))
 
             # shared P-bit
             if bits[7] > 0:
                 pbit0 = extract_bits(buffer, pos, bit_offset, 1)
                 pbit1 = extract_bits(buffer, pos, bit_offset+1, 1)
                 bit_offset += 2
-                #
-                # for end_point in range(2):
-                #     for color in range(3):
-                #         end_points[0, end_point, color] |= pbit0 << (8 - bits[4] - 1) | (end_points[0, end_point, color] >> (bits[4] + 1))
-                #         end_points[1, end_point, color] |= pbit1 << (8 - bits[4] - 1) | (end_points[1, end_point, color] >> (bits[4] + 1))
-                #     if bits[5] > 0:
-                #         end_points[0, end_point, 3] |= pbit0 << (8 - bits[5] - 1) | (end_points[0, end_point, 3] >> (bits[5] + 1))
-                #         end_points[1, end_point, 3] |= pbit1 << (8 - bits[5] - 1) | (end_points[1, end_point, 3] >> (bits[5] + 1))
+
+                for end_point in range(2):
+                    for color in range(3):
+                        end_points[0, end_point, color] |= pbit0 << (8 - bits[4] - 1) | (end_points[0, end_point, color] >> (bits[4] + 1))
+                        end_points[1, end_point, color] |= pbit1 << (8 - bits[4] - 1) | (end_points[1, end_point, color] >> (bits[4] + 1))
+                    if bits[5] > 0:
+                        end_points[0, end_point, 3] |= pbit0 << (8 - bits[5] - 1) | (end_points[0, end_point, 3] >> (bits[5] + 1))
+                        end_points[1, end_point, 3] |= pbit1 << (8 - bits[5] - 1) | (end_points[1, end_point, 3] >> (bits[5] + 1))
 
             if num_subsets == 1:
                 p = table_p1
@@ -182,7 +182,7 @@ def process_image_97(image, buffer, n_buffer, nx, ny):
             assert bit_offset == 128
 
             # print(f'pi97: pos {pos}, bit_offset {bit_offset}, mode {mode}, subsets {num_subsets}, bits {bits}')
-            # print(f'pi97: {(num_subsets, partition_number, rotation, index_selection, bits)}')
+            # print(f'pi97: mode:{mode} ns:{num_subsets} pn:{partition_number} r:{rotation} is:{index_selection} bits:{bits}')
             # print(end_points)
             # print(indexes_primary)
             # print(indexes_secondary)
@@ -215,20 +215,11 @@ def process_image_97(image, buffer, n_buffer, nx, ny):
                     a = (np.uint16(end_points[part_index, 0, 3]) * (64 - alpha_itp) + np.uint16(end_points[part_index, 1, 3]) * alpha_itp + 32) >> 6
 
                     if rotation == 1:
-                        # a, r = r, a
-                        t = a
-                        a = r
-                        r = t
+                        a, r = r, a
                     elif rotation == 2:
-                        # a, g = g, a
-                        t = a
-                        a = g
-                        g = t
+                        a, g = g, a
                     elif rotation == 3:
-                        # a, b = b, a
-                        t = a
-                        a = b
-                        b = t
+                        a, b = b, a
 
                     image[oy + syi, ox + sxi, 0] = r
                     image[oy + syi, ox + sxi, 1] = g

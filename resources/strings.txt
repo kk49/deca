@@ -4,6 +4,7 @@ _materials_list
 _nodefaultbbox
 _object_id
 _scalable
+180_rule_cut_enabled
 equal
 less
 greater
@@ -20,13 +21,16 @@ NOR
 NAND
 XOR
 act
+Activate
 active
 accumalated_impulse_stumble_threshold
 acceleration_time
 ai_character_radius
+aiming_tuning_file
 air_heli
 air_plane
 all_layers
+allow default camera cut
 alphamask_offset_u
 alphamask_offset_v
 alphamask_source_channel
@@ -37,6 +41,10 @@ angle
 angular_damping
 animation_layer_0
 animation_layer_1
+animation_layer_2
+animation_layer_3
+animation_layer_4
+animation_layer_5
 animation_speed
 animation_speed_change
 at_end
@@ -48,14 +56,18 @@ attach_position
 attach_preference
 bar
 behaviour_tree
+blend_option
 block_check
 block_check_auto_despawn
+blood_decal_effect
 bone_name
 bottom_area
 bullet_impulse_scale
 bullet_protection
 bullet_strength_protection
 buoyancy
+camera_alignment
+camera offset
 capsule_impact_threshold
 cast_shadows
 center_of_mass
@@ -67,13 +79,17 @@ collision
 collision_enabled
 color
 cull_distance
+custom_movement_tuning_file
 cutoff_angle_begin
 cutoff_angle_end
 DamageControlRef
 damage_impulse_max
+Deactivate
 debris
 debris_quality
+DebugColor
 deceleration_time
+default
 despawn_event
 despawn_pool
 destruction_disable
@@ -87,6 +103,9 @@ distance_fade_end
 distance_limit
 distance_limit_type
 distance_safe
+DOFHeightFalloff
+DOFSmoothness
+DOFSmoothnessNear
 drag
 drag_coefficient
 do_hide_event
@@ -127,11 +146,15 @@ falloff_start
 filename
 fire_protection
 fire_strength_protection
+flag
 floating_bobble
+FocalDistance
+FocalDistanceNear
 force_activate_on_spawn
 force_destroy
 force_daytime_emissive
 force_show_distance
+FOV
 grappling_mode
 grappling_pull_strength_protection
 gravity
@@ -173,6 +196,7 @@ is_spot_light
 layer
 large_effect_damage_threshold
 lightweight_character
+lifetime
 linear_damping
 list_position
 loop
@@ -180,10 +204,13 @@ loop_count
 loop_mode
 los_check
 make_invulnerable
+make_vulnerable
 mass
 mass_category
 master_object
 max_distance
+MaxDOF
+MaxDOFNear
 max_impulse_clipping
 max_ao
 melee_impulse_scale
@@ -192,6 +219,7 @@ melee_strength_protection
 min_distance
 model_0
 movement_tuning_file
+mpm_texture
 mpmweight
 multiplier
 name
@@ -203,9 +231,11 @@ noise_amplitude
 noise_chaos
 noise_frequency
 normalweight
+normal_texture
 no_vehicle
 npc
 npc_dead
+on_hit
 one_shot
 offset
 offset_u
@@ -244,6 +274,7 @@ RainOccluder
 randomize_unique_indices
 range
 reenable_distance
+reference_name
 reflect_in_water
 relay_event
 reset_on_play
@@ -257,6 +288,7 @@ rotation_mode
 RotationMode
 scale_based_on_distance
 script
+settings file
 show_before_attach
 show_debugging_info
 show_during_missions
@@ -300,6 +332,7 @@ time_max
 time_to_add
 tile_u
 tile_v
+transition groups
 translation_mode
 TranslationMode
 trigger_distance
@@ -307,6 +340,7 @@ trigger_msg
 trigger_percentage
 type
 unload_auto_despawn
+update during pause
 update_params_first_frame_only
 UpdateParamsFirstFrameOnly
 Usage
@@ -315,6 +349,7 @@ vehicle_type
 vertical_acc_to_ragdoll_threshold
 visible
 video_projector
+VFX_HDR_Scale
 volume_intensity
 volumetric_mod
 wake_physics

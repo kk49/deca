@@ -1,5 +1,5 @@
 #### v0.2.4 "Gotta go faster"
-* Removed garc processing for games without garcs
+* Another String update from Ciprianno
 
 #### v0.2.3 "Gotta go fast"
 * Sped up RTPC string dumping speed by caching string hash results and not hitting the DB for every field

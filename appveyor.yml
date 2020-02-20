@@ -22,6 +22,8 @@ build_script:
 
     pip list
 
+    pip install deca/wheels/win_amd64/matplotlib-3.1.3-cp38-cp38-win_amd64.whl
+
     pip install -r deca/requirements.txt
 
     pip install pyinstaller

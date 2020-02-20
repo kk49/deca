@@ -1,4 +1,4 @@
-#### v0.2.5 "Gotta goer faster"
+#### v0.2.5 "Gotta go faster, without graphic artifacts"
 * BC7 decompression works with JIT compilation using Numba
 
 #### v0.2.4 "Gotta go faster"

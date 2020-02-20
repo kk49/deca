@@ -4,6 +4,7 @@ numpy
 scipy
 Pillow
 PySide2==5.11.2
+shiboken2==5.11.2
 XlsxWriter
 pygltflib
 openpyxl

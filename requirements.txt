@@ -3,7 +3,7 @@ matplotlib
 numpy
 scipy
 Pillow
-PySide2
+PySide2==5.11.2
 XlsxWriter
 pygltflib
 openpyxl

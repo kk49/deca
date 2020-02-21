@@ -407,8 +407,8 @@ def ddsc_write_to_dds(ddsc, output_file_name):
 
     if ddsc.header.depth > 1:
         flags = flags | 0x800000  # DDSD_DEPTH
-    dwCaps2 = dwCaps2 | 0x200000
-    resourceDimension = 4
+        dwCaps2 = dwCaps2 | 0x200000
+        resourceDimension = 4
 
     with ArchiveFile(open(output_file_name, 'wb')) as f:
         # magic word

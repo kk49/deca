@@ -2,7 +2,7 @@ import numpy as np
 import struct
 from deca.file import ArchiveFile
 from deca.ff_aaf import load_aaf_header
-from deca.ff_avtx import DdscHeader
+from deca.ff_avtx import DdImageHeader
 from deca.ff_types import *
 
 
@@ -47,9 +47,9 @@ def determine_file_type_and_size(f, file_size0):
         file_type = FTYPE_ADF0
     elif b'AVTX' == magic[0:4]:
         file_type = FTYPE_AVTX
-        header = DdscHeader()
-        header.deserialize(magic)
-        file_sub_type = header.pixel_format
+        header = DdImageHeader()
+        header.deserialize_ddsc(magic)
+        file_sub_type = header.dds_header_dxt10.dxgiFormat
     elif b'AAF' == magic[0:3].upper():
         file_type = FTYPE_AAF
         f.seek(start_pos)

@@ -2,6 +2,8 @@
 * Fix for dds file generation caused by cut and paste shenanigans
 * Fixed bug where filter stopped working
 * Fixed bug where add external stopped working
+* Combine DDSC and DDS processing, now using same code and headers
+* Fixed processing of DXGI format 10 which has 16 bit floating point channels (display scales based on single min and max of all channels)
 
 #### v0.2.5 "Gotta go faster, without graphic artifacts"
 * BC7 decompression works with JIT compilation using Numba

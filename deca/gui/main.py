@@ -11,7 +11,7 @@ from PySide2.QtCore import Slot
 from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
 
 
-window_title = 'decaGUI: v0.2.6-testing'
+window_title = 'decaGUI: v0.2.6-rc'
 
 
 class MainWindow(QMainWindow):
@@ -243,7 +243,7 @@ class MainWindow(QMainWindow):
         if os.name == 'nt':
             game_loc = 'C:/Program Files(x86)/Steam/steamapps/common/'
         else:
-            game_loc = '~/.steam/steamapps/common'
+            game_loc = os.path.expanduser('~/.steam/steamapps/common')
 
         filename = QFileDialog.getOpenFileName(self, 'Create Project ...', game_loc, 'Game EXE (*.exe *.EXE)')
 

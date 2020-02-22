@@ -11,6 +11,9 @@ from PySide2.QtCore import Slot
 from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
 
 
+window_title = 'decaGUI: v0.2.6-testing'
+
+
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
@@ -78,7 +81,7 @@ class MainWindow(QMainWindow):
 
     def vfs_set(self, vfs):
         self.vfs = vfs
-        self.setWindowTitle("deca GUI, Archive: {}".format(vfs.game_info.game_dir))
+        self.setWindowTitle("{}: Archive: {}".format(window_title, vfs.game_info.game_dir))
         self.ui.statusbar.showMessage("LOAD COMPLETE")
         self.vfs_reload()
         self.ui.action_external_add.setEnabled(True)
@@ -240,7 +243,7 @@ class MainWindow(QMainWindow):
         if os.name == 'nt':
             game_loc = 'C:/Program Files(x86)/Steam/steamapps/common/'
         else:
-            game_loc = '../'
+            game_loc = '~/.steam/steamapps/common'
 
         filename = QFileDialog.getOpenFileName(self, 'Create Project ...', game_loc, 'Game EXE (*.exe *.EXE)')
 
@@ -291,7 +294,7 @@ def main():
     # Qt Application
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.setWindowTitle("deca GUI")
+    window.setWindowTitle(window_title)
     window.show()
     app.exec_()
 

@@ -15,12 +15,13 @@ import deca.dxgi
 
 class DecaImage:
     def __init__(
-            self, sx=None, sy=None, depth_cnt=None, depth_idx=None, pixel_format=None,
+            self, sx=None, sy=None, depth_cnt=None, depth_idx=None, surface_id=None, pixel_format=None,
             itype=None, data=None, raw_data=None, filename=None):
         self.size_x = sx
         self.size_y = sy
         self.depth_cnt = depth_cnt
         self.depth_idx = depth_idx
+        self.surface_id = surface_id
         self.pixel_format = pixel_format
         self.itype = itype
         self.data = data
@@ -216,6 +217,9 @@ class DdImageHeader:
 
 
 class Ddsc:
+    """
+    contains surfaces, which contain mip levels, which contain depths, which are 2d images
+    """
     def __init__(self):
         self.header_buffer = None
         self.header = DdImageHeader()
@@ -276,9 +280,9 @@ class Ddsc:
 
         return True
 
-    def load_body(self, f, filename, save_raw_data):
-        nx = self.header.dds_header.dwWidth
-        ny = self.header.dds_header.dwHeight
+    def load_body(self, f, filename, save_raw_data, group_by_surface):
+        nx0 = self.header.dds_header.dwWidth
+        ny0 = self.header.dds_header.dwHeight
         self.mips = []
 
         if self.header.dds_header.dwMipMapCount == 0:
@@ -290,18 +294,54 @@ class Ddsc:
 
         depth = max(1, self.header.dds_header.dwDepth)
 
-        for i in range(mip_map_count):
-            for j in range(depth):
-                self.mips.append(DecaImage(
-                    sx=nx, sy=ny,
-                    depth_cnt=depth, depth_idx=j,
-                    pixel_format=self.header.dds_header_dxt10.dxgiFormat, itype='missing'))
+        surfaces = []
 
-            nx = nx // 2
-            ny = ny // 2
+        if self.header.dds_header.dwCaps2 & DDSCAPS2_CUBEMAP_POSITIVEX != 0:
+            surfaces.append('xp')
+        if self.header.dds_header.dwCaps2 & DDSCAPS2_CUBEMAP_NEGATIVEX != 0:
+            surfaces.append('xn')
+        if self.header.dds_header.dwCaps2 & DDSCAPS2_CUBEMAP_POSITIVEY != 0:
+            surfaces.append('yp')
+        if self.header.dds_header.dwCaps2 & DDSCAPS2_CUBEMAP_NEGATIVEY != 0:
+            surfaces.append('yn')
+        if self.header.dds_header.dwCaps2 & DDSCAPS2_CUBEMAP_POSITIVEZ != 0:
+            surfaces.append('zp')
+        if self.header.dds_header.dwCaps2 & DDSCAPS2_CUBEMAP_NEGATIVEZ != 0:
+            surfaces.append('zn')
 
-        begin = (mip_map_count - mip_map_count_in_file) * depth
-        end = mip_map_count * depth
+        if len(surfaces) == 0:
+            surfaces = ['main']
+
+        if group_by_surface:
+            for sid in surfaces:
+                nx = nx0
+                ny = ny0
+                for i in range(mip_map_count):
+                    for j in range(depth):
+                        self.mips.append(DecaImage(
+                            sx=nx, sy=ny,
+                            depth_cnt=depth, depth_idx=j, surface_id=sid,
+                            pixel_format=self.header.dds_header_dxt10.dxgiFormat, itype='missing'))
+
+                    nx = nx // 2
+                    ny = ny // 2
+        else:
+            nx = nx0
+            ny = ny0
+            for i in range(mip_map_count):
+                for sid in surfaces:
+                    for j in range(depth):
+                        self.mips.append(DecaImage(
+                            sx=nx, sy=ny,
+                            depth_cnt=depth, depth_idx=j, surface_id=sid,
+                            pixel_format=self.header.dds_header_dxt10.dxgiFormat, itype='missing'))
+
+                nx = nx // 2
+                ny = ny // 2
+
+        n_surfaces = len(surfaces)
+        begin = (mip_map_count - mip_map_count_in_file) * depth * n_surfaces
+        end = mip_map_count * depth * n_surfaces
         for midx in range(begin, end):
             mip = self.mips[midx]
             if not self.load_mip(mip, f, filename, save_raw_data):
@@ -313,7 +353,7 @@ class Ddsc:
         self.header.deserialize_ddsc(header)
 
         # print('Compression Format: {}'.format(self.pixel_format))
-        self.load_body(f, filename, save_raw_data)
+        self.load_body(f, filename, save_raw_data, group_by_surface=False)
 
     def load_atx(self, f, filename=None, save_raw_data=False):
         first_loaded = 0
@@ -344,7 +384,7 @@ class Ddsc:
                 return self.load_dds_new(f, filename=filename, save_raw_data=save_raw_data)
         else:
             self.header.deserialize_dds(f)
-            self.load_body(f, filename, save_raw_data)
+            self.load_body(f, filename, save_raw_data, group_by_surface=True)
 
 
 def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):

@@ -80,11 +80,14 @@ class MainWindow(QMainWindow):
         self.vfs = vfs
         self.setWindowTitle("deca GUI, Archive: {}".format(vfs.game_info.game_dir))
         self.ui.statusbar.showMessage("LOAD COMPLETE")
+        self.vfs_reload()
+        self.ui.action_external_add.setEnabled(True)
+
+    def vfs_reload(self):
         self.ui.vfs_node_widget.vfs_set(self.vfs)
         self.ui.vfs_node_widget_non_mapped.vfs_set(self.vfs)
         self.ui.vfs_dir_widget.vfs_set(self.vfs)
         self.ui.data_view.vfs_set(self.vfs)
-        self.ui.action_external_add.setEnabled(True)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -180,8 +183,6 @@ class MainWindow(QMainWindow):
         )
 
     def slot_extract_gltf_clicked(self, checked):
-
-
         self.extract_gltf(
             'GLTF2 / 3D', self.vfs.working_dir + 'gltf2_3d/',
             save_to_one_dir=self.ui.chkbx_export_save_to_one_dir.isChecked(),
@@ -206,7 +207,7 @@ class MainWindow(QMainWindow):
             self.error_dialog('Build Failed: {}'.format(exce.args))
 
     def filter_text_changed(self):
-        txt = self.filter_edit.text()
+        txt = self.ui.filter_edit.text()
         if len(txt) == 0:
             txt = '^.*$'
         else:
@@ -268,7 +269,7 @@ class MainWindow(QMainWindow):
         if filename is not None and len(filename[0]) > 0:
             filename = filename[0]
             self.vfs.external_file_add(filename)
-            self.main_widget.vfs_set(self.vfs)
+            self.vfs_reload()
         else:
             self.logger.log('Cannot Open {}'.format(filename))
 

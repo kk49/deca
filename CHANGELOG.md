@@ -1,3 +1,8 @@
+#### v0.2.6 "Copy and Paste, a dangerous tool"
+* Fix for dds file generation caused by cut and paste shenanigans
+* Fixed bug where filter stopped working
+* Fixed bug where add external stopped working
+
 #### v0.2.5 "Gotta go faster, without graphic artifacts"
 * BC7 decompression works with JIT compilation using Numba
 
@@ -28,7 +33,7 @@
   * '../work/strings.txt' (new)
 * Preparing for separation of filename strings from field name strings from miscellaneous strings
 * Incomplete support for new DXGI 97 / BC7 image format
-* DDSC/AVTX files now put their pixel format into the DB and the sub_type field shared with ADF files that expose thier
+* DDSC/AVTX files now put their pixel format into the DB and the sub_type field shared with ADF files that expose their
     ADF type
 
 

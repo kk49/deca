@@ -148,72 +148,98 @@ class DdImageHeader:
                 self.dds_header.dwCaps |= DDSCAPS_COMPLEX
                 self.dds_header.dwCaps2 |= DDS_CUBEMAP_ALLFACES | DDSCAPS2_CUBEMAP
 
-        self.dump()
+            end_pos = fh.tell()
 
-    def deserialize_dds(self, f, convert_to_dx10=True):
-        self.magic = f.read(4)
+        # self.dump()
 
-        if self.magic != b'DDS ':
-            raise EDecaIncorrectFileFormat('deserialize_dds')
+        return end_pos
 
-        # DDS_HEADER
-        self.dds_header.dwSize = f.read_u32()
-        self.dds_header.dwFlags = f.read_u32()
-        self.dds_header.dwHeight = f.read_u32()
-        self.dds_header.dwWidth = f.read_u32()
-        self.dds_header.dwPitchOrLinearSize = f.read_u32()
-        self.dds_header.dwDepth = f.read_u32()
-        self.dds_header.dwMipMapCount = f.read_u32()
+    def deserialize_dds(self, buffer, convert_to_dx10=True):
+        with ArchiveFile(io.BytesIO(buffer)) as f:
+            self.magic = f.read(4)
 
-        self.dds_header.dwReserved1 = []
-        for i in range(11):
-            self.dds_header.dwReserved1.append(f.read_u32())
+            if self.magic != b'DDS ':
+                raise EDecaIncorrectFileFormat('deserialize_dds')
 
-        # PIXEL_FORMAT
-        self.dds_header.ddspf.dwSize = f.read_u32()
-        self.dds_header.ddspf.dwFlags = f.read_u32()
-        self.dds_header.ddspf.dwFourCC = f.read(4)
-        self.dds_header.ddspf.dwRGBBitCount = f.read_u32()
-        self.dds_header.ddspf.dwRBitMask = f.read_u32()
-        self.dds_header.ddspf.dwGBitMask = f.read_u32()
-        self.dds_header.ddspf.dwBBitMask = f.read_u32()
-        self.dds_header.ddspf.dwABitMask = f.read_u32()
+            # DDS_HEADER
+            self.dds_header.dwSize = f.read_u32()
+            self.dds_header.dwFlags = f.read_u32()
+            self.dds_header.dwHeight = f.read_u32()
+            self.dds_header.dwWidth = f.read_u32()
+            self.dds_header.dwPitchOrLinearSize = f.read_u32()
+            self.dds_header.dwDepth = f.read_u32()
+            self.dds_header.dwMipMapCount = f.read_u32()
 
-        # DDS_HEADER continued
-        self.dds_header.dwCaps = f.read_u32()
-        self.dds_header.dwCaps2 = f.read_u32()
-        self.dds_header.dwCaps3 = f.read_u32()
-        self.dds_header.dwCaps4 = f.read_u32()
-        self.dds_header.dwReserved2 = f.read_u32()
+            self.dds_header.dwReserved1 = []
+            for i in range(11):
+                self.dds_header.dwReserved1.append(f.read_u32())
 
-        # DDS_HEADER_DXT10
-        four_cc = self.dds_header.ddspf.dwFourCC
-        dw_four_cc = struct.unpack('I', four_cc)[0]
-        dxgi_format = dw_four_cc_convert.get(dw_four_cc, dw_four_cc_convert.get(four_cc, None))
+            # PIXEL_FORMAT
+            self.dds_header.ddspf.dwSize = f.read_u32()
+            self.dds_header.ddspf.dwFlags = f.read_u32()
+            self.dds_header.ddspf.dwFourCC = f.read(4)
+            self.dds_header.ddspf.dwRGBBitCount = f.read_u32()
+            self.dds_header.ddspf.dwRBitMask = f.read_u32()
+            self.dds_header.ddspf.dwGBitMask = f.read_u32()
+            self.dds_header.ddspf.dwBBitMask = f.read_u32()
+            self.dds_header.ddspf.dwABitMask = f.read_u32()
 
-        if self.dds_header.ddspf.dwFourCC == b'DX10':
-            self.dds_header_dxt10.dxgiFormat = f.read_u32()
-            self.dds_header_dxt10.resourceDimension = f.read_u32()
-            self.dds_header_dxt10.miscFlag = f.read_u32()
-            self.dds_header_dxt10.arraySize = f.read_u32()
-            self.dds_header_dxt10.miscFlags2 = f.read_u32()
-        elif convert_to_dx10 and dxgi_format is not None:
-            self.dds_header.ddspf.dwFourCC = b'DX10'
-            self.dds_header_dxt10.dxgiFormat = dxgi_format
-            self.dds_header_dxt10.arraySize = 1  # TODO assume array size of one
-            if self.dds_header.dwCaps2 & DDSCAPS2_VOLUME != 0:
-                self.dds_header_dxt10.resourceDimension = 3 + 1
-            else:
-                # TODO assuming 2d texture
-                self.dds_header_dxt10.resourceDimension = 2 + 1
+            # DDS_HEADER continued
+            self.dds_header.dwCaps = f.read_u32()
+            self.dds_header.dwCaps2 = f.read_u32()
+            self.dds_header.dwCaps3 = f.read_u32()
+            self.dds_header.dwCaps4 = f.read_u32()
+            self.dds_header.dwReserved2 = f.read_u32()
 
-            # self.dds_header_dxt10.miscFlag = 0
-            # self.dds_header_dxt10.arraySize = 1
-            # self.dds_header_dxt10.miscFlags2 = 0
+            # DDS_HEADER_DXT10
+            four_cc = self.dds_header.ddspf.dwFourCC
+            dw_four_cc = struct.unpack('I', four_cc)[0]
+            dxgi_format = dw_four_cc_convert.get(dw_four_cc, dw_four_cc_convert.get(four_cc, None))
 
-        self.mip_count = self.dds_header.dwMipMapCount
+            if self.dds_header.ddspf.dwFourCC == b'DX10':
+                self.dds_header_dxt10.dxgiFormat = f.read_u32()
+                self.dds_header_dxt10.resourceDimension = f.read_u32()
+                self.dds_header_dxt10.miscFlag = f.read_u32()
+                self.dds_header_dxt10.arraySize = f.read_u32()
+                self.dds_header_dxt10.miscFlags2 = f.read_u32()
+            elif convert_to_dx10 and dxgi_format is not None:
+                self.dds_header.ddspf.dwFourCC = b'DX10'
+                self.dds_header_dxt10.dxgiFormat = dxgi_format
+                self.dds_header_dxt10.arraySize = 1  # TODO assume array size of one
+                if self.dds_header.dwCaps2 & DDSCAPS2_VOLUME != 0:
+                    self.dds_header_dxt10.resourceDimension = 3 + 1
+                else:
+                    # TODO assuming 2d texture
+                    self.dds_header_dxt10.resourceDimension = 2 + 1
+            elif convert_to_dx10 and dw_four_cc == 0:
+                # older format, probably uses bitmasks
+                dxgi_format = None
+                r_mask = self.dds_header.ddspf.dwRBitMask
+                g_mask = self.dds_header.ddspf.dwGBitMask
+                b_mask = self.dds_header.ddspf.dwBBitMask
+                a_mask = self.dds_header.ddspf.dwABitMask
+                if self.dds_header.ddspf.dwRGBBitCount == 8:
+                    if r_mask == 0xFF:
+                        dxgi_format = DXGI_FORMAT_R8_TYPELESS
+                elif self.dds_header.ddspf.dwRGBBitCount == 32:
+                    if r_mask == (0xFF << 0) and g_mask == (0xFF << 8) and b_mask == (0xFF << 16) and a_mask == (0xFF << 24):
+                        dxgi_format = DXGI_FORMAT_R8G8B8A8_UNORM
+                    elif r_mask == (0xFF << 16) and g_mask == (0xFF << 8) and b_mask == (0xFF << 0) and a_mask == (0xFF << 24):
+                        dxgi_format = DXGI_FORMAT_B8G8R8A8_UNORM
 
-        self.dump()
+                if dxgi_format is not None:
+                    self.dds_header.ddspf.dwFourCC = b'DX10'
+                    self.dds_header_dxt10.dxgiFormat = dxgi_format
+                    self.dds_header_dxt10.arraySize = 1  # TODO assume array size of one
+                    self.dds_header_dxt10.resourceDimension = 2 + 1
+
+            self.mip_count = self.dds_header.dwMipMapCount
+
+            end_pos = f.tell()
+
+        # self.dump()
+
+        return end_pos
 
 
 class Ddsc:
@@ -252,13 +278,22 @@ class Ddsc:
             if raw_data_size < raw_size:
                 raise Exception('Ddsc::load_ddsc: Not Enough Data')
 
-        if pixel_format in {10}:  # floating point components
+        if pixel_format in {2, 10}:  # floating point 4 components
             inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
             deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
             mn = np.nanmin(inp_f32)
             mx = np.nanmax(inp_f32)
             s = 1.0 / (mx - mn)
             inp = ((inp_f32 - mn) * s * 255).astype(dtype=np.uint8)
+        elif pixel_format in {26}:  # floating point 3 components
+            inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
+            deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
+            mn = np.nanmin(inp_f32[:, :, 0:3])
+            mx = np.nanmax(inp_f32[:, :, 0:3])
+            s = 1.0 / (mx - mn)
+            inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
+            inp[:, :, 0:3] = ((inp_f32[:, :, 0:3] - mn) * s * 255).astype(dtype=np.uint8)
+            inp[:, :, 3] = 255
         else:
             inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
             deca.dxgi.process_image(inp, raw_data, nx, ny, pixel_format)
@@ -347,12 +382,22 @@ class Ddsc:
             if not self.load_mip(mip, f, filename, save_raw_data):
                 break
 
+    def load_dds(self, f, filename=None, save_raw_data=False):
+        if isinstance(f, str) or isinstance(f, bytes):
+            with ArchiveFile(open(f, 'rb')) as f:
+                return self.load_dds(f, filename=filename, save_raw_data=save_raw_data)
+        else:
+            header = f.read(256)
+            hl = self.header.deserialize_dds(header)
+            self.header_buffer = header[0:hl]
+            f.seek(hl)
+            self.load_body(f, filename, save_raw_data, group_by_surface=True)
+
     def load_ddsc(self, f, filename=None, save_raw_data=False):
         header = f.read(128)
-        self.header_buffer = header
-        self.header.deserialize_ddsc(header)
-
-        # print('Compression Format: {}'.format(self.pixel_format))
+        hl = self.header.deserialize_ddsc(header)
+        self.header_buffer = header[0:hl]
+        f.seek(hl)
         self.load_body(f, filename, save_raw_data, group_by_surface=False)
 
     def load_atx(self, f, filename=None, save_raw_data=False):
@@ -373,19 +418,6 @@ class Ddsc:
         for finfo in files[1:]:
             self.load_atx(finfo[1], filename=finfo[0], save_raw_data=save_raw_data)
 
-    def load_dds(self, f):
-        im = Image.open(f)
-        im.convert('RGBA')
-        self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='dds', data=np.array(im))]
-
-    def load_dds_new(self, f, filename=None, save_raw_data=False):
-        if isinstance(f, str) or isinstance(f, bytes):
-            with ArchiveFile(open(f, 'rb')) as f:
-                return self.load_dds_new(f, filename=filename, save_raw_data=save_raw_data)
-        else:
-            self.header.deserialize_dds(f)
-            self.load_body(f, filename, save_raw_data, group_by_surface=True)
-
 
 def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
     if vnode.file_type == FTYPE_BMP:
@@ -404,7 +436,7 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
             filename = os.path.splitext(vnode.v_path)
         f_ddsc = vfs.file_obj_from(vnode)
         ddsc = Ddsc()
-        ddsc.load_dds_new(ArchiveFile(f_ddsc), filename=filename, save_raw_data=save_raw_data)
+        ddsc.load_dds(ArchiveFile(f_ddsc), filename=filename, save_raw_data=save_raw_data)
 
     elif vnode.file_type in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:
         if vnode.v_path is None:
@@ -592,7 +624,7 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
         with ArchiveFile(open(ifile, 'rb')) as file_in:
             # dsc_header = file_in.read(37 * 4 - 5 * 4)  # skip dds header
             dsc_header = Ddsc()
-            dsc_header.load_dds_new(file_in, True)
+            dsc_header.load_dds(file_in, True)
             for mip in ddsc.mips:
                 buffer = file_in.read(len(mip.raw_data))
                 mip.raw_data = buffer

@@ -1,5 +1,21 @@
 import struct
 
+
+'''
+https://docs.microsoft.com/en-us/windows/win32/direct3ddds/dds-header
+https://docs.microsoft.com/en-us/windows/win32/direct3ddds/dds-pixelformat
+https://docs.microsoft.com/en-us/windows/win32/direct3ddds/dds-header-dxt10
+https://docs.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide
+https://docs.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format
+https://docs.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-data-conversion
+https://docs.microsoft.com/en-us/windows/win32/direct3d11/texture-block-compression-in-direct3d-11
+https://docs.microsoft.com/en-us/windows/win32/direct3d11/bc6h-format
+https://docs.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
+https://docs.microsoft.com/en-us/windows/win32/direct3d11/bc7-format-mode-reference
+https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/format-support-for-direct3d-11-1-feature-level-hardware
+'''
+
+
 DXGI_FORMAT_UNKNOWN	                    = 0
 DXGI_FORMAT_R32G32B32A32_TYPELESS       = 1
 DXGI_FORMAT_R32G32B32A32_FLOAT          = 2

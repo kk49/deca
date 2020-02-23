@@ -50,6 +50,11 @@ def determine_file_type_and_size(f, file_size0):
         header = DdImageHeader()
         header.deserialize_ddsc(magic)
         file_sub_type = header.dds_header_dxt10.dxgiFormat
+    elif b'DDS ' == magic[0:4]:
+        file_type = FTYPE_DDS
+        header = DdImageHeader()
+        header.deserialize_dds(magic)
+        file_sub_type = header.dds_header_dxt10.dxgiFormat
     elif b'AAF' == magic[0:3].upper():
         file_type = FTYPE_AAF
         f.seek(start_pos)
@@ -57,8 +62,6 @@ def determine_file_type_and_size(f, file_size0):
         file_size = aafh.size_u
     elif b'SARC' == magic[4:8]:
         file_type = FTYPE_SARC
-    elif b'DDS ' == magic[0:4]:
-        file_type = FTYPE_DDS
     elif b'RTPC' == magic[0:4]:
         file_type = FTYPE_RTPC
     elif b'CFX' == magic[0:3]:

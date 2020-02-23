@@ -15,22 +15,15 @@ c_process_image_lib = None
 c_process_image_func = None
 
 
-
-
 # https://docs.microsoft.com/en-us/windows/desktop/direct3d9/opaque-and-1-bit-alpha-textures
 # https://msdn.microsoft.com/ja-jp/library/bb173059(v=vs.85).aspx
 # https://docs.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format
 # less than 32 bit floats
 #   https://docs.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-float-rules
 
-@njit
-def u16_f16_to_f32(value):
-    s = value >> 15
-    e = (value >> 10) & 0x1F
-    f = value & 0x3FF
 
-    den = (1 / 1023.0)
-
+@njit(inline='always')
+def ux_to_fx_to_f32(s, e, f, den):
     if s == 1:
         s = np.float32(-1)
     else:
@@ -47,8 +40,49 @@ def u16_f16_to_f32(value):
     else:
         return np.float32(s * (2.0 ** (e-15)) * (1 + f * den))
 
+
+@njit(inline='always')
+def u10_to_f10_in_f32(value):
+    s = 0
+    e = (value >> 5) & 0x1F
+    f = value & 0x1F
+    den = (1 / 31.0)
+    return ux_to_fx_to_f32(s, e, f, den)
+
+
+@njit(inline='always')
+def u11_to_f11_in_f32(value):
+    s = 0
+    e = (value >> 6) & 0x1F
+    f = value & 0x3F
+    den = (1 / 63.0)
+    return ux_to_fx_to_f32(s, e, f, den)
+
+
+@njit(inline='always')
+def u16_to_f16_in_f32(value):
+    s = value >> 15
+    e = (value >> 10) & 0x1F
+    f = value & 0x3FF
+    den = (1 / 1023.0)
+    return ux_to_fx_to_f32(s, e, f, den)
+
+
 @njit
-def process_image_10(image, buffer, n_buffer, nx, ny):
+def process_image_2(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R32G32B32A32_FLOAT
+    pos = 0
+    chans = [0] * 4
+    for yi in range(ny):
+        for xi in range(nx):
+            chans[0], pos = ff_read_f32(buffer, n_buffer, pos)
+            chans[1], pos = ff_read_f32(buffer, n_buffer, pos)
+            chans[2], pos = ff_read_f32(buffer, n_buffer, pos)
+            chans[3], pos = ff_read_f32(buffer, n_buffer, pos)
+            image[yi, xi, :] = chans
+
+
+@njit
+def process_image_10(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R16G16B16A16_FLOAT
     pos = 0
     chans = [0] * 4
     for yi in range(ny):
@@ -57,29 +91,30 @@ def process_image_10(image, buffer, n_buffer, nx, ny):
             chans[1], pos = ff_read_u16(buffer, n_buffer, pos)
             chans[2], pos = ff_read_u16(buffer, n_buffer, pos)
             chans[3], pos = ff_read_u16(buffer, n_buffer, pos)
-            image[yi, xi, 0] = u16_f16_to_f32(chans[0])
-            image[yi, xi, 1] = u16_f16_to_f32(chans[1])
-            image[yi, xi, 2] = u16_f16_to_f32(chans[2])
-            image[yi, xi, 3] = u16_f16_to_f32(chans[3])
+            image[yi, xi, 0] = u16_to_f16_in_f32(chans[0])
+            image[yi, xi, 1] = u16_to_f16_in_f32(chans[1])
+            image[yi, xi, 2] = u16_to_f16_in_f32(chans[2])
+            image[yi, xi, 3] = u16_to_f16_in_f32(chans[3])
+
 
 @njit
-def process_image_26(image, buffer, n_buffer, nx, ny):
+def process_image_26(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R11G11B10_FLOAT
     pos = 0
     for yi in range(ny):
         for xi in range(nx):
             chans, pos = ff_read_u32(buffer, n_buffer, pos)
-            image[yi, xi, 0] = ((chans >> 21) & 0x07ff) >> 3
-            image[yi, xi, 1] = ((chans >> 10) & 0x07ff) >> 3
-            image[yi, xi, 2] = ((chans >> 0) & 0x03ff) >> 2
-            image[yi, xi, 3] = 0xff
+            image[yi, xi, 0] = u11_to_f11_in_f32((chans >> 0) & 0x07ff)
+            image[yi, xi, 1] = u11_to_f11_in_f32((chans >> 11) & 0x07ff)
+            image[yi, xi, 2] = u10_to_f10_in_f32((chans >> 22) & 0x03ff)
+            image[yi, xi, 3] = 1.0
 
 
 @njit
-def process_image_28(image, buffer, n_buffer, nx, ny):
+def process_image_28(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R8G8B8A8_UNORM
     pos = 0
+    chans = [0] * 4
     for yi in range(ny):
         for xi in range(nx):
-            chans = [0] * 4
             chans[0], pos = ff_read_u8(buffer, n_buffer, pos)
             chans[1], pos = ff_read_u8(buffer, n_buffer, pos)
             chans[2], pos = ff_read_u8(buffer, n_buffer, pos)
@@ -88,11 +123,24 @@ def process_image_28(image, buffer, n_buffer, nx, ny):
 
 
 @njit
-def process_image_87(image, buffer, n_buffer, nx, ny):
+def process_image_60(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R8_TYPELESS
     pos = 0
+    chans = [0] * 1
     for yi in range(ny):
         for xi in range(nx):
-            chans = [0] * 4
+            chans[0], pos = ff_read_u8(buffer, n_buffer, pos)
+            image[yi, xi, 0] = chans[0]
+            image[yi, xi, 1] = 0
+            image[yi, xi, 2] = 0
+            image[yi, xi, 3] = 0
+
+
+@njit
+def process_image_87(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_B8G8R8A8_UNORM
+    pos = 0
+    chans = [0] * 4
+    for yi in range(ny):
+        for xi in range(nx):
             chans[0], pos = ff_read_u8(buffer, n_buffer, pos)
             chans[1], pos = ff_read_u8(buffer, n_buffer, pos)
             chans[2], pos = ff_read_u8(buffer, n_buffer, pos)
@@ -104,7 +152,7 @@ def process_image_87(image, buffer, n_buffer, nx, ny):
 
 
 @njit
-def process_image_71(image, buffer, n_buffer, nx, ny):
+def process_image_71(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_BC1_UNORM
     pos = 0
     bnx = max(1, nx // 4)
     bny = max(1, ny // 4)
@@ -412,9 +460,11 @@ def process_image_83(image, buffer, n_buffer, nx, ny):
 def process_image_python(image, raw, nx, ny, pixel_format):
     # print(f'PF = {pixel_format}')
     loaders = {
+        2: process_image_2,    # DXGI_FORMAT_R32G32B32A32_FLOAT
         10: process_image_10,  # DXGI_FORMAT_R16G16B16A16_FLOAT
         26: process_image_26,  # DXGI_FORMAT_R11G11B10_FLOAT
         28: process_image_28,  # DXGI_FORMAT_R8G8B8A8_UNORM
+        60: process_image_60,  # DXGI_FORMAT_R8_TYPELESS
         87: process_image_87,  # DXGI_FORMAT_B8G8R8A8_UNORM
         71: process_image_71,  # DXGI_FORMAT_BC1_UNORM
         74: process_image_74,  # DXGI_FORMAT_BC2_UNORM
@@ -434,9 +484,11 @@ def process_image_python(image, raw, nx, ny, pixel_format):
 
 def raw_data_size(pixel_format, nx, ny):
     format_db = {
+        2: [True, 16],
         10: [True, 8],
         26: [True, 4],
         28: [True, 4],
+        60: [True, 1],
         87: [True, 4],
         71: [False, 8],
         74: [False, 16],
@@ -458,7 +510,7 @@ def raw_data_size(pixel_format, nx, ny):
 
 def process_image_c(image, raw, nx, ny, pixel_format):
 
-    if pixel_format in {10}:
+    if pixel_format in {2, 10, 26}:  # do floating point loads in python
         process_image_python(image, raw, nx, ny, pixel_format)
     else:
         global c_process_image_func

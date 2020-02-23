@@ -7,10 +7,11 @@ def main():
     if len(sys.argv) > 1:
         filename = sys.argv[1]
     else:
-        # filename = '/home/krys/prj/test-deca/images/rg2/0099d5d87e9ee615.dat'
-        # filename = '/home/krys/prj/test-deca/images/rg2/01f124a03533a3bb.dat'
-        # filename = '/home/krys/prj/test-deca/images/rg2/269a7a27c601837e.dat'
-        filename = '/home/krys/prj/test-deca/images/rg2/26a057f5d16e88f0.dat'
+        # filename = '/home/krys/prj/test-deca/images/rg2/avtx_98/0099d5d87e9ee615.dat'
+        # filename = '/home/krys/prj/test-deca/images/rg2/avtx_98/01f124a03533a3bb.dat'
+        # filename = '/home/krys/prj/test-deca/images/rg2/avtx_98/269a7a27c601837e.dat'
+        # filename = '/home/krys/prj/test-deca/images/rg2/avtx_98/26a057f5d16e88f0.dat'
+        filename = '/home/krys/prj/test-deca/images/rg2/avtx_77/tree_diffuse_atlas.ddsc'
 
     for i in range(8):
         t0 = time.time()

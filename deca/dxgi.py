@@ -252,11 +252,12 @@ def process_image_74(image, buffer, n_buffer, nx, ny):
                     alpha = alpha >> 4
 
 
-@njit(nogil=True, fastmath=True)
+@njit(fastmath=True)
 def process_image_77(image, buffer, n_buffer, nx, ny):
     pos = 0
     bnx = max(1, nx // 4)
     bny = max(1, ny // 4)
+
     alpha = np.zeros((8,), dtype=np.uint8)
     bs = np.zeros((4,), dtype=np.uint8)
     color0_full = np.array((4,), dtype=np.uint8)
@@ -471,9 +472,9 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         77: process_image_77,  # DXGI_FORMAT_BC3_UNORM
         80: process_image_80,  # DXGI_FORMAT_BC4_UNORM
         83: process_image_83,  # DXGI_FORMAT_BC5_UNORM
-        97: process_image_97,  # DXGI_FORMAT_BC5_UNORM
-        98: process_image_97,  # DXGI_FORMAT_BC5_UNORM
-        99: process_image_97,  # DXGI_FORMAT_BC5_UNORM
+        97: process_image_97,  # DXGI_FORMAT_BC7_TYPELESS
+        98: process_image_97,  # DXGI_FORMAT_BC7_UNORM
+        99: process_image_97,  # DXGI_FORMAT_BC7_UNORM_SRGB
     }
 
     if pixel_format in loaders:

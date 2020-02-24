@@ -145,6 +145,7 @@ Reference:
 https://docs.microsoft.com/en-us/windows/win32/direct3ddds/dds-header
 '''
 
+
 '''
 DDSD_CAPS;          Required in every .dds file.	0x1
 DDSD_HEIGHT;        Required in every .dds file.	0x2
@@ -319,6 +320,45 @@ D3DFMT_CxV8U8 DDS_FOURCC	117
 Any DXGI format	DDS_FOURCC	"DX10"
 '''
 
+'''
+typedef struct {
+  DWORD           dwSize;
+  DWORD           dwFlags;
+  DWORD           dwHeight;
+  DWORD           dwWidth;
+  DWORD           dwPitchOrLinearSize;
+  DWORD           dwDepth;
+  DWORD           dwMipMapCount;
+  DWORD           dwReserved1[11];
+  DDS_PIXELFORMAT ddspf;
+  DWORD           dwCaps;
+  DWORD           dwCaps2;
+  DWORD           dwCaps3;
+  DWORD           dwCaps4;
+  DWORD           dwReserved2;
+} DDS_HEADER;
+
+struct DDS_PIXELFORMAT {
+  DWORD dwSize;
+  DWORD dwFlags;
+  DWORD dwFourCC;
+  DWORD dwRGBBitCount;
+  DWORD dwRBitMask;
+  DWORD dwGBitMask;
+  DWORD dwBBitMask;
+  DWORD dwABitMask;
+};
+
+typedef struct {
+  DXGI_FORMAT              dxgiFormat;
+  D3D10_RESOURCE_DIMENSION resourceDimension;
+  UINT                     miscFlag;
+  UINT                     arraySize;
+  UINT                     miscFlags2;
+} DDS_HEADER_DXT10;
+
+'''
+
 
 class DdsHeaderDxt10:
     __slots__ = [
@@ -331,9 +371,9 @@ class DdsHeaderDxt10:
 
     def __init__(self):
         self.dxgiFormat = None
-        self.resourceDimension = None
+        self.resourceDimension = 0
         self.miscFlag = 0
-        self.arraySize = None
+        self.arraySize = 1
         self.miscFlags2 = 0
 
     def __repr__(self):
@@ -361,12 +401,12 @@ class DdsPixelFormat:
     def __init__(self):
         self.dwSize = None
         self.dwFlags = 0
-        self.dwFourCC = None
-        self.dwRGBBitCount = None
-        self.dwRBitMask = None
-        self.dwGBitMask = None
-        self.dwBBitMask = None
-        self.dwABitMask = None
+        self.dwFourCC = 0
+        self.dwRGBBitCount = 0
+        self.dwRBitMask = 0
+        self.dwGBitMask = 0
+        self.dwBBitMask = 0
+        self.dwABitMask = 0
 
     def __repr__(self):
         if self.dwFourCC is None:
@@ -408,11 +448,11 @@ class DdsHeader:
     def __init__(self):
         self.dwSize = None
         self.dwFlags = 0
-        self.dwHeight = None
-        self.dwWidth = None
-        self.dwPitchOrLinearSize = None
-        self.dwDepth = None
-        self.dwMipMapCount = None
+        self.dwHeight = 0
+        self.dwWidth = 0
+        self.dwPitchOrLinearSize = 0
+        self.dwDepth = 0
+        self.dwMipMapCount = 0
         self.dwReserved1 = None
         self.ddspf = DdsPixelFormat()
         self.dwCaps = 0
@@ -438,3 +478,31 @@ class DdsHeader:
         r += f'dwCaps4: {self.dwCaps4}\n'
         r += f'dwReserved2: {self.dwReserved2}\n'
         return r
+
+
+dxgi_format_db = {
+    2: [True, 16],
+    10: [True, 8],
+    26: [True, 4],
+    28: [True, 4],
+    60: [True, 1],
+    87: [True, 4],
+    71: [False, 8],
+    74: [False, 16],
+    77: [False, 16],
+    80: [False, 8],
+    83: [False, 16],
+    97: [False, 16],  # DXGI_FORMAT_BC7_TYPELESS
+    98: [False, 16],  # DXGI_FORMAT_BC7_UNORM
+    99: [False, 16],  # DXGI_FORMAT_BC7_UNORM_SRGB
+}
+
+
+def raw_data_size(pixel_format, nx, ny):
+
+    fi = dxgi_format_db[pixel_format]
+
+    if fi[0]:
+        return fi[1] * nx * ny
+    else:
+        return fi[1] * ((nx + 3) // 4) * ((ny + 3) // 4)

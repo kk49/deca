@@ -114,12 +114,21 @@ class DdImageHeader:
             self.dds_header_dxt10.resourceDimension = fh.read_u8() + 1
             self.dds_header_dxt10.dxgiFormat = fh.read_u32()
 
-            # [0x8, 'DDSD_PITCH'],
-            # [0x80000, 'DDSD_LINEARSIZE'],
-
             self.dds_header.dwWidth = fh.read_u16()
             self.dds_header.dwHeight = fh.read_u16()
             self.dds_header.dwDepth = fh.read_u16()
+
+            is_uncompressed, ele_size = dxgi_format_db[self.dds_header_dxt10.dxgiFormat]
+            if is_uncompressed:
+                self.dds_header.dwFlags |= DDSD_PITCH
+                pls = ele_size * self.dds_header.dwWidth
+            else:
+                self.dds_header.dwFlags |= DDSD_LINEARSIZE
+                w = (self.dds_header.dwWidth + 3) // 4
+                h = (self.dds_header.dwHeight + 3) // 4
+                pls = ele_size * max(1, int(w * h))
+            self.dds_header.dwPitchOrLinearSize = pls
+
             self.flags = fh.read_u16()
             self.dds_header.dwMipMapCount = fh.read_u8()
             self.mip_count = fh.read_u8()
@@ -137,7 +146,8 @@ class DdImageHeader:
             self.dds_header.dwFlags |= DDSD_WIDTH
             self.dds_header.dwFlags |= DDSD_PIXELFORMAT
             self.dds_header.dwFlags |= DDSD_MIPMAPCOUNT
-            self.dds_header.dwFlags |= DDSD_DEPTH
+            if self.dds_header.dwDepth > 1:
+                self.dds_header.dwFlags |= DDSD_DEPTH
 
             self.dds_header.dwCaps |= DDSCAPS_TEXTURE
             if self.dds_header.dwMipMapCount > 1:
@@ -150,7 +160,7 @@ class DdImageHeader:
 
             end_pos = fh.tell()
 
-        # self.dump()
+        self.dump()
 
         return end_pos
 
@@ -237,7 +247,7 @@ class DdImageHeader:
 
             end_pos = f.tell()
 
-        # self.dump()
+        self.dump()
 
         return end_pos
 
@@ -383,15 +393,11 @@ class Ddsc:
                 break
 
     def load_dds(self, f, filename=None, save_raw_data=False):
-        if isinstance(f, str) or isinstance(f, bytes):
-            with ArchiveFile(open(f, 'rb')) as f:
-                return self.load_dds(f, filename=filename, save_raw_data=save_raw_data)
-        else:
-            header = f.read(256)
-            hl = self.header.deserialize_dds(header)
-            self.header_buffer = header[0:hl]
-            f.seek(hl)
-            self.load_body(f, filename, save_raw_data, group_by_surface=True)
+        header = f.read(256)
+        hl = self.header.deserialize_dds(header)
+        self.header_buffer = header[0:hl]
+        f.seek(hl)
+        self.load_body(f, filename, save_raw_data, group_by_surface=True)
 
     def load_ddsc(self, f, filename=None, save_raw_data=False):
         header = f.read(128)
@@ -415,8 +421,8 @@ class Ddsc:
 
     def load_ddsc_atx(self, files, save_raw_data=False):
         self.load_ddsc(files[0][1], filename=files[0][0], save_raw_data=save_raw_data)
-        for finfo in files[1:]:
-            self.load_atx(finfo[1], filename=finfo[0], save_raw_data=save_raw_data)
+        for filename, f in files[1:]:
+            self.load_atx(f, filename=filename, save_raw_data=save_raw_data)
 
 
 def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
@@ -442,7 +448,7 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
         if vnode.v_path is None:
             f_ddsc = vfs.file_obj_from(vnode)
             ddsc = Ddsc()
-            ddsc.load_ddsc(f_ddsc)
+            ddsc.load_ddsc(f_ddsc, save_raw_data=save_raw_data)
         else:
             filename = os.path.splitext(vnode.v_path)
             if len(filename[1]) == 0 and vnode.file_type == FTYPE_AVTX:
@@ -493,62 +499,43 @@ def ddsc_write_to_png(ddsc, output_file_name):
 
 
 def ddsc_write_to_dds(ddsc, output_file_name):
-    flags = 0
-    flags = flags | 0x1  # DDSD_CAPS
-    flags = flags | 0x2  # DDSD_HEIGHT
-    flags = flags | 0x4  # DDSD_WIDTH
-    # flags = flags | 0x8         # DDSD_PITCH
-    flags = flags | 0x1000  # DDSD_PIXELFORMAT
-    flags = flags | 0x20000  # DDSD_MIPMAPCOUNT
-    flags = flags | 0x80000  # DDSD_LINEARSIZE
-
-    dwCaps1 = 0x8 | 0x1000 | 0x400000
-    dwCaps2 = 0
-    resourceDimension = 3
-
-    if ddsc.header.dds_header.dwDepth > 1:
-        flags = flags | 0x800000  # DDSD_DEPTH
-        dwCaps2 = dwCaps2 | 0x200000
-        resourceDimension = 4
-
     with ArchiveFile(open(output_file_name, 'wb')) as f:
         # magic word
         f.write(b'DDS ')
         # DDS_HEADER
         f.write_u32(124)  # dwSize
-        f.write_u32(flags)  # dwFlags
+        f.write_u32(ddsc.header.dds_header.dwFlags)  # dwFlags
         f.write_u32(ddsc.header.dds_header.dwHeight)  # dwHeight
         f.write_u32(ddsc.header.dds_header.dwWidth)  # dwWidth
-        f.write_u32(len(ddsc.mips[0].raw_data))  # dwPitchOrLinearSize
+        f.write_u32(ddsc.header.dds_header.dwPitchOrLinearSize)  # dwPitchOrLinearSize
         f.write_u32(ddsc.header.dds_header.dwDepth)  # dwDepth
         f.write_u32(ddsc.header.dds_header.dwMipMapCount)  # dwMipMapCount
         for i in range(11):
             f.write_u32(0)  # dwReserved1
 
         # PIXEL_FORMAT
-        DDPF_FOURCC = 0x4
         f.write_u32(32)  # DWORD dwSize
-        f.write_u32(DDPF_FOURCC)  # DWORD dwFlags
-        f.write(b'DX10')  # DWORD dwFourCC
-        f.write_u32(0)  # DWORD dwRGBBitCount
-        f.write_u32(0)  # DWORD dwRBitMask
-        f.write_u32(0)  # DWORD dwGBitMask
-        f.write_u32(0)  # DWORD dwBBitMask
-        f.write_u32(0)  # DWORD dwABitMask
+        f.write_u32(ddsc.header.dds_header.ddspf.dwFlags)  # DWORD dwFlags
+        f.write(ddsc.header.dds_header.ddspf.dwFourCC)  # DWORD dwFourCC
+        f.write_u32(ddsc.header.dds_header.ddspf.dwRGBBitCount)  # DWORD dwRGBBitCount
+        f.write_u32(ddsc.header.dds_header.ddspf.dwRBitMask)  # DWORD dwRBitMask
+        f.write_u32(ddsc.header.dds_header.ddspf.dwGBitMask)  # DWORD dwGBitMask
+        f.write_u32(ddsc.header.dds_header.ddspf.dwBBitMask)  # DWORD dwBBitMask
+        f.write_u32(ddsc.header.dds_header.ddspf.dwABitMask)  # DWORD dwABitMask
 
         # DDS_HEADER, cont...
-        f.write_u32(dwCaps1)  # dwCaps
-        f.write_u32(dwCaps2)  # dwCaps2
-        f.write_u32(0)  # dwCaps3
-        f.write_u32(0)  # dwCaps4
+        f.write_u32(ddsc.header.dds_header.dwCaps)  # dwCaps
+        f.write_u32(ddsc.header.dds_header.dwCaps2)  # dwCaps2
+        f.write_u32(ddsc.header.dds_header.dwCaps3)  # dwCaps3
+        f.write_u32(ddsc.header.dds_header.dwCaps4)  # dwCaps4
         f.write_u32(0)  # dwReserved2
 
         # DDS_HEADER_DXT10
-        f.write_u32(ddsc.header.dds_header_dxt10.dxgiFormat)  # DXGI_FORMAT              dxgiFormat;
-        f.write_u32(resourceDimension)  # D3D10_RESOURCE_DIMENSION resourceDimension;
-        f.write_u32(0)  # UINT                     miscFlag;
-        f.write_u32(1)  # UINT                     arraySize;
-        f.write_u32(0)  # UINT                     miscFlags2;
+        f.write_u32(ddsc.header.dds_header_dxt10.dxgiFormat)
+        f.write_u32(ddsc.header.dds_header_dxt10.resourceDimension)
+        f.write_u32(ddsc.header.dds_header_dxt10.miscFlag)
+        f.write_u32(ddsc.header.dds_header_dxt10.arraySize)
+        f.write_u32(ddsc.header.dds_header_dxt10.miscFlags2)
 
         for mip in ddsc.mips:
             f.write(mip.raw_data)
@@ -655,63 +642,3 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
             compiled_files.append((vpath_out, fout_name))
 
     return compiled_files
-
-'''
-typedef struct {
-  DWORD           dwSize;
-  DWORD           dwFlags;
-  DWORD           dwHeight;
-  DWORD           dwWidth;
-  DWORD           dwPitchOrLinearSize;
-  DWORD           dwDepth;
-  DWORD           dwMipMapCount;
-  DWORD           dwReserved1[11];
-  DDS_PIXELFORMAT ddspf;
-  DWORD           dwCaps;
-  DWORD           dwCaps2;
-  DWORD           dwCaps3;
-  DWORD           dwCaps4;
-  DWORD           dwReserved2;
-} DDS_HEADER;
-
-struct DDS_PIXELFORMAT {
-  DWORD dwSize;
-  DWORD dwFlags;
-  DWORD dwFourCC;
-  DWORD dwRGBBitCount;
-  DWORD dwRBitMask;
-  DWORD dwGBitMask;
-  DWORD dwBBitMask;
-  DWORD dwABitMask;
-};
-
-typedef struct {
-  DXGI_FORMAT              dxgiFormat;
-  D3D10_RESOURCE_DIMENSION resourceDimension;
-  UINT                     miscFlag;
-  UINT                     arraySize;
-  UINT                     miscFlags2;
-} DDS_HEADER_DXT10;
-
-'''
-# if dump:
-#     im = PIL.Image.fromarray(inp)
-#     fns = os.path.split(in_file)
-#     ifn = fns[1]
-#     fns = fns[0].split('/')
-#     # print(fns)
-#     if no_header:
-#         impath = image_dump + 'raw_images/{:08x}/'.format(file_sz)
-#     else:
-#         impath = image_dump + '{:02d}/'.format(pixel_format)
-#     impath = impath + '/'.join(fns[3:]) + '/'
-#     imfn = impath + ifn + '.{:04d}x{:04d}.png'.format(fl[1], fl[2])
-#     # print(imfn)
-#     os.makedirs(impath, exist_ok=True)
-#     if not os.path.isfile(imfn):
-#         im.save(imfn)
-# else:
-#     plt.figure()
-#     plt.imshow(inp, interpolation='none')
-#     plt.show()
-

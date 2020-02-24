@@ -466,12 +466,12 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         26: process_image_26,  # DXGI_FORMAT_R11G11B10_FLOAT
         28: process_image_28,  # DXGI_FORMAT_R8G8B8A8_UNORM
         60: process_image_60,  # DXGI_FORMAT_R8_TYPELESS
-        87: process_image_87,  # DXGI_FORMAT_B8G8R8A8_UNORM
         71: process_image_71,  # DXGI_FORMAT_BC1_UNORM
         74: process_image_74,  # DXGI_FORMAT_BC2_UNORM
         77: process_image_77,  # DXGI_FORMAT_BC3_UNORM
         80: process_image_80,  # DXGI_FORMAT_BC4_UNORM
         83: process_image_83,  # DXGI_FORMAT_BC5_UNORM
+        87: process_image_87,  # DXGI_FORMAT_B8G8R8A8_UNORM
         97: process_image_97,  # DXGI_FORMAT_BC7_TYPELESS
         98: process_image_97,  # DXGI_FORMAT_BC7_UNORM
         99: process_image_97,  # DXGI_FORMAT_BC7_UNORM_SRGB
@@ -481,32 +481,6 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         loaders[pixel_format](image, raw, len(raw), nx, ny)
     else:
         raise Exception('Unknown DCC format {}'.format(pixel_format))
-
-
-def raw_data_size(pixel_format, nx, ny):
-    format_db = {
-        2: [True, 16],
-        10: [True, 8],
-        26: [True, 4],
-        28: [True, 4],
-        60: [True, 1],
-        87: [True, 4],
-        71: [False, 8],
-        74: [False, 16],
-        77: [False, 16],
-        80: [False, 8],
-        83: [False, 16],
-        97: [False, 16],  # DXGI_FORMAT_BC7_TYPELESS
-        98: [False, 16],  # DXGI_FORMAT_BC7_UNORM
-        99: [False, 16],  # DXGI_FORMAT_BC7_UNORM_SRGB
-    }
-
-    fi = format_db[pixel_format]
-
-    if fi[0]:
-        return fi[1] * nx * ny
-    else:
-        return fi[1] * ((nx + 3) // 4) * ((ny + 3) // 4)
 
 
 def process_image_c(image, raw, nx, ny, pixel_format):

@@ -252,6 +252,66 @@ class DdImageHeader:
         return end_pos
 
 
+def load_mip(mip, f, filename, save_raw_data, is_atx=False):
+    pixel_format = mip.pixel_format
+    nx = mip.size_x
+    ny = mip.size_y
+    if nx == 0 or ny == 0:
+        return False
+    nxm = max(4, nx)
+    nym = max(4, ny)
+    raw_size = deca.dxgi.raw_data_size(pixel_format, nx, ny)
+    # print('Loading Data: {}'.format(raw_size))
+    raw_data = f.read(raw_size)
+    raw_size_read = len(raw_data)
+
+    if is_atx:
+        if raw_size_read == 0:
+            return False  # Ran out of data probably because more data is in another atx
+        elif raw_size_read < raw_size:
+            raise Exception('Ddsc::load_atx: Not Enough Data')
+    else:
+        if raw_size_read < raw_size:
+            raise Exception('Ddsc::load_ddsc: Not Enough Data')
+
+    if pixel_format in {2, 10}:  # floating point 4 components
+        inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
+        deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
+        mn = np.nanmin(inp_f32)
+        mx = np.nanmax(inp_f32)
+        s = 1.0 / (mx - mn)
+        inp = ((inp_f32 - mn) * s * 255).astype(dtype=np.uint8)
+    elif pixel_format in {26}:  # floating point 3 components
+        inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
+        deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
+        mn = np.nanmin(inp_f32[:, :, 0:3])
+        mx = np.nanmax(inp_f32[:, :, 0:3])
+        s = 1.0 / (mx - mn)
+        inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
+        inp[:, :, 0:3] = ((inp_f32[:, :, 0:3] - mn) * s * 255).astype(dtype=np.uint8)
+        inp[:, :, 3] = 255
+    else:
+        inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
+        deca.dxgi.process_image(inp, raw_data, nx, ny, pixel_format)
+
+    # inp = inp[0:ny, 0:nx, :]  # TODO Qt cannot display 2x2 for some reason
+    if ny < nym or nx < nxm:
+        inp[ny:, :, :] = 0
+        inp[:, nx:, :] = 0
+
+    if is_atx:
+        mip.itype = 'atx'
+    else:
+        mip.itype = 'ddsc'
+    mip.data = inp
+    mip.filename = filename
+
+    if save_raw_data:
+        mip.raw_data = raw_data
+
+    return True
+
+
 class Ddsc:
     """
     contains surfaces, which contain mip levels, which contain depths, which are 2d images
@@ -260,70 +320,20 @@ class Ddsc:
         self.header_buffer = None
         self.header = DdImageHeader()
         self.mips = None
+        self.mip_map = {}
+        self.mips_avtx = []
+        self.mips_dds = []
+
+    def mip_sort_for_dds(self):
+        pass
+
+    def mip_sort_for_avtx(self):
+        pass
 
     def load_bmp(self, f, filename=None):
         im = Image.open(f)
         im.convert('RGBA')
         self.mips = [DecaImage(sx=im.size[0], sy=im.size[1], itype='bmp', data=np.array(im), filename=filename)]
-
-    def load_mip(self, mip, f, filename, save_raw_data, is_atx=False):
-        pixel_format = mip.pixel_format
-        nx = mip.size_x
-        ny = mip.size_y
-        if nx == 0 or ny == 0:
-            return False
-        nxm = max(4, nx)
-        nym = max(4, ny)
-        raw_size = deca.dxgi.raw_data_size(pixel_format, nx, ny)
-        # print('Loading Data: {}'.format(raw_size))
-        raw_data = f.read(raw_size)
-        raw_data_size = len(raw_data)
-
-        if is_atx:
-            if raw_data_size == 0:
-                return False  # Ran out of data probably because more data is in another atx
-            elif raw_data_size < raw_size:
-                raise Exception('Ddsc::load_atx: Not Enough Data')
-        else:
-            if raw_data_size < raw_size:
-                raise Exception('Ddsc::load_ddsc: Not Enough Data')
-
-        if pixel_format in {2, 10}:  # floating point 4 components
-            inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
-            deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
-            mn = np.nanmin(inp_f32)
-            mx = np.nanmax(inp_f32)
-            s = 1.0 / (mx - mn)
-            inp = ((inp_f32 - mn) * s * 255).astype(dtype=np.uint8)
-        elif pixel_format in {26}:  # floating point 3 components
-            inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
-            deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
-            mn = np.nanmin(inp_f32[:, :, 0:3])
-            mx = np.nanmax(inp_f32[:, :, 0:3])
-            s = 1.0 / (mx - mn)
-            inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
-            inp[:, :, 0:3] = ((inp_f32[:, :, 0:3] - mn) * s * 255).astype(dtype=np.uint8)
-            inp[:, :, 3] = 255
-        else:
-            inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
-            deca.dxgi.process_image(inp, raw_data, nx, ny, pixel_format)
-
-        # inp = inp[0:ny, 0:nx, :]  # TODO Qt cannot display 2x2 for some reason
-        if ny < nym or nx < nxm:
-            inp[ny:, :, :] = 0
-            inp[:, nx:, :] = 0
-
-        if is_atx:
-            mip.itype = 'atx'
-        else:
-            mip.itype = 'ddsc'
-        mip.data = inp
-        mip.filename = filename
-
-        if save_raw_data:
-            mip.raw_data = raw_data
-
-        return True
 
     def load_body(self, f, filename, save_raw_data, group_by_surface):
         nx0 = self.header.dds_header.dwWidth
@@ -357,39 +367,47 @@ class Ddsc:
         if len(surfaces) == 0:
             surfaces = ['main']
 
-        if group_by_surface:
+        self.mip_map = {}
+        self.mips_avtx = []
+        self.mips_dds = []
+
+        # create mip levels
+        nx = nx0
+        ny = ny0
+        for i in range(mip_map_count):
             for sid in surfaces:
-                nx = nx0
-                ny = ny0
-                for i in range(mip_map_count):
-                    for j in range(depth):
-                        self.mips.append(DecaImage(
-                            sx=nx, sy=ny,
-                            depth_cnt=depth, depth_idx=j, surface_id=sid,
-                            pixel_format=self.header.dds_header_dxt10.dxgiFormat, itype='missing'))
+                for j in range(depth):
+                    mip_id = (sid, i, j)
+                    self.mip_map[mip_id] = DecaImage(
+                        sx=nx, sy=ny,
+                        depth_cnt=depth, depth_idx=j, surface_id=sid,
+                        pixel_format=self.header.dds_header_dxt10.dxgiFormat, itype='missing')
 
-                    nx = nx // 2
-                    ny = ny // 2
-        else:
-            nx = nx0
-            ny = ny0
+            nx = nx // 2
+            ny = ny // 2
+
+        # DDS format
+        for sid in surfaces:
             for i in range(mip_map_count):
-                for sid in surfaces:
-                    for j in range(depth):
-                        self.mips.append(DecaImage(
-                            sx=nx, sy=ny,
-                            depth_cnt=depth, depth_idx=j, surface_id=sid,
-                            pixel_format=self.header.dds_header_dxt10.dxgiFormat, itype='missing'))
+                for j in range(depth):
+                    mip_id = (sid, i, j)
+                    self.mips_dds.append(self.mip_map[mip_id])
 
-                nx = nx // 2
-                ny = ny // 2
+        # AVTX format
+        for i in range(mip_map_count):
+            for sid in surfaces:
+                for j in range(depth):
+                    mip_id = (sid, i, j)
+                    self.mips_avtx.append(self.mip_map[mip_id])
+
+        self.mips = self.mips_avtx
 
         n_surfaces = len(surfaces)
         begin = (mip_map_count - mip_map_count_in_file) * depth * n_surfaces
         end = mip_map_count * depth * n_surfaces
         for midx in range(begin, end):
             mip = self.mips[midx]
-            if not self.load_mip(mip, f, filename, save_raw_data):
+            if not load_mip(mip, f, filename, save_raw_data):
                 break
 
     def load_dds(self, f, filename=None, save_raw_data=False):
@@ -416,7 +434,7 @@ class Ddsc:
 
         for midx in range(first_loaded - 1, -1, -1):
             mip = self.mips[midx]
-            if not self.load_mip(mip, f, filename, save_raw_data, is_atx=True):
+            if not load_mip(mip, f, filename, save_raw_data, is_atx=True):
                 break
 
     def load_ddsc_atx(self, files, save_raw_data=False):
@@ -537,7 +555,7 @@ def ddsc_write_to_dds(ddsc, output_file_name):
         f.write_u32(ddsc.header.dds_header_dxt10.arraySize)
         f.write_u32(ddsc.header.dds_header_dxt10.miscFlags2)
 
-        for mip in ddsc.mips:
+        for mip in ddsc.mips_dds:
             f.write(mip.raw_data)
 
 
@@ -606,16 +624,21 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
     print('Importing Image: {}\n  input {}\n  opath {}'.format(node.v_path, ifile, opath))
     ddsc = image_load(vfs, node, save_raw_data=True)
 
-    compiled_files = []
-    if ddsc is not None:
-        with ArchiveFile(open(ifile, 'rb')) as file_in:
-            # dsc_header = file_in.read(37 * 4 - 5 * 4)  # skip dds header
-            dsc_header = Ddsc()
-            dsc_header.load_dds(file_in, True)
-            for mip in ddsc.mips:
-                buffer = file_in.read(len(mip.raw_data))
-                mip.raw_data = buffer
+    ddsc_in = Ddsc()
+    with ArchiveFile(open(ifile, 'rb')) as f:
+        ddsc_in.load_dds(f, save_raw_data=True)
 
+    compiled_files = []
+    if ddsc is None:
+        raise EDecaBuildError('Missing vpath: {}'.format(node.v_path))
+    elif ddsc_in is None:
+        raise EDecaBuildError('Could not load: {}'.format(ifile))
+    elif ddsc.header.dds_header_dxt10.dxgiFormat != ddsc_in.header.dds_header_dxt10.dxgiFormat:
+        raise EDecaBuildError('dxgiFormat do not path for ({},{}) and ({},{})'.format(
+            node.v_path, ddsc.header.dds_header_dxt10.dxgiFormat,
+            ifile, ddsc_in.header.dds_header_dxt10.dxgiFormat,
+        ))
+    else:
         out_vpaths = [mip.filename for mip in ddsc.mips]
         out_vpaths = set(out_vpaths)
 
@@ -628,14 +651,14 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
                 if vpath_out.endswith(b'.ddsc'):
                     file_out.write(ddsc.header_buffer)
                     # DDSC files have high to low resolution
-                    for mip_index in range(0, len(ddsc.mips)):
-                        mip = ddsc.mips[mip_index]
+                    for mip_index in range(0, len(ddsc_in.mips_avtx)):
+                        mip = ddsc_in.mips_avtx[mip_index]
                         if vpath_out == mip.filename:
                             file_out.write(mip.raw_data)
                 else:
                     # HMDDSC ATX files have low to high resolution
-                    for mip_index in range(len(ddsc.mips)-1, -1, -1):
-                        mip = ddsc.mips[mip_index]
+                    for mip_index in range(len(ddsc_in.mips_avtx)-1, -1, -1):
+                        mip = ddsc_in.mips_avtx[mip_index]
                         if vpath_out == mip.filename:
                             file_out.write(mip.raw_data)
 

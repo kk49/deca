@@ -5,6 +5,7 @@
 * Combine DDSC and DDS processing, now using same code and headers
 * Fixed processing of DXGI format 10 which has 16 bit floating point channels (display scales based on single min and max of all channels)
 * Added support for CubeMaps DDSC and DDS
+* Support for more image formats, should be all in JC3, JC4, GZ, RAGE2, and theHunter:COTW
 
 #### v0.2.5 "Gotta go faster, without graphic artifacts"
 * BC7 decompression works with JIT compilation using Numba

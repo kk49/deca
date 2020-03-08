@@ -405,7 +405,7 @@ class ToolMakeWebMap:
         for v in adf.table_instance_values[0]['Collectibles']:
             obj_id = v['ID']
             cid = v['Name'].decode('utf-8')
-            name, desc, icon = codex.get(cid, (cid, cid + '_desc', None))
+            name, desc, icon, category = codex.get(cid, (cid, cid + '_desc', None, None))
             name = tr.get(name, name)
             desc = tr.get(desc, desc)
             position = v['Position']

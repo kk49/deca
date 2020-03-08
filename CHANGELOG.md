@@ -1,3 +1,7 @@
+#### v0.2.7 ???
+* Stopped dumping of image file details
+* Fixed Gen Zero map build code
+
 #### v0.2.6 "Copy and Paste, a dangerous tool"
 * Fix for dds file generation caused by cut and paste shenanigans
 * Fixed bug where filter stopped working

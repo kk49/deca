@@ -160,7 +160,7 @@ class DdImageHeader:
 
             end_pos = fh.tell()
 
-        self.dump()
+        # self.dump()
 
         return end_pos
 
@@ -247,7 +247,7 @@ class DdImageHeader:
 
             end_pos = f.tell()
 
-        self.dump()
+        # self.dump()
 
         return end_pos
 

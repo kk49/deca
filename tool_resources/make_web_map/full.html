@@ -16,13 +16,21 @@
 	<script src="https://unpkg.com/leaflet.tilelayer.pouchdbcached@latest/L.TileLayer.PouchDBCached.js"></script>
     <script src="lib/Leaflet.MousePosition/src/L.Control.MousePosition.js"></script>
 
-
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
-
-    <script src="data_full.js"></script>
+    <script src="data/collectable_data.js"></script>
+    <script src="data/region_data.js"></script>
+    <script src="data/mdic_data.js"></script>
+    <script src="data/c_collectable_data.js"></script>
+    <script src="data/c_book_mark_data.js"></script>
+    <script src="data/c_loot_crate_spawn_point_data.js"></script>
+    <script src="data/c_loot_crate_spawn_point_group_data.js"></script>
+    <script src="data/c_player_spawn_point_data.js"></script>
+    <script src="data/c_poi.js"></script>
+    <script src="data/c_poi_nest_marker_poi.js"></script>
+    <script src="data/apex_social_control.js"></script>
 
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <style>
@@ -57,8 +65,7 @@
 
     function onEachFeature(feature, layer) {
         var s = "";
-        if (feature.properties)
-        {
+        if (feature.properties) {
             if (feature.properties && feature.properties.type) {
                 s = s + feature.properties.type;
             }
@@ -91,6 +98,10 @@
             }
             if (feature.properties && feature.properties.comment) {
                 s = s + "<br>cmt: " + feature.properties.comment;
+            }
+            if (feature.properties && feature.properties.sub_type)
+            {
+                s = s + "<br>sub_type: " + feature.properties.sub_type;
             }
             if (feature.properties && feature.properties.position) {
                 p = feature.properties.position;
@@ -262,6 +273,19 @@
                     }
                 );
             }
+            if (ft.startsWith('apex_social:')) {
+                return L.circleMarker(latlng,
+                    {
+                        radius: 8,
+                        color: "#00FF7F",
+                        weight: 1,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: "#00FF7F",
+                        fillOpacity: 0.5
+                    }
+                );
+            }
             if (ft == 'collection.collectionc') {
                 /*
                 if(feature.properties.collectable_id.includes('mixtape')) {
@@ -343,6 +367,11 @@
         ['CPlayerSpawnPoint', false, 2, 'CPlayerSpawnPoint from GZ', '', c_player_spawn_point_data, 0, 1.0],
         ['Relay Beacons', false, 2, 'Relay Beacons from GZ', '', c_poi_nest_marker_poi, 0, 1.0],
     ];
+
+    for (x in apex_social_control)
+    {
+        all_layers.push(['Apex Social: ' + x, false, 2, 'Apex Social from GZ', '', apex_social_control[x], 0, 1.0]);
+    }
 
     var baseMaps = {}
     var overlayMaps = {}

@@ -6,6 +6,8 @@ from deca.ff_adf import AdfDatabase
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf, process_codex_adf
+from deca.util import make_dir_for_file
+from deca.hashes import hash32_func
 from PIL import Image
 import numpy as np
 import os
@@ -21,10 +23,16 @@ src_to_dst_x_scale = 128 / (16 * 1024)  # 180.0/(16*1024)
 src_to_dst_y_scale = -128 / (16 * 1024)  # -90.0/(16*1024)
 
 
+rtpc_prop_name_script = hash32_func('script')
+rtpc_prop_world = hash32_func('world')
+rtpc_prop_ref_apex_identifier = hash32_func('[ref] apex identifier')
+
+
 class RtpcLootVisitor:
     def __init__(self, tr):
         self.tr = tr
         self.regions = []
+        self.apex_social_control = {}
         self.points = {
             'CLootCrateSpawnPoint': [],
             'CLootCrateSpawnPointGroup': [],
@@ -44,6 +52,8 @@ class RtpcLootVisitor:
                 self.process_point(rtpc),
             elif rtpc_class == 'CRegion':
                 self.process_CRegion(rtpc)
+            elif rtpc_class == 'CGraphObject':
+                self.process_CGraphObject(rtpc)
 
     def process_point(self, rtpc):
         rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data.decode('utf-8')
@@ -133,6 +143,39 @@ class RtpcLootVisitor:
             },
         }
         self.regions.append(obj)
+
+    def process_CGraphObject(self, rtpc):
+        script = rtpc.prop_map.get(rtpc_prop_name_script, RtpcProperty()).data.decode('utf-8')
+
+        if script == 'graphs/check_apex_social_event.graph':
+            apex_id = rtpc.prop_map.get(rtpc_prop_ref_apex_identifier, RtpcProperty()).data.decode('utf-8')
+
+            ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[rtpc_prop_world].data)
+            x = ref_matrix.data[0, 3]
+            z = ref_matrix.data[1, 3]
+            y = ref_matrix.data[2, 3]
+            position = [x, z, y]
+            coords = [
+                x * src_to_dst_x_scale + dst_x0,
+                y * src_to_dst_y_scale + dst_y0,
+            ]
+
+            obj = {
+                'type': 'Feature',
+                'properties': {
+                    'type': 'apex_social',
+                    'apex_id': apex_id,
+                    'position': position,
+                },
+                'geometry': {
+                    'type': 'Point',
+                    'coordinates': coords,
+                },
+            }
+
+            lst = self.apex_social_control.get(apex_id, [])
+            lst.append(obj)
+            self.apex_social_control[apex_id] = lst
 
 
 class ToolMakeWebMap:
@@ -497,22 +540,25 @@ class ToolMakeWebMap:
         for k, v in visitor.points.items():
             print('{}: count = {}'.format(k, len(v)))
 
-        fpath = os.path.join(dpath, 'data_full.js')
-        with open(fpath, 'w') as f:
-            f.write('var region_data = {};\n'.format(json.dumps(visitor.regions, indent=4)))
-            f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
-            f.write('var mdic_data = {};\n'.format(json.dumps(mdics, indent=4)))
-            f.write('var c_collectable_data = {};\n'.format(json.dumps(visitor.points['CCollectable'], indent=4)))
-            f.write('var c_book_mark_data = {};\n'.format(json.dumps(visitor.points['CBookMark'], indent=4)))
-            f.write('var c_loot_crate_spawn_point_data = {};\n'.format(json.dumps(visitor.points['CLootCrateSpawnPoint'], indent=4)))
-            f.write('var c_loot_crate_spawn_point_group_data = {};\n'.format(json.dumps(visitor.points['CLootCrateSpawnPointGroup'], indent=4)))
-            f.write('var c_player_spawn_point_data = {};\n'.format(json.dumps(visitor.points['CPlayerSpawnPoint'], indent=4)))
-            f.write('var c_poi = {};\n'.format(json.dumps(visitor.points['CPOI'], indent=4)))
-            f.write('var c_poi_nest_marker_poi = {};\n'.format(json.dumps(visitor.points['CPOI.nest_marker_poi'], indent=4)))
-
-        fpath = os.path.join(dpath, 'data.js')
-        with open(fpath, 'w') as f:
-            f.write('var collectable_data = {};\n'.format(json.dumps(collectables, indent=4)))
+        data_list = [
+            ['collectable_data', collectables],
+            ['region_data', visitor.regions],
+            ['mdic_data', mdics],
+            ['c_collectable_data', visitor.points['CCollectable']],
+            ['c_book_mark_data', visitor.points['CBookMark']],
+            ['c_loot_crate_spawn_point_data', visitor.points['CLootCrateSpawnPoint']],
+            ['c_loot_crate_spawn_point_group_data', visitor.points['CLootCrateSpawnPointGroup']],
+            ['c_player_spawn_point_data', visitor.points['CPlayerSpawnPoint']],
+            ['c_poi', visitor.points['CPOI']],
+            ['c_poi_nest_marker_poi', visitor.points['CPOI.nest_marker_poi']],
+            ['apex_social_control', visitor.apex_social_control],
+        ]
+        for data_item in data_list:
+            fp = f'data/{data_item[0]}.js'
+            fp = os.path.join(dpath, fp)
+            make_dir_for_file(fp)
+            with open(fp, 'w') as f:
+                f.write('var {} = {};\n'.format(data_item[0], json.dumps(data_item[1], indent=4)))
 
         if copy_support_files:
             dst = os.path.join(dpath, 'index.html')

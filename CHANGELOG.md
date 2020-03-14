@@ -2,6 +2,7 @@
 * Stopped dumping of image file details
 * Fixed Gen Zero map build code
 * Added mapping of check_apex_social_event to GZ Map generation
+* Added embedded ADF files in EXE to VFS tree, process instances in them, fixed array processing
 
 #### v0.2.6 "Copy and Paste, a dangerous tool"
 * Fix for dds file generation caused by cut and paste shenanigans

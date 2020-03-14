@@ -91,6 +91,9 @@ class DbWrap:
         self._nodes_to_update = set()
         self._string_hash_to_add = []
         self._gtoc_archive_defs = []
+        # self._objects = []  # uid(ROWID), src_node_id, offset, class_str(_rowid), name_str(_rowid), object_id
+        # self._object_id_refs = []  # object_rowid((src_node_id,offset)), id, flags
+        # self._event_id_refs = []  # object_rowid((src_node_id,offset)), id, flags
 
         self._adf_db.load_from_database(self._db)
 
@@ -114,8 +117,8 @@ class DbWrap:
     def node_read_adf(self, node):
         return self._adf_db.read_node(self._db, node)
 
-    def extract_types_from_exe(self, exe_path):
-        return self._adf_db.extract_types_from_exe(exe_path)
+    def process_adf_in_exe(self, exe_path, node_uid):
+        return self._adf_db.process_adf_in_exe(exe_path, node_uid)
 
     def __enter__(self):
         return self
@@ -148,8 +151,9 @@ class DbWrap:
                 self.log('DATABASE: Inserting {} gt0c archive definitions'.format(len(self._gtoc_archive_defs)))
                 self._db.gtoc_archive_add_many(self._gtoc_archive_defs)
 
-            self.log('DATABASE: Saving ADF Types: {} Types'.format(len(self._adf_db.type_map_def)))
-            self._adf_db.save_to_database(self._db)
+            if self._adf_db.has_type_map_changed():
+                self.log('DATABASE: Saving ADF Types: {} Types'.format(len(self._adf_db.type_map_def)))
+                self._adf_db.save_to_database(self._db)
 
     def node_add(self, node):
         self._nodes_to_add.append(node)

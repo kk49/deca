@@ -468,7 +468,7 @@ def adf_value_extract(v):
 
 
 def read_instance(
-        buffer, n_buffer, buffer_pos, type_id, map_typdef, map_stringhash, abs_offset,
+        buffer, n_buffer, buffer_pos, type_id, map_typedef, map_string_hash, abs_offset,
         bit_offset=None, found_strings=None):
 
     dpos = buffer_pos
@@ -529,7 +529,9 @@ def read_instance(
         else:
             opos = buffer_pos
             buffer_pos = v0[0]
-            v, buffer_pos = read_instance(buffer, n_buffer, buffer_pos, v0[2], map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
+            v, buffer_pos = read_instance(
+                buffer, n_buffer, buffer_pos, v0[2], map_typedef, map_string_hash, abs_offset,
+                found_strings=found_strings)
             buffer_pos = opos
             v = AdfValue(v, type_id, dpos + abs_offset, v0[0] + abs_offset)
 
@@ -603,9 +605,9 @@ def read_instance(
         v = dir_contents
 
     else:
-        if type_id not in map_typdef:
+        if type_id not in map_typedef:
             raise AdfTypeMissing(type_id)
-        type_def = map_typdef[type_id]
+        type_def = map_typedef[type_id]
 
         if type_def.metatype == 0:  # Primative
             raise AdfTypeMissing(type_id)
@@ -615,7 +617,9 @@ def read_instance(
             for m in type_def.members:
                 buffer_pos = p0 + m.offset
                 nm = m.name_utf8
-                vt, buffer_pos = read_instance(buffer, n_buffer, buffer_pos, m.type_hash, map_typdef, map_stringhash, abs_offset, bit_offset=m.bit_offset, found_strings=found_strings)
+                vt, buffer_pos = read_instance(
+                    buffer, n_buffer, buffer_pos, m.type_hash, map_typedef, map_string_hash, abs_offset,
+                    bit_offset=m.bit_offset, found_strings=found_strings)
                 v[nm] = vt
                 # print(nm, vt)
             p1 = buffer_pos
@@ -630,13 +634,13 @@ def read_instance(
             # raise AdfTypeMissing(type_id)
         elif type_def.metatype in {3, 4}:  # Array or Inline Array
             if type_def.metatype == 3:
-                v0, buffer_pos = ff_read_u32s(buffer, n_buffer, buffer_pos, 4)
+                v0, buffer_pos = ff_read_u32s(buffer, n_buffer, buffer_pos, 3)
                 opos = buffer_pos
 
                 offset = v0[0]
                 flags = v0[1]
                 length = v0[2]
-                unknown = v0[3]
+                # unknown = v0[3] sometimes does not exist, is it even real data, in some cases it removed in GZ EXE
                 align = None
                 # aligning based on element size info
                 # if type_def.element_type_hash not in prim_types:
@@ -680,7 +684,8 @@ def read_instance(
 
                     v[i], buffer_pos = read_instance(
                         buffer, n_buffer, buffer_pos,
-                        type_def.element_type_hash, map_typdef, map_stringhash, abs_offset, found_strings=found_strings)
+                        type_def.element_type_hash, map_typedef, map_string_hash, abs_offset,
+                        found_strings=found_strings)
 
                     p1 = buffer_pos
                     # print(p0, p1, p1-p0)
@@ -721,8 +726,8 @@ def read_instance(
         elif type_def.metatype == 9:  # String Hash
             if type_def.size == 4:
                 v, buffer_pos = ff_read_u32(buffer, n_buffer, buffer_pos)
-                if v in map_stringhash:
-                    vs = map_stringhash[v].value
+                if v in map_string_hash:
+                    vs = map_string_hash[v].value
                 else:
                     vs = None
             elif type_def.size == 6:
@@ -730,14 +735,14 @@ def read_instance(
                 v1, buffer_pos = ff_read_u16(buffer, n_buffer, buffer_pos)
                 v2, buffer_pos = ff_read_u16(buffer, n_buffer, buffer_pos)
                 v = v0 << 32 | v1 << 16 | v2
-                if v in map_stringhash:
-                    vs = map_stringhash[v].value
+                if v in map_string_hash:
+                    vs = map_string_hash[v].value
                 else:
                     vs = None
             elif type_def.size == 8:
                 v, buffer_pos = ff_read_u64(buffer, n_buffer, buffer_pos)
-                if v in map_stringhash:
-                    vs = map_stringhash[v].value
+                if v in map_string_hash:
+                    vs = map_string_hash[v].value
                 else:
                     vs = None
             else:
@@ -923,7 +928,8 @@ class Adf:
                 buffer_pos = 0
                 v, buffer_pos = read_instance(
                     buffer, n_buffer, buffer_pos,
-                    ins.type_hash, self.extended_map_typedef, self.map_stringhash, ins.offset, found_strings=self.found_strings)
+                    ins.type_hash, self.extended_map_typedef, self.map_stringhash, ins.offset,
+                    found_strings=self.found_strings)
                 self.table_instance_full_values[i] = v
                 self.table_instance_values[i] = adf_value_extract(v)
                 # except AdfTypeMissing as ae:
@@ -936,9 +942,13 @@ class AdfDatabase:
     def __init__(self, vfs=None):
         self.type_map_def = {}
         self.type_missing = set()
+        self._type_map_updated = False
 
         if vfs is not None:
             self.load_from_database(vfs)
+
+    def has_type_map_changed(self):
+        return self._type_map_updated
 
     def load_from_database(self, vfs: VfsDatabase):
         self.type_map_def, self.type_missing = vfs.adf_type_map_load()
@@ -946,8 +956,16 @@ class AdfDatabase:
     def save_to_database(self, vfs: VfsDatabase):
         vfs.adf_type_map_save(self.type_map_def, self.type_missing)
 
-    def extract_types_from_exe(self, exepath):
+    def typedefs_add(self, map_typedefs):
+        for k, v in map_typedefs.items():
+            if k not in self.type_map_def:
+                self.type_map_def[k] = v
+                self._type_map_updated = True
+
+    def process_adf_in_exe(self, exepath, node_uid):
         self.type_map_def = {}
+
+        adf_sub_files = []
 
         exe_stat = os.stat(exepath)
 
@@ -959,18 +977,24 @@ class AdfDatabase:
             poss = exe.find(b' FDA\x04\x00\x00\x00', poss + 1)
             if poss < 0:
                 break
+
             exe_short = exe[poss:]
             with ArchiveFile(BytesIO(exe_short)) as f:
-                adf = Adf()
-                adf.deserialize(f, process_instances=False)
-                for k, v in adf.map_typedef.items():
-                    self.type_map_def[k] = v
+                try:
+                    adf = Adf()
+                    adf.deserialize(f, map_typedef=self.type_map_def)
+
+                except AdfTypeMissing as ae:
+                    self.type_missing.add((ae.type_id, node_uid))
+                    print('Missing Type {:08x} in {} at offset {}'.format(
+                        ae.type_id, exepath, poss))
+
+            adf_sub_files.append((poss, adf.total_size))
+
+            self.typedefs_add(adf.map_typedef)
             # TODO also add field strings to adf_db/vfs, combine adf_db and vfs into GAME DATABASE?
 
-    def typedefs_add(self, map_typedefs):
-        for k, v in map_typedefs.items():
-            if k not in self.type_map_def:
-                self.type_map_def[k] = v
+        return adf_sub_files
 
     def _load_adf(self, buffer):
         with ArchiveFile(io.BytesIO(buffer)) as fp:
@@ -978,9 +1002,7 @@ class AdfDatabase:
             try:
                 obj.deserialize(fp, self.type_map_def)
                 # get typedefs from regular load, to handle the case where types are in ADF, and ADFB but not EXE
-                for k, v in obj.map_typedef.items():
-                    if k not in self.type_map_def:
-                        self.type_map_def[k] = v
+                self.typedefs_add(obj.map_typedef)
                 return obj
             except EDecaErrorParse:
                 return None

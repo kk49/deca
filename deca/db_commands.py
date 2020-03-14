@@ -96,6 +96,8 @@ class MultiProcessControl:
             for i, command in command_todo:
                 command_results[i] = processor.process_command(command[0], command[1])
             vfs.shutdown()
+
+            return command_results
         else:
             mp_q_results = multiprocessing.Queue()
 
@@ -288,7 +290,26 @@ class Processor:
     def process_exe(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing EXE: {} {}'.format(node.uid, node.p_path))
 
-        db.extract_types_from_exe(node.p_path)
+        adf_sub_file_offsets = db.process_adf_in_exe(node.p_path, node.uid)
+        _, exe_file = os.path.split(node.p_path)
+
+        for idx, (adf_offset, adf_size) in enumerate(adf_sub_file_offsets):
+            fn = f'{exe_file}/{adf_offset:09d}.adf'
+            fn_hash = db.file_hash(fn)
+
+            child = VfsNode(
+                v_hash_type=db.file_hash_type,
+                file_type=FTYPE_ADF,
+                v_path=fn,
+                v_hash=fn_hash,
+                pid=node.uid,
+                offset=adf_offset,
+                size_c=adf_size,
+                size_u=adf_size,
+                index=idx,
+            )
+            db.node_add(child)
+
         node.flags_set(node_flag_processed_file_type)
         db.node_update(node)
 

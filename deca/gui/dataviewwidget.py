@@ -1,4 +1,4 @@
-from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsNode
+from deca.db_processor import vfs_structure_new, vfs_structure_open, VfsNode
 from deca.ff_types import *
 from deca.ff_adf import AdfDatabase
 from deca.gui.viewer_adf import DataViewerAdf

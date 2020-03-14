@@ -10,7 +10,7 @@ import numpy as np
 import deca.ff_rtpc
 
 from .file import ArchiveFile
-from .vfs_db import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
+from .db_core import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
 from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
 from .db_types import *
 from .ff_types import *

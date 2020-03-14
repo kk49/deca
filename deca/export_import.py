@@ -4,7 +4,7 @@ from .errors import *
 from .file import *
 from .ff_types import *
 from .ff_adf import AdfDatabase
-from .vfs_db import VfsDatabase, VfsNode
+from .db_core import VfsDatabase, VfsNode
 from .ff_avtx import image_export
 from .ff_sarc import FileSarc
 from .util import make_dir_for_file

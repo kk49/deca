@@ -9,7 +9,7 @@ from deca.file import ArchiveFile
 from deca.fast_file import *
 from deca.hashes import hash32_func
 from deca.ff_types import FTYPE_ADF_BARE, FTYPE_ADF0
-from deca.vfs_db import VfsDatabase, VfsNode
+from deca.db_core import VfsDatabase, VfsNode
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
 

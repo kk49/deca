@@ -1,7 +1,7 @@
 import sys
 import os
 from deca.errors import *
-from deca.vfs_processor import vfs_structure_new, vfs_structure_open, VfsNode
+from deca.db_processor import vfs_structure_new, vfs_structure_open, VfsNode
 from deca.builder import Builder
 from deca.util import Logger
 from deca.cmds.tool_make_web_map import ToolMakeWebMap

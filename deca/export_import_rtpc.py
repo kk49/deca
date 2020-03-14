@@ -1,7 +1,7 @@
 import os
 import re
 from typing import List
-from .vfs_db import VfsDatabase, VfsNode
+from .db_core import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
 from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix

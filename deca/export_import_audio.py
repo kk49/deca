@@ -1,5 +1,5 @@
 import os
-from .vfs_db import VfsDatabase, VfsNode
+from .db_core import VfsDatabase, VfsNode
 from .util import make_dir_for_file
 
 

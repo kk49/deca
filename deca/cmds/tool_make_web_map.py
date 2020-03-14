@@ -1,5 +1,5 @@
-from deca.vfs_processor import vfs_structure_open
-from deca.vfs_db import VfsDatabase
+from deca.db_processor import vfs_structure_open
+from deca.db_core import VfsDatabase
 from deca.ff_avtx import Ddsc
 from deca.ff_rtpc import Rtpc, PropName, RtpcProperty
 from deca.ff_adf import AdfDatabase

@@ -1,7 +1,7 @@
 import copy
 from typing import Optional
 import xml.etree.ElementTree as ET
-from .vfs_db import VfsDatabase
+from .db_core import VfsDatabase
 from .util import remove_prefix_if_present
 from .ff_avtx import image_load
 from .ff_adf import *

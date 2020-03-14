@@ -3,7 +3,7 @@ import io
 import openpyxl
 
 from .file import ArchiveFile
-from .vfs_db import VfsDatabase, VfsNode
+from .db_core import VfsDatabase, VfsNode
 from .ff_adf import AdfDatabase
 from .export_import_adf import adf_export_xlsx_0x0b73315d
 

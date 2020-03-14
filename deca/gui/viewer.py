@@ -1,4 +1,4 @@
-from deca.vfs_processor import VfsNode, VfsProcessor
+from deca.db_processor import VfsNode, VfsProcessor
 from PySide2.QtWidgets import QWidget
 
 

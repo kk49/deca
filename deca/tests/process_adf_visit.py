@@ -1,6 +1,6 @@
 import time
 from deca.ff_adf import Adf, AdfDatabase
-from deca.vfs_processor import vfs_structure_open
+from deca.db_processor import vfs_structure_open
 
 
 vfs_config = '/home/krys/prj/work/gz/project.json'

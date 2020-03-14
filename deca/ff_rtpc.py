@@ -1,7 +1,7 @@
 from io import BytesIO
 from deca.file import ArchiveFile
 from deca.fast_file_2 import *
-from deca.vfs_db import VfsDatabase
+from deca.db_core import VfsDatabase
 import struct
 from enum import IntEnum
 from typing import List, Optional

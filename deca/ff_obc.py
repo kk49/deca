@@ -1,6 +1,6 @@
 import struct
 import numpy as np
-from deca.vfs_processor import VfsProcessor
+from deca.db_processor import VfsProcessor
 
 
 class Obc:

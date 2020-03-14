@@ -1,5 +1,5 @@
 import os
-from .vfs_db import VfsDatabase, VfsNode, GtocArchiveEntry
+from .db_core import VfsDatabase, VfsNode, GtocArchiveEntry
 from .ff_adf import AdfDatabase
 from .ff_types import *
 from .db_types import *

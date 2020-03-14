@@ -1,6 +1,6 @@
 import re
-from deca.vfs_db import VfsDatabase
-from deca.vfs_processor import vfs_structure_open
+from deca.db_core import VfsDatabase
+from deca.db_processor import vfs_structure_open
 from deca.ff_adf import AdfDatabase
 from deca.digest import process_translation_adf, process_codex_adf
 

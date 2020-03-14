@@ -1,6 +1,6 @@
 from deca.gui.vfs_widgets import used_color_calc
-from deca.vfs_db import VfsDatabase
-from deca.vfs_processor import VfsNode
+from deca.db_core import VfsDatabase
+from deca.db_processor import VfsNode
 from deca.ff_adf import AdfDatabase
 from deca.ff_types import *
 import PySide2

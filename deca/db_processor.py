@@ -5,10 +5,10 @@ import time
 
 import deca.ff_rtpc
 
-from .vfs_db import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
+from .db_core import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
 from .db_types import *
 from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
-from .vfs_commands import MultiProcessControl
+from .db_commands import MultiProcessControl
 from .game_info import determine_game
 from .ff_types import *
 from .ff_adf import AdfDatabase

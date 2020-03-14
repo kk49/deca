@@ -433,11 +433,29 @@ class VfsDatabase:
         self.db_execute_one('DROP INDEX IF EXISTS index_core_nodes_v_path_to_vnode;')
         self.db_execute_one('DROP INDEX IF EXISTS index_core_nodes_v_hash_to_vnode;')
 
+        self.db_execute_one('DROP INDEX IF EXISTS core_strings_hash32_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_strings_hash48_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_strings_hash64_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_object_id_ref_id_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_object_id_ref_id_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_event_id_ref_id_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_event_id_ref_ori_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_gtoc_archive_path_hash32_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_gtoc_archive_archive_magic_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_gtoc_file_entry_row_id_asc;')
+        self.db_execute_one('DROP INDEX IF EXISTS core_gtoc_file_entry_index_asc;')
+
         self.db_execute_one('DROP TABLE IF EXISTS core_node_blocks;')
         self.db_execute_one('DROP TABLE IF EXISTS core_nodes;')
         self.db_execute_one('DROP TABLE IF EXISTS core_string_references;')
         self.db_execute_one('DROP TABLE IF EXISTS core_strings;')
         self.db_execute_one('DROP TABLE IF EXISTS core_adf_types;')
+
+        self.db_execute_one('DROP TABLE IF EXISTS core_objects;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_object_id_ref;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_event_id_ref;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_gtoc_archive_def;')
+        self.db_execute_one('DROP TABLE IF EXISTS core_gtoc_file_entry;')
 
         self.db_execute_one('VACUUM;')
 
@@ -516,6 +534,49 @@ class VfsDatabase:
             );
             '''
         )
+
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_objects" (
+                "node_id_src" INTEGER NOT NULL,
+                "offset" INTEGER NOT NULL, 
+                "class_str_rowid" INTEGER,
+                "name_str_rowid" INTEGER,
+                "object_id" INTEGER,
+                PRIMARY KEY ("node_id_src", "offset")
+            );
+            '''
+        )
+
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_object_id_ref" (
+                "object_rowid" INTEGER NOT NULL,
+                "id" INTEGER NOT NULL,
+                "flags" INTEGER,
+                PRIMARY KEY ("object_rowid", "id")
+            );
+            '''
+        )
+        self.db_execute_one(
+            'CREATE INDEX IF NOT EXISTS "core_object_id_ref_id_asc" ON "core_object_id_ref" ("id" ASC);')
+        self.db_execute_one(
+            'CREATE INDEX IF NOT EXISTS "core_object_id_ref_ori_asc" ON "core_object_id_ref" ("object_rowid" ASC);')
+
+        self.db_execute_one(
+            '''
+            CREATE TABLE IF NOT EXISTS "core_event_id_ref" (
+                "object_rowid" INTEGER NOT NULL,
+                "id" INTEGER NOT NULL,
+                "flags" INTEGER,
+                PRIMARY KEY ("object_rowid", "id")
+            );
+            '''
+        )
+        self.db_execute_one(
+            'CREATE INDEX IF NOT EXISTS "core_event_id_ref_id_asc" ON "core_event_id_ref" ("id" ASC);')
+        self.db_execute_one(
+            'CREATE INDEX IF NOT EXISTS "core_event_id_ref_ori_asc" ON "core_event_id_ref" ("object_rowid" ASC);')
 
         self.db_execute_one(
             '''

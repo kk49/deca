@@ -480,12 +480,12 @@ def parse_prop_data(bufn, prop_info):
     elif prop_type == k_type_objid:
         # todo is the obj id really 64 bits?
         prop_data_pos = prop_data_raw
-        prop_data, pos = ff_read_u64(bufn, prop_data_pos)
+        prop_data, pos = ff_read_s64(bufn, prop_data_pos)
     elif prop_type == k_type_event:
         prop_data_pos = prop_data_raw
         pos = prop_data_pos
         n, pos = ff_read_u32(bufn, pos)
-        prop_data, pos = ff_read_u64s(bufn, pos, n)
+        prop_data, pos = ff_read_s64s(bufn, pos, n)
     else:
         parse_prop_data_raise_error(prop_type)
 

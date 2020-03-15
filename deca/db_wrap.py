@@ -91,9 +91,9 @@ class DbWrap:
         self._nodes_to_update = set()
         self._string_hash_to_add = []
         self._gtoc_archive_defs = []
-        # self._objects = []  # uid(ROWID), src_node_id, offset, class_str(_rowid), name_str(_rowid), object_id
-        # self._object_id_refs = []  # object_rowid((src_node_id,offset)), id, flags
-        # self._event_id_refs = []  # object_rowid((src_node_id,offset)), id, flags
+        self._objects = []  # uid(ROWID), src_node_id, offset, class_str(_rowid), name_str(_rowid), object_id
+        self._object_id_refs = []  # object_rowid((src_node_id,offset)), id, flags
+        self._event_id_refs = []  # object_rowid((src_node_id,offset)), id, flags
 
         self._adf_db.load_from_database(self._db)
 
@@ -155,6 +155,18 @@ class DbWrap:
                 self.log('DATABASE: Saving ADF Types: {} Types'.format(len(self._adf_db.type_map_def)))
                 self._adf_db.save_to_database(self._db)
 
+            if len(self._objects) > 0:
+                self.log('DATABASE: Inserting {} objects'.format(len(self._objects)))
+                obj_rowids = self._db.object_info_add_many(self._objects)
+
+                if len(self._object_id_refs) > 0:
+                    self.log('DATABASE: Inserting {} object id ref'.format(len(self._object_id_refs)))
+                    self._db.object_id_refs_add_many(self._object_id_refs, obj_rowids)
+
+                if len(self._event_id_refs) > 0:
+                    self.log('DATABASE: Inserting {} event id refs'.format(len(self._event_id_refs)))
+                    self._db.event_id_refs_add_many(self._event_id_refs, obj_rowids)
+
     def node_add(self, node):
         self._nodes_to_add.append(node)
 
@@ -215,4 +227,16 @@ class DbWrap:
         else:
             self._gtoc_archive_defs = self._gtoc_archive_defs + archive
 
+    def object_add(self, src_node_id, offset, class_str, name_str, object_id):
+        # uid(ROWID), src_node_id, offset, class_str(_rowid), name_str(_rowid), object_id
+        obj_uid = len(self._objects)
+        self._objects.append([obj_uid, src_node_id, offset, to_str(class_str), to_str(name_str), object_id])
+        return obj_uid
 
+    def object_id_ref_add(self, obj_uid, object_id, flags):
+        # object_rowid((src_node_id,offset)), id, flags
+        self._object_id_refs.append([obj_uid, object_id, flags])
+
+    def event_id_ref_add(self, obj_uid, event_id, flags):
+        # object_rowid((src_node_id,offset)), id, flags
+        self._event_id_refs.append([obj_uid, event_id, flags])

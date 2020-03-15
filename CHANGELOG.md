@@ -1,4 +1,5 @@
 #### v0.2.7 ???
+* Added tracking of RTPC objects, object ids, and event ids to DB
 * Stopped dumping of image file details
 * Fixed Gen Zero map build code
 * Added mapping of check_apex_social_event to GZ Map generation

@@ -966,6 +966,69 @@ class VfsDatabase:
             dbg='hash_string_add_many:0:insert')
         self.db_conn.commit()
 
+    def object_info_add_many(self, objects):
+        # uid(ROWID), src_node_id, offset, class_str(_rowid), name_str(_rowid), object_id
+
+        # prepare strings
+        class_strs = [class_str for _, _, _, class_str, _, _ in objects if class_str is not None]
+        name_strs = [name_str for _, _, _, _, name_str, _ in objects if name_str is not None]
+        str_set = set(class_strs + name_strs)
+        str_lookup = {}
+        for s in str_set:
+            result = self.db_query_all(
+                "SELECT rowid FROM core_strings WHERE string=(?)",
+                (s,),
+                dbg='object_info_add_many:0:select')
+
+            str_lookup[s] = result[0][0]
+
+        str_lookup[None] = None
+
+        # insertion record
+        object_insert = [
+            (src_node_id, offset, str_lookup[class_str], str_lookup[name_str], object_id) for uid, src_node_id, offset, class_str, name_str, object_id in objects
+        ]
+
+        self.db_execute_many(
+            "INSERT OR IGNORE INTO core_objects VALUES (?,?,?,?,?)",
+            object_insert,
+            dbg='object_info_add_many:1:insert'
+        )
+        self.db_conn.commit()
+
+        # lookup records to get obj_rowids
+        obj_rowids = {}
+        for uid, src_node_id, offset, class_str, name_str, object_id in objects:
+            result = self.db_query_all(
+                "SELECT rowid FROM core_objects WHERE node_id_src=(?) AND offset=(?)",
+                (src_node_id, offset),
+                dbg='object_info_add_many:2:select')
+            obj_rowids[uid] = result[0][0]
+
+        return obj_rowids
+
+    def object_id_refs_add_many(self, refs, obj_rowids):
+        # object_rowid((src_node_id,offset)), id, flags
+        records = [(obj_rowids[object_rowid], idd, flags) for object_rowid, idd, flags in refs]
+
+        self.db_execute_many(
+            "INSERT OR IGNORE INTO core_object_id_ref VALUES (?,?,?)",
+            records,
+            dbg='object_id_refs_add_many:0:insert'
+        )
+        self.db_conn.commit()
+
+    def event_id_refs_add_many(self, refs, obj_rowids):
+        # object_rowid((src_node_id,offset)), id, flags
+        records = [(obj_rowids[object_rowid], idd, flags) for object_rowid, idd, flags in refs]
+
+        self.db_execute_many(
+            "INSERT OR IGNORE INTO core_event_id_ref VALUES (?,?,?)",
+            records,
+            dbg='event_id_refs_add_many:0:insert'
+        )
+        self.db_conn.commit()
+
     def gtoc_archive_add_many(self, archives: List[GtocArchiveEntry]):
         # write gtoc archive definitions
         a: GtocArchiveEntry

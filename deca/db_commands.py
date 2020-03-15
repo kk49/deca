@@ -16,7 +16,7 @@ from .db_types import *
 from .ff_types import *
 from .ff_txt import load_json
 from .ff_adf import AdfTypeMissing, GdcArchiveEntry
-from .ff_rtpc import RtpcVisitorGatherStrings
+from .ff_rtpc import RtpcVisitorGatherStrings, k_type_event, k_type_objid, k_type_str, parse_prop_data
 from .ff_arc_tab import tab_file_load, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
 from .ff_gtoc import process_buffer_gtoc, GtocArchiveEntry, GtocFileEntry
@@ -24,6 +24,75 @@ from .util import remove_prefix_if_present, remove_suffix_if_present
 from .kaitai.gfx import Gfx
 
 print_node_info = False
+
+hash32_object_id = hash32_func('_object_id')
+hash32_class = hash32_func('_class')
+hash32_name = hash32_func('name')
+
+
+class RtpcGatherObjectEventStringInfo(RtpcVisitorGatherStrings):
+    def __init__(self, db: DbWrap, src_node_id):
+        super(RtpcGatherObjectEventStringInfo, self).__init__()
+        self._db = db
+        self._src_node_id = src_node_id
+        self._object = None
+        self._object_offset = None
+        self._object_id = None
+        self._class_str = None
+        self._name_str = None
+        self._ref_object_ids = []
+        self._ref_event_ids = []
+
+    def visit(self, buffer):
+        super(RtpcGatherObjectEventStringInfo, self).visit(buffer)
+
+    def node_start(self, bufn, pos, index, node_info):
+        self._object_offset = pos
+        self._object_id = None
+        self._class_str = None
+        self._name_str = None
+        self._ref_object_ids = []
+        self._ref_event_ids = []
+
+    def node_end(self, bufn, pos, index, node_info):
+        # print(f'_src_node_id == {self._src_node_id}')
+        # print(f'_object_offset == {self._object_offset}')
+        # print(f'_class_str == {self._class_str}')
+        # print(f'_name_str == {self._name_str}')
+        # print(f'_object_id == {self._object_id}')
+        # print(f'Event Count == {len(self._ref_event_ids)}')
+        # print(f'Object Count == {len(self._ref_object_ids)}')
+
+        obj_uid = self._db.object_add(
+            self._src_node_id, self._object_offset, self._class_str, self._name_str, self._object_id)
+
+        for ref in self._ref_event_ids:
+            self._db.event_id_ref_add(obj_uid, ref, 0)
+
+        for ref in self._ref_object_ids:
+            self._db.object_id_ref_add(obj_uid, ref, 0)
+
+    def prop_start(self, bufn, pos, index, prop_info):
+        super(RtpcGatherObjectEventStringInfo, self).prop_start(bufn, pos, index, prop_info)
+
+        prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
+
+        if prop_type == k_type_event:
+            prop_data, prop_data_pos = parse_prop_data(bufn, prop_info)
+            for ev in prop_data:
+                self._ref_event_ids.append(ev)
+        elif prop_type == k_type_objid:
+            prop_data, prop_data_pos = parse_prop_data(bufn, prop_info)
+            self._ref_object_ids.append(prop_data)
+            if prop_name_hash == hash32_object_id:
+                self._object_id = prop_data
+        elif prop_type == k_type_str:
+            if prop_name_hash == hash32_class:
+                prop_data, prop_data_pos = parse_prop_data(bufn, prop_info)
+                self._class_str = prop_data
+            elif prop_name_hash == hash32_name:
+                prop_data, prop_data_pos = parse_prop_data(bufn, prop_info)
+                self._name_str = prop_data
 
 
 class LogWrapper:
@@ -585,7 +654,7 @@ class Processor:
         with db.db().file_obj_from(node) as f:
             buffer = f.read(node.size_u)
 
-        rtpc_gather = RtpcVisitorGatherStrings()
+        rtpc_gather = RtpcGatherObjectEventStringInfo(db, node.uid)
         rtpc_gather.visit(buffer)
 
         for s in rtpc_gather.strings:

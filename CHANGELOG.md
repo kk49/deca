@@ -1,4 +1,4 @@
-#### v0.2.7 ???
+#### v0.2.7 Stay Safe
 * Added tracking of RTPC objects, object ids, and event ids to DB
 * Stopped dumping of image file details
 * Fixed Gen Zero map build code

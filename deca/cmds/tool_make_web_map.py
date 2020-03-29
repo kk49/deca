@@ -1,13 +1,13 @@
 from deca.db_processor import vfs_structure_open
 from deca.db_core import VfsDatabase
 from deca.ff_avtx import Ddsc
-from deca.ff_rtpc import Rtpc, PropName, RtpcProperty
 from deca.ff_adf import AdfDatabase
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf, process_codex_adf
 from deca.util import make_dir_for_file
-from deca.hashes import hash32_func
+import deca.ff_rtpc as rtpc
+from deca.ff_rtpc import parse_prop_data
 from PIL import Image
 import numpy as np
 import os
@@ -23,13 +23,10 @@ src_to_dst_x_scale = 128 / (16 * 1024)  # 180.0/(16*1024)
 src_to_dst_y_scale = -128 / (16 * 1024)  # -90.0/(16*1024)
 
 
-rtpc_prop_name_script = hash32_func('script')
-rtpc_prop_world = hash32_func('world')
-rtpc_prop_ref_apex_identifier = hash32_func('[ref] apex identifier')
-
-
-class RtpcLootVisitor:
+#         @0x000001a4(     420) 0xa949bc65 0x00000f5f 0x03 str    = @0x00000f5f(    3935) b'craftingmagazinenoiseshoes'
+class RtpcVisitorMap(rtpc.RtpcVisitor):
     def __init__(self, tr):
+        super(RtpcVisitorMap, self).__init__()
         self.tr = tr
         self.regions = []
         self.apex_social_control = {}
@@ -41,26 +38,26 @@ class RtpcLootVisitor:
             'CBookMark': [],
             'CPOI': [],
             'CPOI.nest_marker_poi': [],
+            'CraftingSchematics': [],
         }
+        self.rtpc_class_name = None  # PropName.CLASS_NAME
+        self.rtpc_class_comment = None  # PropName.CLASS_COMMENT
+        self.rtpc_world = None  # rtpc_prop_world
+        self.rtpc_script = None  # rtpc_prop_name_script
+        self.rtpc_ref_apex_identifier = None  # rtpc_prop_ref_apex_identifier
+        self.rtpc_cregion_border = None  # PropName.CREGION_BORDER
+        self.rtpc_instance_uid = None  # PropName.INSTANCE_UID
+        self.rtpc_cpoi_name = None  # PropName.CPOI_NAME
+        self.rtpc_cpoi_desc = None  # PropName.CPOI_DESC
+        self.rtpc_bookmark_name = None  # PropName.BOOKMARK_NAME
+        self.rtpc_deca_loot_class = None  # 0x34beec18
+        self.rtpc_deca_crafting_type = None  # 0xa949bc65
 
-    def process(self, rtpc):
-        if PropName.CLASS_NAME.value in rtpc.prop_map:
-            rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data.decode('utf-8')
-
-            if rtpc_class in {'CLootCrateSpawnPoint', 'CLootCrateSpawnPointGroup', 'CBookMark', 'CPOI', 'CCollectable',
-                              'CPlayerSpawnPoint'}:
-                self.process_point(rtpc),
-            elif rtpc_class == 'CRegion':
-                self.process_CRegion(rtpc)
-            elif rtpc_class == 'CGraphObject':
-                self.process_CGraphObject(rtpc)
-
-    def process_point(self, rtpc):
-        rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data.decode('utf-8')
-        ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[0x6ca6d4b9].data)
-        x = ref_matrix.data[0, 3]
-        z = ref_matrix.data[1, 3]
-        y = ref_matrix.data[2, 3]
+    def process_point(self):
+        self.rtpc_world = Deca3dMatrix(col_major=self.rtpc_world)
+        x = self.rtpc_world.data[0, 3]
+        z = self.rtpc_world.data[1, 3]
+        y = self.rtpc_world.data[2, 3]
         position = [x, z, y]
         coords = [
             x * src_to_dst_x_scale + dst_x0,
@@ -70,7 +67,7 @@ class RtpcLootVisitor:
         obj = {
             'type': 'Feature',
             'properties': {
-                'type': rtpc_class,
+                'type': self.rtpc_class_name,
                 'position': position,
             },
             'geometry': {
@@ -80,48 +77,103 @@ class RtpcLootVisitor:
         }
 
         comment = ''
-        if PropName.CLASS_COMMENT in rtpc.prop_map:
-            comment = rtpc.prop_map[PropName.CLASS_COMMENT].data.decode('utf-8')
+        if self.rtpc_class_comment is not None:
+            comment = self.rtpc_class_comment
             obj['properties']['comment'] = comment
 
-        if PropName.INSTANCE_UID in rtpc.prop_map:
-            obj_id = rtpc.prop_map[PropName.INSTANCE_UID].data
+        if self.rtpc_instance_uid is not None:
+            obj_id = self.rtpc_instance_uid
             obj['properties']['uid'] = obj_id
             obj['properties']['uid_str'] = '0x{:012X}'.format(obj_id)
 
-        if PropName.CPOI_NAME in rtpc.prop_map:
-            cpoi_name = rtpc.prop_map.get(PropName.CPOI_NAME, RtpcProperty()).data.decode('utf-8')
+        if self.rtpc_cpoi_name is not None:
+            cpoi_name = self.rtpc_cpoi_name
             cpoi_name_tr = self.tr.get(cpoi_name, cpoi_name)
             obj['properties']['poi_name'] = cpoi_name
             obj['properties']['poi_name_tr'] = cpoi_name_tr
 
-        if PropName.CPOI_DESC in rtpc.prop_map:
-            cpoi_desc = rtpc.prop_map.get(PropName.CPOI_DESC, RtpcProperty()).data.decode('utf-8')
+        if self.rtpc_cpoi_desc is not None:
+            cpoi_desc = self.rtpc_cpoi_desc
             cpoi_desc_tr = self.tr.get(cpoi_desc, cpoi_desc)
             obj['properties']['poi_desc'] = cpoi_desc
             obj['properties']['poi_desc_tr'] = cpoi_desc_tr
 
-        if PropName.BOOKMARK_NAME in rtpc.prop_map:
-            bookmark_name = rtpc.prop_map[PropName.BOOKMARK_NAME].data.decode('utf-8')
+        if self.rtpc_bookmark_name is not None:
+            bookmark_name = self.rtpc_bookmark_name
             obj['properties']['bookmark_name'] = bookmark_name
 
-        if 0x34beec18 in rtpc.prop_map:
-            loot_class = rtpc.prop_map[0x34beec18].data.decode('utf-8')
+        if self.rtpc_deca_loot_class is not None:
+            loot_class = self.rtpc_deca_loot_class
             obj['properties']['loot_class'] = loot_class
 
         name = 'CPOI.{}'.format(comment)
         if name in self.points:
             self.points[name].append(obj)
         else:
-            self.points[rtpc_class].append(obj)
+            self.points[self.rtpc_class_name].append(obj)
 
-    def process_CRegion(self, rtpc):
-        obj_type = rtpc.prop_map[PropName.CLASS_NAME].data.decode('utf-8')
-        obj_id = rtpc.prop_map.get(PropName.INSTANCE_UID, RtpcProperty()).data
-        comment = rtpc.prop_map.get(PropName.CLASS_COMMENT, RtpcProperty()).data.decode('utf-8')
+    def process_crafting_schematic(self):
+        self.rtpc_world = Deca3dMatrix(col_major=self.rtpc_world)
+        x = self.rtpc_world.data[0, 3]
+        z = self.rtpc_world.data[1, 3]
+        y = self.rtpc_world.data[2, 3]
+        position = [x, z, y]
+        coords = [
+            x * src_to_dst_x_scale + dst_x0,
+            y * src_to_dst_y_scale + dst_y0,
+        ]
 
-        ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[0x6ca6d4b9].data).data
-        border = np.array(rtpc.prop_map[PropName.CREGION_BORDER].data).reshape((-1, 4)).transpose()
+        obj = {
+            'type': 'Feature',
+            'properties': {
+                'type': self.rtpc_class_name,
+                'position': position,
+            },
+            'geometry': {
+                'type': 'Point',
+                'coordinates': coords,
+            },
+        }
+
+        comment = ''
+        if self.rtpc_class_comment is not None:
+            comment = self.rtpc_deca_crafting_type
+            obj['properties']['comment'] = comment
+
+        if self.rtpc_instance_uid is not None:
+            obj_id = self.rtpc_instance_uid
+            obj['properties']['uid'] = obj_id
+            obj['properties']['uid_str'] = '0x{:012X}'.format(obj_id)
+
+        if self.rtpc_cpoi_name is not None:
+            cpoi_name = self.rtpc_cpoi_name
+            cpoi_name_tr = self.tr.get(cpoi_name, cpoi_name)
+            obj['properties']['poi_name'] = cpoi_name
+            obj['properties']['poi_name_tr'] = cpoi_name_tr
+
+        if self.rtpc_cpoi_desc is not None:
+            cpoi_desc = self.rtpc_cpoi_desc
+            cpoi_desc_tr = self.tr.get(cpoi_desc, cpoi_desc)
+            obj['properties']['poi_desc'] = cpoi_desc
+            obj['properties']['poi_desc_tr'] = cpoi_desc_tr
+
+        if self.rtpc_bookmark_name is not None:
+            bookmark_name = self.rtpc_bookmark_name
+            obj['properties']['bookmark_name'] = bookmark_name
+
+        if self.rtpc_deca_loot_class is not None:
+            loot_class = self.rtpc_deca_loot_class
+            obj['properties']['loot_class'] = loot_class
+
+        self.points['CraftingSchematics'].append(obj)
+
+    def process_CRegion(self):
+        self.rtpc_world = Deca3dMatrix(col_major=self.rtpc_world)
+        obj_type = self.rtpc_class_name
+        obj_id = self.rtpc_instance_uid
+        comment = self.rtpc_class_comment
+        ref_matrix = self.rtpc_world.data
+        border = np.array(self.rtpc_cregion_border).reshape((-1, 4)).transpose()
         border[3, :] = 1.0
         border = np.matmul(ref_matrix, border)
         border = border.transpose()
@@ -144,16 +196,17 @@ class RtpcLootVisitor:
         }
         self.regions.append(obj)
 
-    def process_CGraphObject(self, rtpc):
-        script = rtpc.prop_map.get(rtpc_prop_name_script, RtpcProperty()).data.decode('utf-8')
+    def process_CGraphObject(self):
+        self.rtpc_world = Deca3dMatrix(col_major=self.rtpc_world)
+        script = self.rtpc_script
 
         if script == 'graphs/check_apex_social_event.graph':
-            apex_id = rtpc.prop_map.get(rtpc_prop_ref_apex_identifier, RtpcProperty()).data.decode('utf-8')
+            apex_id = self.rtpc_ref_apex_identifier
 
-            ref_matrix = Deca3dMatrix(col_major=rtpc.prop_map[rtpc_prop_world].data)
-            x = ref_matrix.data[0, 3]
-            z = ref_matrix.data[1, 3]
-            y = ref_matrix.data[2, 3]
+            ref_matrix = self.rtpc_world.data
+            x = ref_matrix[0, 3]
+            z = ref_matrix[1, 3]
+            y = ref_matrix[2, 3]
             position = [x, z, y]
             coords = [
                 x * src_to_dst_x_scale + dst_x0,
@@ -176,6 +229,62 @@ class RtpcLootVisitor:
             lst = self.apex_social_control.get(apex_id, [])
             lst.append(obj)
             self.apex_social_control[apex_id] = lst
+
+    def props_start(self, bufn, pos, count):
+        self.rtpc_class_name = None  # PropName.CLASS_NAME
+        self.rtpc_class_comment = None  # PropName.CLASS_COMMENT
+        self.rtpc_world = None  # rtpc_prop_world
+        self.rtpc_script = None  # rtpc_prop_name_script
+        self.rtpc_ref_apex_identifier = None  # rtpc_prop_ref_apex_identifier
+        self.rtpc_cregion_border = None  # PropName.CREGION_BORDER
+        self.rtpc_instance_uid = None  # PropName.INSTANCE_UID
+        self.rtpc_cpoi_name = None  # PropName.CPOI_NAME
+        self.rtpc_cpoi_desc = None  # PropName.CPOI_DESC
+        self.rtpc_bookmark_name = None  # PropName.BOOKMARK_NAME
+        self.rtpc_deca_loot_class = None  # 0x34beec18
+        self.rtpc_deca_crafting_type = None  # 0xa949bc65
+
+    def props_end(self, bufn, pos, count):
+        point_types = {
+            'CLootCrateSpawnPoint', 'CLootCrateSpawnPointGroup', 'CBookMark', 'CPOI', 'CCollectable',
+            'CPlayerSpawnPoint'
+        }
+
+        if self.rtpc_class_name in point_types:
+            self.process_point(),
+        elif self.rtpc_class_name == 'CGraphObject':
+            self.process_CGraphObject()
+        elif isinstance(self.rtpc_deca_crafting_type, str) and self.rtpc_deca_crafting_type.startswith('crafting') and self.rtpc_class_name == 'CRigidObject':
+            self.process_crafting_schematic()
+        elif self.rtpc_class_name == 'CRegion':
+            self.process_CRegion()
+
+    def prop_start(self, bufn, pos, index, prop_info):
+        prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
+        if rtpc.prop_class_name == prop_name_hash:
+            self.rtpc_class_name = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_class_comment == prop_name_hash:
+            self.rtpc_class_comment = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_world == prop_name_hash:
+            self.rtpc_world = parse_prop_data(bufn, prop_info)[0]
+        elif rtpc.prop_name_script == prop_name_hash:
+            self.rtpc_script = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_ref_apex_identifier == prop_name_hash:
+            self.rtpc_ref_apex_identifier = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_cregion_border == prop_name_hash:
+            self.rtpc_cregion_border = parse_prop_data(bufn, prop_info)[0]
+        elif rtpc.prop_instance_uid == prop_name_hash:
+            self.rtpc_instance_uid = parse_prop_data(bufn, prop_info)[0]
+        elif rtpc.prop_cpoi_name == prop_name_hash:
+            self.rtpc_cpoi_name = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_cpoi_desc == prop_name_hash:
+            self.rtpc_cpoi_desc = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_bookmark_name == prop_name_hash:
+            self.rtpc_bookmark_name = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_deca_loot_class == prop_name_hash:
+            self.rtpc_deca_loot_class = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
+        elif rtpc.prop_deca_crafting_type == prop_name_hash:
+            self.rtpc_deca_crafting_type = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
 
 
 class ToolMakeWebMap:
@@ -440,6 +549,31 @@ class ToolMakeWebMap:
         vnode = self.vfs.nodes_where_match(v_path=b'settings/hp_settings/codex_data.bin')[0]
         codex = process_codex_adf(self.vfs, self.adf_db, vnode, export_path=export_path)
 
+        print('PROCESSING: blo(s)')
+        visitor = RtpcVisitorMap(tr)
+        blo_expr = re.compile(rb'^.*blo$')
+
+        vpaths = self.vfs.nodes_select_distinct_vpath()
+        vpaths = [v for v in vpaths if blo_expr.match(v)]
+
+        for fn in vpaths:
+            print('PROCESSING: {}'.format(fn))
+            vnodes = self.vfs.nodes_where_match(v_path=fn)
+            vnode = vnodes[0]
+            with self.vfs.file_obj_from(vnode) as f:
+                buffer = f.read()
+
+            visitor.visit(buffer)
+
+        # for fn in vpaths:
+        #     print('PROCESSING: {}'.format(fn))
+        #     vnodes = self.vfs.nodes_where_match(v_path=fn)
+        #     vnode = vnodes[0]
+        #     with self.vfs.file_obj_from(vnode) as f:
+        #         rtpc = Rtpc()
+        #         rtpc.deserialize(f)
+        #     rtpc.visit(visitor)
+
         # LOAD from global/collection.collectionc
         # todo dump of different vnodes, one in gdcc is stripped
         vnode = self.vfs.nodes_where_match(v_path=b'global/collection.collectionc')[0]
@@ -517,21 +651,6 @@ class ToolMakeWebMap:
             }
             mdics.append(obj)
 
-        print('PROCESSING: blo(s)')
-        visitor = RtpcLootVisitor(tr=tr)
-        blo_expr = re.compile(rb'^.*blo$')
-
-        vpaths = self.vfs.nodes_select_distinct_vpath()
-        vpaths = [v for v in vpaths if blo_expr.match(v)]
-
-        for fn in vpaths:
-            print('PROCESSING: {}'.format(fn))
-            vnodes = self.vfs.nodes_where_match(v_path=fn)
-            vnode = vnodes[0]
-            with self.vfs.file_obj_from(vnode) as f:
-                rtpc = Rtpc()
-                rtpc.deserialize(f)
-            rtpc.visit(visitor)
 
         # results from found rtpc records
         print('Region: count = {}'.format(len(visitor.regions)))
@@ -552,6 +671,7 @@ class ToolMakeWebMap:
             ['c_poi', visitor.points['CPOI']],
             ['c_poi_nest_marker_poi', visitor.points['CPOI.nest_marker_poi']],
             ['apex_social_control', visitor.apex_social_control],
+            ['crafting_schematics', visitor.points['CraftingSchematics']],
         ]
         for data_item in data_list:
             fp = f'data/{data_item[0]}.js'

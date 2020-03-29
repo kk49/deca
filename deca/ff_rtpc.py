@@ -2,6 +2,7 @@ from io import BytesIO
 from deca.file import ArchiveFile
 from deca.fast_file_2 import *
 from deca.db_core import VfsDatabase
+from deca.hashes import hash32_func
 import struct
 from enum import IntEnum
 from typing import List, Optional
@@ -73,6 +74,20 @@ class PropName(IntEnum):
     CPOI_NAME = 0x6f24d4e5
     CPOI_DESC = 0xe6b6b3f9
     BOOKMARK_NAME = 0x2314c9ea
+
+
+prop_class_name = PropName.CLASS_NAME.value
+prop_class_comment = PropName.CLASS_COMMENT.value
+prop_world = hash32_func('world')
+prop_name_script = hash32_func('script')
+prop_ref_apex_identifier = hash32_func('[ref] apex identifier')
+prop_cregion_border = PropName.CREGION_BORDER.value
+prop_instance_uid = PropName.INSTANCE_UID.value
+prop_cpoi_name = PropName.CPOI_NAME.value
+prop_cpoi_desc = PropName.CPOI_DESC.value
+prop_bookmark_name = PropName.BOOKMARK_NAME.value
+prop_deca_loot_class = 0x34beec18
+prop_deca_crafting_type = 0xa949bc65
 
 
 class FieldNameMap:

@@ -196,7 +196,7 @@ class Deca3dMeshc:
             if hrmesh_node is not None:
                 hrmesh_adf = adf_db.read_node(vfs, hrmesh_node)
                 assert len(hrmesh_adf.table_instance) == 1
-                assert hrmesh_adf.table_instance[0].type_hash == 0x67b3a453
+                # assert hrmesh_adf.table_instance[0].type_hash == 0x67b3a453
                 hrmesh_buffers = AmfMeshBuffers(hrmesh_adf, hrmesh_adf.table_instance_full_values[0])
                 mesh_buffers.indexBuffers = mesh_buffers.indexBuffers + hrmesh_buffers.indexBuffers
                 mesh_buffers.vertexBuffers = mesh_buffers.vertexBuffers + hrmesh_buffers.vertexBuffers

@@ -1,3 +1,9 @@
+#### v0.2.8 ???
+* Moved(ing) GLTF2 processing of APEX models to duck typing, removing asserts, as avalanche has changed types
+* Added schematics to GZ map generation
+* Added script to extract schematic locations
+* Fixed issue with process_adf and process_rtpc needing the data base because they want to lookup hash strings. With no data base it doesnt translate hash strings
+
 #### v0.2.7 Stay Safe
 * Added tracking of RTPC objects, object ids, and event ids to DB
 * Stopped dumping of image file details

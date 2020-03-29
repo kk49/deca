@@ -178,6 +178,18 @@ class RtpcVisitorMap(rtpc.RtpcVisitor):
         border = np.matmul(ref_matrix, border)
         border = border.transpose()
 
+        if len(border) == 0:
+            x = self.rtpc_world.data[0, 3]
+            z = self.rtpc_world.data[1, 3]
+            y = self.rtpc_world.data[2, 3]
+            position = [x, z, y]
+            position = [position, position]
+        else:
+            position = [
+                np.min(border, axis=1)[0:3].tolist(),
+                np.max(border, axis=1)[0:3].tolist(),
+            ]
+
         coords = border * np.array([src_to_dst_x_scale, 0, src_to_dst_y_scale, 0]) + np.array([dst_x0, 0, dst_y0, 0])
         coords = [list(v) for v in coords[:, [0, 2]]]
 
@@ -185,6 +197,7 @@ class RtpcVisitorMap(rtpc.RtpcVisitor):
             'type': 'Feature',
             'properties': {
                 'type': obj_type,
+                'position': position,
                 'uid': obj_id,
                 'uid_str': '0x{:012X}'.format(obj_id),
                 'comment': comment,
@@ -659,19 +672,31 @@ class ToolMakeWebMap:
         for k, v in visitor.points.items():
             print('{}: count = {}'.format(k, len(v)))
 
+        def point_sort(lst):
+            return sorted(lst, key=lambda v: v['properties']['position'])
+
+        def aabb_port(lst):
+            return sorted(lst, key=lambda v: v['properties']['position'][0] + v['properties']['position'][1])
+
+        apex_social_control = {}
+        sorted_keys = sorted(visitor.apex_social_control.keys())
+        for k in sorted_keys:
+            v = visitor.apex_social_control[k]
+            apex_social_control[k] = point_sort(v)
+
         data_list = [
-            ['collectable_data', collectables],
-            ['region_data', visitor.regions],
-            ['mdic_data', mdics],
-            ['c_collectable_data', visitor.points['CCollectable']],
-            ['c_book_mark_data', visitor.points['CBookMark']],
-            ['c_loot_crate_spawn_point_data', visitor.points['CLootCrateSpawnPoint']],
-            ['c_loot_crate_spawn_point_group_data', visitor.points['CLootCrateSpawnPointGroup']],
-            ['c_player_spawn_point_data', visitor.points['CPlayerSpawnPoint']],
-            ['c_poi', visitor.points['CPOI']],
-            ['c_poi_nest_marker_poi', visitor.points['CPOI.nest_marker_poi']],
-            ['apex_social_control', visitor.apex_social_control],
-            ['crafting_schematics', visitor.points['CraftingSchematics']],
+            ['collectable_data', point_sort(collectables)],
+            ['region_data', aabb_port(visitor.regions)],
+            ['mdic_data', aabb_port(mdics)],
+            ['c_collectable_data', point_sort(visitor.points['CCollectable'])],
+            ['c_book_mark_data', point_sort(visitor.points['CBookMark'])],
+            ['c_loot_crate_spawn_point_data', point_sort(visitor.points['CLootCrateSpawnPoint'])],
+            ['c_loot_crate_spawn_point_group_data', point_sort(visitor.points['CLootCrateSpawnPointGroup'])],
+            ['c_player_spawn_point_data', point_sort(visitor.points['CPlayerSpawnPoint'])],
+            ['c_poi', point_sort(visitor.points['CPOI'])],
+            ['c_poi_nest_marker_poi', point_sort(visitor.points['CPOI.nest_marker_poi'])],
+            ['apex_social_control', apex_social_control],
+            ['crafting_schematics', point_sort(visitor.points['CraftingSchematics'])],
         ]
         for data_item in data_list:
             fp = f'data/{data_item[0]}.js'

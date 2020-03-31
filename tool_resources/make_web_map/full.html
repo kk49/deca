@@ -32,6 +32,7 @@
     <script src="data/c_poi_nest_marker_poi.js"></script>
     <script src="data/apex_social_control.js"></script>
     <script src="data/crafting_schematics.js"></script>
+    <script src="data/loot_items.js"></script>
 
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <style>
@@ -287,7 +288,7 @@
                     }
                 );
             }
-            if (ft.startsWith('CRigidObject')) {
+            if (ft.startsWith('CraftingSchematic')) {
                 return L.circleMarker(latlng,
                     {
                         radius: 8,
@@ -296,6 +297,19 @@
                         opacity: 1,
                         fill: true,
                         fillColor: "#00FFAF",
+                        fillOpacity: 0.5
+                    }
+                );
+            }
+            if (ft.startsWith('LootItem')) {
+                return L.circleMarker(latlng,
+                    {
+                        radius: 8,
+                        color: "#00AFFF",
+                        weight: 1,
+                        opacity: 1,
+                        fill: true,
+                        fillColor: "#00AFFF",
                         fillOpacity: 0.5
                     }
                 );
@@ -380,7 +394,8 @@
         ['CLootCrateSpawnPointGroup', false, 2, 'CLootCrateSpawnPointGroup from GZ', '', c_loot_crate_spawn_point_group_data, 0, 1.0],
         ['CPlayerSpawnPoint', false, 2, 'CPlayerSpawnPoint from GZ', '', c_player_spawn_point_data, 0, 1.0],
         ['Relay Beacons', false, 2, 'Relay Beacons from GZ', '', c_poi_nest_marker_poi, 0, 1.0],
-        ['Crafting Schematics', false, 2, 'Crafting Schematics from GZ', '', crafting_schematics, 0, 1.0],
+        ['Items: Schematics', false, 2, 'Crafting Schematics from GZ', '', crafting_schematics, 0, 1.0],
+        ['Items: Placed Loot', false, 2, 'Placed Loot Items from GZ', '', loot_items, 0, 1.0],
     ];
 
     for (x in apex_social_control)

@@ -36,6 +36,7 @@ build_script:
 
 after_build:
     cd dist\deca_gui
+
     7z a ..\..\deca_gui-b%APPVEYOR_BUILD_NUMBER%.zip *
 
 artifacts:

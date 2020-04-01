@@ -69,8 +69,8 @@ $WEBHOOK_DATA="{
   ""embeds"": [ {
     ""color"": $EMBED_COLOR,
     ""author"": {
-      ""name"": ""$env:APPVEYOR_REPO_NAME :: Build #$env:APPVEYOR_BUILD_NUMBER"",
-      ""url"": ""https://ci.appveyor.com/api/buildjobs/$env:APPVEYOR_JOB_ID/artifacts/deca_gui-b$BUILD_VERSION.zip"",
+      ""name"": ""$env:APPVEYOR_REPO_NAME/deca_gui-b$env:APPVEYOR_BUILD_VERSION.zip"",
+      ""url"": ""https://ci.appveyor.com/api/buildjobs/$env:APPVEYOR_JOB_ID/artifacts/deca_gui-b$env:APPVEYOR_BUILD_VERSION.zip"",
       ""icon_url"": ""$AVATAR""
     },
     ""title"": ""$COMMIT_SUBJECT"",

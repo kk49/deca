@@ -58,8 +58,8 @@ else {
 
 # ""url"": ""https://ci.appveyor.com/project/$env:APPVEYOR_ACCOUNT_NAME/$env:APPVEYOR_PROJECT_SLUG/build/$BUILD_VERSION/artifacts"",
 #https://ci.appveyor.com/project/kk49/deca/builds/31868638/artifacts
- ""url"": ""https://ci.appveyor.com/api/buildjobs//artifacts/deca_gui-$BUILD_VERSION.zip"",
-https://ci.appveyor.com/api/buildjobs/0rs82lfnmm38berf/artifacts/deca_gui-b278.zip
+# ""url"": ""https://ci.appveyor.com/api/buildjobs//artifacts/deca_gui-$BUILD_VERSION.zip"",
+# https://ci.appveyor.com/api/buildjobs/0rs82lfnmm38berf/artifacts/deca_gui-b278.zip
 
 $BUILD_VERSION = [uri]::EscapeDataString($env:APPVEYOR_BUILD_VERSION)
 $TIMESTAMP="$(Get-Date -format s)Z"

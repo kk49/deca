@@ -37,7 +37,6 @@ build_script:
 after_build:
     cd dist\deca_gui
     7z a ..\..\deca_gui-b%APPVEYOR_BUILD_NUMBER%.zip *
-    cd ..\..
 
 artifacts:
 - path: deca_gui-b%APPVEYOR_BUILD_NUMBER%.zip
@@ -54,5 +53,5 @@ deploy:
     APPVEYOR_REPO_TAG: true        # deploy on tag push only
 
 on_success:
-  - ps: pwd
+  - ps: cd C:\prj\deca
   - ps: ./appveyor/send.ps1 success $env:BUILD_WEBHOOK_URL

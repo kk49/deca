@@ -54,4 +54,5 @@ deploy:
     APPVEYOR_REPO_TAG: true        # deploy on tag push only
 
 on_success:
-  - ps: appveyor/send.ps1 success $env:BUILD_WEBHOOK_URL
+  - ps: pwd
+  - ps: ./appveyor/send.ps1 success $env:BUILD_WEBHOOK_URL

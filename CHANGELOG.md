@@ -3,6 +3,7 @@
 * Added schematics and loot items to GZ map generation
 * Added script to extract schematic and loot item locations
 * Fixed issue with process_adf and process_rtpc needing the data base because they want to lookup hash strings. With no data base it doesnt translate hash strings
+* Added webhook to put latest successful build into discord
 
 
 #### v0.2.7 Stay Safe

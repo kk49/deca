@@ -474,6 +474,113 @@ class Deca3dModelc:
                     material_idx = len(gltf.materials)
                     gltf.materials.append(gltf_material)
                     material_map[material.name] = material_idx
+                elif b'VegetationFoliage' == material.renderBlockId:
+                    vfs.logger.log('Hacky version of RenderBlockId: {} Material Name: {}'.format(material.renderBlockId, material.name))
+                    # add textures
+                    textures = []
+                    for texture_vpath in material.textures:
+                        textures.append(db.gltf_add_texture(gltf, texture_vpath))
+
+                    # [0] diffused color ,
+                    # [1] normal bump map ,
+                    # [2] ?
+                    # [3] MPM? ,
+
+                    # add material
+                    gltf_material = pyg.Material()
+                    gltf_material.name = material.name.decode('utf-8')
+
+                    # normal bump map
+                    tid = textures[1]
+                    if tid is not None:
+                        gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
+
+                    gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
+
+                    use_spec_gloss = False
+                    if use_spec_gloss:
+                        mat_sg = {}
+                        tid = textures[0]
+                        if tid is not None:
+                            mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                        tid = textures[3]
+                        if tid is not None:
+                            mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+
+                        gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
+                    else:
+                        mat_mr = pyg.PbrMetallicRoughness()
+
+                        tid = textures[0]
+                        if tid is not None:
+                            mat_mr.baseColorTexture = pyg.MaterialTexture(index=tid)
+
+                        tid = textures[3]
+                        if tid is not None:
+                            mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
+
+                        mat_mr.roughnessFactor = 1.0
+                        mat_mr.metallicFactor = 1.0
+
+                        gltf_material.pbrMetallicRoughness = mat_mr
+
+                    material_idx = len(gltf.materials)
+                    gltf.materials.append(gltf_material)
+                    material_map[material.name] = material_idx
+                elif b'VegetationBark' == material.renderBlockId:
+                    vfs.logger.log('Hacky version of RenderBlockId: {} Material Name: {}'.format(material.renderBlockId,
+                                                                                                 material.name))
+                    # add textures
+                    textures = []
+                    for texture_vpath in material.textures:
+                        textures.append(db.gltf_add_texture(gltf, texture_vpath))
+
+                    # [0] diffused color ,
+                    # [1] normal bump map ,
+                    # [2] MPM? ,
+                    # ?
+
+                    # add material
+                    gltf_material = pyg.Material()
+                    gltf_material.name = material.name.decode('utf-8')
+
+                    # normal bump map
+                    tid = textures[1]
+                    if tid is not None:
+                        gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
+
+                    gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
+
+                    use_spec_gloss = False
+                    if use_spec_gloss:
+                        mat_sg = {}
+                        tid = textures[0]
+                        if tid is not None:
+                            mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                        tid = textures[2]
+                        if tid is not None:
+                            mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+
+                        gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
+                    else:
+                        mat_mr = pyg.PbrMetallicRoughness()
+
+                        tid = textures[0]
+                        if tid is not None:
+                            mat_mr.baseColorTexture = pyg.MaterialTexture(index=tid)
+
+                        tid = textures[2]
+                        if tid is not None:
+                            mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
+
+                        mat_mr.roughnessFactor = 1.0
+                        mat_mr.metallicFactor = 1.0
+
+                        gltf_material.pbrMetallicRoughness = mat_mr
+
+                    material_idx = len(gltf.materials)
+                    gltf.materials.append(gltf_material)
+                    material_map[material.name] = material_idx
                 else:
                     vfs.logger.log('Unhandled RenderBlockId: {} Material Name: {}'.format(material.renderBlockId, material.name))
 

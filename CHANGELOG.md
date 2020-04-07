@@ -1,9 +1,11 @@
 #### v0.2.8 ???
+* Added hacky version of exporting VegetationBark and VegetationFoliage material types for GLTF2 export
 * Moved(ing) GLTF2 processing of APEX models to duck typing, removing asserts, as avalanche has changed types
 * Added schematics and loot items to GZ map generation
 * Added script to extract schematic and loot item locations
 * Fixed issue with process_adf and process_rtpc needing the data base because they want to lookup hash strings. With no data base it doesnt translate hash strings
 * Added webhook to put latest successful build into discord
+* Updated to Pillow 6.2.2 to fix CVE-2019-19911 and CVE-2020-5313
 
 
 #### v0.2.7 Stay Safe

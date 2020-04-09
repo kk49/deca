@@ -385,6 +385,12 @@ def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
             for k, iv in v.value.items():
                 s = s + '  ' * (indent + 1) + k + ':\n'
                 s = s + adf_format(iv, vfs, type_map, indent + 2)
+                # add details for equipment hashes
+                if k == 'EquipmentHash':
+                    ele = vfs.lookup_equipment_from_hash(iv.value)
+                    if ele is not None:
+                        s = s + '  ' * (indent + 2) + f'# "{ele["EquipmentName"].decode("utf-8")}"' + '\n'
+
             s = s + '  ' * indent + '}\n'
         elif type_def.metatype == MetaType.Pointer:
             s = s + '  ' * indent + '{}  # {}\n'.format(v.value, value_info)

@@ -345,6 +345,9 @@ class VfsDatabase:
         if init_display:
             logger.log('OPENING: {} {}'.format(self.game_info.game_dir, working_dir))
 
+        self._lookup_equipment_from_name = None
+        self._lookup_equipment_from_hash = None
+
         # setup data base
         self.db_filename = os.path.join(self.working_dir, 'db', 'core.db')
         make_dir_for_file(self.db_filename)
@@ -1335,6 +1338,19 @@ class VfsDatabase:
             return open(node.p_path, 'rb')
         else:
             raise Exception('NOT IMPLEMENTED: DEFAULT')
+
+    def lookup_equipment_from_name(self, name):
+        if self._lookup_equipment_from_name is None:
+            return None
+
+        return self._lookup_equipment_from_name.get(name, None)
+
+    def lookup_equipment_from_hash(self, name_hash):
+        if self._lookup_equipment_from_hash is None:
+            return None
+
+        return self._lookup_equipment_from_hash.get(name_hash, None)
+
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .

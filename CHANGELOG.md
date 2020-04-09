@@ -1,4 +1,5 @@
 #### v0.2.8 ???
+* Added lookup of EquipmentName when EquipmentHash is encountered in string dump of ADF files
 * Added hacky version of exporting VegetationBark and VegetationFoliage material types for GLTF2 export
 * Moved(ing) GLTF2 processing of APEX models to duck typing, removing asserts, as avalanche has changed types
 * Added schematics and loot items to GZ map generation

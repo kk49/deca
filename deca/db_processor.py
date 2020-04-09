@@ -133,6 +133,21 @@ class VfsProcessor(VfsDatabase):
 
         self.nodes_add_many(initial_nodes)
 
+    def load_equipment_info(self):
+        if self.game_info.game_id == 'gz':
+            self.logger.log('Loading equipment.bin')
+            adf_db = AdfDatabase()
+            adf_db.load_from_database(self)
+
+            node = self.nodes_where_match(v_path=b'settings/hp_settings/equipment.bin')[0]
+            equip_info_0 = adf_db.read_node(self, node)
+
+            self._lookup_equipment_from_name = {}
+            self._lookup_equipment_from_hash = {}
+            for equip in equip_info_0.table_instance_values[0]['Items']:
+                self._lookup_equipment_from_name[equip['EquipmentName'].decode('utf-8')] = equip
+                self._lookup_equipment_from_hash[equip['EquipmentHash']] = equip
+
     def process(self, debug=False):
         inner_loop = []
 
@@ -225,6 +240,8 @@ class VfsProcessor(VfsDatabase):
             self.db_execute_one("PRAGMA user_version = 2;")
 
             self.dump_vpaths()
+
+        self.load_equipment_info()
 
         self.dump_status()
 

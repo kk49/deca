@@ -14,14 +14,6 @@ adf_db = AdfDatabase(vfs)
 vnode = vfs.nodes_where_match(v_path=b'text/master_eng.stringlookup')[0]
 tr = process_translation_adf(vfs, adf_db, vnode)
 
-# load equipment info
-vnode = vfs.nodes_where_match(v_path=b'settings/hp_settings/equipment.bin')[0]
-equip_info_0 = adf_db.read_node(vfs, vnode)
-
-equip_info = {}
-for equip in equip_info_0.table_instance_values[0]['Items']:
-    equip_info[equip['EquipmentName'].decode('utf-8')] = equip
-
 
 #         @0x000001a4(     420) 0xa949bc65 0x00000f5f 0x03 str    = @0x00000f5f(    3935) b'craftingmagazinenoiseshoes'
 class RtpcVisitorSchematic(rtpc.RtpcVisitor):
@@ -158,7 +150,7 @@ for i, schematic in enumerate(visitor.schematics):
     name: str
     position, name = schematic
     if name.startswith('schematic_'):
-        equip = equip_info[name]
+        equip = vfs.lookup_equipment_from_name(name)
         crafting = equip['Crafting']
 
         stats_file = crafting['StatsFile']
@@ -277,7 +269,7 @@ with open('placed_equipment.tsv', 'w') as f:
         name: str
         position, name = schematic
         if name is not None:
-            equip = equip_info.get(name, None)
+            equip = vfs.lookup_equipment_from_name(name)
             if equip is not None:
                 equip_name = equip['DisplayNameHash']
                 equip_name_list = vfs.hash_string_match(hash32=equip_name)

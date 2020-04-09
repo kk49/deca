@@ -59,3 +59,4 @@ def process_codex_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode, expo
             codex[cid] = (name, desc, icon, category)
 
     return codex
+

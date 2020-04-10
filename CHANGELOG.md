@@ -1,4 +1,4 @@
-#### v0.2.8 ???
+#### v0.2.8 "I really need to clean my room" 
 * Added lookup of EquipmentName when EquipmentHash is encountered in string dump of ADF files
 * Added hacky version of exporting VegetationBark and VegetationFoliage material types for GLTF2 export
 * Moved(ing) GLTF2 processing of APEX models to duck typing, removing asserts, as avalanche has changed types
@@ -7,7 +7,6 @@
 * Fixed issue with process_adf and process_rtpc needing the data base because they want to lookup hash strings. With no data base it doesnt translate hash strings
 * Added webhook to put latest successful build into discord
 * Updated to Pillow 6.2.2 to fix CVE-2019-19911 and CVE-2020-5313
-
 
 #### v0.2.7 Stay Safe
 * Added tracking of RTPC objects, object ids, and event ids to DB

@@ -13,6 +13,7 @@ from .game_info import determine_game
 from .ff_types import *
 from .ff_adf import AdfDatabase
 from .util import Logger, make_dir_for_file
+from .digest import process_translation_adf
 from .hashes import hash32_func
 
 
@@ -148,6 +149,15 @@ class VfsProcessor(VfsDatabase):
                 self._lookup_equipment_from_name[equip['EquipmentName'].decode('utf-8')] = equip
                 self._lookup_equipment_from_hash[equip['EquipmentHash']] = equip
 
+    def load_translation_info(self):
+        if self.game_info.game_id == 'gz':
+            self.logger.log('Loading Translation (text/master_eng.stringlookup)')
+            adf_db = AdfDatabase()
+            adf_db.load_from_database(self)
+
+            node = self.nodes_where_match(v_path=b'text/master_eng.stringlookup')[0]
+            self._lookup_translation_from_name = process_translation_adf(self, adf_db, node)
+
     def process(self, debug=False):
         inner_loop = []
 
@@ -242,6 +252,7 @@ class VfsProcessor(VfsDatabase):
             self.dump_vpaths()
 
         self.load_equipment_info()
+        self.load_translation_info()
 
         self.dump_status()
 

@@ -1,3 +1,6 @@
+#### v0.2.9 ???
+* Added Translated Name of equipment to comment in ADF files when EquipmentHash is found 
+
 #### v0.2.8 "I really need to clean my room" 
 * Added lookup of EquipmentName when EquipmentHash is encountered in string dump of ADF files
 * Added hacky version of exporting VegetationBark and VegetationFoliage material types for GLTF2 export

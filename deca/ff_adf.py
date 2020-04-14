@@ -389,7 +389,17 @@ def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
                 if k == 'EquipmentHash':
                     ele = vfs.lookup_equipment_from_hash(iv.value)
                     if ele is not None:
-                        s = s + '  ' * (indent + 2) + f'# "{ele["EquipmentName"].decode("utf-8")}"' + '\n'
+                        display_name_hash = ele["DisplayNameHash"]
+                        display_name = vfs.hash_string_match(hash32=display_name_hash)
+                        if display_name:
+                            display_name = display_name[0][1].decode('utf-8')
+                            display_translated = vfs.lookup_translation_from_name(display_name)
+                            if display_translated is None:
+                                display_translated = display_name
+                        else:
+                            display_translated = display_name_hash
+                        s = s + '  ' * (indent + 2) + \
+                            f'# {ele["EquipmentName"].decode("utf-8")} "{display_translated}"' + '\n'
 
             s = s + '  ' * indent + '}\n'
         elif type_def.metatype == MetaType.Pointer:

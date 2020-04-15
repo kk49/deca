@@ -1,4 +1,6 @@
 #### v0.2.9 ???
+* Added user readable name of equipment that uses clothing models
+* Added notes column to file tree to add information that deca finds while processing files
 * Added Translated Name of equipment to comment in ADF files when EquipmentHash is found 
 
 #### v0.2.8 "I really need to clean my room" 

@@ -348,6 +348,7 @@ class VfsDatabase:
         self._lookup_equipment_from_name = None
         self._lookup_equipment_from_hash = None
         self._lookup_translation_from_name = None
+        self._lookup_note_from_file_path = None
 
         # setup data base
         self.db_filename = os.path.join(self.working_dir, 'db', 'core.db')
@@ -1357,6 +1358,13 @@ class VfsDatabase:
             return None
 
         return self._lookup_translation_from_name.get(name, None)
+
+    def lookup_note_from_file_path(self, path):
+        if self._lookup_note_from_file_path is None:
+            return ''
+
+        return self._lookup_note_from_file_path.get(path, '')
+
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .

@@ -60,7 +60,7 @@ class VfsDirBranch(object):
 class VfsDirModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self.vfs = None
+        self.vfs: VfsDatabase = None
         self.adf_db = None
         self.root_node = None
         self.n_rows = 0
@@ -122,11 +122,11 @@ class VfsDirModel(QAbstractItemModel):
         return node.child_count()
 
     def columnCount(self, parent):
-        return 9
+        return 10
 
     def headerData(self, section, orientation, role):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ("Path", "Index", "Type", "Sub_Type", "Hash", "EXT_Hash", "Size_U", "Size_C", "Used_Depth")[section]
+            return ("Path", "Index", "Type", "Sub_Type", "Hash", "EXT_Hash", "Size_U", "Size_C", "Used_Depth", "Notes")[section]
         else:
             return None
 
@@ -170,6 +170,8 @@ class VfsDirModel(QAbstractItemModel):
                     return '{}'.format(vnode.size_c)
                 elif column == 8:
                     return '{}'.format(vnode.used_at_runtime_depth)
+                elif column == 9:
+                    return '{}'.format(self.vfs.lookup_note_from_file_path(vnode.v_path))
         elif role == Qt.BackgroundColorRole:
             if isinstance(node, VfsDirLeaf):
                 uid = node.uid

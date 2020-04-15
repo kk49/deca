@@ -158,6 +158,45 @@ class VfsProcessor(VfsDatabase):
             node = self.nodes_where_match(v_path=b'text/master_eng.stringlookup')[0]
             self._lookup_translation_from_name = process_translation_adf(self, adf_db, node)
 
+    def load_notes_info(self):
+        if self.game_info.game_id == 'gz':
+            self.logger.log('Loading notes from (settings/hp_settings/equipment.bin)')
+
+            adf_db = AdfDatabase()
+            adf_db.load_from_database(self)
+
+            node = self.nodes_where_match(v_path=b'settings/hp_settings/equipment.bin')[0]
+            equip_info_0 = adf_db.read_node(self, node)
+
+            self._lookup_note_from_file_path = {}
+            for equip in equip_info_0.table_instance_values[0]['Items']:
+                files = [
+                    equip['FPModelMale'],
+                    equip['FPModelFemale'],
+                    equip['TPModelMale'],
+                    equip['TPModelFemale'],
+                    equip['AttributeFile'],
+                ]
+
+                display_name_hash = equip["DisplayNameHash"]
+                display_name = self.hash_string_match(hash32=display_name_hash)
+                if display_name:
+                    display_name = display_name[0][1].decode('utf-8')
+                    display_translated = self.lookup_translation_from_name(display_name)
+                    if display_translated is None:
+                        display_translated = display_name
+                else:
+                    display_translated = display_name_hash
+
+                for file in files:
+                    if len(file) > 0:
+                        # file = file.decode('utf-8')
+                        s = self._lookup_note_from_file_path.get(file, '')
+                        if len(s):
+                            s = s + ', '
+                        s = s + f'"{display_translated}"'
+                        self._lookup_note_from_file_path[file] = s
+
     def process(self, debug=False):
         inner_loop = []
 
@@ -253,6 +292,7 @@ class VfsProcessor(VfsDatabase):
 
         self.load_equipment_info()
         self.load_translation_info()
+        self.load_notes_info()
 
         self.dump_status()
 

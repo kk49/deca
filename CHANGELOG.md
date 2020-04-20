@@ -1,4 +1,5 @@
 #### v0.2.9 ???
+* Added attempt to find equipment or string that corresponds to possible hash values for Name, RegionHash. previously this only happened for EquipmentHash
 * Fixed issue with building ddsc files
 * Added user readable name of equipment that uses clothing models
 * Added notes column to file tree to add information that deca finds while processing files

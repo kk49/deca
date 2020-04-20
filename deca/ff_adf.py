@@ -17,6 +17,11 @@ from deca.db_core import VfsDatabase, VfsNode
 # TODO first pass find string hashes?
 # TODO ./files/effects/vehicles/wheels/rear_snow.effc good for basic types
 
+adf_hash_fields = {
+    'EquipmentHash', 'Name', 'RegionHash',
+    'Character', 'SkinTone', 'Stereotype',
+    'LocationId',
+}
 
 class AdfTypeMissing(Exception):
     def __init__(self, type_id, *args, **kwargs):
@@ -386,7 +391,8 @@ def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
                 s = s + '  ' * (indent + 1) + k + ':\n'
                 s = s + adf_format(iv, vfs, type_map, indent + 2)
                 # add details for equipment hashes
-                if isinstance(iv.value, int) and k in {'EquipmentHash', 'Name', 'RegionHash'}:
+                # if isinstance(iv.value, int) and k in adf_hash_fields:
+                if isinstance(iv.value, int):
                     ele = vfs.lookup_equipment_from_hash(iv.value)
                     if ele is not None:
                         display_name_hash = ele["DisplayNameHash"]

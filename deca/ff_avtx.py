@@ -634,7 +634,7 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
     elif ddsc_in is None:
         raise EDecaBuildError('Could not load: {}'.format(ifile))
     elif ddsc.header.dds_header_dxt10.dxgiFormat != ddsc_in.header.dds_header_dxt10.dxgiFormat:
-        raise EDecaBuildError('dxgiFormat do not path for ({},{}) and ({},{})'.format(
+        raise EDecaBuildError('dxgiFormat do not match for ({}, {}) and ({}, {})'.format(
             node.v_path, ddsc.header.dds_header_dxt10.dxgiFormat,
             ifile, ddsc_in.header.dds_header_dxt10.dxgiFormat,
         ))
@@ -652,15 +652,17 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
                     file_out.write(ddsc.header_buffer)
                     # DDSC files have high to low resolution
                     for mip_index in range(0, len(ddsc_in.mips_avtx)):
-                        mip = ddsc_in.mips_avtx[mip_index]
+                        mip = ddsc.mips_avtx[mip_index]
+                        mip_in = ddsc_in.mips_avtx[mip_index]
                         if vpath_out == mip.filename:
-                            file_out.write(mip.raw_data)
+                            file_out.write(mip_in.raw_data)
                 else:
                     # HMDDSC ATX files have low to high resolution
                     for mip_index in range(len(ddsc_in.mips_avtx)-1, -1, -1):
-                        mip = ddsc_in.mips_avtx[mip_index]
+                        mip = ddsc.mips_avtx[mip_index]
+                        mip_in = ddsc_in.mips_avtx[mip_index]
                         if vpath_out == mip.filename:
-                            file_out.write(mip.raw_data)
+                            file_out.write(mip_in.raw_data)
 
             compiled_files.append((vpath_out, fout_name))
 

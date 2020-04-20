@@ -1,7 +1,8 @@
 #### v0.2.9 ???
+* Fixed issue with building ddsc files
 * Added user readable name of equipment that uses clothing models
 * Added notes column to file tree to add information that deca finds while processing files
-* Added Translated Name of equipment to comment in ADF files when EquipmentHash is found 
+* Added Translated Name of equipment to comment in ADF files when EquipmentHash is found
 
 #### v0.2.8 "I really need to clean my room" 
 * Added lookup of EquipmentName when EquipmentHash is encountered in string dump of ADF files

@@ -363,6 +363,29 @@ class AdfValue:
         return s
 
 
+def hash_lookup(vfs: VfsDatabase, hash_code, default=None, prefix=''):
+    if isinstance(hash_code, int):
+        ele = vfs.lookup_equipment_from_hash(hash_code)
+        if ele is not None:
+            display_name_hash = ele["DisplayNameHash"]
+            display_name = vfs.hash_string_match(hash32=display_name_hash)
+            if display_name:
+                display_name = display_name[0][1].decode('utf-8')
+                display_translated = vfs.lookup_translation_from_name(display_name)
+                if display_translated is None:
+                    display_translated = display_name
+            else:
+                display_translated = display_name_hash
+            return f'{prefix}# {ele["EquipmentName"].decode("utf-8")} "{display_translated}"'
+        else:
+            hsm = vfs.hash_string_match(hash32=hash_code)
+            if hsm:
+                display_name = hsm[0][1].decode('utf-8')
+                return f'{prefix}# {display_name}'
+
+    return default
+
+
 def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
     if isinstance(v, AdfValue):
         type_def = type_map.get(v.type_id, TypeDef())
@@ -393,25 +416,9 @@ def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
                 # add details for equipment hashes
                 # if isinstance(iv.value, int) and k in adf_hash_fields:
                 if isinstance(iv.value, int):
-                    ele = vfs.lookup_equipment_from_hash(iv.value)
-                    if ele is not None:
-                        display_name_hash = ele["DisplayNameHash"]
-                        display_name = vfs.hash_string_match(hash32=display_name_hash)
-                        if display_name:
-                            display_name = display_name[0][1].decode('utf-8')
-                            display_translated = vfs.lookup_translation_from_name(display_name)
-                            if display_translated is None:
-                                display_translated = display_name
-                        else:
-                            display_translated = display_name_hash
-                        s = s + '  ' * (indent + 2) + \
-                            f'# {ele["EquipmentName"].decode("utf-8")} "{display_translated}"' + '\n'
-                    else:
-                        hsm = vfs.hash_string_match(hash32=iv.value)
-                        if hsm:
-                            display_name = hsm[0][1].decode('utf-8')
-                            s = s + '  ' * (indent + 2) + \
-                                f'# {display_name}' + '\n'
+                    hs = hash_lookup(vfs, iv.value)
+                    if hs:
+                        s = s + '  ' * (indent + 2) + hs + '\n'
 
             s = s + '  ' * indent + '}\n'
         elif type_def.metatype == MetaType.Pointer:
@@ -473,12 +480,14 @@ def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
         s = ''
         s = s + '  ' * indent + '[\n'
         for ent in v:
-            s = s + '  ' * (indent + 1) + '{}\n'.format(ent)
+            comment = hash_lookup(vfs, ent, default='', prefix='  ')
+            s = s + '  ' * (indent + 1) + f'{ent}{comment}\n'
         s = s + '  ' * indent + ']\n'
 
         return s
     else:
-        return '  ' * indent + '{}\n'.format(v)
+        comment = hash_lookup(vfs, v, default='', prefix='  ')
+        return '  ' * indent + f'{v}{comment}\n'
 
 
 def adf_value_extract(v):

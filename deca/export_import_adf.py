@@ -197,6 +197,7 @@ def node_export_adf_text(
 
     fn_dir = os.path.dirname(fn)
     os.makedirs(fn_dir, exist_ok=True)
-    with open(fn, 'wt') as f:
+
+    with open(fn, 'wt', encoding='utf-8') as f:
         f.write(s)
 

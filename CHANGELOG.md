@@ -1,4 +1,5 @@
 #### v0.2.9 ???
+* Possible fix for text export issue of GZ savefile
 * Will now attempt to annotate all integer and integer array fields in an ADF file to an equipment or text
 * Fixed issue with building ddsc files
 * Added user readable name of equipment that uses clothing models

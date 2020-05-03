@@ -40,6 +40,20 @@ def vfs_structure_open(project_file, logger=None, debug=False):
     return vfs_structure_prep(project_file, working_dir, logger=logger, debug=debug)
 
 
+def vfs_structure_empty(game_dir, exe_name):
+    game_info = determine_game(game_dir, exe_name)
+    vfs = None
+    if game_info is not None:
+        working_dir = '../work/{}_tmp/'.format(game_info.game_id)
+        project_file = os.path.join(working_dir, 'project.json')
+        make_dir_for_file(project_file)
+        game_info.save(project_file)
+        logger = Logger(working_dir)
+        vfs = VfsProcessor(project_file, working_dir, logger)
+
+    return vfs
+
+
 def vfs_structure_prep(project_file, working_dir, logger=None, debug=False):
 
     if logger is None:

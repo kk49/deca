@@ -3,7 +3,7 @@
 # Form implementation generated from reading ui file 'main_window.ui',
 # licensing of 'main_window.ui' applies.
 #
-# Created: Wed Feb 12 01:52:31 2020
+# Created: Sat May  2 22:14:19 2020
 #      by: pyside2-uic  running on PySide2 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
@@ -25,12 +25,12 @@ class Ui_MainWindow(object):
         self.splitter.setHandleWidth(16)
         self.splitter.setChildrenCollapsible(False)
         self.splitter.setObjectName("splitter")
-        self.widget = QtWidgets.QWidget(self.splitter)
-        self.widget.setObjectName("widget")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.widget)
+        self.layoutWidget = QtWidgets.QWidget(self.splitter)
+        self.layoutWidget.setObjectName("layoutWidget")
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.layoutWidget)
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.tabs_nodes = QtWidgets.QTabWidget(self.widget)
+        self.tabs_nodes = QtWidgets.QTabWidget(self.layoutWidget)
         self.tabs_nodes.setObjectName("tabs_nodes")
         self.tab_directory = QtWidgets.QWidget()
         self.tab_directory.setObjectName("tab_directory")
@@ -65,28 +65,28 @@ class Ui_MainWindow(object):
         self.verticalLayout.addWidget(self.tabs_nodes)
         self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
-        self.filter_label = QtWidgets.QLabel(self.widget)
+        self.filter_label = QtWidgets.QLabel(self.layoutWidget)
         self.filter_label.setObjectName("filter_label")
         self.horizontalLayout_4.addWidget(self.filter_label)
-        self.filter_edit = QtWidgets.QLineEdit(self.widget)
+        self.filter_edit = QtWidgets.QLineEdit(self.layoutWidget)
         self.filter_edit.setObjectName("filter_edit")
         self.horizontalLayout_4.addWidget(self.filter_edit)
         self.verticalLayout.addLayout(self.horizontalLayout_4)
         self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_5.setObjectName("horizontalLayout_5")
-        self.vhash_to_vpath_label = QtWidgets.QLabel(self.widget)
+        self.vhash_to_vpath_label = QtWidgets.QLabel(self.layoutWidget)
         self.vhash_to_vpath_label.setObjectName("vhash_to_vpath_label")
         self.horizontalLayout_5.addWidget(self.vhash_to_vpath_label)
-        self.vhash_to_vpath_in_edit = QtWidgets.QLineEdit(self.widget)
+        self.vhash_to_vpath_in_edit = QtWidgets.QLineEdit(self.layoutWidget)
         self.vhash_to_vpath_in_edit.setObjectName("vhash_to_vpath_in_edit")
         self.horizontalLayout_5.addWidget(self.vhash_to_vpath_in_edit)
-        self.vhash_to_vpath_out_edit = QtWidgets.QLineEdit(self.widget)
+        self.vhash_to_vpath_out_edit = QtWidgets.QLineEdit(self.layoutWidget)
         self.vhash_to_vpath_out_edit.setReadOnly(True)
         self.vhash_to_vpath_out_edit.setObjectName("vhash_to_vpath_out_edit")
         self.horizontalLayout_5.addWidget(self.vhash_to_vpath_out_edit)
         self.horizontalLayout_5.setStretch(2, 2)
         self.verticalLayout.addLayout(self.horizontalLayout_5)
-        self.tabs_control = QtWidgets.QTabWidget(self.widget)
+        self.tabs_control = QtWidgets.QTabWidget(self.layoutWidget)
         self.tabs_control.setObjectName("tabs_control")
         self.tab_extract = QtWidgets.QWidget()
         self.tab_extract.setObjectName("tab_extract")
@@ -180,8 +180,11 @@ class Ui_MainWindow(object):
         self.action_exit.setObjectName("action_exit")
         self.action_make_web_map = QtWidgets.QAction(MainWindow)
         self.action_make_web_map.setObjectName("action_make_web_map")
+        self.action_file_gz_open = QtWidgets.QAction(MainWindow)
+        self.action_file_gz_open.setObjectName("action_file_gz_open")
         self.menu_File.addAction(self.action_project_new)
         self.menu_File.addAction(self.action_project_open)
+        self.menu_File.addAction(self.action_file_gz_open)
         self.menu_File.addAction(self.action_external_add)
         self.menu_File.addAction(self.action_exit)
         self.menu_Tools.addAction(self.action_make_web_map)
@@ -227,7 +230,8 @@ class Ui_MainWindow(object):
         self.action_exit.setText(QtWidgets.QApplication.translate("MainWindow", "E&xit", None, -1))
         self.action_exit.setShortcut(QtWidgets.QApplication.translate("MainWindow", "Ctrl+Q", None, -1))
         self.action_make_web_map.setText(QtWidgets.QApplication.translate("MainWindow", "Make &Web Map...", None, -1))
+        self.action_file_gz_open.setText(QtWidgets.QApplication.translate("MainWindow", "Open GenZero File...", None, -1))
 
 from .vfsdirwidget import VfsDirWidget
-from .dataviewwidget import DataViewWidget
 from .vfsnodetablewidget import VfsNodeTableWidget
+from .dataviewwidget import DataViewWidget

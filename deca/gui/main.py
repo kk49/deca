@@ -1,7 +1,7 @@
 import sys
 import os
 from deca.errors import *
-from deca.db_processor import vfs_structure_new, vfs_structure_open, VfsNode
+from deca.db_processor import vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
 from deca.builder import Builder
 from deca.util import Logger
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
@@ -32,8 +32,10 @@ class MainWindow(QMainWindow):
         # Configure Actions
         self.ui.action_project_new.triggered.connect(self.project_new)
         self.ui.action_project_open.triggered.connect(self.project_open)
+        self.ui.action_file_gz_open.triggered.connect(self.file_gz_open)
         self.ui.action_external_add.triggered.connect(self.external_add)
         self.ui.action_external_add.setEnabled(False)
+
         # self.ui.action_external_manage.triggered.connect(self.external_manage)
         self.ui.action_exit.triggered.connect(self.exit_app)
         self.ui.action_make_web_map.triggered.connect(self.tool_make_web_map)
@@ -271,6 +273,19 @@ class MainWindow(QMainWindow):
         filename = QFileDialog.getOpenFileName(self, 'Open External File ...', '.', 'Any File (*)')
         if filename is not None and len(filename[0]) > 0:
             filename = filename[0]
+            self.vfs.external_file_add(filename)
+            self.vfs_reload()
+        else:
+            self.logger.log('Cannot Open {}'.format(filename))
+
+    @Slot()
+    def file_gz_open(self, checked):
+        filename = QFileDialog.getOpenFileName(self, 'Open GZ File ...', '../work', 'Any File (*)')
+        if filename is not None and len(filename[0]) > 0:
+            filename = filename[0]
+            path, _ = os.path.split(filename)
+            vfs = vfs_structure_empty(path, 'GenerationZero')
+            self.vfs_set(vfs)
             self.vfs.external_file_add(filename)
             self.vfs_reload()
         else:

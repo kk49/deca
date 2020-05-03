@@ -38,7 +38,7 @@
       <property name="childrenCollapsible">
        <bool>false</bool>
       </property>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,0,0">
         <item>
          <widget class="QTabWidget" name="tabs_nodes">
@@ -377,6 +377,7 @@
     </property>
     <addaction name="action_project_new"/>
     <addaction name="action_project_open"/>
+    <addaction name="action_file_gz_open"/>
     <addaction name="action_external_add"/>
     <addaction name="action_exit"/>
    </widget>
@@ -422,6 +423,11 @@
   <action name="action_make_web_map">
    <property name="text">
     <string>Make &amp;Web Map...</string>
+   </property>
+  </action>
+  <action name="action_file_gz_open">
+   <property name="text">
+    <string>Open GenZero File...</string>
    </property>
   </action>
  </widget>

@@ -1023,8 +1023,7 @@ class AdfDatabase:
 
                 except AdfTypeMissing as ae:
                     self.type_missing.add((ae.type_id, node_uid))
-                    print('Missing Type {:08x} in {} at offset {}'.format(
-                        ae.type_id, exepath, poss))
+                    self._type_map_updated = True
 
             adf_sub_files.append((poss, adf.total_size))
 
@@ -1102,6 +1101,7 @@ class AdfDatabase:
                 adf = self._load_adf(buffer)
         except AdfTypeMissing as ae:
             self.type_missing.add((ae.type_id, node.uid))
+            self._type_map_updated = True
             raise
 
         return adf

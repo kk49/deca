@@ -1224,7 +1224,7 @@ class VfsDatabase:
                 with io.BytesIO(b) as f:
                     v = pickle.load(f)
                 adf_map[k] = v
-            elif miss is not None and miss != 1:
+            elif miss is not None and miss != 0:
                 adf_missing.add((k, miss))
             else:
                 raise NotImplemented(f'Unknown type record: {k}, {miss}, {b}')

@@ -466,6 +466,10 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         26: process_image_26,  # DXGI_FORMAT_R11G11B10_FLOAT
         28: process_image_28,  # DXGI_FORMAT_R8G8B8A8_UNORM
         60: process_image_60,  # DXGI_FORMAT_R8_TYPELESS
+        61: process_image_60,  # DXGI_FORMAT_R8_UNORM
+        62: process_image_60,  # DXGI_FORMAT_R8_UINT
+        63: process_image_60,  # DXGI_FORMAT_R8_SNORM
+        64: process_image_60,  # DXGI_FORMAT_R8_SINT
         71: process_image_71,  # DXGI_FORMAT_BC1_UNORM
         74: process_image_74,  # DXGI_FORMAT_BC2_UNORM
         77: process_image_77,  # DXGI_FORMAT_BC3_UNORM

@@ -643,7 +643,7 @@ class Processor:
             return True
 
         except AdfTypeMissing as ae:
-            self._comm.log('Missing Type {:08x} in {} {} {}'.format(
+            self._comm.log('DBCmd: Missing Type {:08x} in {} {} {}'.format(
                 ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
         return False
 

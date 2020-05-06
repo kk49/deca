@@ -1,5 +1,8 @@
-#### v0.2.9 ???
-* Possible fix for text export issue of GZ savefile
+#### v0.2.9 The May Day edition
+* Added ability to do basic dump of APEX engine files (like a save file) without processing entire game
+* Fixed issue with not tracking missing ADF types
+* Fixed processing of JC3 (missing image type info, and ADF type bug, related to missing ADF type tracking bug)
+* Fix for text export issue of GZ savefile on at least on windows machine
 * Will now attempt to annotate all integer and integer array fields in an ADF file to an equipment or text
 * Fixed issue with building ddsc files
 * Added user readable name of equipment that uses clothing models

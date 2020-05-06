@@ -1,3 +1,6 @@
+#### v0.2.10 ???
+* Added file node trace for exception causes nodes/files
+
 #### v0.2.9 The May Day edition
 * Added ability to do basic dump of APEX engine files (like a save file) without processing entire game
 * Fixed issue with not tracking missing ADF types

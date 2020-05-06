@@ -315,7 +315,22 @@ class Processor:
             for i, index in enumerate(indexes):
                 self._comm.status(i, n_indexes)
                 node = db.db().node_where_uid(index)
-                results[i] = (index, func(node, db))
+                try:
+                    results[i] = (index, func(node, db))
+                except:
+                    cn = node
+                    while cn is not None:
+                        try:
+                            self._comm.error(
+                                f'loop_over_uid_wrapper: failed for: id: {cn.uid}, pid:{cn.pid}, v: {cn.v_path}, p: {cn.p_path}')
+
+                            if cn.pid is None:
+                                break
+
+                            cn = db.db().node_where_uid(cn.pid)
+                        except:
+                            cn = None
+                    raise
             self._comm.status(n_indexes, n_indexes)
 
         return results

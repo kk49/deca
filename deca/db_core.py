@@ -1268,7 +1268,9 @@ class VfsDatabase:
                     pf.seek(node.offset)
                     buffer_in = pf.read(node.size_c)
 
+                self.logger.log(f'B: id:{node.uid}, pid:{node.pid}, v:{node.v_path}, p:{node.p_path}, cs:{node.size_c}, us:{node.size_u}')
                 buffer_out = extract_aaf(ArchiveFile(io.BytesIO(buffer_in)))
+                self.logger.log(f'E: id:{node.uid}, pid:{node.pid}, v:{node.v_path}, p:{node.p_path}, cs:{node.size_c}, us:{node.size_u}')
 
                 make_dir_for_file(file_name)
                 with open(file_name, 'wb') as fo:

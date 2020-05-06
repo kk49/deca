@@ -11,7 +11,7 @@ from PySide2.QtCore import Slot
 from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
 
 
-window_title = 'decaGUI: v0.2.9-dev'
+window_title = 'decaGUI: v0.2.9'
 
 
 class MainWindow(QMainWindow):

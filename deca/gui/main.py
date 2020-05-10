@@ -1,14 +1,16 @@
 import sys
 import os
 from deca.errors import *
+from deca.db_core import common_prefix
 from deca.db_processor import vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
 from deca.builder import Builder
 from deca.util import Logger
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
 from .main_window import Ui_MainWindow
-from PySide2.QtCore import Slot
-from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
+from PySide2.QtCore import Slot, QUrl
+from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
+from PySide2.QtGui import QDesktopServices
 
 
 window_title = 'decaGUI: v0.2.10-dev'
@@ -73,11 +75,26 @@ class MainWindow(QMainWindow):
         self.ui.bt_extract.setEnabled(False)
         self.ui.bt_extract.clicked.connect(self.slot_extract_clicked)
 
+        self.ui.bt_extract_folder_show.setEnabled(False)
+        self.ui.bt_extract_folder_show.setIcon(self.style().standardIcon(QStyle.SP_DirIcon))
+        self.ui.bt_extract_folder_show.clicked.connect(self.slot_folder_show_clicked)
+
         self.ui.bt_extract_gltf_3d.setEnabled(False)
         self.ui.bt_extract_gltf_3d.clicked.connect(self.slot_extract_gltf_clicked)
 
+        self.ui.bt_extract_gltf_3d_folder_show.setEnabled(False)
+        self.ui.bt_extract_gltf_3d_folder_show.setIcon(self.style().standardIcon(QStyle.SP_DirIcon))
+        self.ui.bt_extract_gltf_3d_folder_show.clicked.connect(self.slot_folder_show_clicked)
+
         self.ui.bt_mod_prep.setEnabled(False)
         self.ui.bt_mod_prep.clicked.connect(self.slot_mod_prep_clicked)
+
+        self.ui.bt_mod_folder_show.setEnabled(False)
+        self.ui.bt_mod_folder_show.setIcon(self.style().standardIcon(QStyle.SP_DirIcon))
+        self.ui.bt_mod_folder_show.clicked.connect(self.slot_folder_show_clicked)
+
+        self.ui.bt_mod_build_folder_show.setIcon(self.style().standardIcon(QStyle.SP_DirIcon))
+        self.ui.bt_mod_build_folder_show.clicked.connect(self.slot_folder_show_clicked)
 
         self.ui.bt_mod_build.clicked.connect(self.slot_mod_build_clicked)
 
@@ -122,11 +139,18 @@ class MainWindow(QMainWindow):
             self.ui.bt_extract.setEnabled(False)
             self.ui.bt_extract_gltf_3d.setEnabled(False)
             self.ui.bt_mod_prep.setEnabled(False)
+            self.ui.bt_extract_folder_show.setEnabled(False)
+            self.ui.bt_extract_gltf_3d_folder_show.setEnabled(False)
+            self.ui.bt_mod_folder_show.setEnabled(False)
+
             str_vpaths = ''
         else:
             self.ui.bt_extract.setEnabled(True)
             self.ui.bt_extract_gltf_3d.setEnabled(True)
             self.ui.bt_mod_prep.setEnabled(True)
+            self.ui.bt_extract_folder_show.setEnabled(True)
+            self.ui.bt_extract_gltf_3d_folder_show.setEnabled(True)
+            self.ui.bt_mod_folder_show.setEnabled(True)
 
             if len(self.current_vpaths) == 1:
                 if isinstance(vpaths[0], bytes):
@@ -178,6 +202,38 @@ class MainWindow(QMainWindow):
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
+    def slot_folder_show_clicked(self, checked):
+        if self.current_vpaths:
+            path = self.current_vpaths[0]
+            for p in self.current_vpaths:
+                path, _, _ = common_prefix(path, p)
+
+            if self.sender() == self.ui.bt_extract_folder_show:
+                root = self.vfs.working_dir + 'extracted/'
+            elif self.sender() == self.ui.bt_extract_gltf_3d_folder_show:
+                root = self.vfs.working_dir + 'gltf2_3d/'
+            elif self.sender() == self.ui.bt_mod_folder_show:
+                root = self.vfs.working_dir + 'mod/'
+            elif self.sender() == self.ui.bt_mod_build_folder_show:
+                root = self.vfs.working_dir + 'build/'
+                path = None
+            else:
+                root = None
+
+            if root:
+                if path:
+                    path = os.path.join(root, path)
+                else:
+                    path = root
+
+                if not os.path.isdir(path):
+                    path, _ = os.path.split(path)
+
+                if os.path.isdir(path):
+                    QDesktopServices.openUrl(QUrl(f'file://{path}'))
+                else:
+                    self.vfs.logger.warning(f'Folder does not exist: {path}')
+                    
     def slot_extract_clicked(self, checked):
         self.extract(
             'Extraction', self.vfs.working_dir + 'extracted/',

@@ -1,4 +1,5 @@
 #### v0.2.10 ???
+* Added folder button next to each extract button and build button to open folder in OS 
 * Added file node trace for exception causes nodes/files
 
 #### v0.2.9 The May Day edition

@@ -222,7 +222,7 @@ class MainWindow(QMainWindow):
 
             if root:
                 if path:
-                    path = os.path.join(root, path)
+                    path = f'{root}/{path}'
                 else:
                     path = root
 
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
                     QDesktopServices.openUrl(QUrl(f'file://{path}'))
                 else:
                     self.vfs.logger.warning(f'Folder does not exist: {path}')
-                    
+
     def slot_extract_clicked(self, checked):
         self.extract(
             'Extraction', self.vfs.working_dir + 'extracted/',

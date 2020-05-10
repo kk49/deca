@@ -222,9 +222,11 @@ class MainWindow(QMainWindow):
 
             if root:
                 if path:
-                    path = f'{root}/{path}'
+                    path = os.path.join(root, path)
                 else:
                     path = root
+
+                path = path.replace('\\', '/')
 
                 if not os.path.isdir(path):
                     path, _ = os.path.split(path)

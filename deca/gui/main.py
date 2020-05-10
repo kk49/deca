@@ -232,7 +232,7 @@ class MainWindow(QMainWindow):
                     path, _ = os.path.split(path)
 
                 if os.path.isdir(path):
-                    QDesktopServices.openUrl(QUrl(f'file://{path}'))
+                    QDesktopServices.openUrl(QUrl(f'{path}'))
                 else:
                     self.vfs.logger.warning(f'Folder does not exist: {path}')
 

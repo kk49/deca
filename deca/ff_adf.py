@@ -415,7 +415,9 @@ def adf_format(v, vfs: VfsDatabase, type_map, indent=0):
                 s = s + adf_format(iv, vfs, type_map, indent + 2)
                 # add details for equipment hashes
                 # if isinstance(iv.value, int) and k in adf_hash_fields:
-                if isinstance(iv.value, int):
+                if not hasattr(iv, 'value'):
+                    pass
+                elif isinstance(iv.value, int):
                     hs = hash_lookup(vfs, iv.value)
                     if hs:
                         s = s + '  ' * (indent + 2) + hs + '\n'

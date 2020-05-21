@@ -383,8 +383,8 @@ class Ddsc:
                         depth_cnt=depth, depth_idx=j, surface_id=sid,
                         pixel_format=self.header.dds_header_dxt10.dxgiFormat, itype='missing')
 
-            nx = nx // 2
-            ny = ny // 2
+            nx = max(1, nx // 2)
+            ny = max(1, ny // 2)
 
         # DDS format
         for sid in surfaces:

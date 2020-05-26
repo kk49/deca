@@ -64,6 +64,8 @@ class DdImageHeader:
         print(f'UNKNOWN: {self.unknown}')
 
         ddsc_flags = [
+            [0x01, "DDSC_MATCHING_ATX_FILES"],
+            [0x08, "DDSC_is_dif_image_file?"],
             [0x40, "DDSC_CUBEMAP"],
         ]
         flags = self.flags
@@ -139,7 +141,7 @@ class DdImageHeader:
             self.size_body = fh.read_u32()
             self.unknown = []
             while fh.tell() < 128:
-                self.unknown.append(fh.read_u32())
+                self.unknown.append(fh.read_u8())
 
             self.dds_header.dwFlags |= DDSD_CAPS
             self.dds_header.dwFlags |= DDSD_HEIGHT
@@ -154,6 +156,12 @@ class DdImageHeader:
                 self.dds_header.dwCaps |= DDSCAPS_COMPLEX
                 self.dds_header.dwCaps |= DDSCAPS_MIPMAP
 
+            if self.flags & 0x01:
+                pass  # ATX files attached to ddsc
+
+            if self.flags & 0x08:
+                pass  # DIF image? only seems to be on dif files, not mpm, nrm, emi
+
             if self.flags & 0x40:
                 self.dds_header.dwCaps |= DDSCAPS_COMPLEX
                 self.dds_header.dwCaps2 |= DDS_CUBEMAP_ALLFACES | DDSCAPS2_CUBEMAP
@@ -167,6 +175,7 @@ class DdImageHeader:
     def deserialize_dds(self, buffer, convert_to_dx10=True):
         with ArchiveFile(io.BytesIO(buffer)) as f:
             self.magic = f.read(4)
+            self.flags = 0
 
             if self.magic != b'DDS ':
                 raise EDecaIncorrectFileFormat('deserialize_dds')
@@ -244,6 +253,9 @@ class DdImageHeader:
                     self.dds_header_dxt10.resourceDimension = 2 + 1
 
             self.mip_count = self.dds_header.dwMipMapCount
+
+            if self.dds_header.dwCaps2 & (DDS_CUBEMAP_ALLFACES | DDSCAPS2_CUBEMAP) != 0:
+                self.flags |= 0x40
 
             end_pos = f.tell()
 
@@ -516,47 +528,78 @@ def ddsc_write_to_png(ddsc, output_file_name):
     image.save(output_file_name)
 
 
+def ddsc_header_dds_write(ddsc, f):
+    # magic word
+    f.write(b'DDS ')
+    # DDS_HEADER
+    f.write_u32(124)  # dwSize
+    f.write_u32(ddsc.header.dds_header.dwFlags)  # dwFlags
+    f.write_u32(ddsc.header.dds_header.dwHeight)  # dwHeight
+    f.write_u32(ddsc.header.dds_header.dwWidth)  # dwWidth
+    f.write_u32(ddsc.header.dds_header.dwPitchOrLinearSize)  # dwPitchOrLinearSize
+    f.write_u32(ddsc.header.dds_header.dwDepth)  # dwDepth
+    f.write_u32(ddsc.header.dds_header.dwMipMapCount)  # dwMipMapCount
+    for i in range(11):
+        f.write_u32(0)  # dwReserved1
+
+    # PIXEL_FORMAT
+    f.write_u32(32)  # DWORD dwSize
+    f.write_u32(ddsc.header.dds_header.ddspf.dwFlags)  # DWORD dwFlags
+    f.write(ddsc.header.dds_header.ddspf.dwFourCC)  # DWORD dwFourCC
+    f.write_u32(ddsc.header.dds_header.ddspf.dwRGBBitCount)  # DWORD dwRGBBitCount
+    f.write_u32(ddsc.header.dds_header.ddspf.dwRBitMask)  # DWORD dwRBitMask
+    f.write_u32(ddsc.header.dds_header.ddspf.dwGBitMask)  # DWORD dwGBitMask
+    f.write_u32(ddsc.header.dds_header.ddspf.dwBBitMask)  # DWORD dwBBitMask
+    f.write_u32(ddsc.header.dds_header.ddspf.dwABitMask)  # DWORD dwABitMask
+
+    # DDS_HEADER, cont...
+    f.write_u32(ddsc.header.dds_header.dwCaps)  # dwCaps
+    f.write_u32(ddsc.header.dds_header.dwCaps2)  # dwCaps2
+    f.write_u32(ddsc.header.dds_header.dwCaps3)  # dwCaps3
+    f.write_u32(ddsc.header.dds_header.dwCaps4)  # dwCaps4
+    f.write_u32(0)  # dwReserved2
+
+    # DDS_HEADER_DXT10
+    f.write_u32(ddsc.header.dds_header_dxt10.dxgiFormat)
+    f.write_u32(ddsc.header.dds_header_dxt10.resourceDimension)
+    f.write_u32(ddsc.header.dds_header_dxt10.miscFlag)
+    f.write_u32(ddsc.header.dds_header_dxt10.arraySize)
+    f.write_u32(ddsc.header.dds_header_dxt10.miscFlags2)
+
+
 def ddsc_write_to_dds(ddsc, output_file_name):
     with ArchiveFile(open(output_file_name, 'wb')) as f:
-        # magic word
-        f.write(b'DDS ')
-        # DDS_HEADER
-        f.write_u32(124)  # dwSize
-        f.write_u32(ddsc.header.dds_header.dwFlags)  # dwFlags
-        f.write_u32(ddsc.header.dds_header.dwHeight)  # dwHeight
-        f.write_u32(ddsc.header.dds_header.dwWidth)  # dwWidth
-        f.write_u32(ddsc.header.dds_header.dwPitchOrLinearSize)  # dwPitchOrLinearSize
-        f.write_u32(ddsc.header.dds_header.dwDepth)  # dwDepth
-        f.write_u32(ddsc.header.dds_header.dwMipMapCount)  # dwMipMapCount
-        for i in range(11):
-            f.write_u32(0)  # dwReserved1
-
-        # PIXEL_FORMAT
-        f.write_u32(32)  # DWORD dwSize
-        f.write_u32(ddsc.header.dds_header.ddspf.dwFlags)  # DWORD dwFlags
-        f.write(ddsc.header.dds_header.ddspf.dwFourCC)  # DWORD dwFourCC
-        f.write_u32(ddsc.header.dds_header.ddspf.dwRGBBitCount)  # DWORD dwRGBBitCount
-        f.write_u32(ddsc.header.dds_header.ddspf.dwRBitMask)  # DWORD dwRBitMask
-        f.write_u32(ddsc.header.dds_header.ddspf.dwGBitMask)  # DWORD dwGBitMask
-        f.write_u32(ddsc.header.dds_header.ddspf.dwBBitMask)  # DWORD dwBBitMask
-        f.write_u32(ddsc.header.dds_header.ddspf.dwABitMask)  # DWORD dwABitMask
-
-        # DDS_HEADER, cont...
-        f.write_u32(ddsc.header.dds_header.dwCaps)  # dwCaps
-        f.write_u32(ddsc.header.dds_header.dwCaps2)  # dwCaps2
-        f.write_u32(ddsc.header.dds_header.dwCaps3)  # dwCaps3
-        f.write_u32(ddsc.header.dds_header.dwCaps4)  # dwCaps4
-        f.write_u32(0)  # dwReserved2
-
-        # DDS_HEADER_DXT10
-        f.write_u32(ddsc.header.dds_header_dxt10.dxgiFormat)
-        f.write_u32(ddsc.header.dds_header_dxt10.resourceDimension)
-        f.write_u32(ddsc.header.dds_header_dxt10.miscFlag)
-        f.write_u32(ddsc.header.dds_header_dxt10.arraySize)
-        f.write_u32(ddsc.header.dds_header_dxt10.miscFlags2)
-
+        ddsc_header_dds_write(ddsc, f)
         for mip in ddsc.mips_dds:
             f.write(mip.raw_data)
+
+
+def ddsc_header_ddsc_write(ddsc, f):
+    f.write(b'AVTX')
+    f.write_u16(1)  # version
+    f.write_u8(ddsc.header.unknown0)
+    f.write_u8(ddsc.header.dds_header_dxt10.resourceDimension - 1)
+    f.write_u32(ddsc.header.dds_header_dxt10.dxgiFormat)
+
+    f.write_u16(ddsc.header.dds_header.dwWidth)
+    f.write_u16(ddsc.header.dds_header.dwHeight)
+    f.write_u16(ddsc.header.dds_header.dwDepth)
+
+    f.write_u16(ddsc.header.flags)
+    f.write_u8(ddsc.header.dds_header.dwMipMapCount)
+    f.write_u8(ddsc.header.mip_count)
+    f.write_u16(ddsc.header.unknown1)
+    f.write_u32(ddsc.header.unknown2)
+    f.write_u32(ddsc.header.unknown3)
+    f.write_u32(ddsc.header.size_header)
+    f.write_u32(ddsc.header.size_body)
+
+    for v in ddsc.header.unknown:
+        f.write_u8(v)
+
+    end_pos = f.tell()
+
+    return end_pos
 
 
 def image_export(vfs: VfsDatabase, node: VfsNode, extract_dir, export_raw, export_processed, allow_overwrite=False):
@@ -633,11 +676,11 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
         raise EDecaBuildError('Missing vpath: {}'.format(node.v_path))
     elif ddsc_in is None:
         raise EDecaBuildError('Could not load: {}'.format(ifile))
-    elif ddsc.header.dds_header_dxt10.dxgiFormat != ddsc_in.header.dds_header_dxt10.dxgiFormat:
-        raise EDecaBuildError('dxgiFormat do not match for ({}, {}) and ({}, {})'.format(
-            node.v_path, ddsc.header.dds_header_dxt10.dxgiFormat,
-            ifile, ddsc_in.header.dds_header_dxt10.dxgiFormat,
-        ))
+    # elif ddsc.header.dds_header_dxt10.dxgiFormat != ddsc_in.header.dds_header_dxt10.dxgiFormat:
+    #     raise EDecaBuildError('dxgiFormat do not match for ({}, {}) and ({}, {})'.format(
+    #         node.v_path, ddsc.header.dds_header_dxt10.dxgiFormat,
+    #         ifile, ddsc_in.header.dds_header_dxt10.dxgiFormat,
+    #     ))
     else:
         out_vpaths = [mip.filename for mip in ddsc.mips]
         out_vpaths = set(out_vpaths)
@@ -647,9 +690,14 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
 
             make_dir_for_file(fout_name)
 
-            with open(fout_name, 'wb') as file_out:
+            with ArchiveFile(open(fout_name, 'wb')) as file_out:
                 if vpath_out.endswith(b'.ddsc'):
-                    file_out.write(ddsc.header_buffer)
+                    # OLD
+                    # file_out.write(ddsc.header_buffer)
+                    # NEW BEGIN
+                    ddsc.header.dds_header_dxt10.dxgiFormat = ddsc_in.header.dds_header_dxt10.dxgiFormat
+                    ddsc_header_ddsc_write(ddsc, file_out)
+                    # NEW END
                     # DDSC files have high to low resolution
                     for mip_index in range(0, len(ddsc_in.mips_avtx)):
                         mip = ddsc.mips_avtx[mip_index]

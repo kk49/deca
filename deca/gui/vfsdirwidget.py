@@ -4,6 +4,7 @@ from deca.db_core import VfsDatabase
 from deca.db_processor import VfsNode
 from deca.ff_adf import AdfDatabase
 from deca.ff_types import *
+from deca.dxgi_types import dxgi_name_db
 from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QSortFilterProxyModel
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QHeaderView, QSizePolicy, QWidget, QHBoxLayout, QTreeView, QAbstractItemView
@@ -153,7 +154,7 @@ class VfsDirModel(QAbstractItemModel):
                     elif vnode.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE}:
                         return '{:08x}'.format(vnode.file_sub_type)
                     else:
-                        return '{}'.format(vnode.file_sub_type)
+                        return '{} ({})'.format(dxgi_name_db.get(vnode.file_sub_type, 'UNKNOWN'), vnode.file_sub_type)
                 elif column == 4:
                     if vnode.v_hash is None:
                         return ''

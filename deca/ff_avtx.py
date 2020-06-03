@@ -120,7 +120,9 @@ class DdImageHeader:
             self.dds_header.dwHeight = fh.read_u16()
             self.dds_header.dwDepth = fh.read_u16()
 
-            is_uncompressed, ele_size = dxgi_format_db[self.dds_header_dxt10.dxgiFormat]
+            is_uncompressed, ele_size = \
+                dxgi_format_db[dxgi_base_format_db[self.dds_header_dxt10.dxgiFormat]]
+
             if is_uncompressed:
                 self.dds_header.dwFlags |= DDSD_PITCH
                 pls = ele_size * self.dds_header.dwWidth

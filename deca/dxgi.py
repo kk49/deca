@@ -152,7 +152,7 @@ def process_image_87(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_B8G8R8A8_U
 
 
 @njit
-def process_image_71(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_BC1_UNORM
+def process_image_70(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_BC1_UNORM
     pos = 0
     bnx = max(1, nx // 4)
     bny = max(1, ny // 4)
@@ -198,7 +198,7 @@ def process_image_71(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_BC1_UNORM
 
 
 @njit
-def process_image_74(image, buffer, n_buffer, nx, ny):
+def process_image_73(image, buffer, n_buffer, nx, ny):
     pos = 0
     bnx = max(1, nx // 4)
     bny = max(1, ny // 4)
@@ -253,7 +253,7 @@ def process_image_74(image, buffer, n_buffer, nx, ny):
 
 
 @njit(fastmath=True)
-def process_image_77(image, buffer, n_buffer, nx, ny):
+def process_image_76(image, buffer, n_buffer, nx, ny):
     pos = 0
     bnx = max(1, nx // 4)
     bny = max(1, ny // 4)
@@ -344,7 +344,7 @@ def process_image_77(image, buffer, n_buffer, nx, ny):
 
 
 @njit
-def process_image_80(image, buffer, n_buffer, nx, ny):
+def process_image_79(image, buffer, n_buffer, nx, ny):
     pos = 0
     bnx = max(1, nx // 4)
     bny = max(1, ny // 4)
@@ -388,7 +388,7 @@ def process_image_80(image, buffer, n_buffer, nx, ny):
 
 
 @njit
-def process_image_83(image, buffer, n_buffer, nx, ny):
+def process_image_82(image, buffer, n_buffer, nx, ny):
     pos = 0
     bnx = max(1, nx // 4)
     bny = max(1, ny // 4)
@@ -460,29 +460,25 @@ def process_image_83(image, buffer, n_buffer, nx, ny):
 
 def process_image_python(image, raw, nx, ny, pixel_format):
     # print(f'PF = {pixel_format}')
+    base_format = dxgi_base_format_db[pixel_format]
+
     loaders = {
         2: process_image_2,    # DXGI_FORMAT_R32G32B32A32_FLOAT
         10: process_image_10,  # DXGI_FORMAT_R16G16B16A16_FLOAT
         26: process_image_26,  # DXGI_FORMAT_R11G11B10_FLOAT
         28: process_image_28,  # DXGI_FORMAT_R8G8B8A8_UNORM
         60: process_image_60,  # DXGI_FORMAT_R8_TYPELESS
-        61: process_image_60,  # DXGI_FORMAT_R8_UNORM
-        62: process_image_60,  # DXGI_FORMAT_R8_UINT
-        63: process_image_60,  # DXGI_FORMAT_R8_SNORM
-        64: process_image_60,  # DXGI_FORMAT_R8_SINT
-        71: process_image_71,  # DXGI_FORMAT_BC1_UNORM
-        74: process_image_74,  # DXGI_FORMAT_BC2_UNORM
-        77: process_image_77,  # DXGI_FORMAT_BC3_UNORM
-        80: process_image_80,  # DXGI_FORMAT_BC4_UNORM
-        83: process_image_83,  # DXGI_FORMAT_BC5_UNORM
+        70: process_image_70,  # DXGI_FORMAT_BC1_TYPELESS
+        73: process_image_73,  # DXGI_FORMAT_BC2_TYPELESS
+        76: process_image_76,  # DXGI_FORMAT_BC3_TYPELESS
+        79: process_image_79,  # DXGI_FORMAT_BC4_TYPELESS
+        82: process_image_82,  # DXGI_FORMAT_BC5_TYPELESS
         87: process_image_87,  # DXGI_FORMAT_B8G8R8A8_UNORM
         97: process_image_97,  # DXGI_FORMAT_BC7_TYPELESS
-        98: process_image_97,  # DXGI_FORMAT_BC7_UNORM
-        99: process_image_97,  # DXGI_FORMAT_BC7_UNORM_SRGB
     }
 
     if pixel_format in loaders:
-        loaders[pixel_format](image, raw, len(raw), nx, ny)
+        loaders[base_format](image, raw, len(raw), nx, ny)
     else:
         raise Exception('Unknown DCC format {}'.format(pixel_format))
 
@@ -570,12 +566,12 @@ def process_image(*args, **kwargs):
     # if (t1 - t0) > 1.0:
     #     print('--------------------------------------------------------------')
     #     print('PT == {}'.format(args[-1]))
-    #     process_image_77.inspect_types()
+    #     process_image_76.inspect_types()
     #     print('--------------------------------------------------------------')
-    #     for k, v in process_image_77.inspect_llvm().items():
+    #     for k, v in process_image_76.inspect_llvm().items():
     #         print(k, v)
     #     print('--------------------------------------------------------------')
-    #     for k, v in process_image_77.inspect_asm().items():
+    #     for k, v in process_image_76.inspect_asm().items():
     #         print(k, v)
     #     print('--------------------------------------------------------------')
 

@@ -1,4 +1,6 @@
 #### v0.2.10 ???
+* Added more mapping of texture types to their base type
+* Added text name for texture types
 * Fixed processing of non square textures
 * Added info about DirectXTex, not currently used
 * Fixed issue with uint32* parameter in some ADF files, causing a crash because it attempts to do a hash string lookup

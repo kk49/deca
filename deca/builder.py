@@ -117,10 +117,10 @@ class Builder:
             pass  # no source path,
         elif src_path.find('DECA') >= 0:
             pass  # BUILD file(s) do not copy
-        elif re.match(r'^.*\.ddsc$', src_path) or \
-                re.match(r'^.*\.hmddsc$', src_path) or \
-                re.match(r'^.*\.atx?$', src_path):
-            pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
+        # elif re.match(r'^.*\.ddsc$', src_path) or \
+        #         re.match(r'^.*\.hmddsc$', src_path) or \
+        #         re.match(r'^.*\.atx?$', src_path):
+        #     pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
         elif src_path.endswith('.ddsc.dds'):
             # Build texture
             vnode = vfs.nodes_where_match(v_path=v_path)[0]

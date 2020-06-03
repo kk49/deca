@@ -1,4 +1,5 @@
 #### v0.2.10 ???
+* Added Loading of multiple external files at once to Load External File
 * Added building ddsc, atx?, hmddsc? directly into archive files, this can be used to package dds files renamed as ddsc!!!
 * Added more mapping of texture types to their base type
 * Added text name for texture types

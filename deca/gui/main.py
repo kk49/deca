@@ -328,26 +328,35 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def external_add(self, checked):
-        filename = QFileDialog.getOpenFileName(self, 'Open External File ...', '.', 'Any File (*)')
-        if filename is not None and len(filename[0]) > 0:
-            filename = filename[0]
-            self.vfs.external_file_add(filename)
-            self.vfs_reload()
+        filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open External File ...', '.', 'Any File (*)')
+        if filenames:
+            any_loaded = False
+            for filename in filenames:
+                if len(filename) > 0:
+                    any_loaded = True
+                    self.vfs.external_file_add(filename)
+            if any_loaded:
+                self.vfs_reload()
         else:
-            self.logger.log('Cannot Open {}'.format(filename))
+            self.logger.log('Cannot Open {}'.format(filenames))
 
     @Slot()
     def file_gz_open(self, checked):
-        filename = QFileDialog.getOpenFileName(self, 'Open GZ File ...', '../work', 'Any File (*)')
-        if filename is not None and len(filename[0]) > 0:
-            filename = filename[0]
-            path, _ = os.path.split(filename)
+        filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open GZ File ...', '../work', 'Any File (*)')
+
+        if filenames is not None and len(filenames[0]) > 0:
+            path, _ = os.path.split(filenames[0])
             vfs = vfs_structure_empty(path, 'GenerationZero')
             self.vfs_set(vfs)
-            self.vfs.external_file_add(filename)
-            self.vfs_reload()
+            any_loaded = False
+            for filename in filenames:
+                if len(filename) > 0:
+                    any_loaded = True
+                    self.vfs.external_file_add(filename)
+            if any_loaded:
+                self.vfs_reload()
         else:
-            self.logger.log('Cannot Open {}'.format(filename))
+            self.logger.log('Cannot Open {}'.format(filenames))
 
     @Slot()
     def exit_app(self, checked):

@@ -283,20 +283,20 @@ class MainWindow(QMainWindow):
         self.ui.vfs_dir_widget.filter_vfspath_set(txt)
 
     def vhash_to_vpath_text_changed(self):
-        txt_in = self.vhash_to_vpath_in_edit.text()
+        txt_in = self.ui.vhash_to_vpath_in_edit.text()
 
         txt_out = ''
         if self.vfs is not None:
             try:
                 val_in = int(txt_in, 0)
-                nodes = self.vfs.nodes_where_v_hash(val_in)
-                for node in nodes:
-                    if len(node.v_path) > 0:
-                        txt_out = node.v_path.decode('utf-8')
+                strings = self.vfs.hash_string_match(hash32=val_in)
+                for s in strings:
+                    if len(s) > 0:
+                        txt_out = s[1].decode('utf-8')
             except ValueError:
                 pass
 
-        self.vhash_to_vpath_out_edit.setText(txt_out)
+        self.ui.vhash_to_vpath_out_edit.setText(txt_out)
 
     @Slot()
     def project_new(self, checked):

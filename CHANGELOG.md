@@ -8,6 +8,7 @@
 * Fixed issue with uint32* parameter in some ADF files, causing a crash because it attempts to do a hash string lookup
 * Added folder button next to each extract button and build button to open folder in OS 
 * Added file node trace for exception causes nodes/files
+* Fixed hash to string search function in gui
 
 #### v0.2.9 The May Day edition
 * Added ability to do basic dump of APEX engine files (like a save file) without processing entire game

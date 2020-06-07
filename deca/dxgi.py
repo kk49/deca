@@ -71,7 +71,7 @@ def u16_to_f16_in_f32(value):
 @njit
 def process_image_2(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R32G32B32A32_FLOAT
     pos = 0
-    chans = [0] * 4
+    chans = [0.0] * 4
     for yi in range(ny):
         for xi in range(nx):
             chans[0], pos = ff_read_f32(buffer, n_buffer, pos)
@@ -120,6 +120,19 @@ def process_image_28(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R8G8B8A8_U
             chans[2], pos = ff_read_u8(buffer, n_buffer, pos)
             chans[3], pos = ff_read_u8(buffer, n_buffer, pos)
             image[yi, xi, :] = chans[:]
+
+
+@njit
+def process_image_41(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R32_FLOAT
+    pos = 0
+    chans = [0.0] * 4
+    for yi in range(ny):
+        for xi in range(nx):
+            chans[0], pos = ff_read_f32(buffer, n_buffer, pos)
+            chans[1] = 0.0
+            chans[2] = 0.0
+            chans[3] = 1.0
+            image[yi, xi, :] = chans
 
 
 @njit

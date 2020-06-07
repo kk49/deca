@@ -485,6 +485,7 @@ dxgi_format_db = {
     10: [True, 8],      # DXGI_FORMAT_R16G16B16A16_FLOAT
     26: [True, 4],      # DXGI_FORMAT_R11G11B10_FLOAT
     28: [True, 4],      # DXGI_FORMAT_R8G8B8A8_UNORM
+    41: [True, 4],      # DXGI_FORMAT_R32_FLOAT
     60: [True, 1],      # DXGI_FORMAT_R8_TYPELESS
     87: [True, 4],      # DXGI_FORMAT_B8G8R8A8_UNORM
     70: [False, 8],     # DXGI_FORMAT_BC1_TYPELESS
@@ -500,6 +501,7 @@ dxgi_base_format_db = {
     10: 10,     # DXGI_FORMAT_R16G16B16A16_FLOAT
     26: 26,     # DXGI_FORMAT_R11G11B10_FLOAT
     28: 28,     # DXGI_FORMAT_R8G8B8A8_UNORM
+    41: 41,     # DXGI_FORMAT_R32_FLOAT
     # DXGI_FORMAT_R8_*
     60: 60, 61: 60, 62: 60, 63: 60, 64: 60,
     # DXGI_FORMAT_B8G8R8A8_UNORM

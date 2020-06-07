@@ -120,8 +120,17 @@ class DdImageHeader:
             self.dds_header.dwHeight = fh.read_u16()
             self.dds_header.dwDepth = fh.read_u16()
 
-            is_uncompressed, ele_size = \
-                dxgi_format_db[dxgi_base_format_db[self.dds_header_dxt10.dxgiFormat]]
+            if self.dds_header_dxt10.dxgiFormat not in dxgi_base_format_db:
+                raise EDecaIncorrectFileFormat('dxgi Format {} not in dxgi_base_format_db'.format(
+                    self.dds_header_dxt10.dxgiFormat))
+
+            fmt = dxgi_base_format_db[self.dds_header_dxt10.dxgiFormat]
+
+            if fmt not in dxgi_format_db:
+                raise EDecaIncorrectFileFormat('dxgi Format {} which maps to {} not in dxgi_base_format_db'.format(
+                    self.dds_header_dxt10.dxgiFormat, fmt))
+
+            is_uncompressed, ele_size = dxgi_format_db[fmt]
 
             if is_uncompressed:
                 self.dds_header.dwFlags |= DDSD_PITCH
@@ -303,6 +312,16 @@ def load_mip(mip, f, filename, save_raw_data, is_atx=False):
         s = 1.0 / (mx - mn)
         inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
         inp[:, :, 0:3] = ((inp_f32[:, :, 0:3] - mn) * s * 255).astype(dtype=np.uint8)
+        inp[:, :, 3] = 255
+    elif pixel_format in {41}:  # floating point 1 components
+        inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
+        deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
+        mn = np.nanmin(inp_f32[:, :, 0:1])
+        mx = np.nanmax(inp_f32[:, :, 0:1])
+        s = 1.0 / (mx - mn)
+        inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
+        inp[:, :, 0:1] = ((inp_f32[:, :, 0:1] - mn) * s * 255).astype(dtype=np.uint8)
+        inp[:, :, 1:3] = 0
         inp[:, :, 3] = 255
     else:
         inp = np.zeros((nym, nxm, 4), dtype=np.uint8)

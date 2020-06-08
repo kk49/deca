@@ -480,6 +480,7 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         10: process_image_10,  # DXGI_FORMAT_R16G16B16A16_FLOAT
         26: process_image_26,  # DXGI_FORMAT_R11G11B10_FLOAT
         28: process_image_28,  # DXGI_FORMAT_R8G8B8A8_UNORM
+        41: process_image_41,  # DXGI_FORMAT_R32_FLOAT
         60: process_image_60,  # DXGI_FORMAT_R8_TYPELESS
         70: process_image_70,  # DXGI_FORMAT_BC1_TYPELESS
         73: process_image_73,  # DXGI_FORMAT_BC2_TYPELESS
@@ -498,7 +499,7 @@ def process_image_python(image, raw, nx, ny, pixel_format):
 
 def process_image_c(image, raw, nx, ny, pixel_format):
 
-    if pixel_format in {2, 10, 26}:  # do floating point loads in python
+    if pixel_format in {2, 10, 26, 41}:  # do floating point loads in python
         process_image_python(image, raw, nx, ny, pixel_format)
     else:
         global c_process_image_func

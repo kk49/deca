@@ -23,12 +23,15 @@ raw_image_size = {
 
 
 def file_stats(f, file_size):
-    # TODO handle huge file size
+    # TODO huge files will take a WHILE
     counts = np.zeros((256,), dtype=np.uint32)
-    buf = f.read(file_size)
-    buf = bytearray(buf)
-    cnt = np.bincount(buf, minlength=256)
-    counts = counts + cnt
+    while True:
+        buf = f.read(1024*1024)
+        if len(buf) == 0:
+            break
+        buf = bytearray(buf)
+        cnt = np.bincount(buf, minlength=256)
+        counts = counts + cnt
     return counts
 
 

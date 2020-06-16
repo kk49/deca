@@ -1,4 +1,6 @@
 #### v0.2.10 ???
+* Load large files 1MB at a time during file determination this was a problem for some people on windows
+* Added script and support to process CAnimSpline objects
 * Added dxgi type 41 support, JC4 s failed to load because this was missing
 * Added Loading of multiple external files at once to Load External File
 * Added building ddsc, atx?, hmddsc? directly into archive files, this can be used to package dds files renamed as ddsc!!!

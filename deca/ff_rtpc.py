@@ -87,6 +87,7 @@ prop_cpoi_name = PropName.CPOI_NAME.value
 prop_cpoi_desc = PropName.CPOI_DESC.value
 prop_bookmark_name = PropName.BOOKMARK_NAME.value
 prop_item_item_id = hash32_func('[Item]  Item ID')
+prop_spline = hash32_func('spline')
 prop_deca_loot_class = 0x34beec18
 prop_deca_crafting_type = 0xa949bc65
 

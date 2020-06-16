@@ -123,8 +123,8 @@ class GameInfo:
 
 
 class GameInfoGZ(GameInfo):
-    def __init__(self, game_dir, exe_name):
-        GameInfo.__init__(self, game_dir, exe_name, 'gz')
+    def __init__(self, game_dir, exe_name, game_id='gz'):
+        GameInfo.__init__(self, game_dir, exe_name, game_id)
         self.map_prefixes += [
             'textures/ui/map_reserve_0/',
             'textures/ui/map_reserve_1/',
@@ -201,69 +201,9 @@ class GameInfoGZ(GameInfo):
         ]
 
 
-class GameInfoGZB(GameInfo):
+class GameInfoGZB(GameInfoGZ):
     def __init__(self, game_dir, exe_name):
-        GameInfo.__init__(self, game_dir, exe_name, 'gzb')
-
-    def archive_path(self):
-        archive_paths = []
-        for cat in ['initial', 'supplemental', 'optional']:
-            archive_paths.append(os.path.join(self.game_dir, 'archives_win64', cat))
-        return archive_paths
-
-    def mdic_ftype(self):
-        return [FTYPE_ADF, FTYPE_ADF_BARE]
-
-    def navmesh_ftype(self):
-        return FTYPE_TAG0
-
-    def obc_ftype(self):
-        return FTYPE_OBC
-
-    def pfs_ftype(self):
-        return FTYPE_TAG0
-
-    def file_assoc(self):
-        return [
-            {
-                b'.ee': FTYPE_SARC,
-                b'.epe': FTYPE_RTPC,
-            },
-            {
-                b'.bl': FTYPE_SARC,
-                b'.nl': FTYPE_SARC,
-                b'.fl': FTYPE_SARC,
-                b'.blo': FTYPE_RTPC,
-                b'.nl.mdic': self.mdic_ftype(),
-                b'.fl.mdic': self.mdic_ftype(),
-                b'.pfs': self.pfs_ftype(),
-                b'.obc': FTYPE_OBC,
-            },
-            {
-                b'.meshc': FTYPE_ADF,
-                b'.hrmeshc': FTYPE_ADF,
-                b'.modelc': FTYPE_ADF,
-                b'.model_deps': FTYPE_TXT,
-                b'.pfxc': self.pfs_ftype(),
-            },
-            {
-                b'.ddsc': [FTYPE_AVTX, FTYPE_DDS],
-                b'.atx0': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx1': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx2': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx3': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx4': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx5': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx6': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx7': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx8': [FTYPE_ATX, FTYPE_NO_TYPE],
-                b'.atx9': [FTYPE_ATX, FTYPE_NO_TYPE],
-            },
-            {
-                b'.fmod_sbankc': FTYPE_TXT,
-                b'.fmod_bankc': FTYPE_RIFF,
-            },
-        ]
+        GameInfoGZ.__init__(self, game_dir, exe_name, 'gzb')
 
 
 class GameInfoTHCOTW(GameInfo):

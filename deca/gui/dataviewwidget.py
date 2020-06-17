@@ -1,3 +1,4 @@
+from deca.db_core import VfsSelection
 from deca.db_processor import vfs_structure_new, vfs_structure_open, VfsNode
 from deca.ff_types import *
 from deca.ff_adf import AdfDatabase
@@ -50,8 +51,8 @@ class DataViewWidget(QWidget):
         self.adf_db = AdfDatabase()
         self.adf_db.load_from_database(self.vfs)
 
-    def vnode_selection_changed(self, vpaths):
-        print('DataViewWidget:vnode_selection_changed: {}'.format(vpaths))
+    def vnode_selection_changed(self, vfs_selection: VfsSelection):
+        print('DataViewWidget:vnode_selection_changed: {}'.format(vfs_selection))
 
     def vnode_2click_selected(self, vnode: VfsNode):
         print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))

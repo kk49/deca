@@ -1,42 +1,15 @@
 import os
-from typing import List, TypeVar
 from .errors import *
 from .file import *
 from .ff_types import *
 from .ff_adf import AdfDatabase
-from .db_core import VfsDatabase, VfsNode
+from .db_core import VfsDatabase, VfsNode, VfsSelection
 from .ff_avtx import image_export
 from .ff_sarc import FileSarc
 from .util import make_dir_for_file
 from .export_import_adf import node_export_adf_processed, node_export_adf_gltf, node_export_adf_text
 from .export_import_rtpc import node_export_rtpc_gltf, node_export_rtpc_text
 from .export_import_audio import node_export_fsb5c_processed
-
-
-NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
-
-
-def expand_vfs_paths(vfs: VfsDatabase, vs, mask):
-    vos = []
-
-    for v in vs:
-        id_pat = v
-        if isinstance(id_pat, str):
-            id_pat = v.encode('ascii')
-
-        if isinstance(id_pat, bytes):
-            nodes_all = vfs.nodes_where_match(v_path_like=id_pat, v_path_regexp=mask)
-            nodes = []
-            for node in nodes_all:
-                if node.file_type != FTYPE_SYMLINK and node.offset is not None:
-                    nodes.append(node)
-            nodes = dict([(n.v_path, n) for n in nodes])
-            nodes = list(nodes.values())
-            vos += nodes
-        else:
-            vos.append(v)
-
-    return vos
 
 
 def extract_node_raw(
@@ -75,40 +48,15 @@ def extract_node_raw(
     return None
 
 
-def find_vfs_node(vfs: VfsDatabase, v):
-    node = None
-    path = None
-    if isinstance(v, bytes):
-        path = v
-    elif isinstance(v, VfsNode):
-        node = v
-    else:
-        raise NotImplementedError('find_vfs_node: Could not extract {}'.format(v))
-
-    if path is not None:
-        matching_nodes = vfs.nodes_where_match(v_path=path)
-        node = None
-        for matching_node in matching_nodes:
-            if matching_node.offset is not None:
-                node = matching_node
-                break
-        if node is None:
-            raise EDecaFileMissing('find_vfs_node: Missing {}'.format(path.decode('utf-8')))
-
-    return node
-
-
 def nodes_export_raw(
         vfs: VfsDatabase,
-        nodes: List[NodeListElement],
-        mask: bytes,
+        vfs_selection: VfsSelection,
         extract_dir: str,
         allow_overwrite=False):
-    vs = expand_vfs_paths(vfs, nodes, mask)
-    for i, v in enumerate(vs):
-        node = find_vfs_node(vfs, v)
-
-        if node is not None:
+    node_map = vfs_selection.nodes_selected_get()
+    for k, (nodes_real, nodes_sym) in node_map.items():
+        if nodes_real and nodes_real[0] is not None:
+            node = nodes_real[0]
             try:
                 extract_node_raw(vfs, node, extract_dir, allow_overwrite)
             except EDecaFileExists as e:
@@ -118,27 +66,25 @@ def nodes_export_raw(
 
 def nodes_export_contents(
         vfs: VfsDatabase,
-        nodes: List[NodeListElement],
-        mask: bytes,
+        vfs_selection: VfsSelection,
         extract_dir: str,
         allow_overwrite=False):
-    vs = expand_vfs_paths(vfs, nodes, mask)
-    for i, v in enumerate(vs):
-        vnode = find_vfs_node(vfs, v)
-
-        if vnode is not None:
+    node_map = vfs_selection.nodes_selected_get()
+    for k, (nodes_real, nodes_sym) in node_map.items():
+        if nodes_real and nodes_real[0] is not None:
+            node = nodes_real[0]
             try:
-                if vnode.file_type == FTYPE_SARC:
+                if node.file_type == FTYPE_SARC:
                     sarc = FileSarc()
-                    with vfs.file_obj_from(vnode) as f:
+                    with vfs.file_obj_from(node) as f:
                         sarc.header_deserialize(f)
                         # extract_node_raw(vfs, vnode, extract_dir, allow_overwrite)
                     entry_v_paths = [v.v_path for v in sarc.entries]
                     entry_is_symlinks = [v.offset == 0 for v in sarc.entries]
 
-                    nodes_export_raw(vfs, entry_v_paths, b'^.*$', extract_dir, allow_overwrite)
+                    nodes_export_raw(vfs, vfs_selection, extract_dir, allow_overwrite)
 
-                    file_list_name = os.path.join(extract_dir, vnode.v_path.decode('utf-8') + '.DECA.FILE_LIST.txt')
+                    file_list_name = os.path.join(extract_dir, node.v_path.decode('utf-8') + '.DECA.FILE_LIST.txt')
 
                     with open(file_list_name, 'w') as f:
                         f.write('sarc.clear();\n')
@@ -155,20 +101,18 @@ def nodes_export_contents(
 
 def nodes_export_gltf(
         vfs: VfsDatabase,
-        nodes: List[NodeListElement],
-        mask: bytes,
+        vfs_selection: VfsSelection,
         extract_dir: str,
         allow_overwrite=False,
         save_to_one_dir=True
 ):
-    vs = expand_vfs_paths(vfs, nodes, mask)
-
     vs_adf = []
     vs_rtpc = []
-    for i, v in enumerate(vs):
-        node = find_vfs_node(vfs, v)
 
-        if node is not None and node.is_valid() and node.offset is not None:
+    node_map = vfs_selection.nodes_selected_get()
+    for k, (nodes_real, nodes_sym) in node_map.items():
+        if nodes_real and nodes_real[0] is not None and nodes_real[0] .is_valid() and nodes_real[0] .offset is not None:
+            node = nodes_real[0]
             try:
                 if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
                     vs_adf.append(node)
@@ -210,23 +154,20 @@ def nodes_export_gltf(
 
 def nodes_export_processed(
         vfs: VfsDatabase,
-        nodes: List[NodeListElement],
-        mask: bytes,
+        vfs_selection: VfsSelection,
         extract_dir: str,
         allow_overwrite=False,
         save_to_processed=False,
         save_to_text=False):
-    vs = expand_vfs_paths(vfs, nodes, mask)
-
     vs_adf = []
     vs_rtpc = []
     vs_images = []
     vs_fsb5cs = []
     vs_other = []
-    for i, v in enumerate(vs):
-        node = find_vfs_node(vfs, v)
-
-        if node is not None and node.is_valid() and node.offset is not None:
+    node_map = vfs_selection.nodes_selected_get()
+    for k, (nodes_real, nodes_sym) in node_map.items():
+        if nodes_real and nodes_real[0] is not None and nodes_real[0] .is_valid() and nodes_real[0] .offset is not None:
+            node = nodes_real[0]
             try:
                 if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
                     vs_adf.append(node)

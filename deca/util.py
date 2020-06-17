@@ -74,6 +74,12 @@ def make_dir_for_file(fn):
     return new_dir
 
 
+def to_unicode(s):
+    if isinstance(s, bytes):
+        s = s.decode('utf-8')
+
+    return s
+
 '''
 JENKINS HASH code from 
 https://github.com/gibbed/Gibbed.JustCause3/blob/master/projects/Gibbed.JustCause3.FileFormats/StringHelpers.cs

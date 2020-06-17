@@ -1,12 +1,14 @@
 import sys
 import os
+from typing import Optional
 from deca.errors import *
-from deca.db_core import common_prefix
-from deca.db_processor import vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
+from deca.db_core import common_prefix, VfsSelection
+from deca.db_processor import VfsProcessor, vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
 from deca.builder import Builder
-from deca.util import Logger
+from deca.util import Logger, to_unicode
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
+from deca.ff_types import FTYPE_SARC
 from .main_window import Ui_MainWindow
 from PySide2.QtCore import Slot, QUrl
 from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
@@ -23,13 +25,12 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
-        self.vfs = None
+        self.vfs: Optional[VfsProcessor] = None
         self.logger = Logger('./')
 
         self.builder = Builder()
         self.current_vnode = None
-        self.current_vpaths = None
-        self.filter_mask = b'^.*$'
+        self.vfs_selection: Optional[VfsSelection] = None
 
         # Configure Actions
         self.ui.action_project_new.triggered.connect(self.project_new)
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         self.ui.vfs_dir_widget.vnode_2click_selected = self.vnode_2click_selected
 
         # filter
+        self.ui.bt_archive_open.clicked.connect(self.archives_toggle)
         self.ui.filter_edit.textChanged.connect(self.filter_text_changed)
 
         self.ui.vhash_to_vpath_in_edit.textChanged.connect(self.vhash_to_vpath_text_changed)
@@ -100,6 +102,7 @@ class MainWindow(QMainWindow):
 
     def vfs_set(self, vfs):
         self.vfs = vfs
+        self.vfs_selection = VfsSelection(vfs, None, b'^.*$')
         self.setWindowTitle("{}: Archive: {}".format(window_title, vfs.game_info.game_dir))
         self.ui.statusbar.showMessage("LOAD COMPLETE")
         self.vfs_reload()
@@ -110,6 +113,20 @@ class MainWindow(QMainWindow):
         self.ui.vfs_node_widget_non_mapped.vfs_set(self.vfs)
         self.ui.vfs_dir_widget.vfs_set(self.vfs)
         self.ui.data_view.vfs_set(self.vfs)
+
+    def archives_update(self):
+        if self.vfs_selection.archive_active_get():
+            self.ui.bt_archive_open.setEnabled(True)
+            self.ui.bt_archive_open.setText('Close Archives')
+        else:
+            self.ui.bt_archive_open.setEnabled(self.vfs_selection.archive_count() > 0)
+            self.ui.bt_archive_open.setText('Open Archives')
+        self.ui.edt_archive_name.setText(self.vfs_selection.archive_summary_str())
+
+    def archives_toggle(self):
+        self.vfs_selection.archive_active_set(not self.vfs_selection.archive_active_get())
+        self.archives_update()
+        self.ui.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -134,37 +151,24 @@ class MainWindow(QMainWindow):
         retval = msg.exec_()
 
     def vnode_selection_changed(self, vpaths):
-        self.current_vpaths = vpaths
-        if self.current_vpaths is None or len(self.current_vpaths) == 0:
-            self.ui.bt_extract.setEnabled(False)
-            self.ui.bt_extract_gltf_3d.setEnabled(False)
-            self.ui.bt_mod_prep.setEnabled(False)
-            self.ui.bt_extract_folder_show.setEnabled(False)
-            self.ui.bt_extract_gltf_3d_folder_show.setEnabled(False)
-            self.ui.bt_mod_folder_show.setEnabled(False)
+        self.vfs_selection.paths_set(vpaths)
+        any_selected = self.vfs_selection.paths_count() > 0
 
-            str_vpaths = ''
-        else:
-            self.ui.bt_extract.setEnabled(True)
-            self.ui.bt_extract_gltf_3d.setEnabled(True)
-            self.ui.bt_mod_prep.setEnabled(True)
-            self.ui.bt_extract_folder_show.setEnabled(True)
-            self.ui.bt_extract_gltf_3d_folder_show.setEnabled(True)
-            self.ui.bt_mod_folder_show.setEnabled(True)
+        self.ui.bt_extract.setEnabled(any_selected)
+        self.ui.bt_extract_gltf_3d.setEnabled(any_selected)
+        self.ui.bt_mod_prep.setEnabled(any_selected)
+        self.ui.bt_extract_folder_show.setEnabled(any_selected)
+        self.ui.bt_extract_gltf_3d_folder_show.setEnabled(any_selected)
+        self.ui.bt_mod_folder_show.setEnabled(any_selected)
 
-            if len(self.current_vpaths) == 1:
-                if isinstance(vpaths[0], bytes):
-                    str_vpaths = vpaths[0].decode('utf-8')
-                else:
-                    str_vpaths = vpaths[0]
-            else:
-                str_vpaths = '**MULTIPLE**'
-
+        str_vpaths = self.vfs_selection.paths_summary_str()
         self.ui.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
         self.ui.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
         self.ui.bt_mod_prep.setText('PREP MOD: {}'.format(str_vpaths))
 
-        self.ui.data_view.vnode_selection_changed(vpaths)
+        # update archives
+        self.archives_update()
+        self.ui.data_view.vnode_selection_changed(self.vfs_selection)
 
     def vnode_2click_selected(self, vnode: VfsNode):
         self.current_vnode = vnode
@@ -174,16 +178,16 @@ class MainWindow(QMainWindow):
         #     self.ui.bt_extract.setEnabled(True)
 
     def extract(self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text):
-        if self.current_vpaths:
+        if self.vfs_selection.node_selected_count() > 0:
             try:
                 if export_raw:
-                    nodes_export_raw(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
+                    nodes_export_raw(self.vfs, self.vfs_selection, extract_dir)
 
                 if export_contents:
-                    nodes_export_contents(self.vfs, self.current_vpaths, self.filter_mask, extract_dir)
+                    nodes_export_contents(self.vfs, self.vfs_selection, extract_dir)
 
                 nodes_export_processed(
-                    self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
+                    self.vfs, self.vfs_selection, extract_dir,
                     allow_overwrite=False,
                     save_to_processed=save_to_processed,
                     save_to_text=save_to_text)
@@ -192,10 +196,10 @@ class MainWindow(QMainWindow):
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
     def extract_gltf(self, eid, extract_dir, save_to_one_dir):
-        if self.current_vpaths:
+        if self.vfs_selection.node_selected_count() > 0:
             try:
                 nodes_export_gltf(
-                    self.vfs, self.current_vpaths, self.filter_mask, extract_dir,
+                    self.vfs, self.vfs_selection, extract_dir,
                     allow_overwrite=False,
                     save_to_one_dir=save_to_one_dir)
 
@@ -203,10 +207,8 @@ class MainWindow(QMainWindow):
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
     def slot_folder_show_clicked(self, checked):
-        if self.current_vpaths:
-            path = self.current_vpaths[0]
-            for p in self.current_vpaths:
-                path, _, _ = common_prefix(path, p)
+        if self.vfs_selection.node_selected_count() > 0:
+            path = self.vfs_selection.common_prefix()
 
             if self.sender() == self.ui.bt_extract_folder_show:
                 root = self.vfs.working_dir + 'extracted/'
@@ -279,8 +281,8 @@ class MainWindow(QMainWindow):
             if txt[-1] != '$':
                 txt = txt + '$'
 
-        self.filter_mask = txt.encode('ascii')
-        self.ui.vfs_dir_widget.filter_vfspath_set(txt)
+        self.vfs_selection.mask_set(txt.encode('ascii'))
+        self.ui.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
 
     def vhash_to_vpath_text_changed(self):
         txt_in = self.ui.vhash_to_vpath_in_edit.text()

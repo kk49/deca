@@ -2,9 +2,19 @@
 <html>
 
 <head>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-169933249-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-169933249-1');
+    </script>
+
     <meta charset='utf-8' />
     <title>deca Map Full</title>
-    <script data-ad-client="ca-pub-9852507806031654" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"
         integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA=="
         crossorigin=""/>
@@ -66,9 +76,9 @@ alt="Web Analytics"></a></div></noscript>
 
 <script>
     var urlParams = new URLSearchParams(window.location.search);
-    var spoilers = !urlParams.has('no_spoilers');
+    var show_dev = urlParams.has('dev');
     var collapse_layers = !urlParams.has('no_collapse_layers');
-    console.log('spoilers = ', spoilers);
+    console.log('show_dev = ', show_dev);
     console.log('collapse_layers = ', collapse_layers);
 
 
@@ -416,9 +426,10 @@ alt="Web Analytics"></a></div></noscript>
         ['Items: Placed Loot', false, 2, 'Placed Loot Items from GZ', '', loot_items, 0, 1.0],
     ];
 
-    for (x in apex_social_control)
-    {
-        all_layers.push(['Apex Social: ' + x, false, 2, 'Apex Social from GZ', '', apex_social_control[x], 0, 1.0]);
+    if(show_dev) {
+        for (x in apex_social_control) {
+            all_layers.push(['Apex Social: ' + x, false, 2, 'Apex Social from GZ', '', apex_social_control[x], 0, 1.0]);
+        }
     }
 
     var baseMaps = {}

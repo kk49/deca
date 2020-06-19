@@ -650,8 +650,13 @@ class VfsDatabase:
         return nodes
 
     def nodes_where_match(
-            self, v_hash=None, v_path=None, v_path_like=None, v_path_regexp=None,
-            file_type=None, pid_in=None,
+            self,
+            v_hash=None,
+            v_path=None,
+            v_path_like=None,
+            v_path_regexp=None,
+            file_type=None,
+            pid_in=None,
             uid_only=False):
         params = []
         wheres = []
@@ -1480,11 +1485,20 @@ class VfsSelection:
         return path
 
     def node_accumulate(self, nodes_visible, nodes_visible_uids, mask=None, pid_in=None, id_pat=None):
-        nodes_all = self.vfs.nodes_where_match(v_path_like=id_pat, v_path_regexp=mask, pid_in=pid_in)
+        if isinstance(id_pat, VfsNode):
+            nodes_all = [id_pat]
+        else:
+            nodes_all = self.vfs.nodes_where_match(v_path_like=id_pat, v_path_regexp=mask, pid_in=pid_in)
+
         for node in nodes_all:
             nodes_visible_uids.add(node.uid)
 
-            lst0 = nodes_visible.get(node.v_path, None)
+            if node.v_path is None:
+                vp = f'uid_{node.uid}'.encode('ascii')
+            else:
+                vp = node.v_path
+
+            lst0 = nodes_visible.get(vp, None)
 
             if lst0 is None:
                 lst = [[], []]
@@ -1497,7 +1511,7 @@ class VfsSelection:
                 lst[1].append(node)
 
             if lst0 is None:
-                nodes_visible[node.v_path] = lst
+                nodes_visible[vp] = lst
 
     def node_update(self):
         if self.nodes_visible_dirty:

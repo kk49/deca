@@ -491,10 +491,10 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         97: process_image_97,  # DXGI_FORMAT_BC7_TYPELESS
     }
 
-    if pixel_format in loaders:
+    if base_format in loaders:
         loaders[base_format](image, raw, len(raw), nx, ny)
     else:
-        raise Exception('Unknown DCC format {}'.format(pixel_format))
+        raise Exception('Unknown DCC format {} base {}'.format(pixel_format, base_format))
 
 
 def process_image_c(image, raw, nx, ny, pixel_format):

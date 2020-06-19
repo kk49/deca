@@ -1428,7 +1428,10 @@ class VfsSelection:
             self.archives = {}
             self.archive_uids = set()
             for path in self.paths:
-                nodes = self.vfs.nodes_where_match(v_path_like=path, file_type=FTYPE_SARC)
+                if isinstance(path, VfsNode):
+                    nodes = [path]
+                else:
+                    nodes = self.vfs.nodes_where_match(v_path_like=path, file_type=FTYPE_SARC)
                 for node in nodes:
                     self.archives[node.v_path] = node
                     self.archive_uids.add(node.uid)

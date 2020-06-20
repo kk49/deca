@@ -58,7 +58,7 @@ build_script:
 
     cd build
 
-    cmake ..\
+    cmake -G "NMake Makefiles" ..\
 
     nmake
 
@@ -66,7 +66,7 @@ build_script:
 
     cd _bin2xml
 
-    cmake  ..\..\_bin2xml\
+    cmake  -G "NMake Makefiles" ..\..\_bin2xml\
 
     nmake
 

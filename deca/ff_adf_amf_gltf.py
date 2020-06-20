@@ -640,7 +640,11 @@ class Deca3dHkSkeleton:
                     f.write(buffer)
 
             if not os.path.isfile(ppath_skel_xml):
-                os.system('./extern/HavokLib/build/_bin2xml/bin2xml {} {}'.format(ppath_skel_raw, ppath_skel_xml))
+                os.system('{} {} {}'.format(
+                    os.path.join('.', 'extern', 'HavokLib', 'build', '_bin2xml', 'bin2xml'),
+                    ppath_skel_raw,
+                    ppath_skel_xml,
+                ))
 
             if not os.path.isfile(ppath_skel_xml):
                 raise EDecaFileMissing('Not Mapped: {}'.format(ppath_skel_xml))

@@ -19,6 +19,16 @@ build_script:
 
     git submodule update --init --recursive --remote
 
+    dir extern
+
+    dir extern/HavokLib
+
+    dir extern/HavokLib/3rd_party
+
+    dir extern/HavokLib/3rd_party/PreCore
+
+    dir extern/HavokLib/3rd_party/PreCore/datas
+
 
     echo SETUP PYTHON
 

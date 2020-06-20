@@ -21,13 +21,13 @@ build_script:
 
     dir extern
 
-    dir extern/HavokLib
+    dir extern\HavokLib
 
-    dir extern/HavokLib/3rd_party
+    dir extern\HavokLib\3rd_party
 
-    dir extern/HavokLib/3rd_party/PreCore
+    dir extern\HavokLib\3rd_party\PreCore
 
-    dir extern/HavokLib/3rd_party/PreCore/datas
+    dir extern\HavokLib\3rd_party\PreCore\datas
 
 
     echo SETUP PYTHON
@@ -68,13 +68,13 @@ build_script:
 
     cd build
 
-    cmake ../
+    cmake ..\
 
     mkdir _bin2xml
 
     cd _bin2xml
 
-    cmake  ../../_bin2xml/
+    cmake  ..\..\_bin2xml\
 
 
     echo PACKAGE

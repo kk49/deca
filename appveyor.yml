@@ -17,7 +17,7 @@ build_script:
 
     git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
 
-    git submodule update --init --recursive --remote
+    git submodule update --init --recursive
 
     dir extern
 

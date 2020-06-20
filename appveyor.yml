@@ -79,6 +79,8 @@ build_script:
 
     echo PACKAGE
 
+    cd C:\prj\deca
+
     pyinstaller deca_gui.spec --clean --noconfirm
 
 

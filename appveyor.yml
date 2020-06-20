@@ -31,7 +31,7 @@ build_script:
 
     echo GET SUBMODULES
 
-    git submodule init
+    echo git submodule init
 
     git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
 

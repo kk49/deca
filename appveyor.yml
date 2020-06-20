@@ -28,11 +28,32 @@ build_script:
 
     cd C:\prj\deca
 
+
+    echo GET SUBMODULES
+
+    git submodule update --init --recursive
+
+
+    echo BUILD IMAGE DLL
+
     "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
 
     cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll
 
+    echo BUILD HAVOK LIB
+
+    cd C:\prj\deca\extern\HavokLib
+
+    mkdir build
+
+    cd build
+
+    cmake ..
+
+    echo PACKAGE
+
     pyinstaller deca_gui.spec --clean --noconfirm
+
 
 after_build:
     cd dist\deca_gui

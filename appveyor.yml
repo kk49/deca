@@ -60,11 +60,15 @@ build_script:
 
     cmake ..\
 
+    nmake
+
     mkdir _bin2xml
 
     cd _bin2xml
 
     cmake  ..\..\_bin2xml\
+
+    nmake
 
 
     echo PACKAGE

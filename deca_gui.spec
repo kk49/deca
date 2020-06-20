@@ -9,7 +9,7 @@ added_files = [
     ('resources/hp', 'resources/hp'),
     ('resources/ghidra_strings', 'resources/ghidra_strings'),
     ('tool_resources/make_web_map', 'tool_resources/make_web_map'),
-    ('extern/HavokLib/build/_bin2xml/bin2xml*', 'extern/HavokLib/build/_bin2xml/),
+    ('extern/HavokLib/build/_bin2xml/bin2xml*', 'extern/HavokLib/build/_bin2xml/'),
 ]
 
 a = Analysis(

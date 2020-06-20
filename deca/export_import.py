@@ -104,7 +104,8 @@ def nodes_export_gltf(
         vfs_selection: VfsSelection,
         extract_dir: str,
         allow_overwrite=False,
-        save_to_one_dir=True
+        save_to_one_dir=True,
+        include_skeleton=False,
 ):
     vs_adf = []
     vs_rtpc = []
@@ -132,7 +133,8 @@ def nodes_export_gltf(
                 node,
                 extract_dir,
                 allow_overwrite=allow_overwrite,
-                save_to_one_dir=save_to_one_dir)
+                save_to_one_dir=save_to_one_dir,
+                include_skeleton=include_skeleton)
 
         except EDecaFileExists as e:
             vfs.logger.log(
@@ -145,7 +147,8 @@ def nodes_export_gltf(
                 node,
                 extract_dir,
                 allow_overwrite=allow_overwrite,
-                save_to_one_dir=save_to_one_dir
+                save_to_one_dir=save_to_one_dir,
+                include_skeleton=include_skeleton,
             )
         except EDecaFileExists as e:
             vfs.logger.log(

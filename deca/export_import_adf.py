@@ -94,10 +94,13 @@ def adf_export_amf_model_0xf7c20a69(
         vnode: VfsNode,
         export_path,
         allow_overwrite,
-        save_to_one_dir=True
+        save_to_one_dir=True,
+        include_skeleton=False,
 ):
     vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
-    gltf = DecaGltf(vfs, export_path, vnode.v_path.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+    gltf = DecaGltf(
+        vfs, export_path, vnode.v_path.decode('utf-8'),
+        save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton)
 
     with gltf.scene():
         with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path)):
@@ -113,10 +116,13 @@ def adf_export_mdic_0xb5b062f1(
         vnode: VfsNode,
         export_path,
         allow_overwrite,
-        save_to_one_dir=True
+        save_to_one_dir=True,
+        include_skeleton=False,
 ):
     vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
-    gltf = DecaGltf(vfs, export_path, vnode.v_path.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+    gltf = DecaGltf(
+        vfs, export_path, vnode.v_path.decode('utf-8'),
+        save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton)
 
     with gltf.scene():
         adf = adf_db.read_node(vfs, vnode)
@@ -154,15 +160,20 @@ def node_export_adf_gltf(
         vnode: VfsNode,
         export_path,
         allow_overwrite=False,
-        save_to_one_dir=True
+        save_to_one_dir=True,
+        include_skeleton=False,
 ):
     adf = adf_db.read_node(vfs, vnode)
     if adf is not None:
         if len(adf.table_instance) == 1:
             if adf.table_instance[0].type_hash == 0xf7c20a69:  # AmfModel
-                adf_export_amf_model_0xf7c20a69(vfs, adf_db, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
+                adf_export_amf_model_0xf7c20a69(
+                    vfs, adf_db, vnode, export_path, allow_overwrite,
+                    save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton)
             elif adf.table_instance[0].type_hash == 0xb5b062f1:  # mdic
-                adf_export_mdic_0xb5b062f1(vfs, adf_db, vnode, export_path, allow_overwrite, save_to_one_dir=save_to_one_dir)
+                adf_export_mdic_0xb5b062f1(
+                    vfs, adf_db, vnode, export_path, allow_overwrite,
+                    save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton)
 
 
 def node_export_adf_processed(

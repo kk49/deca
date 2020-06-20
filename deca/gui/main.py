@@ -195,13 +195,14 @@ class MainWindow(QMainWindow):
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
-    def extract_gltf(self, eid, extract_dir, save_to_one_dir):
+    def extract_gltf(self, eid, extract_dir, save_to_one_dir, include_skeleton):
         if self.vfs_selection.node_selected_count() > 0:
             try:
                 nodes_export_gltf(
                     self.vfs, self.vfs_selection, extract_dir,
                     allow_overwrite=False,
-                    save_to_one_dir=save_to_one_dir)
+                    save_to_one_dir=save_to_one_dir,
+                    include_skeleton=include_skeleton)
 
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
@@ -251,6 +252,7 @@ class MainWindow(QMainWindow):
         self.extract_gltf(
             'GLTF2 / 3D', self.vfs.working_dir + 'gltf2_3d/',
             save_to_one_dir=self.ui.chkbx_export_save_to_one_dir.isChecked(),
+            include_skeleton=self.ui.chkbx_export_3d_include_skeleton.isChecked(),
         )
 
     def slot_mod_prep_clicked(self, checked):

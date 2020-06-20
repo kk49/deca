@@ -804,12 +804,17 @@ class DecaGltfNode:
 
 
 class DecaGltf:
-    def __init__(self, vfs: VfsDatabase, export_path, filename, lod=0, save_to_one_dir=False, flat_file_layout=False):
+    def __init__(
+            self, vfs: VfsDatabase, export_path, filename, lod=0,
+            save_to_one_dir=False,
+            flat_file_layout=False,
+            include_skeleton=False):
         self.vfs = vfs
         self.filename = filename
         self.lod = lod
         self.save_to_one_dir = save_to_one_dir
         self.flat_file_layout = flat_file_layout
+        self.include_skeleton = include_skeleton
         self.gltf = pyg.GLTF2()
         self.gltf.asset.version = "2.0"
         self.gltf.asset.generator = "DECA extractor"
@@ -885,7 +890,7 @@ class DecaGltf:
         self.vfs.logger.log('export_modelc: Started')
         # setup skeleton
         skeleton = None
-        if skeleton_raw_path is not None:
+        if self.include_skeleton and skeleton_raw_path is not None:
             skeleton = self.db.gltf_add_hk_skeleton(self.gltf, skeleton_raw_path, self.d_scene.scene)
 
         # setup materials

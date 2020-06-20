@@ -3,7 +3,7 @@
 # Form implementation generated from reading ui file 'main_window.ui',
 # licensing of 'main_window.ui' applies.
 #
-# Created: Thu Jun  4 20:00:22 2020
+# Created: Sat Jun 20 12:24:47 2020
 #      by: pyside2-uic  running on PySide2 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
@@ -152,13 +152,8 @@ class Ui_MainWindow(object):
         self.bt_extract_gltf_3d = QtWidgets.QPushButton(self.tab_3d_gltf2)
         self.bt_extract_gltf_3d.setObjectName("bt_extract_gltf_3d")
         self.gridLayout_2.addWidget(self.bt_extract_gltf_3d, 0, 2, 1, 1)
-        self.chkbx_export_save_to_one_dir = QtWidgets.QCheckBox(self.tab_3d_gltf2)
-        self.chkbx_export_save_to_one_dir.setObjectName("chkbx_export_save_to_one_dir")
-        self.gridLayout_2.addWidget(self.chkbx_export_save_to_one_dir, 0, 0, 1, 1)
         spacerItem4 = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.gridLayout_2.addItem(spacerItem4, 1, 0, 1, 1)
-        spacerItem5 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.gridLayout_2.addItem(spacerItem5, 0, 3, 1, 1)
+        self.gridLayout_2.addItem(spacerItem4, 2, 0, 1, 1)
         self.bt_extract_gltf_3d_folder_show = QtWidgets.QPushButton(self.tab_3d_gltf2)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -168,6 +163,14 @@ class Ui_MainWindow(object):
         self.bt_extract_gltf_3d_folder_show.setText("")
         self.bt_extract_gltf_3d_folder_show.setObjectName("bt_extract_gltf_3d_folder_show")
         self.gridLayout_2.addWidget(self.bt_extract_gltf_3d_folder_show, 0, 1, 1, 1)
+        self.chkbx_export_save_to_one_dir = QtWidgets.QCheckBox(self.tab_3d_gltf2)
+        self.chkbx_export_save_to_one_dir.setObjectName("chkbx_export_save_to_one_dir")
+        self.gridLayout_2.addWidget(self.chkbx_export_save_to_one_dir, 0, 0, 1, 1)
+        spacerItem5 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.gridLayout_2.addItem(spacerItem5, 0, 3, 1, 1)
+        self.chkbx_export_3d_include_skeleton = QtWidgets.QCheckBox(self.tab_3d_gltf2)
+        self.chkbx_export_3d_include_skeleton.setObjectName("chkbx_export_3d_include_skeleton")
+        self.gridLayout_2.addWidget(self.chkbx_export_3d_include_skeleton, 1, 0, 1, 1)
         self.tabs_control.addTab(self.tab_3d_gltf2, "")
         self.tab_utils = QtWidgets.QWidget()
         self.tab_utils.setObjectName("tab_utils")
@@ -258,6 +261,7 @@ class Ui_MainWindow(object):
         self.tabs_control.setTabText(self.tabs_control.indexOf(self.tab_modding), QtWidgets.QApplication.translate("MainWindow", "Modding", None, -1))
         self.bt_extract_gltf_3d.setText(QtWidgets.QApplication.translate("MainWindow", "EXPORT 3D/GLTF2", None, -1))
         self.chkbx_export_save_to_one_dir.setText(QtWidgets.QApplication.translate("MainWindow", "Save To One Directory", None, -1))
+        self.chkbx_export_3d_include_skeleton.setText(QtWidgets.QApplication.translate("MainWindow", "Include Skeleton", None, -1))
         self.tabs_control.setTabText(self.tabs_control.indexOf(self.tab_3d_gltf2), QtWidgets.QApplication.translate("MainWindow", "3d/GLTF2", None, -1))
         self.vhash_to_vpath_label.setText(QtWidgets.QApplication.translate("MainWindow", "VHash -> VPath", None, -1))
         self.vhash_to_vpath_in_edit.setText(QtWidgets.QApplication.translate("MainWindow", "0", None, -1))
@@ -273,6 +277,6 @@ class Ui_MainWindow(object):
         self.action_make_web_map.setText(QtWidgets.QApplication.translate("MainWindow", "Make &Web Map...", None, -1))
         self.action_file_gz_open.setText(QtWidgets.QApplication.translate("MainWindow", "Open GenZero File...", None, -1))
 
-from .vfsnodetablewidget import VfsNodeTableWidget
 from .vfsdirwidget import VfsDirWidget
 from .dataviewwidget import DataViewWidget
+from .vfsnodetablewidget import VfsNodeTableWidget

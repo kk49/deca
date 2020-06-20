@@ -44,8 +44,8 @@ def rtpc_export_node_recurse(
     if 0x98796658 in rtpc.prop_map:
         material_properties['color_mask_b'] = rtpc.prop_map[0x98796658].data
 
-    # if 0x26fa86fe in rtpc.prop_map:
-    #     skeleton_raw_path = rtpc.prop_map[0x26fa86fe].data
+    if 0x26fa86fe in rtpc.prop_map:
+        skeleton_raw_path = rtpc.prop_map[0x26fa86fe].data
 
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data
@@ -86,7 +86,8 @@ def node_export_rtpc_gltf(
         vnode: VfsNode,
         export_path,
         allow_overwrite=False,
-        save_to_one_dir=True
+        save_to_one_dir=True,
+        include_skeleton=False,
 ):
     vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
 
@@ -94,7 +95,9 @@ def node_export_rtpc_gltf(
     with vfs.file_obj_from(vnode) as f:
         rtpc.deserialize(f)
 
-    gltf = DecaGltf(vfs, export_path, vnode.v_path.decode('utf-8'), save_to_one_dir=save_to_one_dir)
+    gltf = DecaGltf(
+        vfs, export_path, vnode.v_path.decode('utf-8'),
+        save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton)
 
     with gltf.scene():
         with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path.decode('utf-8'))):

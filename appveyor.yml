@@ -8,6 +8,20 @@ build_script:
 
     SET PATH=C:\Python37-x64;C:\Python37-x64\Scripts;%path%
 
+
+    echo GET SUBMODULES
+
+    cd C:\prj\deca
+
+    echo git submodule init
+
+    git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
+
+    git submodule update --init --recursive --remote
+
+
+    echo SETUP PYTHON
+
     cd C:\prj
 
     c:\Python37-x64\python --version
@@ -26,23 +40,15 @@ build_script:
 
     pip install pyinstaller
 
-    cd C:\prj\deca
-
-
-    echo GET SUBMODULES
-
-    echo git submodule init
-
-    git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
-
-    git submodule update --init --recursive --remote
-
 
     echo BUILD IMAGE DLL
+
+    cd C:\prj\deca
 
     "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
 
     cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll
+
 
     echo BUILD HAVOK LIB
 
@@ -52,7 +58,14 @@ build_script:
 
     cd build
 
-    cmake ..
+    cmake ../
+
+    mkdir _bin2xml
+
+    cd _bin2xml
+
+    cmake  ../../_bin2xml/
+
 
     echo PACKAGE
 

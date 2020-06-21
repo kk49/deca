@@ -1,19 +1,20 @@
+from typing import Optional
 from deca.gui.vfs_widgets import used_color_calc
-from deca.db_core import VfsDatabase
 from deca.db_processor import VfsNode
-from deca.ff_adf import AdfDatabase
+from deca.db_view import VfsView
 from deca.ff_types import *
 import PySide2
-from PySide2.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide2.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QHeaderView, QSizePolicy, QTableView, QWidget, QHBoxLayout
 
 
 class VfsNodeTableModel(QAbstractTableModel):
+    vfs_changed_signal = Signal()
+
     def __init__(self, *args, **kwargs):
         QAbstractTableModel.__init__(self, *args, **kwargs)
-        self.vfs = None
-        self.adf_db = None
+        self.vfs_view: Optional[VfsView] = None
         self.show_all = True
         self.uid_table = None
 
@@ -24,42 +25,47 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.remap_hash = None
         self.column_ids = ["Index", "PIDX", "Type", "Sub Type", "Hash", "EXT_hash", "Size_U", "Size_C", "Path"]
 
-    def vfs_set(self, vfs: VfsDatabase):
+        self.vfs_changed_signal.connect(self.update_model)
+
+    def vfs_view_set(self, vfs_view: VfsView):
+        self.vfs_view = vfs_view
+        self.vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_signal.emit())
+        self.vfs_changed_signal.emit()
+
+    def update_model(self):
         self.beginResetModel()
-        self.vfs = vfs
-        self.adf_db = AdfDatabase(vfs)
 
         if self.show_all:
-            self.uid_table = self.vfs.nodes_where_match(uid_only=True)
+            self.uid_table = self.vfs_view.vfs().nodes_where_match(uid_only=True)
         else:
-            self.uid_table = self.vfs.nodes_where_unmapped_select_uid()
+            self.uid_table = self.vfs_view.vfs().nodes_where_unmapped_select_uid()
         self.uid_table.sort()
 
         self.endResetModel()
 
     def sort(self, column: int, order: PySide2.QtCore.Qt.SortOrder):
         # if self.remap_uid is None:
-        #     rm = list(range(len(self.vfs.table_vfsnode)))
+        #     rm = list(range(len(self.vfs_view.vfs().table_vfsnode)))
         #     self.remap_uid = rm
         #
         # if column == 0:  # IDX
         #     self.remap = self.remap_uid
         # elif column == 1:  # PIDX
         #     if self.remap_pid is None:
-        #         rm = list(range(len(self.vfs.table_vfsnode)))
-        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].pid)
+        #         rm = list(range(len(self.vfs_view.vfs().table_vfsnode)))
+        #         rm.sort(key=lambda v: self.vfs_view.vfs().table_vfsnode[v].pid)
         #         self.remap_pid = rm
         #     self.remap = self.remap_pid
         # elif column == 2:  # Type
         #     if self.remap_type is None:
-        #         rm = list(range(len(self.vfs.table_vfsnode)))
-        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].file_type)
+        #         rm = list(range(len(self.vfs_view.vfs().table_vfsnode)))
+        #         rm.sort(key=lambda v: self.vfs_view.vfs().table_vfsnode[v].file_type)
         #         self.remap_type = rm
         #     self.remap = self.remap_type
         # elif column == 3:  # Hash
         #     if self.remap_hash is None:
-        #         rm = list(range(len(self.vfs.table_vfsnode)))
-        #         rm.sort(key=lambda v: self.vfs.table_vfsnode[v].hashid)
+        #         rm = list(range(len(self.vfs_view.vfs().table_vfsnode)))
+        #         rm.sort(key=lambda v: self.vfs_view.vfs().table_vfsnode[v].hashid)
         #         self.remap_hash = rm
         #     self.remap = self.remap_hash
         # else:
@@ -99,7 +105,7 @@ class VfsNodeTableModel(QAbstractTableModel):
 
         if role == Qt.DisplayRole:
             uid = self.uid_table[row]
-            node: VfsNode = self.vfs.node_where_uid(uid)
+            node: VfsNode = self.vfs_view.vfs().node_where_uid(uid)
             if node is None:
                 return 'NA'
             else:
@@ -137,7 +143,7 @@ class VfsNodeTableModel(QAbstractTableModel):
 
         elif role == Qt.BackgroundRole:
             uid = self.uid_table[row]
-            node: VfsNode = self.vfs.node_where_uid(uid)
+            node: VfsNode = self.vfs_view.vfs().node_where_uid(uid)
             if node.is_valid():
                 if column == 8:
                     if node.used_at_runtime_depth is not None:
@@ -199,19 +205,19 @@ class VfsNodeTableWidget(QWidget):
     def show_all_set(self, v):
         self.model.show_all = v
 
-    def vfs_set(self, vfs):
-        self.model.vfs_set(vfs)
+    def vfs_view_set(self, vfs_view):
+        self.model.vfs_view_set(vfs_view)
 
     def clicked(self, index):
         if index.isValid():
             if self.vnode_selection_changed is not None:
                 items = list(set([self.model.uid_table[idx.row()] for idx in self.table_view.selectedIndexes()]))
-                items = [self.model.vfs.node_where_uid(i) for i in items]
+                items = [self.model.vfs_view.vfs().node_where_uid(i) for i in items]
                 self.vnode_selection_changed(items)
 
     def double_clicked(self, index):
         if index.isValid():
             if self.vnode_2click_selected is not None:
                 item = self.model.uid_table[index.row()]
-                item = self.model.vfs.node_where_uid(item)
+                item = self.model.vfs_view.vfs().node_where_uid(item)
                 self.vnode_2click_selected(item)

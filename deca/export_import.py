@@ -3,7 +3,8 @@ from .errors import *
 from .file import *
 from .ff_types import *
 from .ff_adf import AdfDatabase
-from .db_core import VfsDatabase, VfsNode, VfsSelection
+from .db_core import VfsDatabase, VfsNode
+from .db_view import VfsView
 from .ff_avtx import image_export
 from .ff_sarc import FileSarc
 from .util import make_dir_for_file
@@ -50,7 +51,7 @@ def extract_node_raw(
 
 def nodes_export_raw(
         vfs: VfsDatabase,
-        vfs_selection: VfsSelection,
+        vfs_selection: VfsView,
         extract_dir: str,
         allow_overwrite=False):
     node_map = vfs_selection.nodes_selected_get()
@@ -66,7 +67,7 @@ def nodes_export_raw(
 
 def nodes_export_contents(
         vfs: VfsDatabase,
-        vfs_selection: VfsSelection,
+        vfs_selection: VfsView,
         extract_dir: str,
         allow_overwrite=False):
     node_map = vfs_selection.nodes_selected_get()
@@ -101,7 +102,7 @@ def nodes_export_contents(
 
 def nodes_export_gltf(
         vfs: VfsDatabase,
-        vfs_selection: VfsSelection,
+        vfs_selection: VfsView,
         extract_dir: str,
         allow_overwrite=False,
         save_to_one_dir=True,
@@ -157,7 +158,7 @@ def nodes_export_gltf(
 
 def nodes_export_processed(
         vfs: VfsDatabase,
-        vfs_selection: VfsSelection,
+        vfs_selection: VfsView,
         extract_dir: str,
         allow_overwrite=False,
         save_to_processed=False,

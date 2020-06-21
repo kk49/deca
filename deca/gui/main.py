@@ -2,14 +2,15 @@ import sys
 import os
 from typing import Optional
 from deca.errors import *
-from deca.db_core import common_prefix, VfsSelection
 from deca.db_processor import VfsProcessor, vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
+from deca.db_view import VfsView
 from deca.builder import Builder
-from deca.util import Logger, to_unicode
+from deca.util import Logger
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
-from deca.ff_types import FTYPE_SARC
 from .main_window import Ui_MainWindow
+from .vfsdirwidget import VfsDirWidget
+from .vfsnodetablewidget import VfsNodeTableWidget
 from PySide2.QtCore import Slot, QUrl
 from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
 from PySide2.QtGui import QDesktopServices
@@ -30,7 +31,7 @@ class MainWindow(QMainWindow):
 
         self.builder = Builder()
         self.current_vnode = None
-        self.vfs_selection: Optional[VfsSelection] = None
+        self.vfs_selection: Optional[VfsView] = None
 
         # Configure Actions
         self.ui.action_project_new.triggered.connect(self.project_new)
@@ -42,20 +43,6 @@ class MainWindow(QMainWindow):
         # self.ui.action_external_manage.triggered.connect(self.external_manage)
         self.ui.action_exit.triggered.connect(self.exit_app)
         self.ui.action_make_web_map.triggered.connect(self.tool_make_web_map)
-
-        # Configure VFS Node table (all nodes)
-        self.ui.vfs_node_widget.show_all_set(True)
-        self.ui.vfs_node_widget.vnode_selection_changed = self.vnode_selection_changed
-        self.ui.vfs_node_widget.vnode_2click_selected = self.vnode_2click_selected
-
-        # Configure VFS Node table (non-mapped nodes)
-        self.ui.vfs_node_widget_non_mapped.show_all_set(False)
-        self.ui.vfs_node_widget_non_mapped.vnode_selection_changed = self.vnode_selection_changed
-        self.ui.vfs_node_widget_non_mapped.vnode_2click_selected = self.vnode_2click_selected
-
-        # Configure VFS dir table
-        self.ui.vfs_dir_widget.vnode_selection_changed = self.vnode_selection_changed
-        self.ui.vfs_dir_widget.vnode_2click_selected = self.vnode_2click_selected
 
         # filter
         self.ui.bt_archive_open.clicked.connect(self.archives_toggle)
@@ -100,19 +87,42 @@ class MainWindow(QMainWindow):
 
         self.ui.bt_mod_build.clicked.connect(self.slot_mod_build_clicked)
 
+    def tab_nodes_add(self, widget_class, name):
+        # self.tab_extract = QtWidgets.QWidget()
+        # self.tab_extract.setObjectName("tab_extract")
+        # self.gridLayout = QtWidgets.QGridLayout(self.tab_extract)
+        # self.gridLayout.setObjectName("gridLayout")
+        widget = widget_class(self.ui.tabs_nodes)
+        self.ui.tabs_nodes.addTab(widget, name)
+        widget.vnode_selection_changed = self.vnode_selection_changed
+        widget.vnode_2click_selected = self.vnode_2click_selected
+
+        return widget
+
     def vfs_set(self, vfs):
         self.vfs = vfs
-        self.vfs_selection = VfsSelection(vfs, None, b'^.*$')
-        self.setWindowTitle("{}: Archive: {}".format(window_title, vfs.game_info.game_dir))
-        self.ui.statusbar.showMessage("LOAD COMPLETE")
-        self.vfs_reload()
+        self.vfs_selection = VfsView(vfs, None, b'^.*$')
+
+        # Configure VFS dir table
+        widget = self.tab_nodes_add(VfsDirWidget, 'Directory')
+        widget.vfs_view_set(self.vfs_selection)
+
+        # Configure VFS Node table (non-mapped nodes)
+        widget = self.tab_nodes_add(VfsNodeTableWidget, 'Non-Mapped List')
+        widget.show_all_set(False)
+        widget.vfs_view_set(self.vfs_selection)
+
+        # Configure VFS Node table (all nodes)
+        widget = self.tab_nodes_add(VfsNodeTableWidget, 'Raw List')
+        widget.show_all_set(True)
+        widget.vfs_view_set(self.vfs_selection)
+
+        self.ui.data_view.vfs_view_set(self.vfs_selection)
+
         self.ui.action_external_add.setEnabled(True)
 
-    def vfs_reload(self):
-        self.ui.vfs_node_widget.vfs_set(self.vfs)
-        self.ui.vfs_node_widget_non_mapped.vfs_set(self.vfs)
-        self.ui.vfs_dir_widget.vfs_set(self.vfs)
-        self.ui.data_view.vfs_set(self.vfs)
+        self.setWindowTitle("{}: Archive: {}".format(window_title, vfs.game_info.game_dir))
+        self.ui.statusbar.showMessage("LOAD COMPLETE")
 
     def archives_update(self):
         if self.vfs_selection.archive_active_get():
@@ -126,7 +136,7 @@ class MainWindow(QMainWindow):
     def archives_toggle(self):
         self.vfs_selection.archive_active_set(not self.vfs_selection.archive_active_get())
         self.archives_update()
-        self.ui.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
+        self.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -284,7 +294,7 @@ class MainWindow(QMainWindow):
                 txt = txt + '$'
 
         self.vfs_selection.mask_set(txt.encode('ascii'))
-        self.ui.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
+        self.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
 
     def vhash_to_vpath_text_changed(self):
         txt_in = self.ui.vhash_to_vpath_in_edit.text()
@@ -334,13 +344,9 @@ class MainWindow(QMainWindow):
     def external_add(self, checked):
         filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open External File ...', '.', 'Any File (*)')
         if filenames:
-            any_loaded = False
             for filename in filenames:
                 if len(filename) > 0:
-                    any_loaded = True
                     self.vfs.external_file_add(filename)
-            if any_loaded:
-                self.vfs_reload()
         else:
             self.logger.log('Cannot Open {}'.format(filenames))
 
@@ -352,13 +358,9 @@ class MainWindow(QMainWindow):
             path, _ = os.path.split(filenames[0])
             vfs = vfs_structure_empty(path, 'GenerationZero')
             self.vfs_set(vfs)
-            any_loaded = False
             for filename in filenames:
                 if len(filename) > 0:
-                    any_loaded = True
                     self.vfs.external_file_add(filename)
-            if any_loaded:
-                self.vfs_reload()
         else:
             self.logger.log('Cannot Open {}'.format(filenames))
 

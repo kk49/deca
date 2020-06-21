@@ -4,7 +4,7 @@ import sqlite3
 import pickle
 import re
 import numpy as np
-from typing import List, TypeVar
+from typing import List
 
 import deca.util
 from deca.errors import *
@@ -12,7 +12,7 @@ from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_aaf import extract_aaf
 from deca.decompress import DecompressorOodleLZ
-from deca.util import make_dir_for_file, to_unicode
+from deca.util import make_dir_for_file, to_unicode, DecaSignal
 from deca.game_info import game_info_load
 from deca.hashes import hash32_func, hash48_func, hash64_func, hash_all_func
 from deca.ff_gtoc import GtocArchiveEntry, GtocFileEntry
@@ -45,13 +45,6 @@ def regexp(expr, item):
         item = item.encode('ascii')
     reg = re.compile(expr)
     return reg.search(item) is not None
-
-
-def common_prefix(s0, s1):
-    cnt = 0
-    while len(s0) > cnt and len(s1) > cnt and s0[cnt] == s1[cnt]:
-        cnt += 1
-    return s0[:cnt], s0[cnt:], s1[cnt:]
 
 
 def format_hash32(v_hash):
@@ -351,6 +344,8 @@ class VfsDatabase:
         self._lookup_translation_from_name = None
         self._lookup_note_from_file_path = None
 
+        self.db_changed_signal = DecaSignal()
+
         # setup data base
         self.db_filename = os.path.join(self.working_dir, 'db', 'core.db')
         make_dir_for_file(self.db_filename)
@@ -466,6 +461,8 @@ class VfsDatabase:
         self.db_execute_one('VACUUM;')
 
         self.db_conn.commit()
+
+        self.db_changed_signal.call()
 
         self.db_setup()
 
@@ -630,6 +627,8 @@ class VfsDatabase:
             'CREATE INDEX IF NOT EXISTS "core_gtoc_file_entry_index_asc" ON "core_gtoc_file_entry" ("def_index" ASC)')
 
         self.db_conn.commit()
+
+        self.db_changed_signal.call()
 
     def node_where_uid(self, uid):
         r1 = self.db_query_one(
@@ -926,6 +925,8 @@ class VfsDatabase:
         )
         self.db_conn.commit()
 
+        self.db_changed_signal.call()
+
     def nodes_add_many(self, nodes):
         db_nodes = [db_from_vfs_node(node) for node in nodes]
 
@@ -958,11 +959,14 @@ class VfsDatabase:
             )
             self.db_conn.commit()
 
+        self.db_changed_signal.call()
+
     def node_update_many(self, nodes: set):
         db_nodes = [db_from_vfs_node(node) for node in nodes]
         db_nodes = [db_node[1:] + db_node[0:1] for db_node in db_nodes]
         self.db_execute_many(core_nodes_update_all_where_node_id, db_nodes, dbg='node_update_many')
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
     def hash_string_add_many_basic(self, hash_list):
         # (string, h4, h6, h8, ext_hash32)
@@ -974,6 +978,7 @@ class VfsDatabase:
             dbg='hash_string_add_many_basic:0:insert'
         )
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
         hash_list_map = {}
         str_to_row_map = {}
@@ -1003,6 +1008,7 @@ class VfsDatabase:
             ref_list,
             dbg='hash_string_add_many:0:insert')
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
     def object_info_add_many(self, objects):
         # uid(ROWID), src_node_id, offset, class_str(_rowid), name_str(_rowid), object_id
@@ -1033,6 +1039,7 @@ class VfsDatabase:
             dbg='object_info_add_many:1:insert'
         )
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
         # lookup records to get obj_rowids
         obj_rowids = {}
@@ -1055,6 +1062,7 @@ class VfsDatabase:
             dbg='object_id_refs_add_many:0:insert'
         )
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
     def event_id_refs_add_many(self, refs, obj_rowids):
         # object_rowid((src_node_id,offset)), id, flags
@@ -1066,6 +1074,7 @@ class VfsDatabase:
             dbg='event_id_refs_add_many:0:insert'
         )
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
     def gtoc_archive_add_many(self, archives: List[GtocArchiveEntry]):
         # write gtoc archive definitions
@@ -1126,6 +1135,7 @@ class VfsDatabase:
             dbg='gtoc_archive_add_many:2:insert'
         )
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
     def gtoc_archive_where_hash32_magic(self, path_hash32=None, magic=None):
         params = []
@@ -1246,6 +1256,7 @@ class VfsDatabase:
         result = self.db_execute_many(
             "INSERT OR IGNORE INTO core_adf_types VALUES (?,?,?)", adf_list, dbg='adf_type_map_save')
         self.db_conn.commit()
+        self.db_changed_signal.call()
 
     def adf_type_map_load(self):
         result = self.db_query_all("SELECT * FROM core_adf_types", dbg='adf_type_map_load')
@@ -1399,229 +1410,6 @@ class VfsDatabase:
             return ''
 
         return self._lookup_note_from_file_path.get(path, '')
-
-
-NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
-
-
-class VfsSelection:
-    def __init__(self, vfs: VfsDatabase, paths, mask):
-        self.vfs = vfs
-        self.paths = paths
-        self.mask = mask
-        self.archive_active = False
-        self.archives = {}
-        self.archive_uids = set()
-        self.nodes_visible_dirty = True
-        self.nodes_visible = []
-        self.nodes_visible_uids = set()
-        self.nodes_selected_dirty = True
-        self.nodes_selected = []
-        self.nodes_selected_uids = set()
-
-    def archive_active_get(self):
-        return self.archive_active
-
-    def archive_active_set(self, v):
-        self.archive_active = v
-        self.archive_update()
-        self.nodes_visible_dirty = True
-
-    def archive_update(self):
-        if not self.archive_active:
-            self.vfs.logger.log('Archives begin')
-            self.archives = {}
-            self.archive_uids = set()
-            for path in self.paths:
-                if isinstance(path, VfsNode):
-                    nodes = [path]
-                else:
-                    nodes = self.vfs.nodes_where_match(v_path_like=path, file_type=FTYPE_SARC)
-                for node in nodes:
-                    self.archives[node.v_path] = node
-                    self.archive_uids.add(node.uid)
-            self.vfs.logger.log(f'Archives count: {len(self.archives)}')
-
-    def archive_count(self):
-        return len(self.archives)
-
-    def archive_summary_str(self):
-        len_a = len(self.archives)
-        if len_a == 0:
-            return ''
-        elif len_a == 1:
-            return to_unicode(list(self.archives.keys())[0])
-        else:
-            return f'{len_a} Archives'
-
-    def mask_set(self, mask):
-        self.nodes_visible_dirty = True
-        self.mask = mask
-
-    def paths_count(self):
-        if self.paths is None:
-            return 0
-        else:
-            return len(self.paths)
-
-    def paths_set(self, paths):
-        self.nodes_selected_dirty = True
-        self.paths = paths
-        self.archive_update()
-
-    def paths_summary_str(self):
-        if self.paths_count() == 0:
-            return ''
-        elif self.paths_count() == 1:
-            return to_unicode(self.paths[0])
-        else:
-            return '**MULTIPLE**'
-
-    def common_prefix(self):
-        path = self.paths[0]
-        for p in self.paths:
-            path, _, _ = common_prefix(path, p)
-
-        return path
-
-    def node_accumulate(self, nodes_visible, nodes_visible_uids, mask=None, pid_in=None, id_pat=None):
-        if isinstance(id_pat, VfsNode):
-            nodes_all = [id_pat]
-        else:
-            nodes_all = self.vfs.nodes_where_match(v_path_like=id_pat, v_path_regexp=mask, pid_in=pid_in)
-
-        for node in nodes_all:
-            nodes_visible_uids.add(node.uid)
-
-            if node.v_path is None:
-                vp = f'uid_{node.uid}'.encode('ascii')
-            else:
-                vp = node.v_path
-
-            lst0 = nodes_visible.get(vp, None)
-
-            if lst0 is None:
-                lst = [[], []]
-            else:
-                lst = lst0
-
-            if node.file_type != FTYPE_SYMLINK and node.offset is not None:
-                lst[0].append(node)
-            else:
-                lst[1].append(node)
-
-            if lst0 is None:
-                nodes_visible[vp] = lst
-
-    def node_update(self):
-        if self.nodes_visible_dirty:
-            pid_in = self.archive_uids
-            if not self.archive_active:
-                pid_in = set()
-
-            # visible nodes
-            self.nodes_visible = {}
-            self.nodes_visible_uids = set()
-
-            self.node_accumulate(self.nodes_visible, self.nodes_visible_uids, mask=self.mask, pid_in=pid_in)
-
-            self.nodes_visible_dirty = False
-            self.nodes_selected_dirty = True
-
-        if self.nodes_selected_dirty:
-            pid_in = self.archive_uids
-            if not self.archive_active:
-                pid_in = set()
-
-            # selected nodes
-            self.nodes_selected = {}
-            self.nodes_selected_uids = set()
-
-            if self.paths is not None:
-                for v in self.paths:
-                    id_pat = v
-
-                    if isinstance(id_pat, str):
-                        id_pat = v.encode('ascii')
-
-                    self.node_accumulate(self.nodes_selected, self.nodes_selected_uids, mask=self.mask, pid_in=pid_in, id_pat=id_pat)
-
-            self.nodes_selected_dirty = False
-
-    def node_visible_count(self):
-        self.node_update()
-        return len(self.nodes_visible)
-
-    def nodes_visible_get(self):
-        self.node_update()
-        return self.nodes_visible
-
-    def node_visible_has(self, uids):
-        self.node_update()
-        for uid in uids:
-            if uid in self.nodes_visible_uids:
-                return True
-        return False
-
-    def node_selected_count(self):
-        self.node_update()
-        return len(self.nodes_selected)
-
-    def nodes_selected_get(self):
-        self.node_update()
-        return self.nodes_selected
-
-    def node_selected_has(self, uids):
-        self.node_update()
-        for uid in uids:
-            if uid in self.nodes_selected_uids:
-                return True
-        return False
-
-    # def expand_vfs_paths(self):
-    #     vos = []
-    #
-    #     for v in self.paths:
-    #         id_pat = v
-    #
-    #         if isinstance(id_pat, str):
-    #             id_pat = v.encode('ascii')
-    #
-    #         if isinstance(id_pat, bytes):
-    #             nodes_all = self.vfs.nodes_where_match(v_path_like=id_pat, v_path_regexp=self.mask)
-    #             nodes = []
-    #             for node in nodes_all:
-    #                 if node.file_type != FTYPE_SYMLINK and node.offset is not None:
-    #                     nodes.append(node)
-    #             nodes = dict([(n.v_path, n) for n in nodes])
-    #             nodes = list(nodes.values())
-    #             vos += nodes
-    #         else:
-    #             vos.append(v)
-    #
-    #     return vos
-
-    # def find_vfs_node(self, v):
-    #     node = None
-    #     path = None
-    #     if isinstance(v, bytes):
-    #         path = v
-    #     elif isinstance(v, VfsNode):
-    #         node = v
-    #     else:
-    #         raise NotImplementedError('find_vfs_node: Could not extract {}'.format(v))
-    #
-    #     if path is not None:
-    #         matching_nodes = self.vfs.nodes_where_match(v_path=path)
-    #         node = None
-    #         for matching_node in matching_nodes:
-    #             if matching_node.offset is not None:
-    #                 node = matching_node
-    #                 break
-    #         if node is None:
-    #             raise EDecaFileMissing('find_vfs_node: Missing {}'.format(path.decode('utf-8')))
-    #
-    #     return node
 
 '''
 --vfs-fs dropzone --vfs-archive patch_win64 --vfs-archive archives_win64 --vfs-fs .

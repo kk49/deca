@@ -3,7 +3,7 @@
 # Form implementation generated from reading ui file 'main_window.ui',
 # licensing of 'main_window.ui' applies.
 #
-# Created: Sat Jun 20 12:24:47 2020
+# Created: Sat Jun 20 21:38:43 2020
 #      by: pyside2-uic  running on PySide2 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
@@ -32,36 +32,6 @@ class Ui_MainWindow(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.tabs_nodes = QtWidgets.QTabWidget(self.layoutWidget)
         self.tabs_nodes.setObjectName("tabs_nodes")
-        self.tab_directory = QtWidgets.QWidget()
-        self.tab_directory.setObjectName("tab_directory")
-        self.horizontalLayout = QtWidgets.QHBoxLayout(self.tab_directory)
-        self.horizontalLayout.setSpacing(0)
-        self.horizontalLayout.setContentsMargins(6, 6, 6, 6)
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.vfs_dir_widget = VfsDirWidget(self.tab_directory)
-        self.vfs_dir_widget.setObjectName("vfs_dir_widget")
-        self.horizontalLayout.addWidget(self.vfs_dir_widget)
-        self.tabs_nodes.addTab(self.tab_directory, "")
-        self.tab_non_mapped_list = QtWidgets.QWidget()
-        self.tab_non_mapped_list.setObjectName("tab_non_mapped_list")
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.tab_non_mapped_list)
-        self.horizontalLayout_2.setSpacing(6)
-        self.horizontalLayout_2.setContentsMargins(6, 6, 6, 6)
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.vfs_node_widget_non_mapped = VfsNodeTableWidget(self.tab_non_mapped_list)
-        self.vfs_node_widget_non_mapped.setObjectName("vfs_node_widget_non_mapped")
-        self.horizontalLayout_2.addWidget(self.vfs_node_widget_non_mapped)
-        self.tabs_nodes.addTab(self.tab_non_mapped_list, "")
-        self.tab_raw_list = QtWidgets.QWidget()
-        self.tab_raw_list.setObjectName("tab_raw_list")
-        self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.tab_raw_list)
-        self.horizontalLayout_3.setSpacing(0)
-        self.horizontalLayout_3.setContentsMargins(6, 6, 6, 6)
-        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
-        self.vfs_node_widget = VfsNodeTableWidget(self.tab_raw_list)
-        self.vfs_node_widget.setObjectName("vfs_node_widget")
-        self.horizontalLayout_3.addWidget(self.vfs_node_widget)
-        self.tabs_nodes.addTab(self.tab_raw_list, "")
         self.verticalLayout.addWidget(self.tabs_nodes)
         self.horizontalLayout_6 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_6.setContentsMargins(-1, 0, 0, -1)
@@ -235,15 +205,12 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menu_Tools.menuAction())
 
         self.retranslateUi(MainWindow)
-        self.tabs_nodes.setCurrentIndex(0)
+        self.tabs_nodes.setCurrentIndex(-1)
         self.tabs_control.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QtWidgets.QApplication.translate("MainWindow", "MainWindow", None, -1))
-        self.tabs_nodes.setTabText(self.tabs_nodes.indexOf(self.tab_directory), QtWidgets.QApplication.translate("MainWindow", "Directory", None, -1))
-        self.tabs_nodes.setTabText(self.tabs_nodes.indexOf(self.tab_non_mapped_list), QtWidgets.QApplication.translate("MainWindow", "Non-Mapped List", None, -1))
-        self.tabs_nodes.setTabText(self.tabs_nodes.indexOf(self.tab_raw_list), QtWidgets.QApplication.translate("MainWindow", "Raw List", None, -1))
         self.bt_archive_open.setText(QtWidgets.QApplication.translate("MainWindow", "Open Archive", None, -1))
         self.filter_label.setText(QtWidgets.QApplication.translate("MainWindow", "Filter (Python Expression Syntax)", None, -1))
         self.filter_edit.setText(QtWidgets.QApplication.translate("MainWindow", ".*", None, -1))
@@ -277,6 +244,4 @@ class Ui_MainWindow(object):
         self.action_make_web_map.setText(QtWidgets.QApplication.translate("MainWindow", "Make &Web Map...", None, -1))
         self.action_file_gz_open.setText(QtWidgets.QApplication.translate("MainWindow", "Open GenZero File...", None, -1))
 
-from .vfsdirwidget import VfsDirWidget
 from .dataviewwidget import DataViewWidget
-from .vfsnodetablewidget import VfsNodeTableWidget

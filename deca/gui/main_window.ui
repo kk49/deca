@@ -43,83 +43,8 @@
         <item>
          <widget class="QTabWidget" name="tabs_nodes">
           <property name="currentIndex">
-           <number>0</number>
+           <number>-1</number>
           </property>
-          <widget class="QWidget" name="tab_directory">
-           <attribute name="title">
-            <string>Directory</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout">
-            <property name="spacing">
-             <number>0</number>
-            </property>
-            <property name="leftMargin">
-             <number>6</number>
-            </property>
-            <property name="topMargin">
-             <number>6</number>
-            </property>
-            <property name="rightMargin">
-             <number>6</number>
-            </property>
-            <property name="bottomMargin">
-             <number>6</number>
-            </property>
-            <item>
-             <widget class="VfsDirWidget" name="vfs_dir_widget" native="true"/>
-            </item>
-           </layout>
-          </widget>
-          <widget class="QWidget" name="tab_non_mapped_list">
-           <attribute name="title">
-            <string>Non-Mapped List</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_2">
-            <property name="spacing">
-             <number>6</number>
-            </property>
-            <property name="leftMargin">
-             <number>6</number>
-            </property>
-            <property name="topMargin">
-             <number>6</number>
-            </property>
-            <property name="rightMargin">
-             <number>6</number>
-            </property>
-            <property name="bottomMargin">
-             <number>6</number>
-            </property>
-            <item>
-             <widget class="VfsNodeTableWidget" name="vfs_node_widget_non_mapped" native="true"/>
-            </item>
-           </layout>
-          </widget>
-          <widget class="QWidget" name="tab_raw_list">
-           <attribute name="title">
-            <string>Raw List</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_3">
-            <property name="spacing">
-             <number>0</number>
-            </property>
-            <property name="leftMargin">
-             <number>6</number>
-            </property>
-            <property name="topMargin">
-             <number>6</number>
-            </property>
-            <property name="rightMargin">
-             <number>6</number>
-            </property>
-            <property name="bottomMargin">
-             <number>6</number>
-            </property>
-            <item>
-             <widget class="VfsNodeTableWidget" name="vfs_node_widget" native="true"/>
-            </item>
-           </layout>
-          </widget>
          </widget>
         </item>
         <item>
@@ -516,18 +441,6 @@
   </action>
  </widget>
  <customwidgets>
-  <customwidget>
-   <class>VfsNodeTableWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">.vfsnodetablewidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>VfsDirWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">.vfsdirwidget.h</header>
-   <container>1</container>
-  </customwidget>
   <customwidget>
    <class>DataViewWidget</class>
    <extends>QWidget</extends>

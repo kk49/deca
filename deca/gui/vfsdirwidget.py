@@ -1,13 +1,11 @@
-import re
 from collections import defaultdict
 from typing import Optional
 from deca.gui.vfs_widgets import used_color_calc
-from deca.db_core import VfsDatabase, VfsSelection
+from deca.db_view import VfsView
 from deca.db_processor import VfsNode
-from deca.ff_adf import AdfDatabase
 from deca.ff_types import *
 from deca.dxgi_types import dxgi_name_db
-from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QSortFilterProxyModel
+from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QSortFilterProxyModel, Signal
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QHeaderView, QSizePolicy, QWidget, QHBoxLayout, QTreeView, QAbstractItemView
 
@@ -61,26 +59,32 @@ class VfsDirBranch(object):
 
 
 class VfsDirModel(QAbstractItemModel):
+    vfs_changed_signal = Signal()
+
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self.vfs: Optional[VfsDatabase] = None
-        self.adf_db = None
+        self.vfs_view: Optional[VfsView] = None
         self.root_node = None
         self.n_rows = 0
         self.n_cols = 0
 
-    def vfs_set(self, vfs: VfsDatabase):
+        self.vfs_changed_signal.connect(self.update_model)
+
+    def vfs_view_set(self, vfs_view: VfsView):
+        self.vfs_view = vfs_view
+        self.vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_signal.emit())
+        self.vfs_changed_signal.emit()
+
+    def update_model(self):
         self.beginResetModel()
-        self.vfs = vfs
-        self.adf_db = AdfDatabase(vfs)
 
         vpaths = defaultdict(list)
-        tmp = self.vfs.nodes_select_vpath_uid_where_vpath_not_null_type_check_symlink(is_symlink=False)
+        tmp = self.vfs_view.vfs().nodes_select_vpath_uid_where_vpath_not_null_type_check_symlink(is_symlink=False)
         tmp.sort()
         for k, v in tmp:
             vpaths[k].append(v)
 
-        tmp = self.vfs.nodes_select_vpath_uid_where_vpath_not_null_type_check_symlink(is_symlink=True)
+        tmp = self.vfs_view.vfs().nodes_select_vpath_uid_where_vpath_not_null_type_check_symlink(is_symlink=True)
         tmp.sort()
         for k, v in tmp:
             vpaths[k].append(v)
@@ -152,7 +156,7 @@ class VfsDirModel(QAbstractItemModel):
                 return node.name
             elif isinstance(node, VfsDirLeaf):
                 uid = node.uids[0]
-                vnode: VfsNode = self.vfs.node_where_uid(uid)
+                vnode: VfsNode = self.vfs_view.vfs().node_where_uid(uid)
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
@@ -181,11 +185,11 @@ class VfsDirModel(QAbstractItemModel):
                 elif column == 8:
                     return '{}'.format(vnode.used_at_runtime_depth)
                 elif column == 9:
-                    return '{}'.format(self.vfs.lookup_note_from_file_path(vnode.v_path))
+                    return '{}'.format(self.vfs_view.vfs().lookup_note_from_file_path(vnode.v_path))
         elif role == Qt.BackgroundColorRole:
             if isinstance(node, VfsDirLeaf):
                 uid = node.uids[0]
-                vnode: VfsNode = self.vfs.node_where_uid(uid)
+                vnode: VfsNode = self.vfs_view.vfs().node_where_uid(uid)
                 if column == 8:
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
@@ -200,7 +204,7 @@ class VfsDirModel(QAbstractItemModel):
 class DecaSortFilterProxyModel(QSortFilterProxyModel):
     def __init__(self, *args, **kwargs):
         QSortFilterProxyModel.__init__(self, *args, **kwargs)
-        self.vfs_selection: Optional[VfsSelection] = None
+        self.vfs_selection: Optional[VfsView] = None
         self.vis_map = {}
 
     def check_node(self, index):
@@ -275,8 +279,8 @@ class VfsDirWidget(QWidget):
 
         self.filter_vfspath_set(None)
 
-    def vfs_set(self, vfs):
-        self.source_model.vfs_set(vfs)
+    def vfs_view_set(self, vfs_view):
+        self.source_model.vfs_view_set(vfs_view)
         self.proxy_model.setSourceModel(self.source_model)
 
     def clicked(self, index):
@@ -294,7 +298,7 @@ class VfsDirWidget(QWidget):
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
                 uid = tnode.uids[0]
-                item = self.source_model.vfs.node_where_uid(uid)
+                item = self.source_model.vfs_view.vfs().node_where_uid(uid)
                 self.vnode_2click_selected(item)
 
     def filter_vfspath_set(self, selection):

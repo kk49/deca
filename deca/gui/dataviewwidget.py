@@ -1,7 +1,7 @@
-from deca.db_core import VfsSelection
-from deca.db_processor import vfs_structure_new, vfs_structure_open, VfsNode
+from typing import Optional
+from deca.db_processor import VfsNode
+from deca.db_view import VfsView
 from deca.ff_types import *
-from deca.ff_adf import AdfDatabase
 from deca.gui.viewer_adf import DataViewerAdf
 from deca.gui.viewer_rtpc import DataViewerRtpc
 from deca.gui.viewer_image import DataViewerImage
@@ -16,8 +16,7 @@ from PySide2.QtWidgets import QSizePolicy, QWidget, QVBoxLayout, QTabWidget
 class DataViewWidget(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
-        self.vfs = None
-        self.adf_db = None
+        self.vfs_view: Optional[VfsView] = None
 
         self.tab_info = DataViewerInfo()
         self.tab_raw = DataViewerRaw()
@@ -46,22 +45,20 @@ class DataViewWidget(QWidget):
         self.main_layout.addWidget(self.tab_widget)
         self.setLayout(self.main_layout)
 
-    def vfs_set(self, vfs):
-        self.vfs = vfs
-        self.adf_db = AdfDatabase()
-        self.adf_db.load_from_database(self.vfs)
+    def vfs_view_set(self, vfs_view):
+        self.vfs_view = vfs_view
 
-    def vnode_selection_changed(self, vfs_selection: VfsSelection):
+    def vnode_selection_changed(self, vfs_selection: VfsView):
         print('DataViewWidget:vnode_selection_changed: {}'.format(vfs_selection))
 
     def vnode_2click_selected(self, vnode: VfsNode):
         print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))
 
         self.tab_widget.setTabEnabled(self.tab_info_index, True)
-        self.tab_info.vnode_process(self.vfs, vnode)
+        self.tab_info.vnode_process(self.vfs_view.vfs(), vnode)
 
         self.tab_widget.setTabEnabled(self.tab_raw_index, True)
-        self.tab_raw.vnode_process(self.vfs, vnode)
+        self.tab_raw.vnode_process(self.vfs_view.vfs(), vnode)
 
         self.tab_widget.setTabEnabled(self.tab_text_index, False)
         self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
@@ -72,27 +69,27 @@ class DataViewWidget(QWidget):
 
         if vnode.file_type in {FTYPE_TXT}:
             self.tab_widget.setTabEnabled(self.tab_text_index, True)
-            self.tab_text.vnode_process(self.vfs, vnode)
+            self.tab_text.vnode_process(self.vfs_view.vfs(), vnode)
             self.tab_widget.setCurrentIndex(self.tab_text_index)
         elif vnode.file_type in {FTYPE_SARC}:
             self.tab_widget.setTabEnabled(self.tab_sarc_index, True)
-            self.tab_sarc.vnode_process(self.vfs, vnode)
+            self.tab_sarc.vnode_process(self.vfs_view.vfs(), vnode)
             self.tab_widget.setCurrentIndex(self.tab_sarc_index)
         elif vnode.file_type in {FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC, FTYPE_DDS, FTYPE_BMP}:
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
-            self.tab_image.vnode_process(self.vfs, vnode)
+            self.tab_image.vnode_process(self.vfs_view.vfs(), vnode)
             self.tab_widget.setCurrentIndex(self.tab_image_index)
         elif vnode.file_type in {FTYPE_ADF, FTYPE_ADF_BARE, FTYPE_ADF0}:
             self.tab_widget.setTabEnabled(self.tab_adf_index, True)
-            self.tab_adf.vnode_process(self.vfs, vnode)
+            self.tab_adf.vnode_process(self.vfs_view.vfs(), vnode)
             self.tab_widget.setCurrentIndex(self.tab_adf_index)
         elif vnode.file_type in {FTYPE_RTPC}:
             self.tab_widget.setTabEnabled(self.tab_rtpc_index, True)
-            self.tab_rtpc.vnode_process(self.vfs, vnode)
+            self.tab_rtpc.vnode_process(self.vfs_view.vfs(), vnode)
             self.tab_widget.setCurrentIndex(self.tab_rtpc_index)
         elif vnode.file_type in {FTYPE_OBC}:
             self.tab_widget.setTabEnabled(self.tab_obc_index, True)
-            self.tab_obc.vnode_process(self.vfs, vnode)
+            self.tab_obc.vnode_process(self.vfs_view.vfs(), vnode)
             self.tab_widget.setCurrentIndex(self.tab_obc_index)
         else:
             self.tab_widget.setCurrentIndex(self.tab_raw_index)

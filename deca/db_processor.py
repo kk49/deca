@@ -3,8 +3,6 @@ import re
 import csv
 import time
 
-import deca.ff_rtpc
-
 from .db_core import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
 from .db_types import *
 from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
@@ -14,7 +12,6 @@ from .ff_types import *
 from .ff_adf import AdfDatabase
 from .util import Logger, make_dir_for_file
 from .digest import process_translation_adf
-from .hashes import hash32_func
 
 
 def vfs_structure_new(filename):

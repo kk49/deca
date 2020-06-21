@@ -692,16 +692,21 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
     with ArchiveFile(open(ifile, 'rb')) as f:
         ddsc_in.load_dds(f, save_raw_data=True)
 
+    sz_old = (ddsc.header.dds_header.dwWidth, ddsc.header.dds_header.dwHeight),
+    sz_new = (ddsc_in.header.dds_header.dwWidth, ddsc_in.header.dds_header.dwHeight),
+
     compiled_files = []
     if ddsc is None:
         raise EDecaBuildError('Missing vpath: {}'.format(node.v_path))
     elif ddsc_in is None:
         raise EDecaBuildError('Could not load: {}'.format(ifile))
-    # elif ddsc.header.dds_header_dxt10.dxgiFormat != ddsc_in.header.dds_header_dxt10.dxgiFormat:
-    #     raise EDecaBuildError('dxgiFormat do not match for ({}, {}) and ({}, {})'.format(
-    #         node.v_path, ddsc.header.dds_header_dxt10.dxgiFormat,
-    #         ifile, ddsc_in.header.dds_header_dxt10.dxgiFormat,
-    #     ))
+    elif ddsc.header.dds_header_dxt10.dxgiFormat != ddsc_in.header.dds_header_dxt10.dxgiFormat:
+        raise EDecaBuildError('dxgiFormat do not match for ({}, {}) and ({}, {})'.format(
+            node.v_path, ddsc.header.dds_header_dxt10.dxgiFormat,
+            ifile, ddsc_in.header.dds_header_dxt10.dxgiFormat,
+        ))
+    elif sz_old != sz_new:
+        raise EDecaBuildError('Size do not match for ({}, {}) and ({}, {})'.format(node.v_path, sz_old, ifile, sz_new))
     else:
         out_vpaths = [mip.filename for mip in ddsc.mips]
         out_vpaths = set(out_vpaths)
@@ -713,12 +718,9 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
 
             with ArchiveFile(open(fout_name, 'wb')) as file_out:
                 if vpath_out.endswith(b'.ddsc'):
-                    # OLD
-                    # file_out.write(ddsc.header_buffer)
-                    # NEW BEGIN
                     ddsc.header.dds_header_dxt10.dxgiFormat = ddsc_in.header.dds_header_dxt10.dxgiFormat
                     ddsc_header_ddsc_write(ddsc, file_out)
-                    # NEW END
+
                     # DDSC files have high to low resolution
                     for mip_index in range(0, len(ddsc_in.mips_avtx)):
                         mip = ddsc.mips_avtx[mip_index]

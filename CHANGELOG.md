@@ -1,19 +1,20 @@
 #### v0.2.10 ???
-* GLTF2: Added option to export skeletons with models
+* GLTF2: Added option to export skeletons with models (Using [HavokLib!](https://github.com/PredatorCZ/HavokLib))
 * Added ability to sub select all files to subset of 1 or more SARC file contents
 * Load large files 1MB at a time during file determination this was a problem for some people on windows
 * Added script and support to process CAnimSpline objects
-* Added dxgi type 41 support, JC4 s failed to load because this was missing
+* Textures: dxgi type 41 support, JC4 s failed to load because this was missing
 * Added Loading of multiple external files at once to Load External File
-* Added building ddsc, atx?, hmddsc? directly into archive files, this can be used to package dds files renamed as ddsc!!!
-* Added more mapping of texture types to their base type
-* Added text name for texture types
-* Fixed processing of non square textures
+* Build: Added building ddsc, atx?, hmddsc? directly into archive files, this can be used to package dds files renamed as ddsc!!!
+* Textures: Added more mapping of texture types to their base type
+* Textures: Added text name for texture types
+* Textures: Fixed processing of non square textures
+* Textures: Reinstated requirement that DDS to DDSC conversion requires matching DXGI type and size
 * Added info about DirectXTex, not currently used
 * Fixed issue with uint32* parameter in some ADF files, causing a crash because it attempts to do a hash string lookup
-* Added folder button next to each extract button and build button to open folder in OS 
+* GUI: Added folder button next to each extract button and build button to open folder in OS 
 * Added file node trace for exception causes nodes/files
-* Fixed hash to string search function in gui
+* GUI: Fixed hash to string search function in gui
 
 #### v0.2.9 The May Day edition
 * Added ability to do basic dump of APEX engine files (like a save file) without processing entire game

@@ -8,7 +8,9 @@ A hacked up tool for exploring/extracting/modding files from Avalanche Studios A
 mainly Generation Zero.
 
 Written in Python, tested only on Linux, code is a mess, because this is an experiment...
-
+## External Dependecies
+* A modified version of [HavokLib](https://github.com/PredatorCZ/HavokLib) (Modified version here https://github.com/kk49/HavokLib)
+ 
 ## Key Features
 * Export (modelc, meshc, hrmeshc) to GLTF 2.0 (material models not complete/missing, no bones)
 * Export ADF encoded spreadsheets

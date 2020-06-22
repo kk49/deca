@@ -1,3 +1,4 @@
+import re
 from typing import TypeVar, Optional
 
 from .util import DecaSignal, to_unicode, common_prefix
@@ -11,7 +12,7 @@ NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 class VfsView:
     def __init__(self, *params):
         self._vfs: Optional[VfsDatabase] = None
-        self._adf_database: Optional[AdfDatabase] = None
+        self._adf_db: Optional[AdfDatabase] = None
         self._vfs_view: Optional[VfsView] = None
         self.paths = None
         self.mask = None
@@ -21,9 +22,11 @@ class VfsView:
         self.nodes_visible_dirty = True
         self.nodes_visible = []
         self.nodes_visible_uids = set()
+        self.nodes_visible_uids_no_vpaths = set()
         self.nodes_selected_dirty = True
         self.nodes_selected = []
         self.nodes_selected_uids = set()
+        self.nodes_selected_uids_no_vpaths = set()
 
         self.vfs_changed = True
         self.vfs_changed_signal = DecaSignal()
@@ -33,7 +36,7 @@ class VfsView:
             assert isinstance(vfs_view, VfsView)
             self._vfs_view = vfs_view
             self._vfs = vfs_view._vfs
-            self._adf_database = vfs_view._adf_database
+            self._adf_db = vfs_view._adf_db
             self.paths = vfs_view.paths
             self.mask = vfs_view.mask
             vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_callback())
@@ -42,7 +45,7 @@ class VfsView:
             assert isinstance(vfs, VfsDatabase)
             self._vfs_view = None
             self._vfs = vfs
-            self._adf_database = AdfDatabase(vfs)
+            self._adf_db = AdfDatabase(vfs)
             self.paths = params[1]
             self.mask = params[2]
             vfs.db_changed_signal.connect(self, lambda x: x.vfs_changed_callback())
@@ -55,8 +58,8 @@ class VfsView:
     def vfs(self):
         return self._vfs
 
-    def adf_database(self):
-        return self._adf_database
+    def adf_db(self):
+        return self._adf_db
 
     def vfs_changed_callback(self):
         self.vfs_changed = True
@@ -128,37 +131,51 @@ class VfsView:
 
         return path
 
-    def node_accumulate(self, nodes_visible, nodes_visible_uids, mask=None, pid_in=None, id_pat=None):
+    def node_accumulate(self, nodes_map, nodes_uids, nodes_uids_no_vpath, mask=None, pid_in=None, id_pat=None):
         if isinstance(id_pat, VfsNode):
-            nodes_all = [id_pat]
+            nodes_all = [(id_pat.uid, id_pat.v_path, id_pat.file_type, id_pat.offset)]
         else:
-            nodes_all = self.vfs().nodes_where_match(v_path_like=id_pat, v_path_regexp=mask, pid_in=pid_in)
+            nodes_all = self.vfs().nodes_where_match(
+                v_path_like=id_pat,
+                pid_in=pid_in,
+                output='node_id, v_path, file_type, parent_offset',
+            )
 
-        for node in nodes_all:
-            nodes_visible_uids.add(node.uid)
+        for uid, v_path, file_type, parent_offset in nodes_all:
+            nodes_uids.add(uid)
 
-            if node.v_path is None:
-                vp = f'uid_{node.uid}'.encode('ascii')
+            if v_path is None:
+                nodes_uids_no_vpath.add(uid)
             else:
-                vp = node.v_path
+                lst0 = nodes_map.get(v_path, None)
 
-            lst0 = nodes_visible.get(vp, None)
+                if lst0 is None:
+                    lst = [[], []]
+                else:
+                    lst = lst0
 
-            if lst0 is None:
-                lst = [[], []]
-            else:
-                lst = lst0
+                if file_type != FTYPE_SYMLINK and parent_offset is not None:
+                    lst[0].append(uid)
+                else:
+                    lst[1].append(uid)
 
-            if node.file_type != FTYPE_SYMLINK and node.offset is not None:
-                lst[0].append(node)
-            else:
-                lst[1].append(node)
+                if lst0 is None:
+                    nodes_map[v_path] = lst
 
-            if lst0 is None:
-                nodes_visible[vp] = lst
+        mask_expr = re.compile(to_unicode(mask))
+        to_erase = [vp for vp in nodes_map.keys() if mask_expr.match(vp) is None]
+        for vp in to_erase:
+            nodes_map.pop(vp)
 
     def node_update(self):
+        if self.vfs_changed:
+            self._adf_db.load_from_database(self._vfs)
+            self.vfs_changed = False
+            self.nodes_visible_dirty = True
+            self.nodes_selected_dirty = True
+
         if self.nodes_visible_dirty:
+            self.vfs().logger.log(f'Nodes Visible Begin')
             pid_in = self.archive_uids
             if not self.archive_active:
                 pid_in = set()
@@ -166,13 +183,18 @@ class VfsView:
             # visible nodes
             self.nodes_visible = {}
             self.nodes_visible_uids = set()
+            self.nodes_visible_uids_no_vpaths = set()
 
-            self.node_accumulate(self.nodes_visible, self.nodes_visible_uids, mask=self.mask, pid_in=pid_in)
+            self.node_accumulate(
+                self.nodes_visible, self.nodes_visible_uids, self.nodes_visible_uids_no_vpaths,
+                mask=self.mask, pid_in=pid_in)
 
             self.nodes_visible_dirty = False
             self.nodes_selected_dirty = True
+            self.vfs().logger.log(f'Nodes Visible End')
 
         if self.nodes_selected_dirty:
+            self.vfs().logger.log(f'Nodes Selected Begin')
             pid_in = self.archive_uids
             if not self.archive_active:
                 pid_in = set()
@@ -180,6 +202,7 @@ class VfsView:
             # selected nodes
             self.nodes_selected = {}
             self.nodes_selected_uids = set()
+            self.nodes_selected_uids_no_vpaths = set()
 
             if self.paths is not None:
                 for v in self.paths:
@@ -189,17 +212,27 @@ class VfsView:
                         id_pat = v.encode('ascii')
 
                     self.node_accumulate(
-                        self.nodes_selected, self.nodes_selected_uids, mask=self.mask, pid_in=pid_in, id_pat=id_pat)
+                        self.nodes_selected, self.nodes_selected_uids, self.nodes_selected_uids_no_vpaths,
+                        mask=self.mask, pid_in=pid_in, id_pat=id_pat)
 
             self.nodes_selected_dirty = False
+            self.vfs().logger.log(f'Nodes Selected End')
 
     def node_visible_count(self):
         self.node_update()
         return len(self.nodes_visible)
 
-    def nodes_visible_get(self):
+    def nodes_visible_map_get(self):
         self.node_update()
         return self.nodes_visible
+
+    def nodes_visible_uids_get(self):
+        self.node_update()
+        return self.nodes_visible_uids
+
+    def nodes_visible_uids_no_vpath_get(self):
+        self.node_update()
+        return self.nodes_visible_uids_no_vpaths
 
     def node_visible_has(self, uids):
         self.node_update()
@@ -222,6 +255,12 @@ class VfsView:
             if uid in self.nodes_selected_uids:
                 return True
         return False
+
+    def node_where_uid(self, uid):
+        return self.vfs().node_where_uid(uid)
+
+    def lookup_note_from_file_path(self, path):
+        return self.vfs().lookup_note_from_file_path(path)
 
     # def expand_vfs_paths(self):
     #     vos = []

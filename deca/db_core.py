@@ -6,7 +6,7 @@ import re
 import numpy as np
 from typing import List
 
-import deca.util
+from deca.util import common_prefix
 from deca.errors import *
 from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
@@ -656,7 +656,8 @@ class VfsDatabase:
             v_path_regexp=None,
             file_type=None,
             pid_in=None,
-            uid_only=False):
+            uid_only=False,
+            output=None):
         params = []
         wheres = []
 
@@ -699,7 +700,9 @@ class VfsDatabase:
         else:
             where_str = ''
 
-        if uid_only:
+        if output is not None:
+            result_str = output
+        elif uid_only:
             result_str = 'node_id'
         else:
             result_str = '*'
@@ -712,7 +715,9 @@ class VfsDatabase:
                 "SELECT " + result_str + " FROM core_nodes", dbg='nodes_where_match_all')
 
         # todo load blocks
-        if uid_only:
+        if output is not None:
+            return nodes
+        elif uid_only:
             return [v[0] for v in nodes]
         else:
             return [db_to_vfs_node(node) for node in nodes]

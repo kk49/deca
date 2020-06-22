@@ -1,4 +1,3 @@
-from collections import defaultdict
 from typing import Optional
 from deca.gui.vfs_widgets import used_color_calc
 from deca.db_view import VfsView
@@ -68,6 +67,9 @@ class VfsDirModel(QAbstractItemModel):
         self.n_rows = 0
         self.n_cols = 0
 
+        self.header_labels = \
+            ("Path", "Index", "Type", "Sub_Type", "Hash", "EXT_Hash", "Size_U", "Size_C", "Used_Depth", "Notes")
+
         self.vfs_changed_signal.connect(self.update_model)
 
     def vfs_view_set(self, vfs_view: VfsView):
@@ -78,20 +80,15 @@ class VfsDirModel(QAbstractItemModel):
     def update_model(self):
         self.beginResetModel()
 
-        vpaths = defaultdict(list)
-        tmp = self.vfs_view.vfs().nodes_select_vpath_uid_where_vpath_not_null_type_check_symlink(is_symlink=False)
+        vpaths0: dict = self.vfs_view.nodes_visible_map_get()
+        tmp = list(vpaths0.keys())
         tmp.sort()
-        for k, v in tmp:
-            vpaths[k].append(v)
-
-        tmp = self.vfs_view.vfs().nodes_select_vpath_uid_where_vpath_not_null_type_check_symlink(is_symlink=True)
-        tmp.sort()
-        for k, v in tmp:
-            vpaths[k].append(v)
+        vpaths = dict([(k, vpaths0[k]) for k in tmp])
 
         self.root_node = None
         self.root_node = VfsDirBranch('/')
-        for v_path, uids in vpaths.items():
+        for v_path, (vp_uids, sym_uids) in vpaths.items():
+
             if v_path.find('\\') >= 0:
                 print(f'GUI: Warning: Windows Path {v_path}')
                 path = v_path.split('\\')
@@ -104,7 +101,7 @@ class VfsDirModel(QAbstractItemModel):
             for p in path:
                 cnode = cnode.child_add(VfsDirBranch(p))
 
-            cnode.child_add(VfsDirLeaf(name, uids))
+            cnode.child_add(VfsDirLeaf(name, vp_uids + sym_uids))
 
         self.endResetModel()
 
@@ -140,7 +137,7 @@ class VfsDirModel(QAbstractItemModel):
 
     def headerData(self, section, orientation, role):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ("Path", "Index", "Type", "Sub_Type", "Hash", "EXT_Hash", "Size_U", "Size_C", "Used_Depth", "Notes")[section]
+            return self.header_labels[section]
         else:
             return None
 
@@ -156,7 +153,7 @@ class VfsDirModel(QAbstractItemModel):
                 return node.name
             elif isinstance(node, VfsDirLeaf):
                 uid = node.uids[0]
-                vnode: VfsNode = self.vfs_view.vfs().node_where_uid(uid)
+                vnode: VfsNode = self.vfs_view.node_where_uid(uid)
                 if column == 1:
                     return '{}'.format(vnode.uid)
                 elif column == 2:
@@ -185,18 +182,18 @@ class VfsDirModel(QAbstractItemModel):
                 elif column == 8:
                     return '{}'.format(vnode.used_at_runtime_depth)
                 elif column == 9:
-                    return '{}'.format(self.vfs_view.vfs().lookup_note_from_file_path(vnode.v_path))
+                    return '{}'.format(self.vfs_view.lookup_note_from_file_path(vnode.v_path))
         elif role == Qt.BackgroundColorRole:
             if isinstance(node, VfsDirLeaf):
                 uid = node.uids[0]
-                vnode: VfsNode = self.vfs_view.vfs().node_where_uid(uid)
+                vnode: VfsNode = self.vfs_view.node_where_uid(uid)
                 if column == 8:
                     if vnode.used_at_runtime_depth is not None:
                         return used_color_calc(vnode.used_at_runtime_depth)
                 elif column == 3:
                     if vnode.file_sub_type is not None and \
                             vnode.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE} and \
-                            vnode.file_sub_type not in self.adf_db.type_map_def:
+                            vnode.file_sub_type not in self.vfs_view.adf_db().type_map_def:
                         return QColor(Qt.red)
         return None
 
@@ -298,7 +295,7 @@ class VfsDirWidget(QWidget):
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
                 uid = tnode.uids[0]
-                item = self.source_model.vfs_view.vfs().node_where_uid(uid)
+                item = self.source_model.vfs_view.node_where_uid(uid)
                 self.vnode_2click_selected(item)
 
     def filter_vfspath_set(self, selection):

@@ -285,7 +285,7 @@ class MainWindow(QMainWindow):
         )
 
     def slot_mod_build_subset_clicked(self, checked):
-        self.update_select_state()
+        self.update_select_state(self.vfs_view)
 
     def slot_mod_prep_clicked(self, checked):
         self.extract(
@@ -298,7 +298,12 @@ class MainWindow(QMainWindow):
 
     def slot_mod_build_clicked(self, checked):
         try:
-            self.builder.build_dir(self.vfs, self.vfs.working_dir + 'mod/', self.vfs.working_dir + 'build/')
+            subset = None
+            if self.ui.chkbx_mod_build_subset.isChecked():
+                subset = self.vfs_view.nodes_selected_uids_get()
+
+            self.builder.build_dir(
+                self.vfs, self.vfs.working_dir + 'mod/', self.vfs.working_dir + 'build/', subset=subset)
             self.dialog_good('BUILD SUCCESS')
         except EDecaFileExists as ex:
             self.error_dialog('Build Failed: File Exists: {}'.format(ex.args))

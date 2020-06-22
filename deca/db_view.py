@@ -17,14 +17,14 @@ class VfsView:
         self.paths = None
         self.mask = None
         self.parent_id = None
-        self.nodes_visible_dirty = True
-        self.nodes_visible = []
-        self.nodes_visible_uids = set()
-        self.nodes_visible_uids_no_vpaths = set()
-        self.nodes_selected_dirty = True
-        self.nodes_selected = []
-        self.nodes_selected_uids = set()
-        self.nodes_selected_uids_no_vpaths = set()
+        self._nodes_visible_dirty = True
+        self._nodes_visible = []
+        self._nodes_visible_uids = set()
+        self._nodes_visible_uids_no_vpaths = set()
+        self._nodes_selected_dirty = True
+        self._nodes_selected = []
+        self._nodes_selected_uids = set()
+        self._nodes_selected_uids_no_vpaths = set()
 
         self.vfs_changed = True
         self.vfs_changed_signal = DecaSignal()
@@ -69,7 +69,7 @@ class VfsView:
         print('VfsView.vfs_changed')
 
     def mask_set(self, mask):
-        self.nodes_visible_dirty = True
+        self._nodes_visible_dirty = True
         self.mask = mask
 
     def paths_count(self):
@@ -79,7 +79,7 @@ class VfsView:
             return len(self.paths)
 
     def paths_set(self, paths):
-        self.nodes_selected_dirty = True
+        self._nodes_selected_dirty = True
         self.paths = paths
         self.signal_selection_changed.call()
 
@@ -138,34 +138,34 @@ class VfsView:
         if self.vfs_changed:
             self._adf_db.load_from_database(self._vfs)
             self.vfs_changed = False
-            self.nodes_visible_dirty = True
-            self.nodes_selected_dirty = True
+            self._nodes_visible_dirty = True
+            self._nodes_selected_dirty = True
             self.signal_selection_changed.call()
 
-        if self.nodes_visible_dirty:
+        if self._nodes_visible_dirty:
             self.vfs().logger.log(f'Nodes Visible Begin')
 
             # visible nodes
-            self.nodes_visible = {}
-            self.nodes_visible_uids = set()
-            self.nodes_visible_uids_no_vpaths = set()
+            self._nodes_visible = {}
+            self._nodes_visible_uids = set()
+            self._nodes_visible_uids_no_vpaths = set()
 
             self.node_accumulate(
-                self.nodes_visible, self.nodes_visible_uids, self.nodes_visible_uids_no_vpaths,
+                self._nodes_visible, self._nodes_visible_uids, self._nodes_visible_uids_no_vpaths,
                 mask=self.mask, pid_in=self.parent_id)
 
-            self.nodes_visible_dirty = False
-            self.nodes_selected_dirty = True
+            self._nodes_visible_dirty = False
+            self._nodes_selected_dirty = True
             self.signal_selection_changed.call()
             self.vfs().logger.log(f'Nodes Visible End')
 
-        if self.nodes_selected_dirty:
+        if self._nodes_selected_dirty:
             self.vfs().logger.log(f'Nodes Selected Begin')
 
             # selected nodes
-            self.nodes_selected = {}
-            self.nodes_selected_uids = set()
-            self.nodes_selected_uids_no_vpaths = set()
+            self._nodes_selected = {}
+            self._nodes_selected_uids = set()
+            self._nodes_selected_uids_no_vpaths = set()
 
             if self.paths is not None:
                 for v in self.paths:
@@ -175,47 +175,51 @@ class VfsView:
                         id_pat = v.encode('ascii')
 
                     self.node_accumulate(
-                        self.nodes_selected, self.nodes_selected_uids, self.nodes_selected_uids_no_vpaths,
+                        self._nodes_selected, self._nodes_selected_uids, self._nodes_selected_uids_no_vpaths,
                         mask=self.mask, pid_in=self.parent_id, id_pat=id_pat)
 
-            self.nodes_selected_dirty = False
+            self._nodes_selected_dirty = False
             self.vfs().logger.log(f'Nodes Selected End')
 
     def node_visible_count(self):
         self.node_update()
-        return len(self.nodes_visible)
+        return len(self._nodes_visible)
 
     def nodes_visible_map_get(self):
         self.node_update()
-        return self.nodes_visible
+        return self._nodes_visible
 
     def nodes_visible_uids_get(self):
         self.node_update()
-        return self.nodes_visible_uids
+        return self._nodes_visible_uids
 
     def nodes_visible_uids_no_vpath_get(self):
         self.node_update()
-        return self.nodes_visible_uids_no_vpaths
+        return self._nodes_visible_uids_no_vpaths
 
     def node_visible_has(self, uids):
         self.node_update()
         for uid in uids:
-            if uid in self.nodes_visible_uids:
+            if uid in self._nodes_visible_uids:
                 return True
         return False
 
     def node_selected_count(self):
         self.node_update()
-        return len(self.nodes_selected)
+        return len(self._nodes_selected)
 
     def nodes_selected_get(self):
         self.node_update()
-        return self.nodes_selected
+        return self._nodes_selected
+
+    def nodes_selected_uids_get(self):
+        self.node_update()
+        return self._nodes_selected_uids
 
     def node_selected_has(self, uids):
         self.node_update()
         for uid in uids:
-            if uid in self.nodes_selected_uids:
+            if uid in self._nodes_selected_uids:
                 return True
         return False
 

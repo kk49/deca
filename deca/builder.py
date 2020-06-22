@@ -139,7 +139,7 @@ class Builder:
             shutil.copy2(src_path, dst)
             vpath_complete_map[v_path] = dst
 
-    def build_dir(self, vfs: VfsDatabase, src_path: str, dst_path: str):
+    def build_dir(self, vfs: VfsDatabase, src_path: str, dst_path: str, subset=None):
         # find all changed src files
         src_files = {}
 
@@ -214,6 +214,25 @@ class Builder:
                                     pack_list.append(pnode.v_path)
 
         # pprint(depends, width=128)
+
+        if subset is not None:
+            subset_vpaths = set()
+            for uid in subset:
+                vnode: VfsNode = vfs.node_where_uid(uid)
+                subset_vpaths.add(vnode.v_path)
+
+            depends_keep = set()
+            for vpath in subset_vpaths:
+                deps = depends.get(vpath, None)
+                if deps is not None:
+                    depends_keep.add(vpath)
+                    depends_keep = depends_keep.union(deps)
+
+            depends_remove = [k for k in depends.keys() if k not in depends_keep]
+
+            for k in depends_remove:
+                depends.pop(k, None)
+
 
         # copy src modified files to build directory
         vpaths_completed = {}

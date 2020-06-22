@@ -4,7 +4,7 @@ from deca.db_view import VfsView
 from deca.db_processor import VfsNode
 from deca.ff_types import *
 from deca.dxgi_types import dxgi_name_db
-from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, QSortFilterProxyModel, Signal
+from PySide2.QtCore import QAbstractItemModel, QModelIndex, Qt, Signal
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QHeaderView, QSizePolicy, QWidget, QHBoxLayout, QTreeView, QAbstractItemView
 

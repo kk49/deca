@@ -1,11 +1,12 @@
 #### v0.2.10 ???
 * GLTF2: Added option to export skeletons with models (Using [HavokLib!](https://github.com/PredatorCZ/HavokLib))
-* GUI will now create a new tab with the contents of a SARC (nl/fl/...) when the open button in the SARC tab is pressed
+* GUI: will now create a new tab with the contents of a SARC (nl/fl/...) when the open button in the SARC tab is pressed
+* Build: Option added to build a subset of files/archives. Check build subset checkbox, and press build
+* Build: Added building ddsc, atx?, hmddsc? directly into archive files, this can be used to package dds files renamed as ddsc!!!
 * Load large files 1MB at a time during file determination this was a problem for some people on windows
 * Added script and support to process CAnimSpline objects
 * Textures: dxgi type 41 support, JC4 s failed to load because this was missing
 * Added Loading of multiple external files at once to Load External File
-* Build: Added building ddsc, atx?, hmddsc? directly into archive files, this can be used to package dds files renamed as ddsc!!!
 * Textures: Added more mapping of texture types to their base type
 * Textures: Added text name for texture types
 * Textures: Fixed processing of non square textures

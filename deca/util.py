@@ -41,9 +41,19 @@ class DecaSignal:
     def connect(self, obj, func):
         self.callbacks.add((weakref.ref(obj), func))
 
-    def call(self, *params, **kwargs):
+    def disconnect(self, obj):
         to_erase = []
         for i in self.callbacks:
+            if i[0]() == obj:
+                to_erase.append(i)
+
+        for i in to_erase:
+            self.callbacks.remove(i)
+
+    def call(self, *params, **kwargs):
+        to_erase = []
+        callbacks = self.callbacks.copy()
+        for i in callbacks:
             obj = i[0]()
             func = i[1]
             if obj is not None:

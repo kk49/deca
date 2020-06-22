@@ -5,13 +5,13 @@ from deca.errors import *
 from deca.db_processor import VfsProcessor, vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
 from deca.db_view import VfsView
 from deca.builder import Builder
-from deca.util import Logger
+from deca.util import Logger, to_unicode
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
 from .main_window import Ui_MainWindow
 from .vfsdirwidget import VfsDirWidget
 from .vfsnodetablewidget import VfsNodeTableWidget
-from PySide2.QtCore import Slot, QUrl
+from PySide2.QtCore import Slot, QUrl, Signal
 from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
 from PySide2.QtGui import QDesktopServices
 
@@ -20,6 +20,8 @@ window_title = 'decaGUI: v0.2.10-dev'
 
 
 class MainWindow(QMainWindow):
+    signal_selection_changed = Signal(VfsView)
+
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
 
@@ -31,7 +33,12 @@ class MainWindow(QMainWindow):
 
         self.builder = Builder()
         self.current_vnode = None
+        self.vfs_view_root: Optional[VfsView] = None
         self.vfs_view: Optional[VfsView] = None
+
+        self.tab_nodes_deletable = set()
+
+        self.signal_selection_changed.connect(self.update_select_state)
 
         # Configure Actions
         self.ui.action_project_new.triggered.connect(self.project_new)
@@ -45,7 +52,6 @@ class MainWindow(QMainWindow):
         self.ui.action_make_web_map.triggered.connect(self.tool_make_web_map)
 
         # filter
-        self.ui.bt_archive_open.clicked.connect(self.archives_toggle)
         self.ui.filter_edit.textChanged.connect(self.filter_text_changed)
 
         self.ui.vhash_to_vpath_in_edit.textChanged.connect(self.vhash_to_vpath_text_changed)
@@ -58,6 +64,9 @@ class MainWindow(QMainWindow):
         self.ui.chkbx_export_raw_mods.setChecked(True)
         self.ui.chkbx_export_contents_mods.setChecked(False)
         self.ui.chkbx_export_processed_mods.setChecked(False)
+
+        self.ui.chkbx_mod_build_subset.setChecked(False)
+        self.ui.chkbx_mod_build_subset.clicked.connect(self.slot_mod_build_subset_clicked)
 
         self.ui.chkbx_export_save_to_one_dir.setChecked(False)
 
@@ -87,55 +96,49 @@ class MainWindow(QMainWindow):
 
         self.ui.bt_mod_build.clicked.connect(self.slot_mod_build_clicked)
 
-    def tab_nodes_add(self, widget_class, name):
+        self.ui.tabs_nodes.tabCloseRequested.connect(self.slot_nodes_tab_close)
+        self.ui.data_view.signal_archive_open.connect(self.slot_archive_open)
+
+    def tab_nodes_add(self, widget_class, name, deletable=False):
         # self.tab_extract = QtWidgets.QWidget()
         # self.tab_extract.setObjectName("tab_extract")
         # self.gridLayout = QtWidgets.QGridLayout(self.tab_extract)
         # self.gridLayout.setObjectName("gridLayout")
         widget = widget_class(self.ui.tabs_nodes)
         self.ui.tabs_nodes.addTab(widget, name)
-        widget.vnode_selection_changed = self.vnode_selection_changed
         widget.vnode_2click_selected = self.vnode_2click_selected
+
+        if deletable:
+            self.tab_nodes_deletable.add(widget)
 
         return widget
 
     def vfs_set(self, vfs):
         self.vfs = vfs
-        self.vfs_view = VfsView(vfs, None, b'^.*$')
+        self.vfs_view_root = VfsView(vfs, None, b'^.*$')
+        self.vfs_view_root.signal_selection_changed.connect(
+            self, lambda x: x.signal_selection_changed.emit(self.vfs_view_root))
 
         # Configure VFS dir table
         widget = self.tab_nodes_add(VfsDirWidget, 'Directory')
-        widget.vfs_view_set(self.vfs_view)
+        widget.vfs_view_set(self.vfs_view_root)
 
         # Configure VFS Node table (non-mapped nodes)
         widget = self.tab_nodes_add(VfsNodeTableWidget, 'Non-Mapped List')
         widget.show_all_set(False)
-        widget.vfs_view_set(self.vfs_view)
+        widget.vfs_view_set(self.vfs_view_root)
 
         # Configure VFS Node table (all nodes)
         widget = self.tab_nodes_add(VfsNodeTableWidget, 'Raw List')
         widget.show_all_set(True)
-        widget.vfs_view_set(self.vfs_view)
+        widget.vfs_view_set(self.vfs_view_root)
 
-        self.ui.data_view.vfs_view_set(self.vfs_view)
+        self.update_select_state(self.vfs_view_root)
 
         self.ui.action_external_add.setEnabled(True)
 
         self.setWindowTitle("{}: Archive: {}".format(window_title, vfs.game_info.game_dir))
         self.ui.statusbar.showMessage("LOAD COMPLETE")
-
-    def archives_update(self):
-        if self.vfs_view.archive_active_get():
-            self.ui.bt_archive_open.setEnabled(True)
-            self.ui.bt_archive_open.setText('Close Archives')
-        else:
-            self.ui.bt_archive_open.setEnabled(self.vfs_view.archive_count() > 0)
-            self.ui.bt_archive_open.setText('Open Archives')
-        self.ui.edt_archive_name.setText(self.vfs_view.archive_summary_str())
-
-    def archives_toggle(self):
-        self.vfs_view.archive_active_set(not self.vfs_view.archive_active_get())
-        self.archives_update()
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -159,32 +162,49 @@ class MainWindow(QMainWindow):
         msg.setStandardButtons(QMessageBox.Ok)
         retval = msg.exec_()
 
-    def vnode_selection_changed(self, vpaths):
-        self.vfs_view.paths_set(vpaths)
-        any_selected = self.vfs_view.paths_count() > 0
+    def slot_archive_open(self, vnode: VfsNode):
+        widget = self.tab_nodes_add(VfsDirWidget, to_unicode(vnode.v_path), True)
+        vfs_view = VfsView(self.vfs_view, parent_id=vnode.uid)
+        vfs_view.signal_selection_changed.connect(self, lambda x: x.signal_selection_changed.emit(vfs_view))
+        widget.vfs_view_set(vfs_view)
 
-        self.ui.bt_extract.setEnabled(any_selected)
-        self.ui.bt_extract_gltf_3d.setEnabled(any_selected)
-        self.ui.bt_mod_prep.setEnabled(any_selected)
-        self.ui.bt_extract_folder_show.setEnabled(any_selected)
-        self.ui.bt_extract_gltf_3d_folder_show.setEnabled(any_selected)
-        self.ui.bt_mod_folder_show.setEnabled(any_selected)
+    def slot_nodes_tab_close(self, index):
+        widget = self.ui.tabs_nodes.widget(index)
+        if widget in self.tab_nodes_deletable:
+            self.tab_nodes_deletable.remove(widget)
+            if widget is not None:
+                widget.deleteLater()
+            self.ui.tabs_nodes.removeTab(index)
 
-        str_vpaths = self.vfs_view.paths_summary_str()
-        self.ui.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
-        self.ui.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
-        self.ui.bt_mod_prep.setText('PREP MOD: {}'.format(str_vpaths))
+    def update_select_state(self, vfs_view):
+        if vfs_view is not None:
+            self.vfs_view = vfs_view
 
-        # update archives
-        self.archives_update()
-        self.ui.data_view.vnode_selection_changed(self.vfs_view)
+            self.ui.data_view.vfs_view_set(self.vfs_view)
+
+            any_selected = self.vfs_view.paths_count() > 0
+
+            self.ui.bt_extract.setEnabled(any_selected)
+            self.ui.bt_extract_gltf_3d.setEnabled(any_selected)
+            self.ui.bt_mod_prep.setEnabled(any_selected)
+            self.ui.bt_extract_folder_show.setEnabled(any_selected)
+            self.ui.bt_extract_gltf_3d_folder_show.setEnabled(any_selected)
+            self.ui.bt_mod_folder_show.setEnabled(any_selected)
+
+            str_vpaths = self.vfs_view.paths_summary_str()
+            self.ui.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
+            self.ui.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
+            self.ui.bt_mod_prep.setText('PREP MOD: {}'.format(str_vpaths))
+
+            if self.ui.chkbx_mod_build_subset.isChecked():
+                self.ui.bt_mod_build.setText('Build Mod Subset: {}'.format(str_vpaths))
+                self.ui.bt_mod_build.setEnabled(any_selected)
+            else:
+                self.ui.bt_mod_build.setText('Build Mod All')
 
     def vnode_2click_selected(self, vnode: VfsNode):
         self.current_vnode = vnode
         self.ui.data_view.vnode_2click_selected(vnode)
-        # if self.current_vnode is not None:
-        #     self.ui.bt_extract.setText('EXTRACT: {}'.format(vnode.v_path))
-        #     self.ui.bt_extract.setEnabled(True)
 
     def extract(self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text):
         if self.vfs_view.node_selected_count() > 0:
@@ -264,6 +284,9 @@ class MainWindow(QMainWindow):
             include_skeleton=self.ui.chkbx_export_3d_include_skeleton.isChecked(),
         )
 
+    def slot_mod_build_subset_clicked(self, checked):
+        self.update_select_state()
+
     def slot_mod_prep_clicked(self, checked):
         self.extract(
             'Mod Prep', self.vfs.working_dir + 'mod/',
@@ -277,10 +300,10 @@ class MainWindow(QMainWindow):
         try:
             self.builder.build_dir(self.vfs, self.vfs.working_dir + 'mod/', self.vfs.working_dir + 'build/')
             self.dialog_good('BUILD SUCCESS')
-        except EDecaFileExists as exce:
-            self.error_dialog('Build Failed: File Exists: {}'.format(exce.args))
-        except EDecaBuildError as exce:
-            self.error_dialog('Build Failed: {}'.format(exce.args))
+        except EDecaFileExists as ex:
+            self.error_dialog('Build Failed: File Exists: {}'.format(ex.args))
+        except EDecaBuildError as ex:
+            self.error_dialog('Build Failed: {}'.format(ex.args))
 
     def filter_text_changed(self):
         txt = self.ui.filter_edit.text()

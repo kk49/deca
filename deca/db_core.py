@@ -689,9 +689,9 @@ class VfsDatabase:
             params.append(file_type)
             wheres.append('(file_type == (?))')
 
-        if pid_in is not None and len(pid_in) > 0:
-            params += list(pid_in)
-            wheres.append('(parent_id IN ({}))'.format(','.join('?' * len(pid_in))))
+        if pid_in is not None:
+            params.append(pid_in)
+            wheres.append('(parent_id == (?))')
 
         if len(wheres) > 0:
             where_str = ' WHERE ' + wheres[0]

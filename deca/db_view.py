@@ -10,15 +10,13 @@ NodeListElement = TypeVar('NodeListElement', str, bytes, VfsNode)
 
 
 class VfsView:
-    def __init__(self, *params):
+    def __init__(self, *params, **kwargs):
         self._vfs: Optional[VfsDatabase] = None
         self._adf_db: Optional[AdfDatabase] = None
         self._vfs_view: Optional[VfsView] = None
         self.paths = None
         self.mask = None
-        self.archive_active = False
-        self.archives = {}
-        self.archive_uids = set()
+        self.parent_id = None
         self.nodes_visible_dirty = True
         self.nodes_visible = []
         self.nodes_visible_uids = set()
@@ -30,6 +28,10 @@ class VfsView:
 
         self.vfs_changed = True
         self.vfs_changed_signal = DecaSignal()
+
+        self.signal_selection_changed = DecaSignal()
+
+        self.parent_id = kwargs.get('parent_id', None)
 
         if len(params) == 1:
             vfs_view = params[0]
@@ -66,41 +68,6 @@ class VfsView:
         self.vfs_changed_signal.call()
         print('VfsView.vfs_changed')
 
-    def archive_active_get(self):
-        return self.archive_active
-
-    def archive_active_set(self, v):
-        self.archive_active = v
-        self.archive_update()
-        self.nodes_visible_dirty = True
-
-    def archive_update(self):
-        if not self.archive_active:
-            self.vfs().logger.log('Archives begin')
-            self.archives = {}
-            self.archive_uids = set()
-            for path in self.paths:
-                if isinstance(path, VfsNode):
-                    nodes = [path]
-                else:
-                    nodes = self.vfs().nodes_where_match(v_path_like=path, file_type=FTYPE_SARC)
-                for node in nodes:
-                    self.archives[node.v_path] = node
-                    self.archive_uids.add(node.uid)
-            self.vfs().logger.log(f'Archives end count: {len(self.archives)}')
-
-    def archive_count(self):
-        return len(self.archives)
-
-    def archive_summary_str(self):
-        len_a = len(self.archives)
-        if len_a == 0:
-            return ''
-        elif len_a == 1:
-            return to_unicode(list(self.archives.keys())[0])
-        else:
-            return f'{len_a} Archives'
-
     def mask_set(self, mask):
         self.nodes_visible_dirty = True
         self.mask = mask
@@ -114,7 +81,7 @@ class VfsView:
     def paths_set(self, paths):
         self.nodes_selected_dirty = True
         self.paths = paths
-        self.archive_update()
+        self.signal_selection_changed.call()
 
     def paths_summary_str(self):
         if self.paths_count() == 0:
@@ -173,12 +140,10 @@ class VfsView:
             self.vfs_changed = False
             self.nodes_visible_dirty = True
             self.nodes_selected_dirty = True
+            self.signal_selection_changed.call()
 
         if self.nodes_visible_dirty:
             self.vfs().logger.log(f'Nodes Visible Begin')
-            pid_in = self.archive_uids
-            if not self.archive_active:
-                pid_in = set()
 
             # visible nodes
             self.nodes_visible = {}
@@ -187,17 +152,15 @@ class VfsView:
 
             self.node_accumulate(
                 self.nodes_visible, self.nodes_visible_uids, self.nodes_visible_uids_no_vpaths,
-                mask=self.mask, pid_in=pid_in)
+                mask=self.mask, pid_in=self.parent_id)
 
             self.nodes_visible_dirty = False
             self.nodes_selected_dirty = True
+            self.signal_selection_changed.call()
             self.vfs().logger.log(f'Nodes Visible End')
 
         if self.nodes_selected_dirty:
             self.vfs().logger.log(f'Nodes Selected Begin')
-            pid_in = self.archive_uids
-            if not self.archive_active:
-                pid_in = set()
 
             # selected nodes
             self.nodes_selected = {}
@@ -213,7 +176,7 @@ class VfsView:
 
                     self.node_accumulate(
                         self.nodes_selected, self.nodes_selected_uids, self.nodes_selected_uids_no_vpaths,
-                        mask=self.mask, pid_in=pid_in, id_pat=id_pat)
+                        mask=self.mask, pid_in=self.parent_id, id_pat=id_pat)
 
             self.nodes_selected_dirty = False
             self.vfs().logger.log(f'Nodes Selected End')

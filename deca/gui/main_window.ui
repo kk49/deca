@@ -39,36 +39,16 @@
        <bool>false</bool>
       </property>
       <widget class="QWidget" name="layoutWidget">
-       <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,0,0">
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,0">
         <item>
          <widget class="QTabWidget" name="tabs_nodes">
           <property name="currentIndex">
            <number>-1</number>
           </property>
+          <property name="tabsClosable">
+           <bool>true</bool>
+          </property>
          </widget>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_6">
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <item>
-           <widget class="QPushButton" name="bt_archive_open">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>Open Archive</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="edt_archive_name"/>
-          </item>
-         </layout>
         </item>
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_4">
@@ -173,13 +153,6 @@
             <string>Modding</string>
            </attribute>
            <layout class="QGridLayout" name="gridLayout_3">
-            <item row="0" column="2">
-             <widget class="QPushButton" name="bt_mod_prep">
-              <property name="text">
-               <string>Extract For Modding</string>
-              </property>
-             </widget>
-            </item>
             <item row="0" column="3">
              <spacer name="horizontalSpacer_2">
               <property name="orientation">
@@ -193,10 +166,10 @@
               </property>
              </spacer>
             </item>
-            <item row="0" column="0">
-             <widget class="QCheckBox" name="chkbx_export_raw_mods">
+            <item row="0" column="1">
+             <widget class="QPushButton" name="bt_mod_folder_show">
               <property name="text">
-               <string>Export Raw Files</string>
+               <string/>
               </property>
              </widget>
             </item>
@@ -207,7 +180,21 @@
               </property>
              </widget>
             </item>
-            <item row="3" column="0">
+            <item row="1" column="0">
+             <widget class="QCheckBox" name="chkbx_export_processed_mods">
+              <property name="text">
+               <string>Export As Processed</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="QCheckBox" name="chkbx_export_raw_mods">
+              <property name="text">
+               <string>Export Raw Files</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
              <spacer name="verticalSpacer_3">
               <property name="orientation">
                <enum>Qt::Vertical</enum>
@@ -220,10 +207,10 @@
               </property>
              </spacer>
             </item>
-            <item row="1" column="0">
-             <widget class="QCheckBox" name="chkbx_export_processed_mods">
+            <item row="0" column="2">
+             <widget class="QPushButton" name="bt_mod_prep">
               <property name="text">
-               <string>Export As Processed</string>
+               <string>Extract For Modding</string>
               </property>
              </widget>
             </item>
@@ -234,17 +221,17 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="1">
-             <widget class="QPushButton" name="bt_mod_folder_show">
+            <item row="1" column="1">
+             <widget class="QPushButton" name="bt_mod_build_folder_show">
               <property name="text">
                <string/>
               </property>
              </widget>
             </item>
-            <item row="1" column="1">
-             <widget class="QPushButton" name="bt_mod_build_folder_show">
+            <item row="3" column="0">
+             <widget class="QCheckBox" name="chkbx_mod_build_subset">
               <property name="text">
-               <string/>
+               <string>Build Subset</string>
               </property>
              </widget>
             </item>

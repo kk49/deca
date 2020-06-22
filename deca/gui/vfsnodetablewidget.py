@@ -28,9 +28,14 @@ class VfsNodeTableModel(QAbstractTableModel):
         self.vfs_changed_signal.connect(self.update_model)
 
     def vfs_view_set(self, vfs_view: VfsView):
-        self.vfs_view = vfs_view
-        self.vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_signal.emit())
-        self.vfs_changed_signal.emit()
+        if self.vfs_view != vfs_view:
+            if self.vfs_view is not None:
+                self.vfs_view.vfs_changed_signal.disconnect(self)
+                self.vfs_view = None
+
+            self.vfs_view = vfs_view
+            self.vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_signal.emit())
+            self.vfs_changed_signal.emit()
 
     def update_model(self):
         self.beginResetModel()
@@ -167,7 +172,6 @@ class VfsNodeTableWidget(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
-        self.vnode_selection_changed = None
         self.vnode_2click_selected = None
 
         # Getting the Model
@@ -210,10 +214,10 @@ class VfsNodeTableWidget(QWidget):
 
     def clicked(self, index):
         if index.isValid():
-            if self.vnode_selection_changed is not None:
+            if self.model.vfs_view is not None:
                 items = list(set([self.model.uid_table[idx.row()] for idx in self.table_view.selectedIndexes()]))
                 items = [self.model.vfs_view.node_where_uid(i) for i in items]
-                self.vnode_selection_changed(items)
+                self.model.vfs_view.paths_set(items)
 
     def double_clicked(self, index):
         if index.isValid():

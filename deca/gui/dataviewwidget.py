@@ -10,10 +10,14 @@ from deca.gui.viewer_info import DataViewerInfo
 from deca.gui.viewer_text import DataViewerText
 from deca.gui.viewer_sarc import DataViewerSarc
 from deca.gui.viewer_obc import DataViewerObc
+from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QSizePolicy, QWidget, QVBoxLayout, QTabWidget
 
 
 class DataViewWidget(QWidget):
+    signal_selection_changed = Signal()
+    signal_archive_open = Signal(VfsNode)
+
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
         self.vfs_view: Optional[VfsView] = None
@@ -22,6 +26,7 @@ class DataViewWidget(QWidget):
         self.tab_raw = DataViewerRaw()
         self.tab_text = DataViewerText()
         self.tab_sarc = DataViewerSarc()
+        self.tab_sarc.signal_archive_open.connect(self.signal_archive_open)
         self.tab_image = DataViewerImage()
         self.tab_adf = DataViewerAdf()
         self.tab_rtpc = DataViewerRtpc()
@@ -45,11 +50,20 @@ class DataViewWidget(QWidget):
         self.main_layout.addWidget(self.tab_widget)
         self.setLayout(self.main_layout)
 
-    def vfs_view_set(self, vfs_view):
-        self.vfs_view = vfs_view
+        self.signal_selection_changed.connect(self.vnode_selection_changed)
 
-    def vnode_selection_changed(self, vfs_view: VfsView):
-        print('DataViewWidget:vnode_selection_changed: {}'.format(vfs_view))
+    def vfs_view_set(self, vfs_view):
+        if self.vfs_view != vfs_view:
+            if self.vfs_view is not None:
+                self.vfs_view.signal_selection_changed.disconnect(self)
+                self.vfs_view = None
+
+            self.vfs_view = vfs_view
+            self.vfs_view.signal_selection_changed.connect(self, lambda x: x.signal_selection_changed.emit())
+            self.signal_selection_changed.emit()
+
+    def vnode_selection_changed(self):
+        print('DataViewWidget:vnode_selection_changed')
 
     def vnode_2click_selected(self, vnode: VfsNode):
         print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))

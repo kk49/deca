@@ -73,9 +73,14 @@ class VfsDirModel(QAbstractItemModel):
         self.vfs_changed_signal.connect(self.update_model)
 
     def vfs_view_set(self, vfs_view: VfsView):
-        self.vfs_view = vfs_view
-        self.vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_signal.emit())
-        self.vfs_changed_signal.emit()
+        if self.vfs_view != vfs_view:
+            if self.vfs_view is not None:
+                self.vfs_view.vfs_changed_signal.disconnect(self)
+                self.vfs_view = None
+
+            self.vfs_view = vfs_view
+            self.vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_signal.emit())
+            self.vfs_changed_signal.emit()
 
     def update_model(self):
         self.beginResetModel()
@@ -202,7 +207,6 @@ class VfsDirWidget(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
-        self.vnode_selection_changed = None
         self.vnode_2click_selected = None
 
         # Getting the Model
@@ -238,11 +242,11 @@ class VfsDirWidget(QWidget):
 
     def clicked(self, index):
         if index.isValid():
-            if self.vnode_selection_changed is not None:
+            if self.source_model.vfs_view is not None:
                 items = self.view.selectedIndexes()
                 items = list(set([idx.internalPointer() for idx in items]))
                 items = [idx.v_path() for idx in items if isinstance(idx, VfsDirLeaf) or isinstance(idx, VfsDirBranch)]
-                self.vnode_selection_changed(items)
+                self.source_model.vfs_view.paths_set(items)
 
     def double_clicked(self, index):
         if index.isValid():

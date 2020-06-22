@@ -1,6 +1,6 @@
 #### v0.2.10 ???
 * GLTF2: Added option to export skeletons with models (Using [HavokLib!](https://github.com/PredatorCZ/HavokLib))
-* Added ability to sub select all files to subset of 1 or more SARC file contents
+* GUI will now create a new tab with the contents of a SARC (nl/fl/...) when the open button in the SARC tab is pressed
 * Load large files 1MB at a time during file determination this was a problem for some people on windows
 * Added script and support to process CAnimSpline objects
 * Textures: dxgi type 41 support, JC4 s failed to load because this was missing

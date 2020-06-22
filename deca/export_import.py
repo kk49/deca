@@ -51,14 +51,14 @@ def extract_node_raw(
 
 def nodes_export_raw(
         vfs: VfsDatabase,
-        vfs_selection: VfsView,
+        vfs_view: VfsView,
         extract_dir: str,
         allow_overwrite=False):
-    node_map = vfs_selection.nodes_selected_get()
+    node_map = vfs_view.nodes_selected_get()
     for k, (nodes_real, nodes_sym) in node_map.items():
         if nodes_real and nodes_real[0] is not None:
             uid = nodes_real[0]
-            node = vfs_selection.node_where_uid(uid)
+            node = vfs_view.node_where_uid(uid)
             try:
                 extract_node_raw(vfs, node, extract_dir, allow_overwrite)
             except EDecaFileExists as e:
@@ -68,14 +68,14 @@ def nodes_export_raw(
 
 def nodes_export_contents(
         vfs: VfsDatabase,
-        vfs_selection: VfsView,
+        vfs_view: VfsView,
         extract_dir: str,
         allow_overwrite=False):
-    node_map = vfs_selection.nodes_selected_get()
+    node_map = vfs_view.nodes_selected_get()
     for k, (nodes_real, nodes_sym) in node_map.items():
         if nodes_real and nodes_real[0] is not None:
             uid = nodes_real[0]
-            node = vfs_selection.node_where_uid(uid)
+            node = vfs_view.node_where_uid(uid)
             try:
                 if node.file_type == FTYPE_SARC:
                     sarc = FileSarc()
@@ -85,7 +85,7 @@ def nodes_export_contents(
                     entry_v_paths = [v.v_path for v in sarc.entries]
                     entry_is_symlinks = [v.offset == 0 for v in sarc.entries]
 
-                    nodes_export_raw(vfs, vfs_selection, extract_dir, allow_overwrite)
+                    nodes_export_raw(vfs, vfs_view, extract_dir, allow_overwrite)
 
                     file_list_name = os.path.join(extract_dir, node.v_path.decode('utf-8') + '.DECA.FILE_LIST.txt')
 
@@ -104,7 +104,7 @@ def nodes_export_contents(
 
 def nodes_export_gltf(
         vfs: VfsDatabase,
-        vfs_selection: VfsView,
+        vfs_view: VfsView,
         extract_dir: str,
         allow_overwrite=False,
         save_to_one_dir=True,
@@ -113,11 +113,11 @@ def nodes_export_gltf(
     vs_adf = []
     vs_rtpc = []
 
-    node_map = vfs_selection.nodes_selected_get()
+    node_map = vfs_view.nodes_selected_get()
     for k, (nodes_real, nodes_sym) in node_map.items():
         if nodes_real and nodes_real[0] is not None:
             uid = nodes_real[0]
-            node = vfs_selection.node_where_uid(uid)
+            node = vfs_view.node_where_uid(uid)
             if node.is_valid() and node.offset is not None:
                 try:
                     if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
@@ -162,7 +162,7 @@ def nodes_export_gltf(
 
 def nodes_export_processed(
         vfs: VfsDatabase,
-        vfs_selection: VfsView,
+        vfs_view: VfsView,
         extract_dir: str,
         allow_overwrite=False,
         save_to_processed=False,
@@ -172,11 +172,11 @@ def nodes_export_processed(
     vs_images = []
     vs_fsb5cs = []
     vs_other = []
-    node_map = vfs_selection.nodes_selected_get()
+    node_map = vfs_view.nodes_selected_get()
     for k, (nodes_real, nodes_sym) in node_map.items():
         if nodes_real and nodes_real[0] is not None:
             uid = nodes_real[0]
-            node = vfs_selection.node_where_uid(uid)
+            node = vfs_view.node_where_uid(uid)
             if node.is_valid() and node.offset is not None:
                 try:
                     if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:

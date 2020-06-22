@@ -48,8 +48,8 @@ class DataViewWidget(QWidget):
     def vfs_view_set(self, vfs_view):
         self.vfs_view = vfs_view
 
-    def vnode_selection_changed(self, vfs_selection: VfsView):
-        print('DataViewWidget:vnode_selection_changed: {}'.format(vfs_selection))
+    def vnode_selection_changed(self, vfs_view: VfsView):
+        print('DataViewWidget:vnode_selection_changed: {}'.format(vfs_view))
 
     def vnode_2click_selected(self, vnode: VfsNode):
         print('DataViewWidget:vnode_2click_selected: {}'.format(vnode))

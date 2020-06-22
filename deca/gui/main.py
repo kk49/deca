@@ -31,7 +31,7 @@ class MainWindow(QMainWindow):
 
         self.builder = Builder()
         self.current_vnode = None
-        self.vfs_selection: Optional[VfsView] = None
+        self.vfs_view: Optional[VfsView] = None
 
         # Configure Actions
         self.ui.action_project_new.triggered.connect(self.project_new)
@@ -101,23 +101,23 @@ class MainWindow(QMainWindow):
 
     def vfs_set(self, vfs):
         self.vfs = vfs
-        self.vfs_selection = VfsView(vfs, None, b'^.*$')
+        self.vfs_view = VfsView(vfs, None, b'^.*$')
 
         # Configure VFS dir table
         widget = self.tab_nodes_add(VfsDirWidget, 'Directory')
-        widget.vfs_view_set(self.vfs_selection)
+        widget.vfs_view_set(self.vfs_view)
 
         # Configure VFS Node table (non-mapped nodes)
         widget = self.tab_nodes_add(VfsNodeTableWidget, 'Non-Mapped List')
         widget.show_all_set(False)
-        widget.vfs_view_set(self.vfs_selection)
+        widget.vfs_view_set(self.vfs_view)
 
         # Configure VFS Node table (all nodes)
         widget = self.tab_nodes_add(VfsNodeTableWidget, 'Raw List')
         widget.show_all_set(True)
-        widget.vfs_view_set(self.vfs_selection)
+        widget.vfs_view_set(self.vfs_view)
 
-        self.ui.data_view.vfs_view_set(self.vfs_selection)
+        self.ui.data_view.vfs_view_set(self.vfs_view)
 
         self.ui.action_external_add.setEnabled(True)
 
@@ -125,18 +125,17 @@ class MainWindow(QMainWindow):
         self.ui.statusbar.showMessage("LOAD COMPLETE")
 
     def archives_update(self):
-        if self.vfs_selection.archive_active_get():
+        if self.vfs_view.archive_active_get():
             self.ui.bt_archive_open.setEnabled(True)
             self.ui.bt_archive_open.setText('Close Archives')
         else:
-            self.ui.bt_archive_open.setEnabled(self.vfs_selection.archive_count() > 0)
+            self.ui.bt_archive_open.setEnabled(self.vfs_view.archive_count() > 0)
             self.ui.bt_archive_open.setText('Open Archives')
-        self.ui.edt_archive_name.setText(self.vfs_selection.archive_summary_str())
+        self.ui.edt_archive_name.setText(self.vfs_view.archive_summary_str())
 
     def archives_toggle(self):
-        self.vfs_selection.archive_active_set(not self.vfs_selection.archive_active_get())
+        self.vfs_view.archive_active_set(not self.vfs_view.archive_active_get())
         self.archives_update()
-        self.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -161,8 +160,8 @@ class MainWindow(QMainWindow):
         retval = msg.exec_()
 
     def vnode_selection_changed(self, vpaths):
-        self.vfs_selection.paths_set(vpaths)
-        any_selected = self.vfs_selection.paths_count() > 0
+        self.vfs_view.paths_set(vpaths)
+        any_selected = self.vfs_view.paths_count() > 0
 
         self.ui.bt_extract.setEnabled(any_selected)
         self.ui.bt_extract_gltf_3d.setEnabled(any_selected)
@@ -171,14 +170,14 @@ class MainWindow(QMainWindow):
         self.ui.bt_extract_gltf_3d_folder_show.setEnabled(any_selected)
         self.ui.bt_mod_folder_show.setEnabled(any_selected)
 
-        str_vpaths = self.vfs_selection.paths_summary_str()
+        str_vpaths = self.vfs_view.paths_summary_str()
         self.ui.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
         self.ui.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
         self.ui.bt_mod_prep.setText('PREP MOD: {}'.format(str_vpaths))
 
         # update archives
         self.archives_update()
-        self.ui.data_view.vnode_selection_changed(self.vfs_selection)
+        self.ui.data_view.vnode_selection_changed(self.vfs_view)
 
     def vnode_2click_selected(self, vnode: VfsNode):
         self.current_vnode = vnode
@@ -188,16 +187,16 @@ class MainWindow(QMainWindow):
         #     self.ui.bt_extract.setEnabled(True)
 
     def extract(self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text):
-        if self.vfs_selection.node_selected_count() > 0:
+        if self.vfs_view.node_selected_count() > 0:
             try:
                 if export_raw:
-                    nodes_export_raw(self.vfs, self.vfs_selection, extract_dir)
+                    nodes_export_raw(self.vfs, self.vfs_view, extract_dir)
 
                 if export_contents:
-                    nodes_export_contents(self.vfs, self.vfs_selection, extract_dir)
+                    nodes_export_contents(self.vfs, self.vfs_view, extract_dir)
 
                 nodes_export_processed(
-                    self.vfs, self.vfs_selection, extract_dir,
+                    self.vfs, self.vfs_view, extract_dir,
                     allow_overwrite=False,
                     save_to_processed=save_to_processed,
                     save_to_text=save_to_text)
@@ -206,10 +205,10 @@ class MainWindow(QMainWindow):
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
     def extract_gltf(self, eid, extract_dir, save_to_one_dir, include_skeleton):
-        if self.vfs_selection.node_selected_count() > 0:
+        if self.vfs_view.node_selected_count() > 0:
             try:
                 nodes_export_gltf(
-                    self.vfs, self.vfs_selection, extract_dir,
+                    self.vfs, self.vfs_view, extract_dir,
                     allow_overwrite=False,
                     save_to_one_dir=save_to_one_dir,
                     include_skeleton=include_skeleton)
@@ -218,8 +217,8 @@ class MainWindow(QMainWindow):
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
     def slot_folder_show_clicked(self, checked):
-        if self.vfs_selection.node_selected_count() > 0:
-            path = self.vfs_selection.common_prefix()
+        if self.vfs_view.node_selected_count() > 0:
+            path = self.vfs_view.common_prefix()
 
             if self.sender() == self.ui.bt_extract_folder_show:
                 root = self.vfs.working_dir + 'extracted/'
@@ -293,8 +292,7 @@ class MainWindow(QMainWindow):
             if txt[-1] != '$':
                 txt = txt + '$'
 
-        self.vfs_selection.mask_set(txt.encode('ascii'))
-        self.vfs_dir_widget.filter_vfspath_set(self.vfs_selection)
+        self.vfs_view.mask_set(txt.encode('ascii'))
 
     def vhash_to_vpath_text_changed(self):
         txt_in = self.ui.vhash_to_vpath_in_edit.text()

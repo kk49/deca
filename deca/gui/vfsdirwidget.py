@@ -198,43 +198,6 @@ class VfsDirModel(QAbstractItemModel):
         return None
 
 
-class DecaSortFilterProxyModel(QSortFilterProxyModel):
-    def __init__(self, *args, **kwargs):
-        QSortFilterProxyModel.__init__(self, *args, **kwargs)
-        self.vfs_selection: Optional[VfsView] = None
-        self.vis_map = {}
-
-    def check_node(self, index):
-        if index in self.vis_map:
-            return self.vis_map[index]
-
-        tnode = index.internalPointer()
-        vis = False
-        if isinstance(tnode, VfsDirBranch):
-            for r in range(self.sourceModel().rowCount(index)):
-                cindex = self.sourceModel().index(r, 0, index)
-                vis = vis | self.check_node(cindex)
-
-        elif isinstance(tnode, VfsDirLeaf):
-            vis = self.vfs_selection is None or self.vfs_selection.node_visible_has(tnode.uids)
-
-        self.vis_map[index] = vis
-
-        return vis
-
-    def filter_set(self, selection):
-        self.beginResetModel()
-        self.vfs_selection = selection
-        self.vis_map = {}
-        if self.sourceModel() is not None:
-            self.check_node(self.sourceModel().index(0, 0, QModelIndex()))
-        self.endResetModel()
-
-    def filterAcceptsRow(self, source_row: int, source_parent):
-        index = self.sourceModel().index(source_row, 0, source_parent)
-        return self.check_node(index)
-
-
 class VfsDirWidget(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
@@ -244,9 +207,6 @@ class VfsDirWidget(QWidget):
 
         # Getting the Model
         self.source_model = VfsDirModel()
-
-        # prepare filter
-        self.proxy_model = DecaSortFilterProxyModel(self)
 
         # Creating a QTableView
         self.view = QTreeView()
@@ -258,8 +218,7 @@ class VfsDirWidget(QWidget):
         font = self.view.font()
         font.setPointSize(8)
         self.view.setFont(font)
-        # self.view.setSortingEnabled(True)
-        self.view.setModel(self.proxy_model)
+        self.view.setModel(self.source_model)
 
         # # QTableView Headers
         self.header = self.view.header()
@@ -274,31 +233,21 @@ class VfsDirWidget(QWidget):
         self.main_layout.addWidget(self.view)
         self.setLayout(self.main_layout)
 
-        self.filter_vfspath_set(None)
-
     def vfs_view_set(self, vfs_view):
         self.source_model.vfs_view_set(vfs_view)
-        self.proxy_model.setSourceModel(self.source_model)
 
     def clicked(self, index):
         if index.isValid():
             if self.vnode_selection_changed is not None:
                 items = self.view.selectedIndexes()
-                items = [self.proxy_model.mapToSource(idx) for idx in items]
                 items = list(set([idx.internalPointer() for idx in items]))
                 items = [idx.v_path() for idx in items if isinstance(idx, VfsDirLeaf) or isinstance(idx, VfsDirBranch)]
                 self.vnode_selection_changed(items)
 
     def double_clicked(self, index):
         if index.isValid():
-            index = self.proxy_model.mapToSource(index)
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
                 uid = tnode.uids[0]
                 item = self.source_model.vfs_view.node_where_uid(uid)
                 self.vnode_2click_selected(item)
-
-    def filter_vfspath_set(self, selection):
-        # self.proxy_model.setFilterRegExp(QRegExp(expr, Qt.CaseInsensitive, QRegExp.RegExp))
-        # self.proxy_model.setFilterKeyColumn(0)
-        self.proxy_model.filter_set(selection)

@@ -16,6 +16,7 @@
 * GUI: Added folder button next to each extract button and build button to open folder in OS 
 * Added file node trace for exception causes nodes/files
 * GUI: Fixed hash to string search function in gui
+* Fixed issue with newer file formats, block info was not reloaded from the database
 
 #### v0.2.9 The May Day edition
 * Added ability to do basic dump of APEX engine files (like a save file) without processing entire game

@@ -80,7 +80,7 @@ class VfsNode:
         'offset',
         'size_c',
         'size_u',
-        'blocks',
+        '_blocks',
         'flags',
         'used_at_runtime_depth',
     )
@@ -118,7 +118,7 @@ class VfsNode:
         self.size_c = size_c  # compressed size in client
         self.size_u = size_u  # extracted size
 
-        self.blocks = blocks
+        self._blocks = blocks
 
         if flags is None:
             self.flags = 0
@@ -210,6 +210,26 @@ class VfsNode:
             return format_hash64(self.v_hash)
         else:
             raise NotImplementedError('hash_type not handled: {:016x}'.format(np.uint64(self.flags)))
+
+    def blocks_raw(self):
+        if not self._blocks:
+            return None
+
+        return self._blocks
+
+    def blocks_get(self, vfs):
+        vfs: VfsDatabase
+
+        if self._blocks is None:
+            self._blocks = vfs.blocks_where_node_id(self.uid)
+
+            if self._blocks is None:
+                self._blocks = False
+
+        if not self._blocks:
+            return [(self.offset, self.size_c, self.size_u)]
+
+        return self._blocks
 
 
 core_nodes_definition = \
@@ -630,12 +650,25 @@ class VfsDatabase:
 
         self.db_changed_signal.call()
 
+    def blocks_where_node_id(self, node_id):
+        blocks = self.db_query_all(
+            "SELECT block_offset, block_length_compressed, block_length_uncompressed "
+            "FROM core_node_blocks "
+            "WHERE node_id == (?) "
+            "ORDER BY block_index ASC",
+            [node_id], dbg='blocks_where_node_id')
+
+        if len(blocks) > 0:
+            return blocks
+
+        return None
+
     def node_where_uid(self, uid):
         r1 = self.db_query_one(
             "select * from core_nodes where node_id == (?)",
             [uid],
             dbg='node_where_uid')
-        # todo load blocks
+
         r1 = db_to_vfs_node(r1)
         return r1
 
@@ -644,7 +677,7 @@ class VfsDatabase:
             "select * from core_nodes where node_id in (?)",
             [uids],
             dbg='nodes_where_uid')
-        # todo load blocks
+
         nodes = [db_to_vfs_node(node) for node in nodes]
         return nodes
 
@@ -943,8 +976,9 @@ class VfsDatabase:
         self.db_conn.commit()
 
         blocks = []
+        node: VfsNode
         for node in nodes:
-            if node.blocks:
+            if node.blocks_raw():
                 result = self.db_query_all(
                     "SELECT node_id FROM core_nodes WHERE parent_id=(?) and parent_index=(?)",
                     [node.pid, node.index],
@@ -953,7 +987,7 @@ class VfsDatabase:
 
                 node.uid = result[0][0]
 
-                for bi, block in enumerate(node.blocks):
+                for bi, block in enumerate(node.blocks_raw()):
                     blocks.append((node.uid, bi, block[0], block[1], block[2]))
 
         if blocks:
@@ -1339,10 +1373,7 @@ class VfsDatabase:
                 bad_blocks = []
                 buffer_out = b''
 
-                if node.blocks is None:
-                    blocks = [(node.offset, node.size_c, node.size_u)]
-                else:
-                    blocks = node.blocks
+                blocks = node.blocks_get(self)
 
                 with self.file_obj_from(parent_node) as f_in:
                     for bi, (block_offset, compressed_len, uncompressed_len) in enumerate(blocks):
@@ -1369,7 +1400,7 @@ class VfsDatabase:
                 if bad_blocks:
                     self.logger.trace('{}: ct:{}, cf:{}, sc:{}, su:{}, bnn:{}, bl:{}, f:{}'.format(
                         label, node.compression_type_get(), node.compression_flag_get(), node.size_c, node.size_u,
-                        node.blocks is not None, all_blocks, file_name,
+                        len(blocks) > 0, all_blocks, file_name,
                     ))
 
                 return io.BytesIO(buffer_out)

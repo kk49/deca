@@ -26,9 +26,8 @@ class VfsView:
         self._nodes_selected_uids = set()
         self._nodes_selected_uids_no_vpaths = set()
 
-        self.vfs_changed = True
-        self.vfs_changed_signal = DecaSignal()
-
+        self.source_changed = True
+        self.signal_visible_changed = DecaSignal()
         self.signal_selection_changed = DecaSignal()
 
         self.parent_id = kwargs.get('parent_id', None)
@@ -41,7 +40,7 @@ class VfsView:
             self._adf_db = vfs_view._adf_db
             self.paths = vfs_view.paths
             self.mask = vfs_view.mask
-            vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_callback())
+            vfs_view.signal_visible_changed.connect(self, lambda x: x.slot_visible_changed())
         elif len(params) == 3:
             vfs = params[0]
             assert isinstance(vfs, VfsDatabase)
@@ -50,7 +49,7 @@ class VfsView:
             self._adf_db = AdfDatabase(vfs)
             self.paths = params[1]
             self.mask = params[2]
-            vfs.db_changed_signal.connect(self, lambda x: x.vfs_changed_callback())
+            vfs.db_changed_signal.connect(self, lambda x: x.slot_visible_changed())
         else:
             raise Exception('Incorrect Parameter count to VfsView')
 
@@ -63,14 +62,16 @@ class VfsView:
     def adf_db(self):
         return self._adf_db
 
-    def vfs_changed_callback(self):
-        self.vfs_changed = True
-        self.vfs_changed_signal.call()
-        print('VfsView.vfs_changed')
+    def slot_visible_changed(self):
+        print('VfsView.slot_visible_changed')
+        self.source_changed = True
+        self.signal_visible_changed.call()
 
     def mask_set(self, mask):
+        print('VfsView.mask_set')
         self._nodes_visible_dirty = True
         self.mask = mask
+        self.signal_visible_changed.call()
 
     def paths_count(self):
         if self.paths is None:
@@ -135,12 +136,13 @@ class VfsView:
             nodes_map.pop(vp)
 
     def node_update(self):
-        if self.vfs_changed:
+        selection_changed = False
+        if self.source_changed:
             self._adf_db.load_from_database(self._vfs)
-            self.vfs_changed = False
+            self.source_changed = False
             self._nodes_visible_dirty = True
             self._nodes_selected_dirty = True
-            self.signal_selection_changed.call()
+            selection_changed = True
 
         if self._nodes_visible_dirty:
             self.vfs().logger.log(f'Nodes Visible Begin')
@@ -156,7 +158,7 @@ class VfsView:
 
             self._nodes_visible_dirty = False
             self._nodes_selected_dirty = True
-            self.signal_selection_changed.call()
+            selection_changed = True
             self.vfs().logger.log(f'Nodes Visible End')
 
         if self._nodes_selected_dirty:
@@ -180,6 +182,9 @@ class VfsView:
 
             self._nodes_selected_dirty = False
             self.vfs().logger.log(f'Nodes Selected End')
+
+        if selection_changed:
+            self.signal_selection_changed.call()
 
     def node_visible_count(self):
         self.node_update()

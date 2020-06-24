@@ -27,14 +27,17 @@ class VfsNodeTableModel(QAbstractTableModel):
 
         self.vfs_changed_signal.connect(self.update_model)
 
+    def vfs_view_get(self):
+        return self.vfs_view
+
     def vfs_view_set(self, vfs_view: VfsView):
         if self.vfs_view != vfs_view:
             if self.vfs_view is not None:
-                self.vfs_view.vfs_changed_signal.disconnect(self)
+                self.vfs_view.signal_visible_changed.disconnect(self)
                 self.vfs_view = None
 
             self.vfs_view = vfs_view
-            self.vfs_view.vfs_changed_signal.connect(self, lambda x: x.vfs_changed_signal.emit())
+            self.vfs_view.signal_visible_changed.connect(self, lambda x: x.vfs_changed_signal.emit())
             self.vfs_changed_signal.emit()
 
     def update_model(self):
@@ -169,7 +172,7 @@ class VfsNodeTableModel(QAbstractTableModel):
 
 
 class VfsNodeTableWidget(QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, vfs_view, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
         self.vnode_2click_selected = None
@@ -206,11 +209,13 @@ class VfsNodeTableWidget(QWidget):
         # Set the layout to the QWidget
         self.setLayout(self.main_layout)
 
+        self.model.vfs_view_set(vfs_view)
+
     def show_all_set(self, v):
         self.model.show_all = v
 
-    def vfs_view_set(self, vfs_view):
-        self.model.vfs_view_set(vfs_view)
+    def vfs_view_get(self):
+        return self.model.vfs_view_get()
 
     def clicked(self, index):
         if index.isValid():

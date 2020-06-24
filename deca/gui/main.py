@@ -9,24 +9,43 @@ from deca.util import Logger, to_unicode
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
 from .main_window import Ui_MainWindow
+from .deca_interfaces import IVfsViewSrc
 from .vfsdirwidget import VfsDirWidget
 from .vfsnodetablewidget import VfsNodeTableWidget
 from PySide2.QtCore import Slot, QUrl, Signal
-from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
+from PySide2.QtWidgets import QWidget, QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
 from PySide2.QtGui import QDesktopServices
 
 
 window_title = 'decaGUI: v0.2.10-dev'
 
 
+class MainWindowDataSource(IVfsViewSrc):
+    def __init__(self, main_window, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.main_window: MainWindow = main_window
+
+    def vfs_get(self):
+        return self.main_window.vfs
+
+    def vfs_view_get(self):
+        return self.main_window.vfs_view_current()
+
+    def archive_open(self, selection):
+        return self.main_window.slot_archive_open(selection)
+
+
 class MainWindow(QMainWindow):
+    signal_visible_changed = Signal(VfsView)
     signal_selection_changed = Signal(VfsView)
 
     def __init__(self, *args, **kwargs):
-        super(MainWindow, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        self.data_source = MainWindowDataSource(self)
 
         self.vfs: Optional[VfsProcessor] = None
         self.logger = Logger('./')
@@ -34,11 +53,11 @@ class MainWindow(QMainWindow):
         self.builder = Builder()
         self.current_vnode = None
         self.vfs_view_root: Optional[VfsView] = None
-        self.vfs_view: Optional[VfsView] = None
 
         self.tab_nodes_deletable = set()
 
-        self.signal_selection_changed.connect(self.update_select_state)
+        self.signal_visible_changed.connect(self.slot_visible_changed)
+        self.signal_selection_changed.connect(self.slot_selection_changed)
 
         # Configure Actions
         self.ui.action_project_new.triggered.connect(self.project_new)
@@ -52,7 +71,7 @@ class MainWindow(QMainWindow):
         self.ui.action_make_web_map.triggered.connect(self.tool_make_web_map)
 
         # filter
-        self.ui.filter_edit.textChanged.connect(self.filter_text_changed)
+        self.ui.filter_edit.textEdited.connect(self.filter_text_changed)
 
         self.ui.vhash_to_vpath_in_edit.textChanged.connect(self.vhash_to_vpath_text_changed)
 
@@ -97,48 +116,9 @@ class MainWindow(QMainWindow):
         self.ui.bt_mod_build.clicked.connect(self.slot_mod_build_clicked)
 
         self.ui.tabs_nodes.tabCloseRequested.connect(self.slot_nodes_tab_close)
-        self.ui.data_view.signal_archive_open.connect(self.slot_archive_open)
+        self.ui.tabs_nodes.currentChanged.connect(self.slot_nodes_tab_current_changed)
 
-    def tab_nodes_add(self, widget_class, name, deletable=False):
-        # self.tab_extract = QtWidgets.QWidget()
-        # self.tab_extract.setObjectName("tab_extract")
-        # self.gridLayout = QtWidgets.QGridLayout(self.tab_extract)
-        # self.gridLayout.setObjectName("gridLayout")
-        widget = widget_class(self.ui.tabs_nodes)
-        self.ui.tabs_nodes.addTab(widget, name)
-        widget.vnode_2click_selected = self.vnode_2click_selected
-
-        if deletable:
-            self.tab_nodes_deletable.add(widget)
-
-        return widget
-
-    def vfs_set(self, vfs):
-        self.vfs = vfs
-        self.vfs_view_root = VfsView(vfs, None, b'^.*$')
-        self.vfs_view_root.signal_selection_changed.connect(
-            self, lambda x: x.signal_selection_changed.emit(self.vfs_view_root))
-
-        # Configure VFS dir table
-        widget = self.tab_nodes_add(VfsDirWidget, 'Directory')
-        widget.vfs_view_set(self.vfs_view_root)
-
-        # Configure VFS Node table (non-mapped nodes)
-        widget = self.tab_nodes_add(VfsNodeTableWidget, 'Non-Mapped List')
-        widget.show_all_set(False)
-        widget.vfs_view_set(self.vfs_view_root)
-
-        # Configure VFS Node table (all nodes)
-        widget = self.tab_nodes_add(VfsNodeTableWidget, 'Raw List')
-        widget.show_all_set(True)
-        widget.vfs_view_set(self.vfs_view_root)
-
-        self.update_select_state(self.vfs_view_root)
-
-        self.ui.action_external_add.setEnabled(True)
-
-        self.setWindowTitle("{}: Archive: {}".format(window_title, vfs.game_info.game_dir))
-        self.ui.statusbar.showMessage("LOAD COMPLETE")
+        self.ui.data_view.data_source_set(self.data_source)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -162,11 +142,58 @@ class MainWindow(QMainWindow):
         msg.setStandardButtons(QMessageBox.Ok)
         retval = msg.exec_()
 
+    def vfs_view_create(self, *args, **kwargs):
+        vfs_view = VfsView(*args, **kwargs)
+        vfs_view.signal_visible_changed.connect(
+            self, lambda x: x.signal_visible_changed.emit(vfs_view))
+        vfs_view.signal_selection_changed.connect(
+            self, lambda x: x.signal_selection_changed.emit(vfs_view))
+
+        return vfs_view
+
+    def vfs_set(self, vfs):
+        self.vfs = vfs
+        self.vfs_view_root = self.vfs_view_create(vfs, None, b'^.*$')
+
+        # Configure VFS dir table
+        widget = self.tab_nodes_add(VfsDirWidget, self.vfs_view_root, 'Directory')
+
+        # Configure VFS Node table (non-mapped nodes)
+        widget = self.tab_nodes_add(VfsNodeTableWidget, self.vfs_view_root, 'Non-Mapped List')
+        widget.show_all_set(False)
+
+        # Configure VFS Node table (all nodes)
+        widget = self.tab_nodes_add(VfsNodeTableWidget, self.vfs_view_root, 'Raw List')
+        widget.show_all_set(True)
+
+        self.ui.action_external_add.setEnabled(True)
+
+        self.setWindowTitle("{}: Archive: {}".format(window_title, vfs.game_info.game_dir))
+        self.ui.statusbar.showMessage("LOAD COMPLETE")
+
+    def vfs_view_current(self):
+        widget = self.ui.tabs_nodes.currentWidget()
+        if widget is None:
+            return None
+        return widget.vfs_view_get()
+
+    def tab_nodes_add(self, widget_class, vfs_view, name, deletable=False):
+        # self.tab_extract = QtWidgets.QWidget()
+        # self.tab_extract.setObjectName("tab_extract")
+        # self.gridLayout = QtWidgets.QGridLayout(self.tab_extract)
+        # self.gridLayout.setObjectName("gridLayout")
+        widget = widget_class(vfs_view, self.ui.tabs_nodes)
+        self.ui.tabs_nodes.addTab(widget, name)
+        widget.vnode_2click_selected = self.vnode_2click_selected
+
+        if deletable:
+            self.tab_nodes_deletable.add(widget)
+
+        return widget
+
     def slot_archive_open(self, vnode: VfsNode):
-        widget = self.tab_nodes_add(VfsDirWidget, to_unicode(vnode.v_path), True)
-        vfs_view = VfsView(self.vfs_view, parent_id=vnode.uid)
-        vfs_view.signal_selection_changed.connect(self, lambda x: x.signal_selection_changed.emit(vfs_view))
-        widget.vfs_view_set(vfs_view)
+        vfs_view = self.vfs_view_create(self.vfs_view_current(), parent_id=vnode.uid)
+        self.tab_nodes_add(VfsDirWidget, vfs_view, to_unicode(vnode.v_path), True)
 
     def slot_nodes_tab_close(self, index):
         widget = self.ui.tabs_nodes.widget(index)
@@ -176,13 +203,22 @@ class MainWindow(QMainWindow):
                 widget.deleteLater()
             self.ui.tabs_nodes.removeTab(index)
 
+    def slot_nodes_tab_current_changed(self, index):
+        widget = self.ui.tabs_nodes.widget(index)
+        self.update_select_state(self.vfs_view_current())
+
+    def slot_visible_changed(self, vfs_view: VfsView):
+        self.update_select_state(vfs_view)
+
+    def slot_selection_changed(self, vfs_view: VfsView):
+        self.update_select_state(vfs_view)
+
     def update_select_state(self, vfs_view):
-        if vfs_view is not None:
-            self.vfs_view = vfs_view
+        if vfs_view == self.vfs_view_current():
+            any_selected = vfs_view.paths_count() > 0
 
-            self.ui.data_view.vfs_view_set(self.vfs_view)
-
-            any_selected = self.vfs_view.paths_count() > 0
+            if not self.ui.filter_edit.hasFocus():
+                self.ui.filter_edit.setText(to_unicode(vfs_view.mask))
 
             self.ui.bt_extract.setEnabled(any_selected)
             self.ui.bt_extract_gltf_3d.setEnabled(any_selected)
@@ -191,7 +227,7 @@ class MainWindow(QMainWindow):
             self.ui.bt_extract_gltf_3d_folder_show.setEnabled(any_selected)
             self.ui.bt_mod_folder_show.setEnabled(any_selected)
 
-            str_vpaths = self.vfs_view.paths_summary_str()
+            str_vpaths = self.vfs_view_current().paths_summary_str()
             self.ui.bt_extract.setText('EXTRACT: {}'.format(str_vpaths))
             self.ui.bt_extract_gltf_3d.setText('EXTRACT 3D/GLTF2: {}'.format(str_vpaths))
             self.ui.bt_mod_prep.setText('PREP MOD: {}'.format(str_vpaths))
@@ -207,16 +243,16 @@ class MainWindow(QMainWindow):
         self.ui.data_view.vnode_2click_selected(vnode)
 
     def extract(self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text):
-        if self.vfs_view.node_selected_count() > 0:
+        if self.vfs_view_current().node_selected_count() > 0:
             try:
                 if export_raw:
-                    nodes_export_raw(self.vfs, self.vfs_view, extract_dir)
+                    nodes_export_raw(self.vfs, self.vfs_view_current(), extract_dir)
 
                 if export_contents:
-                    nodes_export_contents(self.vfs, self.vfs_view, extract_dir)
+                    nodes_export_contents(self.vfs, self.vfs_view_current(), extract_dir)
 
                 nodes_export_processed(
-                    self.vfs, self.vfs_view, extract_dir,
+                    self.vfs, self.vfs_view_current(), extract_dir,
                     allow_overwrite=False,
                     save_to_processed=save_to_processed,
                     save_to_text=save_to_text)
@@ -225,10 +261,10 @@ class MainWindow(QMainWindow):
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
     def extract_gltf(self, eid, extract_dir, save_to_one_dir, include_skeleton):
-        if self.vfs_view.node_selected_count() > 0:
+        if self.vfs_view_current().node_selected_count() > 0:
             try:
                 nodes_export_gltf(
-                    self.vfs, self.vfs_view, extract_dir,
+                    self.vfs, self.vfs_view_current(), extract_dir,
                     allow_overwrite=False,
                     save_to_one_dir=save_to_one_dir,
                     include_skeleton=include_skeleton)
@@ -237,8 +273,8 @@ class MainWindow(QMainWindow):
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
     def slot_folder_show_clicked(self, checked):
-        if self.vfs_view.node_selected_count() > 0:
-            path = self.vfs_view.common_prefix()
+        if self.vfs_view_current().node_selected_count() > 0:
+            path = self.vfs_view_current().common_prefix()
 
             if self.sender() == self.ui.bt_extract_folder_show:
                 root = self.vfs.working_dir + 'extracted/'
@@ -285,7 +321,7 @@ class MainWindow(QMainWindow):
         )
 
     def slot_mod_build_subset_clicked(self, checked):
-        self.update_select_state(self.vfs_view)
+        self.update_select_state(self.vfs_view_current())
 
     def slot_mod_prep_clicked(self, checked):
         self.extract(
@@ -300,7 +336,7 @@ class MainWindow(QMainWindow):
         try:
             subset = None
             if self.ui.chkbx_mod_build_subset.isChecked():
-                subset = self.vfs_view.nodes_selected_uids_get()
+                subset = self.vfs_view_current().nodes_selected_uids_get()
 
             self.builder.build_dir(
                 self.vfs, self.vfs.working_dir + 'mod/', self.vfs.working_dir + 'build/', subset=subset)
@@ -320,7 +356,7 @@ class MainWindow(QMainWindow):
             if txt[-1] != '$':
                 txt = txt + '$'
 
-        self.vfs_view.mask_set(txt.encode('ascii'))
+        self.vfs_view_current().mask_set(txt.encode('ascii'))
 
     def vhash_to_vpath_text_changed(self):
         txt_in = self.ui.vhash_to_vpath_in_edit.text()

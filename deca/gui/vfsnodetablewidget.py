@@ -213,6 +213,7 @@ class VfsNodeTableWidget(QWidget):
 
     def show_all_set(self, v):
         self.model.show_all = v
+        self.model.update_model()
 
     def vfs_view_get(self):
         return self.model.vfs_view_get()

@@ -12,6 +12,8 @@
         gtag('config', 'UA-169933249-1');
     </script>
 
+    <script data-ad-client="ca-pub-9852507806031654" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+
     <meta charset='utf-8' />
     <title>deca Map Full</title>
 
@@ -55,31 +57,33 @@
 
 <body>
 
-<!-- Default Statcounter code for Mathartbang.com
-http://mathartbang.com/ -->
+<!-- Default Statcounter code for Mathartbang.com http://mathartbang.com/ -->
 <script type="text/javascript">
-var sc_project=12340476;
-var sc_invisible=1;
-var sc_security="e165fee7";
+    var sc_project=12340476;
+    var sc_invisible=1;
+    var sc_security="e165fee7";
 </script>
-<script type="text/javascript"
-src="https://www.statcounter.com/counter/counter.js"
-async></script>
-<noscript><div class="statcounter"><a title="Web Analytics"
-href="https://statcounter.com/" target="_blank"><img
-class="statcounter"
-src="https://c.statcounter.com/12340476/0/e165fee7/1/"
-alt="Web Analytics"></a></div></noscript>
+<script type="text/javascript" src="https://www.statcounter.com/counter/counter.js" async>
+</script>
+<noscript>
+    <div class="statcounter">
+        <a title="Web Analytics" href="https://statcounter.com/" target="_blank">
+            <img class="statcounter" src="https://c.statcounter.com/12340476/0/e165fee7/1/" alt="Web Analytics">
+        </a>
+    </div>
+</noscript>
 <!-- End of Statcounter Code -->
 
 <div id="mapid"></div>
 
 <script>
     var urlParams = new URLSearchParams(window.location.search);
-    var show_dev = urlParams.has('dev');
     var collapse_layers = !urlParams.has('no_collapse_layers');
-    console.log('show_dev = ', show_dev);
+    var spoilers = urlParams.has('spoilers');
+    var show_dev = urlParams.has('dev');
     console.log('collapse_layers = ', collapse_layers);
+    console.log('spoilers = ', spoilers);
+    console.log('show_dev = ', show_dev);
 
 
     var crs = L.CRS.Simple;
@@ -102,7 +106,7 @@ alt="Web Analytics"></a></div></noscript>
             if (feature.properties && feature.properties.uid_str) {
                 s = s + "<br>id: " + feature.properties.uid_str;
             }
-            if (spoilers && feature.properties && feature.properties.poi_name_tr) {
+            if (feature.properties && feature.properties.poi_name_tr) {
                 s = s + "<br>name_tr: " + feature.properties.poi_name_tr;
             }
             if (spoilers && feature.properties && feature.properties.poi_desc_tr) {
@@ -117,7 +121,7 @@ alt="Web Analytics"></a></div></noscript>
             if (feature.properties && feature.properties.bookmark_name) {
                 s = s + "<br>name: " + feature.properties.bookmark_name;
             }
-            if (spoilers && feature.properties && feature.properties.collectable_name_tr) {
+            if (feature.properties && feature.properties.collectable_name_tr) {
                 s = s + "<br>name: " + feature.properties.collectable_name_tr;
             }
             if (spoilers && feature.properties && feature.properties.collectable_desc_tr) {

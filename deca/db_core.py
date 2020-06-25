@@ -1435,11 +1435,11 @@ class VfsDatabase:
 
         return self._lookup_equipment_from_hash.get(name_hash, None)
 
-    def lookup_translation_from_name(self, name):
+    def lookup_translation_from_name(self, name, default=None):
         if self._lookup_translation_from_name is None:
-            return None
+            return default
 
-        return self._lookup_translation_from_name.get(name, None)
+        return self._lookup_translation_from_name.get(name, default)
 
     def lookup_note_from_file_path(self, path):
         if self._lookup_note_from_file_path is None:

@@ -35,6 +35,16 @@ def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode
 def process_codex_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode, export_path='./digest/'):
     codex_fn = adf_export_xlsx_0x0b73315d(vfs, adf_db, node, export_path=export_path, allow_overwrite=True)
     codex_wb = openpyxl.load_workbook(filename=codex_fn)
+
+    cat_id = []
+    cat_name = []
+    for col in codex_wb['CollectableCategories'].columns:
+        c = [v.value for v in col]
+        if c[0] == 'id':
+            cat_id = c[1:]
+        elif c[0] == 'name':
+            cat_name = c[1:]
+
     codex_id = []
     codex_name = []
     codex_desc = []
@@ -53,10 +63,12 @@ def process_codex_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode, expo
         elif c[0] == 'collection_id':
             codex_category = c[1:]
 
+    categories = dict(zip(cat_id, cat_name))
+
     codex = {}
     for cid, name, desc, icon, category in zip(codex_id, codex_name, codex_desc, codex_icon, codex_category):
         if cid is not None:
             codex[cid] = (name, desc, icon, category)
 
-    return codex
+    return categories, codex
 

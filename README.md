@@ -8,9 +8,18 @@ A hacked up tool for exploring/extracting/modding files from Avalanche Studios A
 mainly Generation Zero.
 
 Written in Python, tested only on Linux, code is a mess, because this is an experiment...
-## External Dependecies
-* A modified version of [HavokLib](https://github.com/PredatorCZ/HavokLib) (Modified version here https://github.com/kk49/HavokLib)
- 
+
+## (Pre-)Releases for Windows
+https://github.com/kk49/deca/releases
+
+*Development Releases are on the Discord*
+
+## Discord
+For **deca** specific and general GenZero, theHunter:COTW, and other APEX engine games modding.
+Also has a channel for development releases of **deca**
+
+https://discord.gg/x5AuPj7
+
 ## Key Features
 * Export (modelc, meshc, hrmeshc) to GLTF 2.0 (material models not complete/missing, no bones)
 * Export ADF encoded spreadsheets
@@ -19,22 +28,19 @@ Written in Python, tested only on Linux, code is a mess, because this is an expe
 * GUI to explore archive files
 * Basic rebuilding of archive files to update textures, Characters/Machines work. Set pieces do not.
 
-## Supported Games
-|GAME|STATUS|Nodes Total|Nodes Named|Hashes Total|Hashes Found|ADF Types Found / Missing|Last Update|
-|---|---|---|---|---|---|---|---|
-|Avalanche Studios' Generation Zero®|Loading most/all files|860879|857305|63375|59897|888 / 7|2019/02/16|
-|Avalanche Studios' theHunter™: Call of the Wild|Loading most/all files|278223|273556|72268|67717|920 / 0|2019/02/16|
-|Avalanche Studios' Just Cause 3|Loading most/all files. Lots of FPs|1907029|FPs|277852|FPs|797 / 0|2019/02/05|
-|Avalanche Studios' Just Cause 4|Loading most/all files|1911397|1757124|223864|190329|1055 / 0|2019/02/04|
-|Avalanche Studios' RAGE 2|Partial/In-Development|1740966|1572865|470800|302941|2091 / 0|2019/02/16|
+## "Supported" Games
+Support varies among the games, people are activily using **deca** for GenZero and theHunter:COTW
 
-## Discord
-For deca specific and general GenZero (and theHunter?) modding.
-
-https://discord.gg/x5AuPj7
+|GAME|
+|---|
+|Avalanche Studios' Generation Zero®|
+|Avalanche Studios' theHunter™: Call of the Wild|
+|Avalanche Studios' Just Cause 3|
+|Avalanche Studios' Just Cause 4|
+|Avalanche Studios' RAGE 2|
 
 ## Quick Start
-No installer, just unzip the release file in some directory and start deca_gui.exe. (not signed so windows will complain)
+No installer, just unzip the [release file](https://github.com/kk49/deca/releases) in some directory and start deca_gui.exe. (not signed so windows will complain)
 Go to the menu and under File select New Project ..., find theHunter EXE, and wait 40 minutes the first time.
 It does a bunch of work to figure out possible file names, and python multiprocessing on Windows is a pain.
 
@@ -43,7 +49,7 @@ directory.
 
 It currently creates a work/hp directory one directory above where deca_gui.exe is. So you can used File/Open Project 
 and find the project.json file to open it again. Ignore the log tab on the left and take a look at the DIR tab, which 
-shows the entry VFS layout. Double click on nodes and the contents (if deca can parse them) appears in the tables on 
+shows the entry VFS layout. Double click on nodes and the contents (if **deca** can parse them) appears in the tables on 
 the right.
 
 Individual files can be extracted with the EXTRACT button after they are selected with one click. They are placed in 
@@ -59,27 +65,31 @@ game does not crash before it gets to BETA over screen)
 ## Game Support
 
 ## File Type Status (Numbers are arbitrary)
-|FILES|Game|Status|Notes|
-|-----|------------|-----------|-----|
-|TAB/ARC|GZB|Done?| double check code to see if something is not understood |
-|AAF| GZB|Done?| double check code to see if something is not understood |
-|SARC| GZB|Done?| double check code to see if something is not understood |
-|AVTX, ATX, DDSC, HMDDSC| GZB|Done? | double check code to see if something is not understood |
-|ADF| GZB | Extractable, Parsed | Partial Handling of GameDataCollection (0x178842fe)|
-| |  |  | Export of modelc, meshc, hrmeshc, mdic to GLTF 2.0 (material models not correct?, missing bones) |
-| |  |  | Missing code for types that have hardcoded parsers in EXE(?) |
-| |  |  | stringlookup not fully grokked |
-|RTPC| GZB | Extractable, Parsed |  |
-|OGG| GZB| Extractable | Ogg file, can be extracted |
-|TAG0| GZB | Extractable |  |
-|btc| GZB | Extractable |  |
-|CFX| GZB | Extractable | Autodesk Scaleform https://github.com/jindrapetrik/jpexs-decompiler |
-|RIFF| GZB | Extractable |  |
-|lFSB5| GZB | Extractable |  |
-|.obc| GZB | Extractable | found a correlation in file size, guess at record size/count |
-|RBMDL|JC3| Extractable |  |
+|FILES|Status|Notes|
+|-----|-----------|-----|
+|TAB/ARC|Done| |
+|AAF| Done|  |
+|SARC| Done|  |
+|AVTX, ATX, DDSC, HMDDSC| Done |  |
+|ADF| Extractable, Parsed | Partial Handling of GameDataCollection (0x178842fe)|
+| |  | Export of modelc, meshc, hrmeshc, mdic to GLTF 2.0 (material models not correct?, missing bones) |
+| |  | Missing code for types that have hardcoded parsers in EXE(?) |
+| |  | stringlookup not fully grokked |
+|RTPC|  Extractable, Parsed |  |
+|OGG| Extractable | Ogg file, can be extracted |
+|CFX|  Extractable | Autodesk Scaleform https://github.com/jindrapetrik/jpexs-decompiler |
+|.obc|  Extractable | found a correlation in file size, guess at record size/count |
+|RIFF|  Extractable |  |
+|lFSB5|  Extractable |  |
+|RBMDL| Extractable |  |
+|TAG0|  Extractable |  |
+|btc|  Extractable |  |
 
+## External Dependencies
+* A modified version of [HavokLib](https://github.com/PredatorCZ/HavokLib) (Modified version here https://github.com/kk49/HavokLib)
+ 
 ## References
+
 #### Gibbed's Just Cause 3 archive exporter
 Learned about ALL the files here and used as a basis to understand changes made in GZ.
 

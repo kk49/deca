@@ -3,7 +3,7 @@ import re
 from typing import List
 from .db_core import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
-from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString
+from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString, prop_skeleton, prop_model_skeleton
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 
 '''
@@ -44,8 +44,11 @@ def rtpc_export_node_recurse(
     if 0x98796658 in rtpc.prop_map:
         material_properties['color_mask_b'] = rtpc.prop_map[0x98796658].data
 
-    if 0x26fa86fe in rtpc.prop_map:
-        skeleton_raw_path = rtpc.prop_map[0x26fa86fe].data
+    if prop_model_skeleton in rtpc.prop_map:
+        skeleton_raw_path = rtpc.prop_map[prop_model_skeleton].data
+
+    if prop_skeleton in rtpc.prop_map:
+        skeleton_raw_path = rtpc.prop_map[prop_skeleton].data
 
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data

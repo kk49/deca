@@ -90,6 +90,8 @@ prop_item_item_id = hash32_func('[Item]  Item ID')
 prop_spline = hash32_func('spline')
 prop_deca_loot_class = 0x34beec18
 prop_deca_crafting_type = 0xa949bc65
+prop_model_skeleton = hash32_func('model_skeleton')
+prop_skeleton = hash32_func('skeleton')
 
 
 class FieldNameMap:

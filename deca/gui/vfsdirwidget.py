@@ -10,11 +10,14 @@ from PySide2.QtWidgets import QHeaderView, QSizePolicy, QWidget, QHBoxLayout, QT
 
 
 class VfsDirLeaf(object):
-    def __init__(self, name, uids):
+    def __init__(self, name, uids_hard, uids_sym, in_gdcc_count):
         self.name = name
         self.parent = None
         self.row = 0
-        self.uids = uids
+        self.uids = uids_hard + uids_sym
+        self.uids_hard = uids_hard
+        self.uids_sym = uids_sym
+        self.in_gdcc_count = in_gdcc_count
 
     def v_path(self):
         pn = b''
@@ -63,12 +66,13 @@ class VfsDirModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
         self.vfs_view: Optional[VfsView] = None
+        self.gdc_body_uids = set()
         self.root_node = None
         self.n_rows = 0
         self.n_cols = 0
 
         self.header_labels = \
-            ("Path", "Index", "Type", "Sub_Type", "Hash", "EXT_Hash", "Size_U", "Size_C", "Used_Depth", "Notes")
+            ("Path", "Index", "Type", "Sub_Type", "Hash", "EXT_Hash", "Size_U", "Size_C", "G, H, S", "Notes")
 
         self.vfs_changed_signal.connect(self.update_model)
 
@@ -82,6 +86,15 @@ class VfsDirModel(QAbstractItemModel):
                 self.vfs_view = None
 
             self.vfs_view = vfs_view
+
+            # find gdc.DECA / FTYPE_GDCBODY files, so they can tag their children
+            gdc_uids = set(self.vfs_view.vfs().nodes_where_match(file_type=FTYPE_GDCBODY, uid_only=True))
+
+            self.gdc_body_uids = set()
+            for pid in gdc_uids:
+                uids = self.vfs_view.vfs().nodes_where_match(pid_in=pid, uid_only=True)
+                self.gdc_body_uids = self.gdc_body_uids.union(uids)
+
             self.vfs_view.signal_visible_changed.connect(self, lambda x: x.vfs_changed_signal.emit())
             self.vfs_changed_signal.emit()
 
@@ -109,7 +122,11 @@ class VfsDirModel(QAbstractItemModel):
             for p in path:
                 cnode = cnode.child_add(VfsDirBranch(p))
 
-            cnode.child_add(VfsDirLeaf(name, vp_uids + sym_uids))
+            in_gdcc_count = 0
+            for uid in vp_uids:
+                if uid in self.gdc_body_uids:
+                    in_gdcc_count += 1
+            cnode.child_add(VfsDirLeaf(name, vp_uids, sym_uids, in_gdcc_count=in_gdcc_count))
 
         self.endResetModel()
 
@@ -188,7 +205,7 @@ class VfsDirModel(QAbstractItemModel):
                 elif column == 7:
                     return '{}'.format(vnode.size_c)
                 elif column == 8:
-                    return '{}'.format(vnode.used_at_runtime_depth)
+                    return '{}, {}, {}'.format(node.in_gdcc_count, len(node.uids_hard), len(node.uids_sym))
                 elif column == 9:
                     return '{}'.format(self.vfs_view.lookup_note_from_file_path(vnode.v_path))
         elif role == Qt.BackgroundColorRole:
@@ -196,8 +213,8 @@ class VfsDirModel(QAbstractItemModel):
                 uid = node.uids[0]
                 vnode: VfsNode = self.vfs_view.node_where_uid(uid)
                 if column == 8:
-                    if vnode.used_at_runtime_depth is not None:
-                        return used_color_calc(vnode.used_at_runtime_depth)
+                    if node.in_gdcc_count > 0:
+                        return QColor(Qt.yellow)
                 elif column == 3:
                     if vnode.file_sub_type is not None and \
                             vnode.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE} and \

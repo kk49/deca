@@ -3,6 +3,11 @@
 * GUI: will now create a new tab with the contents of a SARC (nl/fl/...) when the open button in the SARC tab is pressed
 * Build: Option added to build a subset of files/archives. Check build subset checkbox, and press build
 * Build: Added building ddsc, atx?, hmddsc? directly into archive files, this can be used to package dds files renamed as ddsc!!!
+* GUI: Added "G, H, S" column, which displays how many versions of a file are
+  * G : in a GDCC file
+  * H : "Hard" meaning the file contents are present
+  * S : "Symbolic" meaning the container of the file only references the file by name, and does not contain the contents
+* GUI: Removed Used Depth column, was only used during early development, not super useful currently
 * Load large files 1MB at a time during file determination this was a problem for some people on windows
 * Added script and support to process CAnimSpline objects
 * Textures: dxgi type 41 support, JC4 s failed to load because this was missing

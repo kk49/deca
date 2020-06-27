@@ -15,7 +15,7 @@
     <script data-ad-client="ca-pub-9852507806031654" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
 
     <meta charset='utf-8' />
-    <title>deca Map Full</title>
+    <title>DECA: Generation Zero: Full Map</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"
         integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA=="
@@ -49,9 +49,18 @@
 
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <style>
-        body { margin:0; padding:0; }
-        #mapid { position:absolute; top:0; bottom:0; width:100%; }
-        #xmapid { height: 800px; }
+        body { width: 100%; position: absolute; top: 0; bottom: 0; margin:0; padding:0; }
+        #main { width: 100%; position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; }
+        #intro { }
+        #mapid { flex-grow: 1; }
+        /*body { margin:0; padding:0;}*/
+        /*#intro { position: absolute; height:10%; width:100%; }*/
+        /*#mapid { position: absolute; top:10%; bottom:0; width:100%; }*/
+    </style>
+    <style>
+    #sections table, th, td {
+        border: 1px solid black;
+    }
     </style>
 </head>
 
@@ -74,7 +83,18 @@
 </noscript>
 <!-- End of Statcounter Code -->
 
-<div id="mapid"></div>
+<div id="main">
+    <div id="sections">
+        <table>
+            <tr>
+                <td><a href="/deca/gz/index.html?no_collapse_layers">Map Simple</a></td>
+                <td><a href="/deca/gz/full.html?no_collapse_layers">Map Full</a></td>
+                <td><a href="/deca/gz/collectibles/souvenirs.html">Collectibles</a>
+            </tr>
+        </table>
+    </div>
+    <div id="mapid"></div>
+</div>
 
 <script>
     var urlParams = new URLSearchParams(window.location.search);

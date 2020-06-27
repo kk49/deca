@@ -17,7 +17,7 @@ from PySide2.QtWidgets import QWidget, QApplication, QMainWindow, QMessageBox, Q
 from PySide2.QtGui import QDesktopServices
 
 
-window_title = 'decaGUI: v0.2.10'
+window_title = 'decaGUI: v0.2.11-dev'
 
 
 class MainWindowDataSource(IVfsViewSrc):

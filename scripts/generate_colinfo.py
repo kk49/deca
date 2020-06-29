@@ -15,7 +15,7 @@ tr = process_translation_adf(vfs, adf_db, vnode)
 
 # LOAD collectable codex information
 vnode = vfs.nodes_where_match(v_path=b'settings/hp_settings/codex_data.bin')[0]
-codex = process_codex_adf(vfs, adf_db, vnode)
+categories, codex = process_codex_adf(vfs, adf_db, vnode)
 
 # Load collectable info
 vnode = vfs.nodes_where_match(v_path=b'global/collection.collectionc')[0]

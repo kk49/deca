@@ -54,12 +54,18 @@ class Builder:
                         for entry in sarc_file.entries:
                             if entry.v_path == v_path:
                                 raise EDecaBuildError(
-                                    'BUILD ERROR: {}: Tried to re-add v_path'.format(src_context, v_path.decode('UTF-8')))
+                                    'BUILD ERROR: {}: Tried to re-add v_path: {}'.format(
+                                        src_context, v_path.decode('UTF-8')))
 
                         # Add to end
                         entry = EntrySarc(v_path=v_path)
                         entry.is_symlink = cmd == 'sarc.symlink'
-                        src_node = vfs.nodes_where_match(v_path=v_path)[0]
+                        src_node = vfs.nodes_where_match(v_path=v_path)
+                        if not src_node:
+                            raise EDecaBuildError(
+                                'BUILD ERROR: {}: v_path does not exist in database: {}'.format(
+                                    src_context, v_path.decode('UTF-8')))
+                        src_node = src_node[0]
                         entry.length = src_node.size_u
                         sarc_file.entries.append(entry)
                     # elif cmd == 'sarc.remove':

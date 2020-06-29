@@ -593,7 +593,7 @@ class ToolMakeWebMap:
 
         # load collectable codex
         vnode = self.vfs.nodes_where_match(v_path=b'settings/hp_settings/codex_data.bin')[0]
-        codex = process_codex_adf(self.vfs, self.adf_db, vnode, export_path=export_path)
+        categories, codex = process_codex_adf(self.vfs, self.adf_db, vnode, export_path=export_path)
 
         print('PROCESSING: blo(s)')
         visitor = RtpcVisitorMap(tr)

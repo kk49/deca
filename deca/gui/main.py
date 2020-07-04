@@ -416,7 +416,7 @@ class MainWindow(QMainWindow):
     def file_gz_open(self, checked):
         filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open GZ File ...', '../work', 'Any File (*)')
 
-        if filenames is not None and len(filenames[0]) > 0:
+        if filenames and len(filenames[0]) > 0:
             path, _ = os.path.split(filenames[0])
             vfs = vfs_structure_empty(path, 'GenerationZero')
             self.vfs_set(vfs)

@@ -1,4 +1,5 @@
 #### v0.2.11 ???
+* Handle games without settings/hp_settings/equipment.bin 
 
 #### v0.2.10 Half Way There
 * GLTF2: Added option to export skeletons with models (Using [HavokLib!](https://github.com/PredatorCZ/HavokLib))

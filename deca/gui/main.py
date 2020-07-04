@@ -1,3 +1,4 @@
+import re
 import sys
 import os
 from typing import Optional
@@ -12,9 +13,9 @@ from .main_window import Ui_MainWindow
 from .deca_interfaces import IVfsViewSrc
 from .vfsdirwidget import VfsDirWidget
 from .vfsnodetablewidget import VfsNodeTableWidget
-from PySide2.QtCore import Slot, QUrl, Signal
+from PySide2.QtCore import Slot, QUrl, Signal, QEvent
 from PySide2.QtWidgets import QWidget, QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
-from PySide2.QtGui import QDesktopServices
+from PySide2.QtGui import QDesktopServices, QKeyEvent, QKeySequence
 
 
 window_title = 'decaGUI: v0.2.11-dev'
@@ -71,7 +72,10 @@ class MainWindow(QMainWindow):
         self.ui.action_make_web_map.triggered.connect(self.tool_make_web_map)
 
         # filter
-        self.ui.filter_edit.textEdited.connect(self.filter_text_changed)
+        self.ui.filter_edit.textChanged.connect(self.filter_text_changed)
+        self.ui.filter_edit.installEventFilter(self)
+        self.ui.filter_set_bt.clicked.connect(self.filter_text_accepted)
+        self.ui.filter_clear_bt.clicked.connect(self.filter_text_cleared)
 
         self.ui.vhash_to_vpath_in_edit.textChanged.connect(self.vhash_to_vpath_text_changed)
 
@@ -119,6 +123,14 @@ class MainWindow(QMainWindow):
         self.ui.tabs_nodes.currentChanged.connect(self.slot_nodes_tab_current_changed)
 
         self.ui.data_view.data_source_set(self.data_source)
+
+        self.ui.filter_edit.setText('.*')
+
+    def eventFilter(self, source, event):
+        if event.type() == QEvent.KeyRelease and source is self.ui.filter_edit:
+            self.filter_text_key_release(source, event)
+
+        return super().eventFilter(source, event)
 
     def error_dialog(self, s):
         msg = QMessageBox()
@@ -346,8 +358,9 @@ class MainWindow(QMainWindow):
         except EDecaBuildError as ex:
             self.error_dialog('Build Failed: {}'.format(ex.args))
 
-    def filter_text_changed(self):
+    def filter_text_get(self):
         txt = self.ui.filter_edit.text()
+
         if len(txt) == 0:
             txt = '^.*$'
         else:
@@ -356,7 +369,50 @@ class MainWindow(QMainWindow):
             if txt[-1] != '$':
                 txt = txt + '$'
 
-        self.vfs_view_current().mask_set(txt.encode('ascii'))
+        return txt
+
+    def filter_text_changed(self):
+        txt = self.filter_text_get()
+        same = False
+        try:
+            valid = True
+            re.compile(txt)  # test compile
+        except re.error as err:
+            valid = False
+
+        if self.vfs_view_current():
+            same = txt == to_unicode(self.vfs_view_current().mask)
+
+        if not valid:
+            ss = 'QLineEdit {background-color: red;}'
+        elif same:
+            ss = ''
+        else:
+            ss = 'QLineEdit {background-color: yellow;}'
+
+        self.ui.filter_edit.setStyleSheet(ss)
+        self.ui.filter_set_bt.setEnabled(valid and not same)
+        self.ui.filter_clear_bt.setEnabled(not same)
+
+    def filter_text_key_release(self, source, event: QKeyEvent):
+        if event.text() == '\r':
+            if self.ui.filter_set_bt.isEnabled():
+                self.filter_text_accepted(True)
+        elif event.text() == '\x1b':
+            self.filter_text_cleared(True)
+
+    def filter_text_accepted(self, checked):
+        if self.vfs_view_current():
+            txt = self.filter_text_get()
+            self.vfs_view_current().mask_set(txt.encode('ascii'))
+            self.filter_text_changed()
+
+    def filter_text_cleared(self, checked):
+        if self.vfs_view_current():
+            txt = to_unicode(self.vfs_view_current().mask)
+        else:
+            txt = '^.*$'
+        self.ui.filter_edit.setText(txt)
 
     def vhash_to_vpath_text_changed(self):
         txt_in = self.ui.vhash_to_vpath_in_edit.text()

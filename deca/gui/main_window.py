@@ -3,7 +3,7 @@
 # Form implementation generated from reading ui file 'main_window.ui',
 # licensing of 'main_window.ui' applies.
 #
-# Created: Sun Jun 21 22:28:19 2020
+# Created: Sat Jul  4 18:30:12 2020
 #      by: pyside2-uic  running on PySide2 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
@@ -40,8 +40,15 @@ class Ui_MainWindow(object):
         self.filter_label.setObjectName("filter_label")
         self.horizontalLayout_4.addWidget(self.filter_label)
         self.filter_edit = QtWidgets.QLineEdit(self.layoutWidget)
+        self.filter_edit.setText("")
         self.filter_edit.setObjectName("filter_edit")
         self.horizontalLayout_4.addWidget(self.filter_edit)
+        self.filter_set_bt = QtWidgets.QPushButton(self.layoutWidget)
+        self.filter_set_bt.setObjectName("filter_set_bt")
+        self.horizontalLayout_4.addWidget(self.filter_set_bt)
+        self.filter_clear_bt = QtWidgets.QPushButton(self.layoutWidget)
+        self.filter_clear_bt.setObjectName("filter_clear_bt")
+        self.horizontalLayout_4.addWidget(self.filter_clear_bt)
         self.verticalLayout.addLayout(self.horizontalLayout_4)
         self.tabs_control = QtWidgets.QTabWidget(self.layoutWidget)
         self.tabs_control.setObjectName("tabs_control")
@@ -205,7 +212,8 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QtWidgets.QApplication.translate("MainWindow", "MainWindow", None, -1))
         self.filter_label.setText(QtWidgets.QApplication.translate("MainWindow", "Filter (Python Expression Syntax)", None, -1))
-        self.filter_edit.setText(QtWidgets.QApplication.translate("MainWindow", ".*", None, -1))
+        self.filter_set_bt.setText(QtWidgets.QApplication.translate("MainWindow", "Set", None, -1))
+        self.filter_clear_bt.setText(QtWidgets.QApplication.translate("MainWindow", "Clear", None, -1))
         self.bt_extract.setText(QtWidgets.QApplication.translate("MainWindow", "EXTRACT", None, -1))
         self.chkbx_export_processed_extract.setText(QtWidgets.QApplication.translate("MainWindow", "Export As Processed", None, -1))
         self.chkbx_export_contents_extract.setText(QtWidgets.QApplication.translate("MainWindow", "Export Contents", None, -1))

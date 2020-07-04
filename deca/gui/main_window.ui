@@ -62,7 +62,21 @@
           <item>
            <widget class="QLineEdit" name="filter_edit">
             <property name="text">
-             <string>.*</string>
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="filter_set_bt">
+            <property name="text">
+             <string>Set</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="filter_clear_bt">
+            <property name="text">
+             <string>Clear</string>
             </property>
            </widget>
           </item>

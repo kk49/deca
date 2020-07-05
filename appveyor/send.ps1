@@ -56,7 +56,8 @@ else {
   $URL=""
 }
 
-$CHANGE_LOG_LINES="$(python ./appveyor/get_dev_changelog.py CHANGELOG.md)" -replace "`"", "'" -join "`r`n"
+$CHANGE_LOG_LINES="$(python ./appveyor/get_dev_changelog.py CHANGELOG.md)" -replace "`"", "'"
+$OFS = "`r`n"
 
 Write-Output $CHANGE_LOG_LINES
 

@@ -56,8 +56,9 @@ else {
   $URL=""
 }
 
-$CHANGE_LOG_LINES="$(python ./appveyor/get_dev_changelog.py CHANGELOG.md)" -replace "`"", "'"
-$CHANGE_LOG_LINES=([text.encoding]::ASCII).GetBytes(($CHANGE_LOG_LINES -join "`r`n") + "`r`n")
+$CHANGE_LOG_LINES=(python ./appveyor/get_dev_changelog.py CHANGELOG.md) | Out-String
+# "$()" -replace "`"", "'"
+# (Shell command) | Out-String
 
 Write-Output $CHANGE_LOG_LINES
 

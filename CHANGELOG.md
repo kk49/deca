@@ -1,5 +1,6 @@
 #### v0.2.11 ???
 * Handle games without settings/hp_settings/equipment.bin
+* Better handling of GLTF2 export of adf files that are not models and/or are missing type info
 * Regular expression mask:
     * Accepted when **Enter** is key'ed or **SET** is pressed
     * Reset to previously accepted value if **Esc** is key'ed or **CLEAR** is pressed

@@ -2,7 +2,7 @@ import os
 from .errors import *
 from .file import *
 from .ff_types import *
-from .ff_adf import AdfDatabase
+from .ff_adf import AdfDatabase, AdfTypeMissing
 from .db_core import VfsDatabase, VfsNode
 from .db_view import VfsView
 from .ff_avtx import image_export
@@ -143,7 +143,10 @@ def nodes_export_gltf(
 
         except EDecaFileExists as e:
             vfs.logger.log(
-                'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+                'WARNING: Extracting {} Failed: overwrite disabled and {} exists, skipping'.format(node.v_path, e.args[0]))
+        except AdfTypeMissing as e:
+            vfs.logger.log(
+                'WARNING: Extracting {} Failed: Missing ADF Type 0x{:08x}  '.format(node.v_path, e.type_id))
 
     for node in vs_rtpc:
         try:

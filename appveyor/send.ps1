@@ -57,7 +57,7 @@ else {
 }
 
 $CHANGE_LOG_LINES="$(python ./appveyor/get_dev_changelog.py CHANGELOG.md)" -replace "`"", "'"
-$CHANGE_LOG_LINES=$CHANGE_LOG_LINES -join "`r`n"
+$CHANGE_LOG_LINES=([text.encoding]::ASCII).GetBytes(($CHANGE_LOG_LINES -join "`r`n") + "`r`n")
 
 Write-Output $CHANGE_LOG_LINES
 

@@ -1,4 +1,3 @@
-import copy
 from typing import Optional
 import xml.etree.ElementTree as ET
 from .db_core import VfsDatabase
@@ -8,7 +7,8 @@ from .ff_adf import *
 from .ff_adf_amf import *
 import pygltflib as pyg
 import scipy.spatial.transform as sst
-
+import copy
+import subprocess
 
 def _get_or_none(index, list_data):
     if index < len(list_data):
@@ -639,15 +639,26 @@ class Deca3dHkSkeleton:
                 with open(ppath_skel_raw, 'wb') as f:
                     f.write(buffer)
 
+            run_out = None
             if not os.path.isfile(ppath_skel_xml):
-                os.system('{} {} {}'.format(
-                    os.path.join('.', 'extern', 'HavokLib', 'build', '_bin2xml', 'bin2xml'),
-                    ppath_skel_raw,
-                    ppath_skel_xml,
-                ))
+                run_out = subprocess.run(
+                    '{} {} {}'.format(
+                        os.path.join('.', 'extern', 'HavokLib', 'build', '_bin2xml', 'bin2xml'),
+                        ppath_skel_raw,
+                        ppath_skel_xml,
+                    ),
+                    shell=True,
+                    capture_output=True,
+                )
 
             if not os.path.isfile(ppath_skel_xml):
-                raise EDecaFileMissing('Not Mapped: {}'.format(ppath_skel_xml))
+                if run_out is None:
+                    stdout = 'stdout MISSING'
+                    stderr = 'stderr MISSING'
+                else:
+                    stdout = run_out.stdout
+                    stderr = run_out.stderr
+                raise EDecaFileMissing('Not Mapped: {}, SO: {}, SE: {}'.format(ppath_skel_xml, stdout, stderr))
 
             # TODO this is a hack
             tree = ET.parse(ppath_skel_xml)
@@ -733,7 +744,7 @@ class Deca3dHkSkeleton:
                     mat2 = mat2.transpose()
                     mat2_bytes = mat2.tobytes()
                     f.write(mat2_bytes)
-                    print(mat2)
+                    # print(mat2)
 
             # setup accessor
             buffer = pyg.Buffer()

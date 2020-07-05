@@ -56,10 +56,7 @@ else {
   $URL=""
 }
 
-$CHANGE_LOG_LINES=(python ./appveyor/get_dev_changelog.py CHANGELOG.md) | Out-String
-# "$()" -replace "`"", "'"
-# (Shell command) | Out-String
-
+$CHANGE_LOG_LINES=(python ./appveyor/get_dev_changelog.py CHANGELOG.md) -join "\n"
 Write-Output $CHANGE_LOG_LINES
 
 $BUILD_VERSION = [uri]::EscapeDataString($env:APPVEYOR_BUILD_VERSION)

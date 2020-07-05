@@ -74,7 +74,7 @@ $WEBHOOK_DATA="{
     },
     ""title"": ""$COMMIT_SUBJECT"",
     ""url"": ""$URL"",
-    ""description"": ""$COMMIT_MESSAGE $CREDITS"",
+    ""description"": ""$COMMIT_MESSAGE $CREDITS $CHANGE_LOG_LINES"",
     ""fields"": [
       {
         ""name"": ""Commit"",

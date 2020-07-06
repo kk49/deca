@@ -639,17 +639,16 @@ class Deca3dHkSkeleton:
                 with open(ppath_skel_raw, 'wb') as f:
                     f.write(buffer)
 
+            cmd = '{} {} {}'.format(
+                os.path.join('.', 'extern', 'HavokLib', 'build', '_bin2xml', 'bin2xml'),
+                ppath_skel_raw,
+                ppath_skel_xml,
+            )
+
             run_out = None
+
             if not os.path.isfile(ppath_skel_xml):
-                run_out = subprocess.run(
-                    '{} {} {}'.format(
-                        os.path.join('.', 'extern', 'HavokLib', 'build', '_bin2xml', 'bin2xml'),
-                        ppath_skel_raw,
-                        ppath_skel_xml,
-                    ),
-                    shell=True,
-                    capture_output=True,
-                )
+                run_out = subprocess.run(cmd, shell=True, capture_output=True)
 
             if not os.path.isfile(ppath_skel_xml):
                 if run_out is None:
@@ -658,7 +657,8 @@ class Deca3dHkSkeleton:
                 else:
                     stdout = run_out.stdout
                     stderr = run_out.stderr
-                raise EDecaFileMissing('Not Mapped: {}, SO: {}, SE: {}'.format(ppath_skel_xml, stdout, stderr))
+
+                raise EDecaFileMissing('Not Mapped: {}, CMD: {}, SO: {}, SE: {}'.format(ppath_skel_xml, cmd, stdout, stderr))
 
             # TODO this is a hack
             tree = ET.parse(ppath_skel_xml)

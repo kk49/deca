@@ -116,7 +116,7 @@ class FieldNameMap:
                 return v
 
         if hash48 is not None:
-            v = self._h48_dict.get(hash32, ())
+            v = self._h48_dict.get(hash48, ())
             if v != ():
                 return v
             else:

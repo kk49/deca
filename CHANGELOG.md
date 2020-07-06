@@ -1,4 +1,5 @@
 #### v0.2.11 ???
+* Fixed typo in RTPC 48 bit hash lookup, was using cache incorrectly
 * Added more aggressive splitting of strings into possible substrings, now splits on `,`, `|`, and ` `
 * Changed call to skeleton generator to use subprocess.run instead of os.system, should capture stderr and stdout 
 * Better handling of GLTF2 export of adf files that are not models and/or are missing type info

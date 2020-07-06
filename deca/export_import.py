@@ -128,6 +128,9 @@ def nodes_export_gltf(
                 except EDecaFileExists as e:
                     vfs.logger.log(
                         'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+                except EDecaFileMissing as e:
+                    vfs.logger.log(
+                        'ERROR: Extracting {} Failed: {}  '.format(node.v_path, e.args[0]))
 
     adf_db = AdfDatabase(vfs)
     for node in vs_adf:
@@ -146,7 +149,10 @@ def nodes_export_gltf(
                 'WARNING: Extracting {} Failed: overwrite disabled and {} exists, skipping'.format(node.v_path, e.args[0]))
         except AdfTypeMissing as e:
             vfs.logger.log(
-                'WARNING: Extracting {} Failed: Missing ADF Type 0x{:08x}  '.format(node.v_path, e.type_id))
+                'ERROR: Extracting {} Failed: Missing ADF Type 0x{:08x}  '.format(node.v_path, e.type_id))
+        except EDecaFileMissing as e:
+            vfs.logger.log(
+                'ERROR: Extracting {} Failed: {}  '.format(node.v_path, e.args[0]))
 
     for node in vs_rtpc:
         try:

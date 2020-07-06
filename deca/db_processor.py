@@ -3,6 +3,7 @@ import re
 import csv
 import time
 
+from .file import ArchiveFile
 from .db_core import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
 from .db_types import *
 from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
@@ -632,12 +633,17 @@ class VfsProcessor(VfsDatabase):
             (False, './resources/{}/strings.txt'.format(self.game_info.game_id)),
             (True, './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)),
             (False, './resources/strings.txt'),  # backwords compatibility
+
             (False, './resources/common/fields.txt'),  # deca common field names
             (False, './resources/common/filenames.txt'),  # deca common file names
             (False, './resources/common/strings.txt'),  # deca common strings
+
             (False, '../work/fields.txt'),  # user common field names
             (False, '../work/filenames.txt'),  # user common file names
             (False, '../work/strings.txt'),  # user common strings
+
+            (False, '../work/property_list.hsh'),  # Ashen Tools hash loading
+
         ]
 
         search_dir = './resources/ghidra_strings'
@@ -654,12 +660,27 @@ class VfsProcessor(VfsDatabase):
         with DbWrap(self, logger=self) as db:
             for used_at_runtime, fn in fns:
                 if os.path.isfile(fn):
-                    self.logger.log('STRINGS FROM RESOURCES: Loading possible strings from {}'.format(fn))
-                    with open(fn, 'rb') as f:
-                        custom_strings = f.readlines()
+                    self.logger.log('STRINGS FROM RESOURCES: {}: Loading possible strings'.format(fn))
+
+                    custom_strings = []
+                    if fn.endswith('txt'):
+                        with open(fn, 'rb') as f:
+                            custom_strings = f.readlines()
+                    elif fn.endswith('hsh'):
+                        with ArchiveFile(open(fn, 'rb')) as f:
+                            while True:
+                                s = f.read_strz()
+                                if s is None:
+                                    break
+                                h = f.read_u32()
+                                custom_strings.append(s)
+
+                    else:
+                        self.logger.log('STRINGS FROM RESOURCES: {}: UNHANDLED FILE TYPE'.format(fn))
+
                     custom_strings = set(custom_strings)
                     string_count += len(custom_strings)
-                    self.logger.log('STRINGS FROM RESOURCES: Loaded {} strings'.format(len(custom_strings)))
+                    self.logger.log('STRINGS FROM RESOURCES: {}: Loaded {} strings'.format(fn, len(custom_strings)))
                     for s in custom_strings:
                         db.propose_string(s.strip(), None, used_at_runtime=used_at_runtime)
 

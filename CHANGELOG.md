@@ -1,4 +1,5 @@
 #### v0.2.11 ???
+* Added loading of strings from `work/property_list.hsh` if it exists. property_list.hsh is included in the Ashen Tools 
 * Fixed typo in RTPC 48 bit hash lookup, was using cache incorrectly
 * Added more aggressive splitting of strings into possible substrings, now splits on `,`, `|`, and ` `
 * Changed call to skeleton generator to use subprocess.run instead of os.system, should capture stderr and stdout 

@@ -77,7 +77,10 @@ class ArchiveFile:
                 break
             else:
                 r = r + v
-        return r
+        if len(r) == 0:
+            return None
+        else:
+            return r
 
     def read_base(self, fmt, elen, n, raise_on_no_data):
         if n is None:

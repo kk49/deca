@@ -66,7 +66,7 @@ build_script:
 
     cd _bin2xml
 
-    cmake  -G "NMake Makefiles" ..\..\_bin2xml\
+    cmake  -DCMAKE_BUILD_TYPE=Release -G "NMake Makefiles" ..\..\_bin2xml\
 
     nmake
 

@@ -58,7 +58,7 @@ build_script:
 
     cd build
 
-    cmake -G "NMake Makefiles" ..\
+    cmake -DCMAKE_BUILD_TYPE=Release -G "NMake Makefiles" ..\
 
     nmake
 

@@ -68,16 +68,19 @@ class ArchiveFile:
         return self.f.write(blk)
 
     def read_strz(self, delim=b'\00'):
+        eof = False
         r = b''
         while True:
             v = self.f.read(1)
             if len(v) == 0:
+                eof = True
                 break
             elif v == delim:
                 break
             else:
                 r = r + v
-        if len(r) == 0:
+
+        if eof:
             return None
         else:
             return r

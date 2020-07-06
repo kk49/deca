@@ -299,6 +299,7 @@ show_label_box_extents
 show_on_map
 side_area
 skeleton
+slot_type
 spawn_tags
 spawn_alias_override
 specular_multiplier

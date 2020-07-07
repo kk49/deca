@@ -1,14 +1,14 @@
 from typing import Optional
-import xml.etree.ElementTree as ET
-from .db_core import VfsDatabase
+import xml.etree.ElementTree as ElementTree
 from .util import remove_prefix_if_present
-from .ff_avtx import image_load
+from .ff_avtx import image_load, ddsc_write_to_dds, ddsc_write_to_png
 from .ff_adf import *
 from .ff_adf_amf import *
 import pygltflib as pyg
 import scipy.spatial.transform as sst
 import copy
 import subprocess
+
 
 def _get_or_none(index, list_data):
     if index < len(list_data):
@@ -62,7 +62,7 @@ class Deca3dMatrix:
 
 
 class Deca3dDatabase:
-    def __init__(self, vfs: VfsDatabase, resource_prefix_abs, resource_prefix_uri, flat_file_layout):
+    def __init__(self, vfs: VfsDatabase, resource_prefix_abs, resource_prefix_uri, flat_file_layout, texture_format):
         self.vfs = vfs
         self.adf_db = AdfDatabase(vfs)
         self.resource_prefix_abs = resource_prefix_abs
@@ -72,11 +72,12 @@ class Deca3dDatabase:
         self.map_vpath_to_modelc = {}
         self.map_vpath_to_hk_skeleton = {}
         self.flat_file_layout = flat_file_layout
+        self.texture_format = texture_format
 
     def gltf_add_texture(self, gltf, v_path):
         item = self.map_vpath_to_texture.get(v_path, Deca3dTexture(v_path))
         self.map_vpath_to_texture[v_path] = item
-        return item.add_to_gltf(self.vfs, self.adf_db, self, gltf)
+        return item.add_to_gltf(self.vfs, self.adf_db, self, gltf, self.texture_format)
 
     def gltf_add_meshc(self, gltf, v_path):
         item = self.map_vpath_to_meshc.get(v_path, Deca3dMeshc(v_path))
@@ -108,7 +109,7 @@ class Deca3dTexture:
         self.gltf_id = None
         self.texture_saved = False
 
-    def add_to_gltf(self, vfs: VfsDatabase, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2):
+    def add_to_gltf(self, vfs: VfsDatabase, adf_db, db: Deca3dDatabase, gltf: pyg.GLTF2, texture_format):
         if not self.texture_saved:
             vfs.logger.log('Texture:Setup: {}'.format(self.v_path))
             # dump textures
@@ -116,7 +117,10 @@ class Deca3dTexture:
             if len(self.v_path) > 0:
                 texture_nodes = vfs.nodes_where_match(v_path=self.v_path)
                 if len(texture_nodes) > 0:
-                    texture_fn = self.v_path.decode('utf-8') + '.png'
+                    texture_fn = self.v_path.decode('utf-8')
+                    if not texture_fn.endswith(texture_format):
+                        texture_fn += '.' + texture_format
+
                     if db.flat_file_layout:
                         texture_fn = texture_fn.replace('/', '_')
                     texture_fn_uri = os.path.join(db.resource_prefix_uri, texture_fn)
@@ -126,17 +130,15 @@ class Deca3dTexture:
                         texture_node = texture_nodes[0]
                         ddsc = image_load(vfs, texture_node, save_raw_data=True)
 
-                        mips = None
-                        for i in range(len(ddsc.mips)):
-                            if ddsc.mips[i].data is not None:
-                                mips = ddsc.mips[i]
-                                break
-                            else:
-                                vfs.logger.log('Texture:Setup: Missing LOD {}'.format(i))
-
                         os.makedirs(os.path.dirname(texture_fn_absolute), exist_ok=True)
-                        npimp = mips.pil_image()
-                        npimp.save(texture_fn_absolute)
+
+                        if texture_fn_absolute.endswith('png'):
+                            ddsc_write_to_png(ddsc, texture_fn_absolute)
+                        elif texture_fn_absolute.endswith('ddsc') or texture_fn_absolute.endswith('dds'):
+                            ddsc_write_to_dds(ddsc, texture_fn_absolute)
+                        else:
+                            vfs.logger.log('ERROR: {}: Unhandled Texture format: {}'.format(self.v_path, texture_format))
+
                 else:
                     vfs.logger.log('WARNING: Missing Texture file: {}'.format(self.v_path))
 
@@ -661,7 +663,7 @@ class Deca3dHkSkeleton:
                 raise EDecaFileMissing('Not Mapped: {}, CMD: {}, SO: {}, SE: {}'.format(ppath_skel_xml, cmd, stdout, stderr))
 
             # TODO this is a hack
-            tree = ET.parse(ppath_skel_xml)
+            tree = ElementTree.parse(ppath_skel_xml)
             root = tree.getroot()
 
             skel = None
@@ -823,13 +825,18 @@ class DecaGltf:
             self, vfs: VfsDatabase, export_path, filename, lod=0,
             save_to_one_dir=False,
             flat_file_layout=False,
-            include_skeleton=False):
+            include_skeleton=False,
+            texture_format=None):
         self.vfs = vfs
         self.filename = filename
         self.lod = lod
         self.save_to_one_dir = save_to_one_dir
         self.flat_file_layout = flat_file_layout
         self.include_skeleton = include_skeleton
+        if texture_format is None:
+            self.texture_format = 'dds'
+        else:
+            self.texture_format = texture_format
         self.gltf = pyg.GLTF2()
         self.gltf.asset.version = "2.0"
         self.gltf.asset.generator = "DECA extractor"
@@ -851,7 +858,12 @@ class DecaGltf:
                 dirs = os.path.dirname(dirs)
         os.makedirs(os.path.dirname(self.export_path), exist_ok=True)
 
-        self.db = Deca3dDatabase(self.vfs, self.resource_prefix_abs, self.resource_prefix_uri, self.flat_file_layout)
+        self.db = Deca3dDatabase(
+            self.vfs,
+            self.resource_prefix_abs,
+            self.resource_prefix_uri,
+            self.flat_file_layout,
+            self.texture_format)
 
     def gltf_save(self):
         assert self.gltf is not None

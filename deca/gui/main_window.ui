@@ -256,6 +256,19 @@
             <string>3d/GLTF2</string>
            </attribute>
            <layout class="QGridLayout" name="gridLayout_2">
+            <item row="0" column="3">
+             <spacer name="horizontalSpacer_3">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>0</width>
+                <height>0</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
             <item row="0" column="2">
              <widget class="QPushButton" name="bt_extract_gltf_3d">
               <property name="text">
@@ -263,18 +276,19 @@
               </property>
              </widget>
             </item>
-            <item row="2" column="0">
-             <spacer name="verticalSpacer_2">
-              <property name="orientation">
-               <enum>Qt::Vertical</enum>
+            <item row="1" column="0">
+             <widget class="QCheckBox" name="chkbx_export_3d_include_skeleton">
+              <property name="text">
+               <string>Include Skeleton</string>
               </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>20</width>
-                <height>0</height>
-               </size>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="QCheckBox" name="chkbx_export_save_to_one_dir">
+              <property name="text">
+               <string>Save To One Directory</string>
               </property>
-             </spacer>
+             </widget>
             </item>
             <item row="0" column="1">
              <widget class="QPushButton" name="bt_extract_gltf_3d_folder_show">
@@ -289,31 +303,43 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="0">
-             <widget class="QCheckBox" name="chkbx_export_save_to_one_dir">
-              <property name="text">
-               <string>Save To One Directory</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="3">
-             <spacer name="horizontalSpacer_3">
+            <item row="3" column="0">
+             <spacer name="verticalSpacer_2">
               <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+               <enum>Qt::Vertical</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>0</width>
+                <width>20</width>
                 <height>0</height>
                </size>
               </property>
              </spacer>
             </item>
-            <item row="1" column="0">
-             <widget class="QCheckBox" name="chkbx_export_3d_include_skeleton">
+            <item row="2" column="0">
+             <widget class="QLabel" name="lbl_texture_format">
               <property name="text">
-               <string>Include Skeleton</string>
+               <string>Texture Format</string>
               </property>
+             </widget>
+            </item>
+            <item row="2" column="2">
+             <widget class="QComboBox" name="cmbbx_texture_format">
+              <item>
+               <property name="text">
+                <string>dds</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>ddsc</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>png</string>
+               </property>
+              </item>
              </widget>
             </item>
            </layout>

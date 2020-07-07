@@ -14,8 +14,8 @@ from .deca_interfaces import IVfsViewSrc
 from .vfsdirwidget import VfsDirWidget
 from .vfsnodetablewidget import VfsNodeTableWidget
 from PySide2.QtCore import Slot, QUrl, Signal, QEvent
-from PySide2.QtWidgets import QWidget, QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
-from PySide2.QtGui import QDesktopServices, QKeyEvent, QKeySequence
+from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
+from PySide2.QtGui import QDesktopServices, QKeyEvent
 
 
 window_title = 'decaGUI: v0.2.11-dev'
@@ -272,14 +272,16 @@ class MainWindow(QMainWindow):
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
 
-    def extract_gltf(self, eid, extract_dir, save_to_one_dir, include_skeleton):
+    def extract_gltf(self, eid, extract_dir, save_to_one_dir, include_skeleton, texture_format):
         if self.vfs_view_current().node_selected_count() > 0:
             try:
                 nodes_export_gltf(
                     self.vfs, self.vfs_view_current(), extract_dir,
                     allow_overwrite=False,
                     save_to_one_dir=save_to_one_dir,
-                    include_skeleton=include_skeleton)
+                    include_skeleton=include_skeleton,
+                    texture_format=texture_format,
+                )
 
             except EDecaFileExists as exce:
                 self.error_dialog('{} Canceled: File Exists: {}'.format(eid, exce.args))
@@ -330,6 +332,7 @@ class MainWindow(QMainWindow):
             'GLTF2 / 3D', self.vfs.working_dir + 'gltf2_3d/',
             save_to_one_dir=self.ui.chkbx_export_save_to_one_dir.isChecked(),
             include_skeleton=self.ui.chkbx_export_3d_include_skeleton.isChecked(),
+            texture_format=self.ui.cmbbx_texture_format.currentText(),
         )
 
     def slot_mod_build_subset_clicked(self, checked):

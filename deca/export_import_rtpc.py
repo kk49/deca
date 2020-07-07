@@ -1,6 +1,4 @@
 import os
-import re
-from typing import List
 from .db_core import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
 from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString, prop_skeleton, prop_model_skeleton
@@ -88,9 +86,10 @@ def node_export_rtpc_gltf(
         vfs: VfsDatabase,
         vnode: VfsNode,
         export_path,
-        allow_overwrite=False,
-        save_to_one_dir=True,
-        include_skeleton=False,
+        allow_overwrite,
+        save_to_one_dir,
+        include_skeleton,
+        texture_format,
 ):
     vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
 
@@ -100,7 +99,7 @@ def node_export_rtpc_gltf(
 
     gltf = DecaGltf(
         vfs, export_path, vnode.v_path.decode('utf-8'),
-        save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton)
+        save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton, texture_format=texture_format)
 
     with gltf.scene():
         with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path.decode('utf-8'))):

@@ -268,11 +268,15 @@ DDPF_LUMINANCE = 0x20000
 # todo add d3d format support eventually?
 dw_four_cc_convert = {
     b'DXT1': DXGI_FORMAT_BC1_UNORM,
+    b'DXT2': DXGI_FORMAT_BC2_UNORM,
     b'DXT3': DXGI_FORMAT_BC2_UNORM,
+    b'DXT4': DXGI_FORMAT_BC3_UNORM,
     b'DXT5': DXGI_FORMAT_BC3_UNORM,
     b'BC4U': DXGI_FORMAT_BC4_UNORM,
     b'BC4S': DXGI_FORMAT_BC4_SNORM,
+    b'ATI1': DXGI_FORMAT_BC4_UNORM,
     b'ATI2': DXGI_FORMAT_BC5_UNORM,
+    b'BC5U': DXGI_FORMAT_BC5_UNORM,
     b'BC5S': DXGI_FORMAT_BC5_SNORM,
     b'RGBG': DXGI_FORMAT_R8G8_B8G8_UNORM,
     b'GRGB': DXGI_FORMAT_G8R8_G8B8_UNORM,
@@ -645,8 +649,8 @@ dxgi_name_db = {
 
 def raw_data_size(pixel_format, nx, ny):
 
-    is_uncompressed, ele_size = \
-        dxgi_format_db[dxgi_base_format_db[pixel_format]]
+    base_format = dxgi_base_format_db[pixel_format]
+    is_uncompressed, ele_size = dxgi_format_db[base_format]
 
     if is_uncompressed:
         return ele_size * nx * ny

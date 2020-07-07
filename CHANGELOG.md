@@ -1,5 +1,6 @@
 #### v0.2.11 ???
-* Added option of export GLTF2 models with: dds format, ddsc (dds format, ddsc extension), or png formats
+* Added pre dxt10 dwFourCC encodings DXT2, DXT4, ATI1, BC5U ala https://walbourn.github.io/the-dds-file-format-lives/
+* Added option to export GLTF2 models with: dds format, ddsc (dds format, ddsc extension), or png formats
 * Added loading of strings from `work/property_list.hsh` if it exists. property_list.hsh is included in the Ashen Tools 
 * Fixed typo in RTPC 48 bit hash lookup, was using cache incorrectly
 * Added more aggressive splitting of strings into possible substrings, now splits on `,`, `|`, and ` `

@@ -1,4 +1,3 @@
-from io import BytesIO
 from deca.file import ArchiveFile
 from deca.fast_file_2 import *
 from deca.db_core import VfsDatabase
@@ -172,148 +171,6 @@ class RtpcProperty:
             data)
         # return '0x{:08x}: {} = {}'.format(self.name_hash, PropType.type_names[self.type], self.data,)
 
-    def repr_with_name(self, hash_lookup: FieldNameMap):
-        data = self.data
-        if self.type == k_type_objid:
-            name6 = hash_lookup.lookup(hash48=data & 0x0000FFFFFFFFFFFF)
-            name = 'id:0x{:012X}'.format(data)
-            if name6:
-                name = 'id:DB:H6:"{}"[{}]'.format(name6, name)
-            else:
-                name4 = hash_lookup.lookup(hash32=data)
-                if name4:
-                    name = 'id:DB:H4:"{}"[{}]'.format(name4, name)
-
-            data = name
-
-        elif self.type == k_type_event:
-            data_new = []
-            for d in data:
-                name6 = hash_lookup.lookup(hash48=d & 0x0000FFFFFFFFFFFF)
-                name = 'ev:0x{:012X}'.format(d)
-                if name6:
-                    name = 'ev:DB:H6:"{}"[{}]'.format(name6, name)
-                else:
-                    name4 = hash_lookup.lookup(hash32=d)
-                    if name4:
-                        name = 'ev:DB:H4:"{}"[{}]'.format(name4, name)
-
-                data_new.append(name)
-            data = data_new
-
-        name = hash_lookup.lookup(hash32=self.name_hash)
-        if name:
-            name = '"{}"'.format(name)
-        else:
-            name = f'0x{self.name_hash:08x}'
-
-        return '@0x{:08x}({: 8d}) {} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
-            self.pos, self.pos,
-            name,
-            self.data_raw,
-            self.type,
-            PropType_names[self.type],
-            self.data_pos, self.data_pos,
-            data)
-        # return '0x{:08x}: {} = {}'.format(self.name_hash, PropType.type_names[self.type], self.data,)
-
-    def deserialize(self, f):
-        self.pos = f.tell()
-        self.name_hash = f.read_u32()
-        self.data_pos = f.tell()
-        self.data_raw = f.read_u32()
-        self.type = f.read_u8()
-
-        self.data = self.data_raw
-
-        raw_buf = struct.pack('I', self.data_raw)
-        if self.type == k_type_none:
-            pass
-        elif self.type == k_type_u32:
-            self.data = struct.unpack('I', raw_buf)[0]
-        elif self.type == k_type_f32:
-            self.data = struct.unpack('f', raw_buf)[0]
-        elif self.type == k_type_str:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            self.data = f.read_strz()
-            f.seek(opos)
-        elif self.type == k_type_vec2:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            self.data = list(f.read_f32(2))
-            f.seek(opos)
-        elif self.type == k_type_vec3:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            self.data = list(f.read_f32(3))
-            f.seek(opos)
-        elif self.type == k_type_vec4:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            self.data = list(f.read_f32(4))
-            f.seek(opos)
-        elif self.type == k_type_mat3x3:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            self.data = list(f.read_f32(9))
-            f.seek(opos)
-        elif self.type == k_type_mat4x4:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            self.data = list(f.read_f32(16))
-            f.seek(opos)
-        elif self.type == k_type_array_u32:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            n = f.read_u32()
-            self.data = []
-            if n > 0:
-                self.data = list(f.read_u32(n))
-            f.seek(opos)
-        elif self.type == k_type_array_f32:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            n = f.read_u32()
-            self.data = []
-            if n > 0:
-                self.data = list(f.read_f32(n))
-            f.seek(opos)
-        elif self.type == k_type_array_u8:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            n = f.read_u32()
-            self.data = []
-            if n > 0:
-                self.data = list(f.read_u8(n))
-            f.seek(opos)
-        elif self.type == k_type_objid:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            self.data = f.read_u64()
-            f.seek(opos)
-        elif self.type == k_type_event:
-            opos = f.tell()
-            self.data_pos = self.data_raw
-            f.seek(self.data_raw)
-            n = f.read_u32()
-            self.data = []
-            for i in range(n):
-                self.data.append(f.read_u64())
-            f.seek(opos)
-        else:
-            raise Exception('NOT HANDLED {}'.format(self.type))
-
 
 class RtpcNode:
     __slots__ = (
@@ -344,52 +201,6 @@ class RtpcNode:
         return 'n:{} pc:{} cc:{} @ {} {:08x}'.format(
             name, self.prop_count, self.child_count, self.data_offset, self.data_offset)
 
-    def dump_to_string(self, hash_lookup: FieldNameMap, indent=0):
-        ind0 = ' ' * indent
-        ind1 = ' ' * (indent + 2)
-        ind2 = ' ' * (indent + 4)
-        sbuf = ''
-        sbuf = sbuf + ind0 + 'node:\n'
-        sbuf = sbuf + ind1 + self.repr_with_name(hash_lookup) + '\n'
-        sbuf = sbuf + ind1 + 'properties ---------------\n'
-        for p in self.prop_table:
-            sbuf = sbuf + ind2 + p.repr_with_name(hash_lookup) + '\n'
-        sbuf = sbuf + ind1 + 'children -----------------\n'
-        for c in self.child_table:
-            sbuf = sbuf + c.dump_to_string(hash_lookup, indent + 4)
-
-        return sbuf
-
-    def deserialize(self, f):
-        self.name_hash = f.read_u32()
-        self.data_offset = f.read_u32()
-        self.prop_count = f.read_u16()
-        self.child_count = f.read_u16()
-
-        oldp = f.tell()
-        f.seek(self.data_offset)
-        # read properties
-        self.prop_table = []
-        for i in range(self.prop_count):
-            prop = RtpcProperty()
-            prop.deserialize(f)
-            self.prop_table.append(prop)
-            self.prop_map[prop.name_hash] = prop
-
-        #  children 4-byte aligned
-        np = f.tell()
-        f.seek(np + (4 - (np % 4)) % 4)
-
-        # read children
-        self.child_table = []
-        for i in range(self.child_count):
-            child = RtpcNode()
-            child.deserialize(f)
-            self.child_table.append(child)
-            self.child_map[child.name_hash] = child
-
-        f.seek(oldp)
-
 
 class Rtpc:
     def __init__(self):
@@ -397,32 +208,248 @@ class Rtpc:
         self.version = None
         self.root_node: Optional[RtpcNode] = None
 
-    def deserialize(self, fraw):
-        f = ArchiveFile(fraw)
 
-        self.magic = f.read_strl(4)
-        if self.magic != b'RTPC':
-            raise Exception('Bad MAGIC {}'.format(self.magic))
+def rtpc_prop_from_binary(f, prop):
+    prop.pos = f.tell()
+    prop.name_hash = f.read_u32()
+    prop.data_pos = f.tell()
+    prop.data_raw = f.read_u32()
+    prop.type = f.read_u8()
 
-        self.version = f.read_u32()
+    prop.data = prop.data_raw
 
-        self.root_node = RtpcNode()
-        self.root_node.deserialize(f)
+    raw_buf = struct.pack('I', prop.data_raw)
+    if prop.type == k_type_none:
+        pass
+    elif prop.type == k_type_u32:
+        prop.data = struct.unpack('I', raw_buf)[0]
+    elif prop.type == k_type_f32:
+        prop.data = struct.unpack('f', raw_buf)[0]
+    elif prop.type == k_type_str:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        prop.data = f.read_strz()
+        f.seek(opos)
+    elif prop.type == k_type_vec2:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        prop.data = list(f.read_f32(2))
+        f.seek(opos)
+    elif prop.type == k_type_vec3:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        prop.data = list(f.read_f32(3))
+        f.seek(opos)
+    elif prop.type == k_type_vec4:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        prop.data = list(f.read_f32(4))
+        f.seek(opos)
+    elif prop.type == k_type_mat3x3:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        prop.data = list(f.read_f32(9))
+        f.seek(opos)
+    elif prop.type == k_type_mat4x4:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        prop.data = list(f.read_f32(16))
+        f.seek(opos)
+    elif prop.type == k_type_array_u32:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        n = f.read_u32()
+        prop.data = []
+        if n > 0:
+            prop.data = list(f.read_u32(n))
+        f.seek(opos)
+    elif prop.type == k_type_array_f32:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        n = f.read_u32()
+        prop.data = []
+        if n > 0:
+            prop.data = list(f.read_f32(n))
+        f.seek(opos)
+    elif prop.type == k_type_array_u8:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        n = f.read_u32()
+        prop.data = []
+        if n > 0:
+            prop.data = list(f.read_u8(n))
+        f.seek(opos)
+    elif prop.type == k_type_objid:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        prop.data = f.read_u64()
+        f.seek(opos)
+    elif prop.type == k_type_event:
+        opos = f.tell()
+        prop.data_pos = prop.data_raw
+        f.seek(prop.data_raw)
+        n = f.read_u32()
+        prop.data = []
+        for i in range(n):
+            prop.data.append(f.read_u64())
+        f.seek(opos)
+    else:
+        raise Exception('NOT HANDLED {}'.format(prop.type))
 
-        return self
 
-    def visit(self, visitor, node=None):
-        if node is None:
-            node = self.root_node
+def rtpc_node_from_binary(f, node):
+    node.name_hash = f.read_u32()
+    node.data_offset = f.read_u32()
+    node.prop_count = f.read_u16()
+    node.child_count = f.read_u16()
 
-        visitor.process(node)
+    old_p = f.tell()
+    f.seek(node.data_offset)
+    # read properties
+    node.prop_table = []
+    for i in range(node.prop_count):
+        prop = RtpcProperty()
+        rtpc_prop_from_binary(f, prop)
+        node.prop_table.append(prop)
+        node.prop_map[prop.name_hash] = prop
 
-        for child in node.child_table:
-            self.visit(visitor, node=child)
+    #  children 4-byte aligned
+    pos = f.tell()
+    f.seek(pos + (4 - (pos % 4)) % 4)
 
-    def dump_to_string(self, vfs):
-        hash_lookup = FieldNameMap(vfs)
-        return self.root_node.dump_to_string(hash_lookup)
+    # read children
+    node.child_table = []
+    for i in range(node.child_count):
+        child = RtpcNode()
+        rtpc_node_from_binary(f, child)
+        node.child_table.append(child)
+        node.child_map[child.name_hash] = child
+
+    f.seek(old_p)
+
+
+def rtpc_from_binary(f_raw, rtpc: Optional[Rtpc] = None):
+    if rtpc is None:
+        rtpc = Rtpc()
+
+    f = ArchiveFile(f_raw)
+
+    rtpc.magic = f.read_strl(4)
+    if rtpc.magic != b'RTPC':
+        raise Exception('Bad MAGIC {}'.format(rtpc.magic))
+
+    rtpc.version = f.read_u32()
+
+    rtpc.root_node = RtpcNode()
+    rtpc_node_from_binary(f, rtpc.root_node)
+
+    return rtpc
+
+
+def rtpc_prop_to_string(prop0, hash_lookup: FieldNameMap):
+    if isinstance(prop0, RtpcProperty):
+        prop_pos = prop0.pos
+        prop_name_hash = prop0.name_hash
+        prop_data_raw = prop0.data_raw
+        prop_type = prop0.type
+        prop_data = prop0.data
+        prop_data_pos = prop0.data_pos
+    else:
+        prop_pos, prop_name_hash, prop_data_pos0, prop_data_raw, prop_type, prop_data, prop_data_pos = prop0
+
+    data = prop_data
+    if prop_type == k_type_objid:
+        name6 = hash_lookup.lookup(hash48=data & 0x0000FFFFFFFFFFFF)
+        name = 'id:0x{:012X}'.format(data)
+        if name6:
+            name = 'id:DB:H6:"{}"[{}]'.format(name6, name)
+        else:
+            name4 = hash_lookup.lookup(hash32=data)
+            if name4:
+                name = 'id:DB:H4:"{}"[{}]'.format(name4, name)
+
+        data = name
+
+    elif prop_type == k_type_event:
+        data_new = []
+        for d in data:
+            name6 = hash_lookup.lookup(hash48=d & 0x0000FFFFFFFFFFFF)
+            name = 'ev:0x{:012X}'.format(d)
+            if name6:
+                name = 'ev:DB:H6:"{}"[{}]'.format(name6, name)
+            else:
+                name4 = hash_lookup.lookup(hash32=d)
+                if name4:
+                    name = 'ev:DB:H4:"{}"[{}]'.format(name4, name)
+
+            data_new.append(name)
+        data = data_new
+
+    elif prop_type == k_type_u32:
+        d = data
+        name = '{} (0x{:08X})'.format(d, d)
+        name4 = hash_lookup.lookup(hash32=d)
+        if name4:
+            name = 'u32:DB:H4:"{}"[{}]'.format(name4, name)
+        data = name
+    elif prop_type == k_type_array_u32:
+        data_new = []
+        for d in data:
+            name = '{} (0x{:08X})'.format(d, d)
+            name4 = hash_lookup.lookup(hash32=d)
+            if name4:
+                name = 'u32:DB:H4:"{}"[{}]'.format(name4, name)
+
+            data_new.append(name)
+        data = data_new
+
+    name = hash_lookup.lookup(hash32=prop_name_hash)
+    if name:
+        name = '"{}"'.format(name)
+    else:
+        name = f'0x{prop_name_hash:08x}'
+
+    return '@0x{:08x}({: 8d}) {} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {} '.format(
+        prop_pos, prop_pos,
+        name,
+        prop_data_raw,
+        prop_type,
+        PropType_names[prop_type],
+        prop_data_pos, prop_data_pos,
+        data)
+    # return '0x{:08x}: {} = {}'.format(self.name_hash, PropType.type_names[self.type], self.data,)
+
+
+def rtpc_node_to_string(node: RtpcNode, hash_lookup: FieldNameMap, indent=0):
+    ind0 = ' ' * indent
+    ind1 = ' ' * (indent + 2)
+    ind2 = ' ' * (indent + 4)
+    sbuf = ''
+    sbuf = sbuf + ind0 + 'node:\n'
+    sbuf = sbuf + ind1 + node.repr_with_name(hash_lookup) + '\n'
+    sbuf = sbuf + ind1 + 'properties ---------------\n'
+    for p in node.prop_table:
+        sbuf = sbuf + ind2 + rtpc_prop_to_string(p, hash_lookup) + '\n'
+    sbuf = sbuf + ind1 + 'children -----------------\n'
+    for c in node.child_table:
+        sbuf = sbuf + rtpc_node_to_string(c, hash_lookup, indent + 4)
+
+    return sbuf
+
+
+def rtpc_to_string(rtpc: Rtpc, vfs):
+    hash_lookup = FieldNameMap(vfs)
+    return rtpc_node_to_string(rtpc.root_node, hash_lookup)
 
 
 """
@@ -506,6 +533,7 @@ def parse_prop_data(bufn, prop_info):
         n, pos = ff_read_u32(bufn, pos)
         prop_data, pos = ff_read_s64s(bufn, pos, n)
     else:
+        prop_data = None
         parse_prop_data_raise_error(prop_type)
 
     return prop_data, prop_data_pos
@@ -654,54 +682,9 @@ class RtpcVisitorDumpToString(RtpcVisitor):
         self._lines.append(self._ind1 + 'properties ---------------')
 
     def prop_start(self, bufn, pos, index, prop_info):
-        prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
+        prop = (*prop_info, *parse_prop_data(bufn, prop_info))
 
-        prop_data, prop_data_pos = parse_prop_data(bufn, prop_info)
-
-        if prop_type == k_type_objid:
-            name6 = self.hash_lookup.lookup(hash48=prop_data & 0x0000FFFFFFFFFFFF)
-            name = 'id:0x{:012X}'.format(prop_data)
-            if name6:
-                name = 'id:DB:H6:"{}"[{}]'.format(name6, name)
-            else:
-                name4 = self.hash_lookup.lookup(hash32=prop_data)
-                if name4:
-                    name = 'id:DB:H4:"{}"[{}]'.format(name4, name)
-
-            prop_data = name
-
-        elif prop_type == k_type_event:
-            data_new = []
-            for d in prop_data:
-                name6 = self.hash_lookup.lookup(hash48=d & 0x0000FFFFFFFFFFFF)
-                name = 'ev:0x{:012X}'.format(d)
-                if name6:
-                    name = 'ev:DB:H6:"{}"[{}]'.format(name6, name)
-                else:
-                    name4 = self.hash_lookup.lookup(hash32=d)
-                    if name4:
-                        name = 'ev:DB:H4:"{}"[{}]'.format(name4, name)
-
-                data_new.append(name)
-            prop_data = data_new
-
-        name = self.hash_lookup.lookup(hash32=prop_name_hash)
-        if name:
-            name = '"{}"'.format(name)
-        else:
-            name = f'0x{prop_name_hash:08x}'
-
-        self._lines.append(
-            self._ind2 + '@0x{:08x}({: 8d}) {} 0x{:08x} 0x{:02x} {:6s} = @0x{:08x}({: 8d}) {}'.format(
-                prop_pos, prop_pos,
-                name,
-                prop_data_raw,
-                prop_type,
-                PropType_names[prop_type],
-                prop_data_pos, prop_data_pos,
-                prop_data
-            )
-        )
+        self._lines.append(self._ind2 + rtpc_prop_to_string(prop, self.hash_lookup))
 
 
 class RtpcVisitorGatherStrings(RtpcVisitor):

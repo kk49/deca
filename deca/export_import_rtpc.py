@@ -1,7 +1,7 @@
 import os
 from .db_core import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
-from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString, prop_skeleton, prop_model_skeleton
+from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString, prop_skeleton, prop_model_skeleton, rtpc_from_binary
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 
 '''
@@ -95,7 +95,7 @@ def node_export_rtpc_gltf(
 
     rtpc = Rtpc()
     with vfs.file_obj_from(vnode) as f:
-        rtpc.deserialize(f)
+        rtpc_from_binary(f, rtpc)
 
     gltf = DecaGltf(
         vfs, export_path, vnode.v_path.decode('utf-8'),

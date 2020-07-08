@@ -1,13 +1,11 @@
 import os
-import io
 import multiprocessing
 import queue
 import time
 import sys
 import traceback
 import numpy as np
-
-import deca.ff_rtpc
+from typing import List, Optional
 
 from .file import ArchiveFile
 from .db_core import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
@@ -145,6 +143,7 @@ class MultiProcessControl:
         command_todo = [(i, cmd) for i, cmd in enumerate(command_list)]
         command_active = {}
         command_complete = []
+
         command_results = [None] * len(command_list)
 
         exception_list = []
@@ -310,6 +309,7 @@ class Processor:
 
     def loop_over_uid_wrapper(self, indexes, func):
         n_indexes = len(indexes)
+        results: List[Optional[tuple]]
         results = [None] * n_indexes
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, index in enumerate(indexes):
@@ -337,6 +337,7 @@ class Processor:
 
     def loop_over_vhash_wrapper(self, vhashes, func):
         n_indexes = len(vhashes)
+        results: List[Optional[tuple]]
         results = [None] * n_indexes
         with DbWrap(self._vfs, logger=self._comm, index_offset=n_indexes) as db:
             for i, v_hash in enumerate(vhashes):
@@ -347,14 +348,14 @@ class Processor:
         return results
 
     def process_file_type_find_no_name(self, node: VfsNode, db: DbWrap):
-        # self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+        # self._comm.trace(f'process_file_type_find_no_name: {node.uid} {node.v_hash_to_str()} {node.v_path}')
         determine_file_type(db.db(), node)
         node.flags_set(node_flag_processed_file_raw_no_name)
         db.node_update(node)
         return True
 
     def process_file_type_find_with_name(self, node: VfsNode, db: DbWrap):
-        # self._comm.trace('Processing File Type Determine: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
+        # self._comm.trace(g'process_file_type_find_with_name: {node.uid} {node.v_hash_to_str()} {node.v_path}')
         determine_file_type_by_name(db.db(), node)
         if node.file_type is not None:
             node.flags_set(node_flag_processed_file_raw_with_name)
@@ -864,8 +865,8 @@ class Processor:
                                     possible_ftypes = ftype_list[FTYPE_ANY_TYPE]
 
                                 if (ftype_int & possible_ftypes) != 0:
-                                    # TODO this is diabled because it can cause a lot of traffic back to the main thread
-                                    #  RAGE2 has 1.7 million nodes
+                                    # TODO this is disabled because it can cause a lot of traffic back to the
+                                    #  main thread RAGE2 has 1.7 million nodes
                                     # self._comm.trace('v_path:add  {} {} {} {} {}'.format(
                                     #     node.v_hash_to_str(), v_path, node.file_type, possible_ftypes, src_node))
                                     node.v_path = v_path

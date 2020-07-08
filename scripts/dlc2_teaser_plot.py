@@ -53,15 +53,15 @@ class RtpcVisitorDlc2Teaser(rtpc.RtpcVisitor):
 
     def prop_start(self, bufn, pos, index, prop_info):
         prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
-        if rtpc.prop_class_name == prop_name_hash:
+        if rtpc.h_prop_class == prop_name_hash:
             self.rtpc_class_name = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
             self.node_stack[self.node_stack_index][1] = self.rtpc_class_name
-        elif rtpc.prop_class_comment == prop_name_hash:
+        elif rtpc.h_prop_name == prop_name_hash:
             self.rtpc_class_comment = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_world == prop_name_hash:
+        elif rtpc.h_prop_world == prop_name_hash:
             self.rtpc_world = parse_prop_data(bufn, prop_info)[0]
             self.node_stack[self.node_stack_index][2] = self.rtpc_world
-        elif rtpc.prop_spline == prop_name_hash:
+        elif rtpc.h_prop_spline == prop_name_hash:
             self.rtpc_spline = parse_prop_data(bufn, prop_info)[0]
 
 

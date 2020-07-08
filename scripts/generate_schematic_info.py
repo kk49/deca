@@ -95,33 +95,33 @@ class RtpcVisitorSchematic(rtpc.RtpcVisitor):
 
     def prop_start(self, bufn, pos, index, prop_info):
         prop_pos, prop_name_hash, prop_data_pos, prop_data_raw, prop_type = prop_info
-        if rtpc.prop_class_name == prop_name_hash:
+        if rtpc.h_prop_class == prop_name_hash:
             self.rtpc_class_name = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
             self.node_stack[self.node_stack_index][1] = self.rtpc_class_name
-        elif rtpc.prop_class_comment == prop_name_hash:
+        elif rtpc.h_prop_name == prop_name_hash:
             self.rtpc_class_comment = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_world == prop_name_hash:
+        elif rtpc.h_prop_world == prop_name_hash:
             self.rtpc_world = parse_prop_data(bufn, prop_info)[0]
             self.node_stack[self.node_stack_index][2] = self.rtpc_world
-        elif rtpc.prop_name_script == prop_name_hash:
+        elif rtpc.h_prop_script == prop_name_hash:
             self.rtpc_script = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_ref_apex_identifier == prop_name_hash:
+        elif rtpc.h_prop_ref_apex_identifier == prop_name_hash:
             self.rtpc_ref_apex_identifier = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_cregion_border == prop_name_hash:
+        elif rtpc.h_prop_border == prop_name_hash:
             self.rtpc_cregion_border = parse_prop_data(bufn, prop_info)[0]
-        elif rtpc.prop_instance_uid == prop_name_hash:
+        elif rtpc.h_prop_object_id == prop_name_hash:
             self.rtpc_instance_uid = parse_prop_data(bufn, prop_info)[0]
-        elif rtpc.prop_cpoi_name == prop_name_hash:
+        elif rtpc.h_prop_label_key == prop_name_hash:
             self.rtpc_cpoi_name = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_cpoi_desc == prop_name_hash:
+        elif rtpc.h_prop_deca_cpoi_desc == prop_name_hash:
             self.rtpc_cpoi_desc = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_bookmark_name == prop_name_hash:
+        elif rtpc.h_prop_note == prop_name_hash:
             self.rtpc_bookmark_name = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_item_item_id == prop_name_hash:
+        elif rtpc.h_prop_item_item_id == prop_name_hash:
             self.rtpc_item_item_id = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_deca_loot_class == prop_name_hash:
+        elif rtpc.h_prop_spawn_tags == prop_name_hash:
             self.rtpc_deca_loot_class = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
-        elif rtpc.prop_deca_crafting_type == prop_name_hash:
+        elif rtpc.h_prop_deca_crafting_type == prop_name_hash:
             self.rtpc_deca_crafting_type = parse_prop_data(bufn, prop_info)[0].decode('utf-8')
 
 

@@ -6,8 +6,6 @@ import struct
 from enum import IntEnum
 from typing import List, Optional
 
-# Node Types
-
 
 class PropType(IntEnum):
     type_none = 0
@@ -62,35 +60,26 @@ PropType_names = [
     'event',
 ]
 
+h_prop_class = hash32_func('_class')
+h_prop_class_hash = hash32_func('_class_hash')
+h_prop_name = hash32_func('name')
+h_prop_world = hash32_func('world')
+h_prop_script = hash32_func('script')
+h_prop_border = hash32_func('border')
+h_prop_object_id = hash32_func('_object_id')
+h_prop_label_key = hash32_func('label_key')
+h_prop_note = hash32_func('note')
+h_prop_spline = hash32_func('spline')
+h_prop_spawn_tags = hash32_func('spawn_tags')
+h_prop_model_skeleton = hash32_func('model_skeleton')
+h_prop_skeleton = hash32_func('skeleton')
 
-class PropName(IntEnum):
-    CLASS_NAME = 0x1473b179
-    CLASS_NAME_HASH = 0xd04059e6
-    CREGION_BORDER = 0x1c1d51a9
-    CLASS_COMMENT = 0xd31ab684
-    INSTANCE_UID = 0xcfff8405
-    ROTPOS_TRANSFORM = 0x6ca6d4b9
-    CPOI_NAME = 0x6f24d4e5
-    CPOI_DESC = 0xe6b6b3f9
-    BOOKMARK_NAME = 0x2314c9ea
+h_prop_item_item_id = hash32_func('[Item]  Item ID')
+h_prop_ref_apex_identifier = hash32_func('[ref] apex identifier')
 
-
-prop_class_name = PropName.CLASS_NAME.value
-prop_class_comment = PropName.CLASS_COMMENT.value
-prop_world = hash32_func('world')
-prop_name_script = hash32_func('script')
-prop_ref_apex_identifier = hash32_func('[ref] apex identifier')
-prop_cregion_border = PropName.CREGION_BORDER.value
-prop_instance_uid = PropName.INSTANCE_UID.value
-prop_cpoi_name = PropName.CPOI_NAME.value
-prop_cpoi_desc = PropName.CPOI_DESC.value
-prop_bookmark_name = PropName.BOOKMARK_NAME.value
-prop_item_item_id = hash32_func('[Item]  Item ID')
-prop_spline = hash32_func('spline')
-prop_deca_loot_class = 0x34beec18
-prop_deca_crafting_type = 0xa949bc65
-prop_model_skeleton = hash32_func('model_skeleton')
-prop_skeleton = hash32_func('skeleton')
+# guess at naming these fields
+h_prop_deca_crafting_type = 0xa949bc65
+h_prop_deca_cpoi_desc = 0xe6b6b3f9
 
 
 class FieldNameMap:

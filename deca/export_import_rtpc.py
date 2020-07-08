@@ -1,7 +1,8 @@
 import os
 from .db_core import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
-from .ff_rtpc import Rtpc, PropName, RtpcNode, RtpcVisitorDumpToString, prop_skeleton, prop_model_skeleton, rtpc_from_binary
+from .ff_rtpc import Rtpc, RtpcNode, RtpcVisitorDumpToString, rtpc_from_binary, \
+    h_prop_skeleton, h_prop_model_skeleton, h_prop_class
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 
 '''
@@ -19,8 +20,8 @@ def rtpc_export_node_recurse(
         material_properties=None,
         skeleton_raw_path=None):
     rtpc_class = b''
-    if PropName.CLASS_NAME.value in rtpc.prop_map:
-        rtpc_class = rtpc.prop_map[PropName.CLASS_NAME.value].data
+    if h_prop_class in rtpc.prop_map:
+        rtpc_class = rtpc.prop_map[h_prop_class].data
 
     rtpc_model_vpath = None
 
@@ -42,11 +43,11 @@ def rtpc_export_node_recurse(
     if 0x98796658 in rtpc.prop_map:
         material_properties['color_mask_b'] = rtpc.prop_map[0x98796658].data
 
-    if prop_model_skeleton in rtpc.prop_map:
-        skeleton_raw_path = rtpc.prop_map[prop_model_skeleton].data
+    if h_prop_model_skeleton in rtpc.prop_map:
+        skeleton_raw_path = rtpc.prop_map[h_prop_model_skeleton].data
 
-    if prop_skeleton in rtpc.prop_map:
-        skeleton_raw_path = rtpc.prop_map[prop_skeleton].data
+    if h_prop_skeleton in rtpc.prop_map:
+        skeleton_raw_path = rtpc.prop_map[h_prop_skeleton].data
 
     if rtpc_class == b'CRigidObject':
         rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data

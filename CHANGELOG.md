@@ -1,10 +1,11 @@
 #### v0.2.11 ???
+* Added cleanup of textures that have missing mip levels when exporting to GLTF2.
 * Added speculative decoding of u32s in RTPC to hashed strings, also Cleanup of RTPC processing/handling
 * Added pre dxt10 dwFourCC encodings DXT2, DXT4, ATI1, BC5U ala https://walbourn.github.io/the-dds-file-format-lives/
 * Added option to export GLTF2 models with: dds format, ddsc (dds format, ddsc extension), or png formats
 * Added loading of strings from `work/property_list.hsh` if it exists. property_list.hsh is included in the Ashen Tools 
 * Fixed typo in RTPC 48 bit hash lookup, was using cache incorrectly
-* Added more aggressive splitting of strings into possible substrings, now splits on `,`, `|`, and ` `
+* Added more aggressive splitting of strings into possible substrings, now splits on `,`, `|`
 * Changed call to skeleton generator to use subprocess.run instead of os.system, should capture stderr and stdout 
 * Better handling of GLTF2 export of adf files that are not models and/or are missing type info
 * Handle games without settings/hp_settings/equipment.bin

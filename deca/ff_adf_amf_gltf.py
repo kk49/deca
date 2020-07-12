@@ -1,7 +1,7 @@
 from typing import Optional
 import xml.etree.ElementTree as ElementTree
 from .util import remove_prefix_if_present
-from .ff_avtx import image_load, ddsc_write_to_dds, ddsc_write_to_png
+from .ff_avtx import image_load, ddsc_write_to_dds, ddsc_write_to_png, ddsc_clean
 from .ff_adf import *
 from .ff_adf_amf import *
 import pygltflib as pyg
@@ -129,6 +129,9 @@ class Deca3dTexture:
                     if not os.path.isfile(texture_fn_absolute):
                         texture_node = texture_nodes[0]
                         ddsc = image_load(vfs, texture_node, save_raw_data=True)
+
+                        if ddsc_clean(ddsc):
+                            vfs.logger.warning('WARNING: {}: missing high resolution data'.format(self.v_path))
 
                         os.makedirs(os.path.dirname(texture_fn_absolute), exist_ok=True)
 

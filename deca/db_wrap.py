@@ -215,13 +215,15 @@ class DbWrap:
 
         # find substrings spliting on , and |
         substrings = [string]
-        seps = [b',', b'|', b'/', b' ']
+        # TODO put b'/', b' ' back
+        seps = [b',', b'|']
         for sep in seps:
             substrings_new = []
             for substring in substrings:
                 substrings_new += substring.split(sep)
             substrings = substrings_new
 
+        is_field_name = True  # for substrings to be possible field names
         for substring in substrings:
             if substring != string:
                 self.propose_string(substring.strip(), parent_node, is_field_name, possible_file_types, used_at_runtime, fix_paths)

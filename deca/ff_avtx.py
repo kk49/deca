@@ -537,6 +537,40 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
     return ddsc
 
 
+def ddsc_clean(ddsc: Ddsc):
+    first_good = -1
+
+    for i, mip in enumerate(ddsc.mips):
+        if mip.raw_data is not None:
+            first_good = i
+            break
+
+    if first_good > 0:
+        ddsc.header.dds_header.dwMipMapCount -= first_good
+        ddsc.header.dds_header.dwWidth = ddsc.mips[first_good].size_x
+        ddsc.header.dds_header.dwHeight = ddsc.mips[first_good].size_y
+
+        max_x = ddsc.mips[first_good].size_x
+        max_y = ddsc.mips[first_good].size_y
+
+        ddsc.mips = [mip for mip in ddsc.mips if mip.size_x <= max_x and mip.size_y <= max_y]
+        ddsc.mips_avtx = [mip for mip in ddsc.mips_avtx if mip.size_x <= max_x and mip.size_y <= max_y]
+        ddsc.mips_dds = [mip for mip in ddsc.mips_dds if mip.size_x <= max_x and mip.size_y <= max_y]
+
+        remove_keys = []
+        v: DecaImage
+        for k, v in ddsc.mip_map.items():
+            if v.size_x > max_x or v.size_y > max_y:
+                remove_keys.append(k)
+
+        for k in remove_keys:
+            ddsc.mip_map.pop(k, None)
+
+        return True
+
+    return False
+
+
 def ddsc_write_to_png(ddsc, output_file_name):
     image = None
     for i in range(len(ddsc.mips)):

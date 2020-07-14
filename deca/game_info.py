@@ -1,49 +1,14 @@
 from deca.ff_types import *
+from typing import List
 import os
 import json
+import re
 
 
-def determine_game(game_dir, exe_name):
-    game_info = None
-    if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-        game_info = GameInfoGZB(game_dir, exe_name)
-    elif exe_name.find('GenerationZero') >= 0:
-        game_info = GameInfoGZ(game_dir, exe_name)
-    elif exe_name.find('theHunterCotW') >= 0:
-        game_info = GameInfoTHCOTW(game_dir, exe_name)
-    elif exe_name.find('JustCause3') >= 0:
-        game_info = GameInfoJC3(game_dir, exe_name)
-    elif exe_name.find('JustCause4') >= 0:
-        game_info = GameInfoJC4(game_dir, exe_name)
-    elif exe_name.find('RAGE2') >= 0:
-        game_info = GameInfoRage2(game_dir, exe_name)
-    else:
-        pass
-
-    return game_info
-
-
-def game_info_load(project_file):
-    with open(project_file) as f:
-        settings = json.load(f)
-    game_dir = settings['game_dir']
-    exe_name = settings['exe_name']
-    game_id = settings['game_id']
-
-    if game_id == 'gz':
-        return GameInfoGZ(game_dir, exe_name)
-    elif game_id == 'hp':
-        return GameInfoTHCOTW(game_dir, exe_name)
-    elif game_id == 'jc3':
-        return GameInfoJC3(game_dir, exe_name)
-    elif game_id == 'jc4':
-        return GameInfoJC4(game_dir, exe_name)
-    elif game_id == 'gzb':
-        return GameInfoGZB(game_dir, exe_name)
-    elif game_id == 'rg2':
-        return GameInfoRage2(game_dir, exe_name)
-    else:
-        raise NotImplementedError()
+game_info_prefixes = [
+    '../work/gameinfo',
+    './resources/gameinfo',
+]
 
 
 class GameInfo:
@@ -54,7 +19,7 @@ class GameInfo:
         self.archive_version = 3
         self.file_hash_size = 4
         self.oo_decompress_dll = None
-        self.area_prefixs = ['']
+        self.area_prefixes = ['']
 
         self.world_patches = [
             'terrain/hp/patches/',
@@ -91,7 +56,7 @@ class GameInfo:
             'game_dir': self.game_dir,
             'exe_name': self.exe_name,
             'game_id': self.game_id,
-            'archive_paths': self.archive_path(),
+            'archive_paths': self.archive_paths(),
         }
 
         with open(filename, 'w') as f:
@@ -100,7 +65,7 @@ class GameInfo:
     def unarchived_files(self):
         return []
 
-    def archive_path(self):
+    def archive_paths(self):
         raise NotImplementedError()
 
     def mdic_ftype(self):
@@ -122,6 +87,112 @@ class GameInfo:
         return False
 
 
+def expand_list(data0, envs):
+    data_out = data0
+    for env in envs:
+        data_in = data_out
+
+        if env[1]:
+            data_out = []
+
+            for value in env[1]:
+                for din in data_in:
+                    data_out.append(din.replace(env[0], value))
+
+    data_in = data_out
+    data_out = []
+    seen = set()
+    for value in data_in:
+        if value not in seen:
+            seen.add(value)
+            data_out.append(value)
+
+    return data_out
+
+
+class GameInfoJson(GameInfo):
+    def __init__(self, game_dir, exe_name, jdata):
+        GameInfo.__init__(self, game_dir, exe_name, jdata['game_id'])
+        self.archive_version = jdata['archive_version']
+        self.file_hash_size = jdata['file_hash_size']
+
+        self.oo_decompress_dll = jdata.get('oo_decompress_dll', None)
+        if not self.oo_decompress_dll:
+            self.oo_decompress_dll = None
+
+        self.map_zooms = jdata['map_zooms']
+        self.map_max_count = jdata['map_max_count']
+        self.world_indexes = jdata.get('world_indexes', [])
+
+        self.area_prefixes = jdata.get('area_prefixes', [])
+        self.world_patches = jdata.get('world_patches', [])
+        self.world_occluders = jdata.get('world_occluders', [])
+        self.world_navheightfields = jdata.get('world_navheightfields', [])
+        self.world_hm = jdata.get('world_hm', [])
+        self.world_ai = jdata.get('world_ai', [])
+        self.map_prefixes = jdata.get('map_prefixes', [])
+        self._unarchived_files = jdata.get('unarchived_files', [])
+        self._archive_path = jdata.get('archive_paths', [])
+        self._mdic_ftype = jdata.get('mdic_ftype', '').split(',')
+        self._navmesh_ftype = jdata.get('navmesh_ftype', '').split(',')
+        self._obc_ftype = jdata.get('obc_ftype', '').split(',')
+        self._pfs_ftype = jdata.get('pfs_ftype', '').split(',')
+        self._file_assoc = jdata.get('file_assoc', [])
+        self._has_garcs = jdata.get('has_garcs', False)
+
+        if self.game_dir.endswith('/') or self.game_dir.endswith('\\'):
+            gd = self.game_dir[:-1]
+        else:
+            gd = self.game_dir
+
+        envs = [
+            ('${GAME_DIR}', [gd]),
+            ('${AREA_PREFIX}', self.area_prefixes),
+            ('${WORLD_INDEX}', self.world_indexes),
+        ]
+
+        self.world_patches = expand_list(self.world_patches, envs)
+        self.world_occluders = expand_list(self.world_occluders, envs)
+        self.world_navheightfields = expand_list(self.world_navheightfields, envs)
+        self.world_hm = expand_list(self.world_hm, envs)
+        self.world_ai = expand_list(self.world_ai, envs)
+        self.map_prefixes = expand_list(self.map_prefixes, envs)
+        self._unarchived_files = expand_list(self._unarchived_files, envs)
+        self._archive_paths = expand_list(self._archive_path, envs)
+
+        old_fa = self._file_assoc
+        self._file_assoc = []
+        for fa in old_fa:
+            nfa = {}
+            for k, v in fa.items():
+                nfa[k.encode('ascii')] = v.split(',')
+            self._file_assoc.append(nfa)
+
+    def unarchived_files(self):
+        return self._unarchived_files
+
+    def archive_paths(self):
+        return self._archive_paths
+
+    def mdic_ftype(self):
+        return self._mdic_ftype
+
+    def navmesh_ftype(self):
+        return self._navmesh_ftype
+
+    def obc_ftype(self):
+        return self._obc_ftype
+
+    def pfs_ftype(self):
+        return self._pfs_ftype
+
+    def file_assoc(self):
+        return self._file_assoc
+
+    def has_garcs(self):
+        return self._has_garcs
+
+
 class GameInfoGZ(GameInfo):
     def __init__(self, game_dir, exe_name, game_id='gz'):
         GameInfo.__init__(self, game_dir, exe_name, game_id)
@@ -135,7 +206,7 @@ class GameInfoGZ(GameInfo):
         files = [os.path.join(self.game_dir, 'Shaders_F.shader_bundle')]
         return files
 
-    def archive_path(self):
+    def archive_paths(self):
         archive_paths = []
         for cat in ['initial', 'supplemental', 'optional']:
             archive_paths.append(os.path.join(self.game_dir, 'archives_win64', cat))
@@ -219,9 +290,9 @@ class GameInfoTHCOTW(GameInfo):
             'hp_africa_',
 
             'hp_patagonia_',
-            'hp_trophyworld_'
+            'hp_trophyworld_',
             'hp_yukon_',
-            'hp_trophyworld_2_'
+            'hp_trophyworld_2_',
             
             'hp_iberia_',
         ]
@@ -252,7 +323,7 @@ class GameInfoTHCOTW(GameInfo):
                 self.world_hm.append(f'worlds/base/terrain/hp/horizonmap/horizon_hp_{area}')
                 self.world_hm.append(f'worlds/world{i}/terrain/world{i}/horizonmap/horizon_hp_{area}')
 
-    def archive_path(self):
+    def archive_paths(self):
         archive_paths = []
         archive_paths.append(os.path.join(self.game_dir, 'archives_win64'))
         return archive_paths
@@ -321,7 +392,7 @@ class GameInfoJC3(GameInfo):
             'dlc/demonios/textures/ui/',
         ]
 
-    def archive_path(self):
+    def archive_paths(self):
         archive_paths = []
         archive_paths.append(os.path.join(self.game_dir, 'patch_win64'))
         archive_paths.append(os.path.join(self.game_dir, 'archives_win64'))
@@ -394,7 +465,7 @@ class GameInfoJC4(GameInfo):
             'dlc/demonios/textures/ui/',
         ]
 
-    def archive_path(self):
+    def archive_paths(self):
         archive_paths = []
         archive_paths.append(os.path.join(self.game_dir, 'archives_win64'))
         return archive_paths
@@ -489,7 +560,7 @@ class GameInfoRage2(GameInfo):
             'textures/ui/world_map/',
         ]
 
-    def archive_path(self):
+    def archive_paths(self):
         archive_paths = [
             os.path.join(self.game_dir, 'archives_win64'),
         ]
@@ -551,3 +622,93 @@ class GameInfoRage2(GameInfo):
 
     def has_garcs(self):
         return True
+
+
+class GameInfoFactory:
+    def __init__(self, json_file):
+        self.json_file = json_file
+        with open(json_file, 'r') as f:
+            self.json = json.load(f)
+
+    def create(self, game_dir, exe_name, game_id=None):
+        exe_match = self.json.get('exe_match', None)
+        exe_not_match = self.json.get('exe_not_match', None)
+
+        full_path = os.path.join(game_dir, exe_name)
+
+        if game_id is not None and game_id != self.json['game_id']:
+            return None
+
+        if exe_match is None or not re.match(exe_match, full_path):
+            return None
+
+        if exe_not_match is not None and re.match(exe_not_match, full_path):
+            return None
+
+        return GameInfoJson(game_dir, exe_name, self.json)
+
+
+def determine_game_info(game_dir, exe_name, game_id=None):
+    json_files = []
+    for prefix in game_info_prefixes:
+        json_files += [os.path.join(prefix, fn) for fn in os.listdir(prefix) if fn.endswith('json')]
+
+    for fn in json_files:
+        factory = GameInfoFactory(fn)
+        game_info = factory.create(game_dir, exe_name, game_id)
+        if game_info is not None:
+            return game_info
+
+    return None
+
+
+def determine_game(game_dir, exe_name):
+    game_info = determine_game_info(game_dir, exe_name)
+    if game_info is not None:
+        return game_info
+
+    game_info = None
+    if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
+        game_info = GameInfoGZB(game_dir, exe_name)
+    elif exe_name.find('GenerationZero') >= 0:
+        game_info = GameInfoGZ(game_dir, exe_name)
+    elif exe_name.find('theHunterCotW') >= 0:
+        game_info = GameInfoTHCOTW(game_dir, exe_name)
+    elif exe_name.find('JustCause3') >= 0:
+        game_info = GameInfoJC3(game_dir, exe_name)
+    elif exe_name.find('JustCause4') >= 0:
+        game_info = GameInfoJC4(game_dir, exe_name)
+    elif exe_name.find('RAGE2') >= 0:
+        game_info = GameInfoRage2(game_dir, exe_name)
+    else:
+        pass
+
+    return game_info
+
+
+def game_info_load(project_file):
+    with open(project_file) as f:
+        settings = json.load(f)
+
+    game_dir = settings['game_dir']
+    exe_name = settings['exe_name']
+    game_id = settings['game_id']
+
+    game_info = determine_game_info(game_dir, exe_name, game_id=game_id)
+    if game_info is not None:
+        return game_info
+
+    if game_id == 'gz':
+        return GameInfoGZ(game_dir, exe_name)
+    elif game_id == 'hp':
+        return GameInfoTHCOTW(game_dir, exe_name)
+    elif game_id == 'jc3':
+        return GameInfoJC3(game_dir, exe_name)
+    elif game_id == 'jc4':
+        return GameInfoJC4(game_dir, exe_name)
+    elif game_id == 'gzb':
+        return GameInfoGZB(game_dir, exe_name)
+    elif game_id == 'rg2':
+        return GameInfoRage2(game_dir, exe_name)
+    else:
+        raise NotImplementedError()

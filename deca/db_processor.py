@@ -110,7 +110,7 @@ class VfsProcessor(VfsDatabase):
 
         self.logger.log('Add TAB / ARC files')
         input_files = []
-        dir_in = self.game_info.archive_path()
+        dir_in = self.game_info.archive_paths()
         dir_found = []
 
         while len(dir_in) > 0:

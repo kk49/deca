@@ -651,7 +651,8 @@ class GameInfoFactory:
 def determine_game_info(game_dir, exe_name, game_id=None):
     json_files = []
     for prefix in game_info_prefixes:
-        json_files += [os.path.join(prefix, fn) for fn in os.listdir(prefix) if fn.endswith('json')]
+        if os.path.isdir(prefix):
+            json_files += [os.path.join(prefix, fn) for fn in os.listdir(prefix) if fn.endswith('json')]
 
     for fn in json_files:
         factory = GameInfoFactory(fn)

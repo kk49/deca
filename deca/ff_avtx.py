@@ -151,7 +151,7 @@ class DdImageHeader:
             self.size_header = fh.read_u32()
             self.size_body = fh.read_u32()
             self.unknown = []
-            while fh.tell() < 128:
+            while fh.tell() < self.size_header:
                 self.unknown.append(fh.read_u8())
 
             self.dds_header.dwFlags |= DDSD_CAPS
@@ -451,7 +451,7 @@ class Ddsc:
         self.load_body(f, filename, save_raw_data, group_by_surface=True)
 
     def load_ddsc(self, f, filename=None, save_raw_data=False):
-        header = f.read(128)
+        header = f.read(256)
         hl = self.header.deserialize_ddsc(header)
         self.header_buffer = header[0:hl]
         f.seek(hl)

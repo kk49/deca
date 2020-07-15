@@ -107,12 +107,14 @@ class AmfModel(AmfClass):
 
 
 class AmfSubMesh(AmfClass):
-    def __init__(self, adf: Adf = None, value_raw: AdfValue = None):
+    def __init__(self, adf: Adf = None, value_raw: AdfValue = None, merged_buffers=False):
         AmfClass.__init__(self)
         self.subMeshId = None
         self.indexCount = None
         self.indexStreamOffset = None
         self.boundingBox = None
+
+        self._merged_buffers = merged_buffers
 
         if adf is not None and value_raw is not None:
             self.parse(adf, value_raw)
@@ -121,8 +123,12 @@ class AmfSubMesh(AmfClass):
         value = value_raw.value
         self.subMeshId = value['SubMeshId'].hash_string
         self.indexCount = value['IndexCount'].value
-        self.indexStreamOffset = value['IndexStreamOffset'].value
         self.boundingBox = AmfBoundingBox(adf, value['BoundingBox'])
+
+        if self._merged_buffers:
+            self.indexStreamOffset = 0
+        else:
+            self.indexStreamOffset = value['IndexStreamOffset'].value
 
 
 class AmfStreamAttribute(AmfClass):
@@ -153,7 +159,7 @@ class AmfStreamAttribute(AmfClass):
 
 
 class AmfMesh(AmfClass):
-    def __init__(self, adf: Adf = None, value_raw: AdfValue = None):
+    def __init__(self, adf: Adf = None, value_raw: AdfValue = None, merged_buffers=False):
         AmfClass.__init__(self)
         self.meshTypeId = None
         self.indexCount = None
@@ -170,6 +176,8 @@ class AmfMesh(AmfClass):
         self.subMeshes = None
         self.streamAttributes = None
 
+        self._merged_buffers = merged_buffers
+
         if adf is not None and value_raw is not None:
             self.parse(adf, value_raw)
 
@@ -178,24 +186,35 @@ class AmfMesh(AmfClass):
         self.meshTypeId = value['MeshTypeId'].hash_string
         self.indexCount = value['IndexCount'].value
         self.vertexCount = value['VertexCount'].value
-        self.indexBufferIndex = value['IndexBufferIndex'].value
+
         self.indexBufferStride = value['IndexBufferStride'].value
-        self.indexBufferOffset = value['IndexBufferOffset'].value
-        self.vertexBufferIndices = list(value['VertexBufferIndices'].value)
         self.vertexStreamStrides = list(value['VertexStreamStrides'].value)
         self.vertexStreamOffsets = value['VertexStreamOffsets'].value
+
+        if self._merged_buffers:
+            merged_buffer_index = value['MergedBufferIndex'].value
+            self.indexBufferIndex = merged_buffer_index
+            self.indexBufferOffset = 0
+            self.vertexBufferIndices = [merged_buffer_index] * len(self.vertexStreamOffsets)
+        else:
+            self.indexBufferIndex = value['IndexBufferIndex'].value
+            self.indexBufferOffset = value['IndexBufferOffset'].value
+            self.vertexBufferIndices = list(value['VertexBufferIndices'].value)
+
         self.textureDensities = value['TextureDensities'].value
         self.meshProperties = adf_value_extract(value['MeshProperties'])
         self.boneIndexLookup = value['BoneIndexLookup'].value
-        self.subMeshes = [AmfSubMesh(adf, v) for v in value['SubMeshes'].value]
+        self.subMeshes = [AmfSubMesh(adf, v, merged_buffers=self._merged_buffers) for v in value['SubMeshes'].value]
         self.streamAttributes = [AmfStreamAttribute(adf, v) for v in value['StreamAttributes'].value]
 
 
 class AmfLodGroup(AmfClass):
-    def __init__(self, adf: Adf = None, value_raw: AdfValue = None):
+    def __init__(self, adf: Adf = None, value_raw: AdfValue = None, merged_buffers=False):
         AmfClass.__init__(self)
         self.lodIndex = None
         self.meshes = None
+
+        self._merged_buffers = merged_buffers
 
         if adf is not None and value_raw is not None:
             self.parse(adf, value_raw)
@@ -203,16 +222,18 @@ class AmfLodGroup(AmfClass):
     def parse(self, adf: Adf, value_raw: AdfValue):
         value = value_raw.value
         self.lodIndex = value['LODIndex'].value
-        self.meshes = [AmfMesh(adf, v) for v in value['Meshes'].value]
+        self.meshes = [AmfMesh(adf, v, merged_buffers=self._merged_buffers) for v in value['Meshes'].value]
 
 
 class AmfMeshHeader(AmfClass):
-    def __init__(self, adf: Adf = None, value_raw: AdfValue = None):
+    def __init__(self, adf: Adf = None, value_raw: AdfValue = None, merged_buffers=False):
         AmfClass.__init__(self)
         self.boundingBox = None
         self.memoryTag = None
         self.lodGroups = None
         self.highLodPath = None
+
+        self._merged_buffers = merged_buffers
 
         if adf is not None and value_raw is not None:
             self.parse(adf, value_raw)
@@ -222,7 +243,7 @@ class AmfMeshHeader(AmfClass):
         self.boundingBox = AmfBoundingBox(adf, value['BoundingBox'])
         self.memoryTag = value['MemoryTag'].value
         self.highLodPath = value['HighLodPath'].hash_string
-        self.lodGroups = [AmfLodGroup(adf, v) for v in value['LodGroups'].value]
+        self.lodGroups = [AmfLodGroup(adf, v, merged_buffers=self._merged_buffers) for v in value['LodGroups'].value]
 
 
 class AmfBuffer(AmfClass):
@@ -241,19 +262,55 @@ class AmfBuffer(AmfClass):
 
 
 class AmfMeshBuffers(AmfClass):
-    def __init__(self, adf: Adf = None, value_raw: AdfValue = None):
+    def __init__(self, adf: Adf = None, value_raw: AdfValue = None, merged_buffers=False):
         AmfClass.__init__(self)
         self.memoryTag = None
         self.indexBuffers = None
         self.vertexBuffers = None
+
+        self._merged_buffers = merged_buffers
+
         if adf is not None and value_raw is not None:
             self.parse(adf, value_raw)
 
     def parse(self, adf: Adf, value_raw: AdfValue):
         value = value_raw.value
         self.memoryTag = value['MemoryTag']
-        self.indexBuffers = [AmfBuffer(adf, v) for v in value['IndexBuffers'].value]
-        self.vertexBuffers = [AmfBuffer(adf, v) for v in value['VertexBuffers'].value]
+        if self._merged_buffers:
+            index_offsets = value['IndexOffsets'].value
+            vertex_offsets = value['VertexOffsets'].value
+
+            # TODO BUG IN APEX ENGINE, index offsets stored by index count :/
+            index_offsets = [2 * i for i in index_offsets]
+
+            buffer_data = value['MergedBuffer'].value['Data'].value
+            buffer_create_srv = value['MergedBuffer'].value['CreateSRV'].value
+
+            offsets = index_offsets + vertex_offsets + [len(buffer_data)]
+            offsets.sort()
+            ends = {}
+            for i, offset in enumerate(offsets):
+                if i+1 < len(offsets):
+                    ends[offset] = offsets[i+1]
+
+            self.indexBuffers = []
+            for offset in index_offsets:
+                new_buffer = AmfBuffer()
+                new_buffer.data = buffer_data[offset:ends[offset]]
+                new_buffer.createSrv = buffer_create_srv
+                self.indexBuffers.append(new_buffer)
+
+            self.vertexBuffers = []
+            for offset in vertex_offsets:
+                new_buffer = AmfBuffer()
+                new_buffer.data = buffer_data[offset:ends[offset]]
+                new_buffer.createSrv = buffer_create_srv
+                self.vertexBuffers.append(new_buffer)
+
+            # merged_buffer = [AmfBuffer(adf, v) for v in value['MergedBuffer'].value]
+        else:
+            self.indexBuffers = [AmfBuffer(adf, v) for v in value['IndexBuffers'].value]
+            self.vertexBuffers = [AmfBuffer(adf, v) for v in value['VertexBuffers'].value]
 
 
 # stream/buffer conversion routines
@@ -651,14 +708,20 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
 
                 # translate original stream
                 data_in = np.frombuffer(buf_in, dtype=dtype_in)
-                data_in_mem = np.zeros(data_in.shape, dtype=dtype_in_mem)
-                for idx, sattr_in in enumerate(attributes_in):
-                    fidx = 'f{}'.format(idx)
+                data_in_mem = np.zeros((data_in.shape[0],), dtype=dtype_in_mem)
+                if data_in.dtype.fields is None:
+                    assert len(attributes_in) == 1
+                    sattr_in = attributes_in[0]
                     finfo_in = field_format_info[sattr_in.format[1]]
-                    preconvert_scale(data_in_mem[fidx], data_in[fidx], sattr_in, False, finfo_in.converter)
+                    preconvert_scale(data_in_mem, data_in, sattr_in, False, finfo_in.converter)
+                else:
+                    for idx, sattr_in in enumerate(attributes_in):
+                        fidx = 'f{}'.format(idx)
+                        finfo_in = field_format_info[sattr_in.format[1]]
+                        preconvert_scale(data_in_mem[fidx], data_in[fidx], sattr_in, False, finfo_in.converter)
 
                 data_out_mem = np.frombuffer(data_in_mem.tobytes(), dtype=dtype_out_mem).copy()
-                data_out = np.zeros(data_in.shape, dtype=dtype_out)
+                data_out = np.zeros(data_in.shape[0], dtype=dtype_out)
                 for idx, sattr_out in enumerate(attributes_out):
                     fidx = 'f{}'.format(idx)
                     finfo_out = field_format_info[sattr_out.format[1]]

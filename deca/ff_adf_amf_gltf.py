@@ -180,11 +180,18 @@ class Deca3dMeshc:
             vfs.logger.log('Setup Meshc: {}'.format(self.v_path))
             mesh_adf = adf_db.read_node(vfs, vfs.nodes_where_match(v_path=self.v_path)[0])
             assert len(mesh_adf.table_instance) == 2
-            assert mesh_adf.table_instance[0].type_hash == 0xea60065d
-            # 0x67b3a453 - GenZ, 0xe6834477 - theHunter
-            assert mesh_adf.table_instance[1].type_hash in {0x67b3a453, 0xe6834477}
-            mesh_header = AmfMeshHeader(mesh_adf, mesh_adf.table_instance_full_values[0])
-            mesh_buffers = AmfMeshBuffers(mesh_adf, mesh_adf.table_instance_full_values[1])
+            # 0xea60065d - gz/hp, 0x7A2C9B73 - rg2
+            assert mesh_adf.table_instance[0].type_hash in {0xea60065d, 0x7A2C9B73}
+            # 0x67b3a453 - gz, 0xe6834477 - hp, 0x0E1C0800 - rg2
+            assert mesh_adf.table_instance[1].type_hash in {0x67b3a453, 0xe6834477, 0x0E1C0800}
+            mesh_header = AmfMeshHeader(
+                mesh_adf,
+                mesh_adf.table_instance_full_values[0],
+                merged_buffers=mesh_adf.table_instance[0].type_hash in {0x7A2C9B73})
+            mesh_buffers = AmfMeshBuffers(
+                mesh_adf,
+                mesh_adf.table_instance_full_values[1],
+                merged_buffers=mesh_adf.table_instance[1].type_hash in {0x0E1C0800})
 
             hrmesh_vpath = mesh_header.highLodPath
             hrmesh_vpath2 = remove_prefix_if_present(b'intermediate/', hrmesh_vpath)
@@ -202,7 +209,10 @@ class Deca3dMeshc:
                 hrmesh_adf = adf_db.read_node(vfs, hrmesh_node)
                 assert len(hrmesh_adf.table_instance) == 1
                 # assert hrmesh_adf.table_instance[0].type_hash == 0x67b3a453
-                hrmesh_buffers = AmfMeshBuffers(hrmesh_adf, hrmesh_adf.table_instance_full_values[0])
+                hrmesh_buffers = AmfMeshBuffers(
+                    hrmesh_adf,
+                    hrmesh_adf.table_instance_full_values[0],
+                    merged_buffers=mesh_adf.table_instance[1].type_hash in {0x0E1C0800})
                 mesh_buffers.indexBuffers = mesh_buffers.indexBuffers + hrmesh_buffers.indexBuffers
                 mesh_buffers.vertexBuffers = mesh_buffers.vertexBuffers + hrmesh_buffers.vertexBuffers
 

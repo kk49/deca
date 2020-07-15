@@ -2,7 +2,7 @@ import os
 from .db_core import VfsDatabase, VfsNode
 from .errors import EDecaFileExists
 from .ff_rtpc import Rtpc, RtpcNode, RtpcVisitorDumpToString, rtpc_from_binary, \
-    h_prop_skeleton, h_prop_model_skeleton, h_prop_class
+    h_prop_skeleton, h_prop_model_skeleton, h_prop_class, h_prop_class_hash
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 
 '''
@@ -22,6 +22,11 @@ def rtpc_export_node_recurse(
     rtpc_class = b''
     if h_prop_class in rtpc.prop_map:
         rtpc_class = rtpc.prop_map[h_prop_class].data
+    elif h_prop_class_hash in rtpc.prop_map:
+        rtpc_class_hash = rtpc.prop_map[h_prop_class_hash].data
+        rtpc_class_hash = vfs.hash_string_match(hash32=rtpc_class_hash)
+        if len(rtpc_class_hash) > 0:
+            rtpc_class = rtpc_class_hash[0][1]
 
     rtpc_model_vpath = None
 
@@ -43,23 +48,26 @@ def rtpc_export_node_recurse(
     if 0x98796658 in rtpc.prop_map:
         material_properties['color_mask_b'] = rtpc.prop_map[0x98796658].data
 
+    # skeleton lookup
     if h_prop_model_skeleton in rtpc.prop_map:
         skeleton_raw_path = rtpc.prop_map[h_prop_model_skeleton].data
-
-    if h_prop_skeleton in rtpc.prop_map:
+    elif h_prop_skeleton in rtpc.prop_map:
         skeleton_raw_path = rtpc.prop_map[h_prop_skeleton].data
 
+    if isinstance(skeleton_raw_path, int):
+        skeleton_raw_path = vfs.hash_string_match(hash32=skeleton_raw_path)
+        if len(skeleton_raw_path) > 0:
+            skeleton_raw_path = skeleton_raw_path[0][1]
+        else:
+            skeleton_raw_path = None
+
+    # model lookup
     if rtpc_class == b'CRigidObject':
-        rtpc_modelc_vhash = rtpc.prop_map[0x32b409e0].data
-        rtpc_model_vpath = vfs.nodes_select_distinct_vpath_where_vhash(rtpc_modelc_vhash)[0]
+        rtpc_model_vpath = rtpc.prop_map[0x32b409e0].data
     elif rtpc_class == b'SCharacterPart':
         rtpc_model_vpath = rtpc.prop_map[0xb498c27d].data
     elif rtpc_class == b'CPartProp':
-        rtpc_modelc_vhash = rtpc.prop_map[0xa74f2259].data
-        rtpc_model_vpath = vfs.nodes_select_distinct_vpath_where_vhash(rtpc_modelc_vhash)[0]
-    elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
-        if 0x0f94740b in rtpc.prop_map:
-            rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
+        rtpc_model_vpath = rtpc.prop_map[0xa74f2259].data
     elif rtpc_class in {b'CSkeletalAnimatedObject', b'CSecondaryMotionAttachment'}:
         if 0x0f94740b in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0x0f94740b].data
@@ -70,6 +78,13 @@ def rtpc_export_node_recurse(
         # TODO entity_type = rtpc.prop_map[0xd31ab684].data
         if 0xf9dcf6ab in rtpc.prop_map:
             rtpc_model_vpath = rtpc.prop_map[0xf9dcf6ab].data
+
+    if isinstance(rtpc_model_vpath, int):
+        rtpc_model_vpath = vfs.hash_string_match(hash32=rtpc_model_vpath)
+        if len(rtpc_model_vpath) > 0:
+            rtpc_model_vpath = rtpc_model_vpath[0][1]
+        else:
+            rtpc_model_vpath = None
 
     if rtpc_model_vpath is not None:
         gltf.export_modelc(

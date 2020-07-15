@@ -1,4 +1,5 @@
 #### v0.2.11 ???
+* First pass at RAGE2 model export. (BUG IN APEX ENGINE? index buffer offsets in archive, offsets not in bytes, but indexes)
 * All game {gz, gzb, jc3, jc4, rg2}.json configurations are loaded from `resources/gameinfo`
 * Additional user provided game configurations can be loaded from `work/gameinfo`
 * Added cleanup of textures that have missing mip levels when exporting to GLTF2.

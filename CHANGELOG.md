@@ -1,5 +1,6 @@
 #### v0.2.11 ???
-* Added option to load game description from json files
+* All game {gz, gzb, jc3, jc4, rg2}.json configurations are loaded from `resources/gameinfo`
+* Additional user provided game configurations can be loaded from `work/gameinfo`
 * Added cleanup of textures that have missing mip levels when exporting to GLTF2.
 * Added speculative decoding of u32s in RTPC to hashed strings, also Cleanup of RTPC processing/handling
 * Added pre dxt10 dwFourCC encodings DXT2, DXT4, ATI1, BC5U ala https://walbourn.github.io/the-dds-file-format-lives/

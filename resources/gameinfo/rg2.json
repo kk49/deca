@@ -1,0 +1,92 @@
+{
+  "game_id": "rg2",
+  "exe_match": ".*RAGE2.*",
+  "archive_version": 5,
+  "file_hash_size": 8,
+  "oo_decompress_dll": "${GAME_DIR}/oo2core_7_win64.dll",
+  "area_prefixes": [
+    ""
+  ],
+  "world_patches": [
+    "terrain/heatwave/patches/width_3/",
+    "terrain/heatwave/patches/width_4/",
+    "terrain/heatwave/patches/width_8/"
+  ],
+  "world_occluders": [
+    "terrain/heatwave/occluder/"
+  ],
+  "world_navheightfields": [
+    "terrain/hp/navheightfield/globalhires/"
+  ],
+  "world_hm": [
+    "terrain/heatwave/horizonmap/horizonmap_tessellation_disabled_",
+    "terrain/heatwave/horizonmap/horizonmap_tessellation_enabled_",
+    "terrain/heatwave/horizonmap/horizonmap_moon_tessellation_disabled_",
+    "terrain/heatwave/horizonmap/horizonmap_moon_tessellation_enabled_"
+  ],
+  "world_ai": [
+    "ai/tiles/"
+  ],
+  "map_zooms": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "map_max_count": 1024,
+  "map_prefixes": [
+    "textures/ui/world_map/worldmap_",
+    "textures/ui/world_map/"
+  ],
+  "unarchived_files": [
+  ],
+  "archive_paths": [
+    "${GAME_DIR}/archives_win64/"
+  ],
+  "mdic_ftype": "adf",
+  "navmesh_ftype": "h2014",
+  "obc_ftype": "",
+  "pfs_ftype": "pfx",
+  "has_garcs": true,
+  "file_assoc": [
+    {
+      ".ee": "META-ANY-TYPE",
+      ".epe": "rtpc"
+    },
+    {
+      ".bl": "META-ANY-TYPE",
+      ".nl": "META-ANY-TYPE",
+      ".fl": "META-ANY-TYPE",
+      ".blo": "rtpc",
+      ".nl.mdic": "adf",
+      ".fl.mdic": "adf",
+      ".pfs": "pfx",
+      ".obc": "obc"
+    },
+    {
+      ".meshc": "adf",
+      ".hrmeshc": "adf",
+      ".modelc": "adf",
+      ".model_deps": "txt",
+      ".pfxc": "pfx"
+    },
+    {
+      ".ddsc": "avtx,dds",
+      ".hmddsc": "atx,META-NO-TYPE",
+      ".atx0": "atx,META-NO-TYPE",
+      ".atx1": "atx,META-NO-TYPE",
+      ".atx2": "atx,META-NO-TYPE"
+    },
+    {
+      ".fmod_sbankc": "txt",
+      ".fmod_bankc": "riff"
+    },
+    {
+      ".swf": "gfx",
+      ".cfx": "gfx",
+      ".gfx": "gfx"
+    }
+  ]
+}

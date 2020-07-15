@@ -122,7 +122,7 @@ class GameInfoJson(GameInfo):
 
         self.map_zooms = jdata['map_zooms']
         self.map_max_count = jdata['map_max_count']
-        self.world_indexes = jdata.get('world_indexes', [])
+        self.world_indexes = ['{}'.format(v) for v in jdata.get('world_indexes', [])]
 
         self.area_prefixes = jdata.get('area_prefixes', [])
         self.world_patches = jdata.get('world_patches', [])
@@ -151,6 +151,8 @@ class GameInfoJson(GameInfo):
             ('${WORLD_INDEX}', self.world_indexes),
         ]
 
+        if self.oo_decompress_dll is not None:
+            self.oo_decompress_dll = expand_list([self.oo_decompress_dll], envs)[0]
         self.world_patches = expand_list(self.world_patches, envs)
         self.world_occluders = expand_list(self.world_occluders, envs)
         self.world_navheightfields = expand_list(self.world_navheightfields, envs)
@@ -668,22 +670,22 @@ def determine_game(game_dir, exe_name):
     if game_info is not None:
         return game_info
 
-    game_info = None
-    if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
-        game_info = GameInfoGZB(game_dir, exe_name)
-    elif exe_name.find('GenerationZero') >= 0:
-        game_info = GameInfoGZ(game_dir, exe_name)
-    elif exe_name.find('theHunterCotW') >= 0:
-        game_info = GameInfoTHCOTW(game_dir, exe_name)
-    elif exe_name.find('JustCause3') >= 0:
-        game_info = GameInfoJC3(game_dir, exe_name)
-    elif exe_name.find('JustCause4') >= 0:
-        game_info = GameInfoJC4(game_dir, exe_name)
-    elif exe_name.find('RAGE2') >= 0:
-        game_info = GameInfoRage2(game_dir, exe_name)
-    else:
-        pass
-
+    # game_info = None
+    # if exe_name.find('GenerationZero') >= 0 and game_dir.find('BETA') >= 0:
+    #     game_info = GameInfoGZB(game_dir, exe_name)
+    # elif exe_name.find('GenerationZero') >= 0:
+    #     game_info = GameInfoGZ(game_dir, exe_name)
+    # elif exe_name.find('theHunterCotW') >= 0:
+    #     game_info = GameInfoTHCOTW(game_dir, exe_name)
+    # elif exe_name.find('JustCause3') >= 0:
+    #     game_info = GameInfoJC3(game_dir, exe_name)
+    # elif exe_name.find('JustCause4') >= 0:
+    #     game_info = GameInfoJC4(game_dir, exe_name)
+    # elif exe_name.find('RAGE2') >= 0:
+    #     game_info = GameInfoRage2(game_dir, exe_name)
+    # else:
+    #     pass
+    #
     return game_info
 
 
@@ -699,17 +701,19 @@ def game_info_load(project_file):
     if game_info is not None:
         return game_info
 
-    if game_id == 'gz':
-        return GameInfoGZ(game_dir, exe_name)
-    elif game_id == 'hp':
-        return GameInfoTHCOTW(game_dir, exe_name)
-    elif game_id == 'jc3':
-        return GameInfoJC3(game_dir, exe_name)
-    elif game_id == 'jc4':
-        return GameInfoJC4(game_dir, exe_name)
-    elif game_id == 'gzb':
-        return GameInfoGZB(game_dir, exe_name)
-    elif game_id == 'rg2':
-        return GameInfoRage2(game_dir, exe_name)
-    else:
-        raise NotImplementedError()
+    raise NotImplementedError()
+
+    # if game_id == 'gz':
+    #     return GameInfoGZ(game_dir, exe_name)
+    # elif game_id == 'hp':
+    #     return GameInfoTHCOTW(game_dir, exe_name)
+    # elif game_id == 'jc3':
+    #     return GameInfoJC3(game_dir, exe_name)
+    # elif game_id == 'jc4':
+    #     return GameInfoJC4(game_dir, exe_name)
+    # elif game_id == 'gzb':
+    #     return GameInfoGZB(game_dir, exe_name)
+    # elif game_id == 'rg2':
+    #     return GameInfoRage2(game_dir, exe_name)
+    # else:
+    #     raise NotImplementedError()

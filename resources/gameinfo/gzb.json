@@ -1,0 +1,93 @@
+{
+  "game_id": "gzb",
+  "exe_match": ".*BETA.*GenerationZero.*",
+  "archive_version": 3,
+  "file_hash_size": 4,
+  "oo_decompress_dll": false,
+  "area_prefixes": [
+    ""
+  ],
+  "world_patches": [
+    "terrain/hp/patches/",
+    "terrain/jc3/patches/"
+  ],
+  "world_occluders": [
+    "terrain/hp/occluder/",
+    "terrain/jc3/occluder/"
+  ],
+  "world_navheightfields": [
+    "terrain/hp/navheightfield/globalhires/",
+    "terrain/jc3/navheightfield/globalhires/"
+  ],
+  "world_hm": [
+    "terrain/hp/horizonmap/horizon_",
+    "terrain/jc3/horizonmap/horizon_"
+  ],
+  "world_ai": [
+    "ai/tiles/"
+  ],
+  "map_zooms": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "map_max_count": 500,
+  "map_prefixes": [
+    "textures/ui/",
+    "textures/ui/map_reserve_0/",
+    "textures/ui/map_reserve_1/",
+    "textures/ui/warboard_map/"
+  ],
+  "unarchived_files": [
+    "${GAME_DIR}/Shaders_F.shader_bundle"
+  ],
+  "archive_paths": [
+    "${GAME_DIR}/archives_win64/initial/",
+    "${GAME_DIR}/archives_win64/supplemental/",
+    "${GAME_DIR}/archives_win64/optional/"
+  ],
+  "mdic_ftype": "adf,adfb",
+  "navmesh_ftype": "tag0",
+  "obc_ftype": "obc",
+  "pfs_ftype": "tag0",
+  "has_garcs": false,
+  "file_assoc": [
+    {
+      ".ee": "sarc",
+      ".epe": "rtpc"
+    },
+    {
+      ".bl": "sarc",
+      ".nl": "sarc",
+      ".fl": "sarc",
+      ".blo": "rtpc",
+      ".nl.mdic": "adf,adfb",
+      ".fl.mdic": "adf,adfb",
+      ".pfs": "tag0",
+      ".obc": "obc"
+    },
+    {
+      ".meshc": "adf",
+      ".hrmeshc": "adf",
+      ".modelc": "adf",
+      ".model_deps": "txt",
+      ".pfxc": "tag0"
+    },
+    {
+      ".ddsc": "avtx,dds",
+      ".atx1": "atx,META-NO-TYPE",
+      ".atx2": "atx,META-NO-TYPE",
+      ".atx3": "atx,META-NO-TYPE"
+    },
+    {
+      ".fmod_sbankc": "txt",
+      ".fmod_bankc": "riff"
+    },
+    {
+      ".swf": "gfx",
+      ".cfx": "gfx",
+      ".gfx": "gfx"
+    }
+  ]
+}

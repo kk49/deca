@@ -515,13 +515,13 @@ field_format_info = {
     b'AmfFormat_R8G8_SINT': FormatInfo('2i1', '2i1', convert_copy),
     b'AmfFormat_R16_FLOAT': FormatInfo('f2', 'f4', convert_copy),
     b'AmfFormat_R16_UNORM': FormatInfo('u2', 'f4', convert_norm_u16),
-    b'AmfFormat_R16_UINT': FormatInfo('u2', 'u2', convert_copy),
+    b'AmfFormat_R16_UINT': FormatInfo('u2', 'u4', convert_copy),
     b'AmfFormat_R16_SNORM': FormatInfo('i2', 'f4', convert_norm_s16),
-    b'AmfFormat_R16_SINT': FormatInfo('i2', 'i2', convert_copy),
+    b'AmfFormat_R16_SINT': FormatInfo('i2', 'i4', convert_copy),
     b'AmfFormat_R8_UNORM': FormatInfo('u1', 'f4', convert_norm_u8),
-    b'AmfFormat_R8_UINT': FormatInfo('u1', 'u1', convert_copy),
+    b'AmfFormat_R8_UINT': FormatInfo('u1', 'u4', convert_copy),
     b'AmfFormat_R8_SNORM': FormatInfo('i1', 'f4', convert_norm_s8),
-    b'AmfFormat_R8_SINT': FormatInfo('i1', 'i1', convert_copy),
+    b'AmfFormat_R8_SINT': FormatInfo('i1', 'i4', convert_copy),
     b'AmfFormat_R32_UNIT_VEC_AS_FLOAT': FormatInfo('f4', '3f4', convert_R32_UNIT_VEC_AS_FLOAT),
     b'AmfFormat_R32_R8G8B8A8_UNORM_AS_FLOAT': FormatInfo('f4', '4f4', convert_R32_R8G8B8A8_UNORM_AS_FLOAT),
     b'AmfFormat_R8G8B8A8_TANGENT_SPACE': FormatInfo('4u1', '6f4', convert_R8G8B8A8_TANGENT_SPACE),  # normal, tangent
@@ -709,42 +709,52 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                 # translate original stream
                 data_in = np.frombuffer(buf_in, dtype=dtype_in)
                 data_in_mem = np.zeros((data_in.shape[0],), dtype=dtype_in_mem)
-                if data_in.dtype.fields is None:
-                    assert len(attributes_in) == 1
-                    sattr_in = attributes_in[0]
+
+                for idx, sattr_in in enumerate(attributes_in):
                     finfo_in = field_format_info[sattr_in.format[1]]
-                    preconvert_scale(data_in_mem, data_in, sattr_in, False, finfo_in.converter)
-                else:
-                    for idx, sattr_in in enumerate(attributes_in):
+                    if data_in.dtype.fields is None:
+                        assert len(attributes_in) == 1
+                        data_in_mem_field = data_in_mem
+                        data_in_field = data_in
+                    else:
                         fidx = 'f{}'.format(idx)
-                        finfo_in = field_format_info[sattr_in.format[1]]
-                        preconvert_scale(data_in_mem[fidx], data_in[fidx], sattr_in, False, finfo_in.converter)
+                        data_in_mem_field = data_in_mem[fidx]
+                        data_in_field = data_in[fidx]
+
+                    preconvert_scale(data_in_mem_field, data_in_field, sattr_in, False, finfo_in.converter)
 
                 data_out_mem = np.frombuffer(data_in_mem.tobytes(), dtype=dtype_out_mem).copy()
-                data_out = np.zeros(data_in.shape[0], dtype=dtype_out)
+                data_out = np.zeros((data_in.shape[0],), dtype=dtype_out)
                 for idx, sattr_out in enumerate(attributes_out):
-                    fidx = 'f{}'.format(idx)
                     finfo_out = field_format_info[sattr_out.format[1]]
+                    if data_out.dtype.fields is None:
+                        assert len(attributes_out) == 1
+                        data_out_mem_field = data_out_mem
+                        data_out_field = data_out
+                    else:
+                        fidx = 'f{}'.format(idx)
+                        data_out_mem_field = data_out_mem[fidx]
+                        data_out_field = data_out[fidx]
 
                     # update bone indexs
                     if mesh.meshProperties is not None and mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
                         arr_map = np.array(mesh.boneIndexLookup)
-                        data_out_mem[fidx][:, :] = arr_map[data_out_mem[fidx]]
+                        data_out_mem_field[:, :] = arr_map[data_out_mem_field]
 
-                    preconvert_scale(data_out[fidx], data_out_mem[fidx], sattr_out, True, finfo_out.converter)
+                    preconvert_scale(data_out_field, data_out_mem_field, sattr_out, True, finfo_out.converter)
 
                     # Normals should be unit length
                     if sattr_out.usage[1] == b'AmfUsage_Normal' or sattr_out.usage[1] == b'AmfUsage_Tangent':
-                        norm = np.linalg.norm(data_out[fidx][:, 0:3], axis=1)
+                        norm = np.linalg.norm(data_out_field[:, 0:3], axis=1)
                         norm[norm == 0] = 1.0
-                        data_out[fidx][:, 0:3] = data_out[fidx][:, 0:3] / norm[:, np.newaxis]
-                        data_out[fidx][np.isnan(norm), 0:3] = 0
-                        data_out[fidx][np.isnan(norm), 0] = 1
+                        data_out_field[:, 0:3] = data_out_field[:, 0:3] / norm[:, np.newaxis]
+                        data_out_field[np.isnan(norm), 0:3] = 0
+                        data_out_field[np.isnan(norm), 0] = 1
                         if np.any(np.isnan(norm)):
                             print('WARNING: Found nan in data: {}'.format(sattr_out.usage[1]))
 
-                    sattr_out.min = np.min(data_out[fidx], axis=0)
-                    sattr_out.max = np.max(data_out[fidx], axis=0)
+                    sattr_out.min = np.min(data_out_field, axis=0)
+                    sattr_out.max = np.max(data_out_field, axis=0)
 
                 # store updated stream
                 vs_info[4] = bytes(data_out.data)

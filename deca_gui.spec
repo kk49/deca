@@ -8,6 +8,8 @@ added_files = [
     ('resources/gzb', 'resources/gzb'),
     ('resources/hp', 'resources/hp'),
     ('resources/ghidra_strings', 'resources/ghidra_strings'),
+    ('resources/gameinfo', 'resources/gameinfo'),
+    ('resources/adf', 'resources/adf'),
     ('tool_resources/make_web_map', 'tool_resources/make_web_map'),
     ('extern/HavokLib/build/_bin2xml/bin2xml*', 'extern/HavokLib/build/_bin2xml/'),
 ]

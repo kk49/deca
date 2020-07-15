@@ -146,6 +146,7 @@ class GameInfoJson(GameInfo):
             gd = self.game_dir
 
         envs = [
+            ('${DECA_DIR}', ['.']),
             ('${GAME_DIR}', [gd]),
             ('${AREA_PREFIX}', self.area_prefixes),
             ('${WORLD_INDEX}', self.world_indexes),

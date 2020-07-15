@@ -1,4 +1,5 @@
 #### v0.2.11 ???
+* GLTF2 export of BC1_UNORM, BC2_UNORM, BC3_UNORM, downgrades to pre DX10 format, to work around blender bug(?)
 * First pass at RAGE2 model export. (BUG IN APEX ENGINE? index buffer offsets in archive, offsets not in bytes, but indexes)
 * All game {gz, gzb, jc3, jc4, rg2}.json configurations are loaded from `resources/gameinfo`
 * Additional user provided game configurations can be loaded from `work/gameinfo`

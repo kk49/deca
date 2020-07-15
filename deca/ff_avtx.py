@@ -537,7 +537,13 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
     return ddsc
 
 
-def ddsc_clean(ddsc: Ddsc):
+def ddsc_clean(ddsc: Ddsc, prefer_old_format=True):
+    # prefer old header for better compatibility
+    if prefer_old_format and ddsc.header.dds_header.ddspf.dwFourCC == b'DX10':
+        ddsc.header.dds_header.ddspf.dwFourCC = \
+            dw_four_cc_downgrade.get(ddsc.header.dds_header_dxt10.dxgiFormat, b'DX10')
+
+    # remove missing mip levels
     first_good = -1
 
     for i, mip in enumerate(ddsc.mips):
@@ -615,11 +621,12 @@ def ddsc_header_dds_write(ddsc, f):
     f.write_u32(0)  # dwReserved2
 
     # DDS_HEADER_DXT10
-    f.write_u32(ddsc.header.dds_header_dxt10.dxgiFormat)
-    f.write_u32(ddsc.header.dds_header_dxt10.resourceDimension)
-    f.write_u32(ddsc.header.dds_header_dxt10.miscFlag)
-    f.write_u32(ddsc.header.dds_header_dxt10.arraySize)
-    f.write_u32(ddsc.header.dds_header_dxt10.miscFlags2)
+    if ddsc.header.dds_header.ddspf.dwFourCC == b'DX10':
+        f.write_u32(ddsc.header.dds_header_dxt10.dxgiFormat)
+        f.write_u32(ddsc.header.dds_header_dxt10.resourceDimension)
+        f.write_u32(ddsc.header.dds_header_dxt10.miscFlag)
+        f.write_u32(ddsc.header.dds_header_dxt10.arraySize)
+        f.write_u32(ddsc.header.dds_header_dxt10.miscFlags2)
 
 
 def ddsc_write_to_dds(ddsc, output_file_name):

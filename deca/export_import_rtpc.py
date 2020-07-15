@@ -86,7 +86,7 @@ def rtpc_export_node_recurse(
         else:
             rtpc_model_vpath = None
 
-    if rtpc_model_vpath is not None:
+    if rtpc_model_vpath is not None and len(rtpc_model_vpath) > 0:
         gltf.export_modelc(
             rtpc_model_vpath, world_matrix,
             material_properties=material_properties,

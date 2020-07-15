@@ -424,7 +424,7 @@ class Deca3dModelc:
             material_map = {}
             material: AmfMaterial
             for material in model.materials:
-                if b'GeneralR2' == material.renderBlockId:
+                if material.renderBlockId in {b'GeneralR2', b'Character'}:
                     # add textures
                     textures = []
                     for texture_vpath in material.textures:
@@ -445,7 +445,7 @@ class Deca3dModelc:
                     if tid is not None:
                         gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
 
-                    if material.attributes['UseEmissive']:
+                    if material.attributes.get('UseEmissive', False):
                         gltf_material.emissiveFactor = [1.0, 1.0, 1.0]
                         tid = textures[4]
                         if tid is not None:
@@ -597,7 +597,7 @@ class Deca3dModelc:
                     gltf.materials.append(gltf_material)
                     material_map[material.name] = material_idx
                 else:
-                    vfs.logger.log('Unhandled RenderBlockId: {} Material Name: {}'.format(material.renderBlockId, material.name))
+                    vfs.logger.log(f'Unhandled RenderBlockId: {material.renderBlockId} Material Name: {material.name}')
 
             meshes_all = db.gltf_add_meshc(gltf, model.mesh)
             meshes_new = {}

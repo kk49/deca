@@ -773,6 +773,21 @@ class VfsProcessor(VfsDatabase):
                         for pk, pv in pe.items():
                             assoc_strings[file + pk] = pv
 
+        # ai spawn maps
+        '''
+        settings/hp_settings/hp_ai_textures/spawn_maps/spawn_dreadnought_c.bmp_datac
+        textures/hp_ai_textures/spawn_maps/spawn_dreadnought_c.ddsc
+        textures/hp_ai_textures/spawn_maps/spawn_dreadnought_c_user.ddsc
+        '''
+        re_bmp_datac = re.compile(br'^settings/hp_settings/hp_ai_textures/(.*)\.bmp_datac$')
+        for k in all_hash4:
+            mr = re_bmp_datac.match(k)
+            if mr:
+                nf = b'textures/hp_ai_textures/' + mr.group(1) + b'.ddsc'
+                assoc_strings[nf] = [FTYPE_DDS, FTYPE_AVTX]
+                nf = b'textures/hp_ai_textures/' + mr.group(1) + b'_user.ddsc'
+                assoc_strings[nf] = [FTYPE_DDS, FTYPE_AVTX]
+
         hash_present = set(self.nodes_select_distinct_vhash())
 
         with DbWrap(self, logger=self) as db:

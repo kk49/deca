@@ -50,7 +50,16 @@
   "map_zooms": [0,1,2,3],
   "map_max_count": 500,
   "map_prefixes": [
-    "textures/ui/"
+    "textures/ui/map_reserve_0/",
+    "textures/ui/map_reserve_1/",
+    "textures/ui/map_reserve_2/",
+    "textures/ui/map_reserve_3/",
+    "textures/ui/map_reserve_4/",
+    "textures/ui/map_reserve_5/",
+    "textures/ui/map_reserve_6/",
+    "textures/ui/map_reserve_7/",
+    "textures/ui/map_reserve_8/",
+    "textures/ui/map_reserve_9/"
   ],
   "unarchived_files": [],
   "archive_paths": [

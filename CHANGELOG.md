@@ -14,6 +14,7 @@
 * Changed call to skeleton generator to use subprocess.run instead of os.system, should capture stderr and stdout 
 * Better handling of GLTF2 export of adf files that are not models and/or are missing type info
 * Handle games without settings/hp_settings/equipment.bin
+* Upgraded Pillow to 7.1.0 (security alert fix)
 * Regular expression mask:
     * Accepted when **Enter** is key'ed or **SET** is pressed
     * Reset to previously accepted value if **Esc** is key'ed or **CLEAR** is pressed

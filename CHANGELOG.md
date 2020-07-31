@@ -1,4 +1,5 @@
 #### v0.2.11 ???
+* Added hack to handle bone weights being all zero when vertex is not connected to any bones, APEX is fine with this GLTF2/Blender is not
 * Added guessing of textures/hp_ai_textures/{\*,\*_user}.ddsc from settings/hp_settings/hp_ai_textures/\*.bmp_datac    
 * GLTF2 export of BC1_UNORM, BC2_UNORM, BC3_UNORM, downgrades to pre DX10 format, to work around blender bug(?)
 * First pass at RAGE2 model export. (BUG IN APEX ENGINE? index buffer offsets in archive, offsets not in bytes, but indexes)

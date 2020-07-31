@@ -660,8 +660,7 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     if usage_in == b'AmfUsage_Tangent':
                         formats_out = [b'DecaFormat_R32G32B32A32_FLOAT_P1']
                         # formats_out = [b'DecaFormat_R32G32B32A32_FLOAT_N1']
-
-                    if usage_in == b'AmfUsage_TangentSpace':
+                    elif usage_in == b'AmfUsage_TangentSpace':
                         usages_out = [b'AmfUsage_Normal', b'AmfUsage_Tangent']
                         formats_out = [b'AmfFormat_R32G32B32_FLOAT', b'DecaFormat_R32G32B32A32_FLOAT_P1']
 
@@ -740,6 +739,12 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     if mesh.meshProperties is not None and mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
                         arr_map = np.array(mesh.boneIndexLookup)
                         data_out_mem_field[:, :] = arr_map[data_out_mem_field]
+
+                    # TODO APEX Engine can handle bone weights that are all zero because no bones are attached,
+                    #  GLTF2 cannot
+                    if sattr_out.usage[1] == b'AmfUsage_BoneWeight':
+                        msk = np.all(data_out_mem_field == 0.0, 1)
+                        data_out_mem_field[msk] = np.zeros((4,)) + 0.25
 
                     preconvert_scale(data_out_field, data_out_mem_field, sattr_out, True, finfo_out.converter)
 

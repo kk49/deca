@@ -27,19 +27,21 @@ else:
 
 avatar_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Appveyor_logo.svg/256px-Appveyor_logo.svg.png'
 
-result = subprocess.run(['git', 'log', '-1', '--pretty="%H"'], stdout=subprocess.PIPE)
-repo_commit = result.stdout.decode('utf-8')
+repo_commit = os.environ["APPVEYOR_REPO_COMMIT"]
+result = subprocess.run(['git', 'log', '-1', '--pretty=%H'], stdout=subprocess.PIPE)
+if not repo_commit:
+    repo_commit = result.stdout.decode('utf-8')
 
-result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty="%aN"'], stdout=subprocess.PIPE)
+result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%aN'], stdout=subprocess.PIPE)
 AUTHOR_NAME = result.stdout.decode('utf-8')
 
-result = subprocess.run(['git', f'log -1 {repo_commit} --pretty="%cN"'], stdout=subprocess.PIPE)
+result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%cN'], stdout=subprocess.PIPE)
 COMMITTER_NAME = result.stdout.decode('utf-8')
 
-result = subprocess.run(['git', f'log -1 {repo_commit} --pretty="%s"'], stdout=subprocess.PIPE)
+result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%s'], stdout=subprocess.PIPE)
 COMMIT_SUBJECT = result.stdout.decode('utf-8')
 
-result = subprocess.run(['git', f'log -1 {repo_commit} --pretty="%b"'], stdout=subprocess.PIPE)
+result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%b'], stdout=subprocess.PIPE)
 COMMIT_MESSAGE = result.stdout.decode('utf-8')
 
 

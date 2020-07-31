@@ -1,4 +1,5 @@
 import os
+import re
 from .errors import *
 from .file import *
 from .ff_types import *
@@ -11,6 +12,7 @@ from .util import make_dir_for_file
 from .export_import_adf import node_export_adf_processed, node_export_adf_gltf, node_export_adf_text
 from .export_import_rtpc import node_export_rtpc_gltf, node_export_rtpc_text
 from .export_import_audio import node_export_fsb5c_processed
+from .export_map import export_map
 
 
 def extract_node_raw(
@@ -64,6 +66,27 @@ def nodes_export_raw(
             except EDecaFileExists as e:
                 vfs.logger.log(
                     'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+
+
+def nodes_export_map(
+        vfs: VfsDatabase,
+        vfs_view: VfsView,
+        extract_dir: str,
+        export_map_full,
+        export_map_tiles):
+    node_map = vfs_view.nodes_selected_get()
+
+    prefixes = set()
+    pat = re.compile(r'^(.*zoom).*$')
+    for k in node_map.keys():
+        mr = pat.match(k)
+        if mr:
+            prefixes.add(mr.group(1))
+
+    for prefix in prefixes:
+        d, f = os.path.split(prefix)
+        export_path = os.path.join(extract_dir, d, 'deca.map')
+        export_map(vfs, prefix, export_path, export_map_full, export_map_tiles)
 
 
 def nodes_export_contents(

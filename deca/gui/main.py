@@ -8,7 +8,8 @@ from deca.db_view import VfsView
 from deca.builder import Builder
 from deca.util import Logger, to_unicode
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
-from deca.export_import import nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf
+from deca.export_import import \
+    nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf, nodes_export_map
 from .main_window import Ui_MainWindow
 from .deca_interfaces import IVfsViewSrc
 from .vfsdirwidget import VfsDirWidget
@@ -254,7 +255,9 @@ class MainWindow(QMainWindow):
         self.current_vnode = vnode
         self.ui.data_view.vnode_2click_selected(vnode)
 
-    def extract(self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text):
+    def extract(
+            self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text,
+            export_map_full, export_map_tiles):
         if self.vfs_view_current().node_selected_count() > 0:
             try:
                 if export_raw:
@@ -262,6 +265,9 @@ class MainWindow(QMainWindow):
 
                 if export_contents:
                     nodes_export_contents(self.vfs, self.vfs_view_current(), extract_dir)
+
+                if export_map_full or export_map_tiles:
+                    nodes_export_map(self.vfs, self.vfs_view_current(), extract_dir, export_map_full, export_map_tiles)
 
                 nodes_export_processed(
                     self.vfs, self.vfs_view_current(), extract_dir,
@@ -325,6 +331,8 @@ class MainWindow(QMainWindow):
             export_contents=self.ui.chkbx_export_contents_extract.isChecked(),
             save_to_processed=self.ui.chkbx_export_processed_extract.isChecked(),
             save_to_text=self.ui.chkbx_export_text_extract.isChecked(),
+            export_map_full=self.ui.cmbbx_map_format.currentText().find('Full') > -1,
+            export_map_tiles=self.ui.cmbbx_map_format.currentText().find('Tiles') > -1,
         )
 
     def slot_extract_gltf_clicked(self, checked):

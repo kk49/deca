@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>617</width>
-    <height>599</height>
+    <width>1050</width>
+    <height>637</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -92,30 +92,24 @@
             <string>Extract</string>
            </attribute>
            <layout class="QGridLayout" name="gridLayout">
-            <item row="6" column="0">
-             <spacer name="verticalSpacer">
-              <property name="orientation">
-               <enum>Qt::Vertical</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>20</width>
-                <height>0</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="0" column="2">
-             <widget class="QPushButton" name="bt_extract">
-              <property name="text">
-               <string>EXTRACT</string>
-              </property>
-             </widget>
-            </item>
             <item row="4" column="0">
              <widget class="QCheckBox" name="chkbx_export_processed_extract">
               <property name="text">
                <string>Export As Processed</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QCheckBox" name="chkbx_export_text_extract">
+              <property name="text">
+               <string>Export As Text</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QPushButton" name="bt_extract_folder_show">
+              <property name="text">
+               <string/>
               </property>
              </widget>
             </item>
@@ -139,6 +133,13 @@
               </property>
              </widget>
             </item>
+            <item row="0" column="2">
+             <widget class="QPushButton" name="bt_extract">
+              <property name="text">
+               <string>EXTRACT</string>
+              </property>
+             </widget>
+            </item>
             <item row="0" column="0">
              <widget class="QCheckBox" name="chkbx_export_raw_extract">
               <property name="text">
@@ -146,18 +147,43 @@
               </property>
              </widget>
             </item>
-            <item row="1" column="0">
-             <widget class="QCheckBox" name="chkbx_export_text_extract">
+            <item row="7" column="0">
+             <spacer name="verticalSpacer">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>0</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item row="6" column="0">
+             <widget class="QCheckBox" name="chkbx_export_map">
               <property name="text">
-               <string>Export As Text</string>
+               <string>Export Map</string>
               </property>
              </widget>
             </item>
-            <item row="0" column="1">
-             <widget class="QPushButton" name="bt_extract_folder_show">
-              <property name="text">
-               <string/>
-              </property>
+            <item row="6" column="2">
+             <widget class="QComboBox" name="cmbbx_map_format">
+              <item>
+               <property name="text">
+                <string>Full</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Tiles</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Full + Tiles</string>
+               </property>
+              </item>
              </widget>
             </item>
            </layout>
@@ -403,7 +429,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>617</width>
+     <width>1050</width>
      <height>24</height>
     </rect>
    </property>

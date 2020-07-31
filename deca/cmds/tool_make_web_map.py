@@ -1,11 +1,11 @@
 from deca.db_processor import vfs_structure_open
 from deca.db_core import VfsDatabase
-from deca.ff_avtx import Ddsc
 from deca.ff_adf import AdfDatabase
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf, process_codex_adf
 from deca.util import make_dir_for_file
+from deca.export_map import export_map, tileset_make
 import deca.ff_rtpc as rtpc
 from deca.ff_rtpc import parse_prop_data
 from PIL import Image
@@ -342,56 +342,6 @@ class ToolMakeWebMap:
 
         self.adf_db = AdfDatabase(self.vfs)
 
-    def tileset_make(self, img, tile_path, tile_size=256, max_zoom=-1):
-        # save full image, mainly for debugging
-        os.makedirs(tile_path, exist_ok=True)
-        img.save(os.path.join(tile_path, 'full.png'))
-
-        # determine zoom levels
-        sz = img.size
-        max_width = max(*sz)
-        zooms = 0
-        w = tile_size
-        while w <= max_width:
-            zooms = zooms + 1
-            w = w * 2
-
-        # save tiles
-        zimgs = [None] * zooms
-        zimgs[-1] = img
-        for z in range(zooms):
-            zlevel = zooms - 1 - z
-            zpath = tile_path + '/{}'.format(zlevel)
-            print('Generate Zoom: {}'.format(zpath))
-
-            # shrink image
-            if zimgs[zlevel] is None:
-                zimgs[zlevel] = zimgs[zlevel + 1].resize((sz[0] >> z, sz[1] >> z), Image.LANCZOS)
-
-            if not os.path.isdir(zpath):
-                for x in range(0, 2 ** zlevel):
-                    dpath = os.path.join(zpath, '{}'.format(x))
-                    os.makedirs(dpath, exist_ok=True)
-                    for y in range(0, 2 ** zlevel):
-                        fpath = os.path.join(dpath, '{}.png'.format(y))
-                        zimgs[zlevel].crop((x * tile_size, y * tile_size, (x + 1) * tile_size, (y + 1) * tile_size)).save(
-                            fpath)
-
-        for zlevel in range(zooms, max_zoom+1):
-            width = tile_size >> (zlevel - (zooms-1))
-            zpath = os.path.join(tile_path, '{}'.format(zlevel))
-            print('Generate Zoom: {}'.format(zpath))
-            if not os.path.isdir(zpath):
-                for x in range(0, 2 ** zlevel):
-                    dpath = os.path.join(zpath, '{}'.format(x))
-                    os.makedirs(dpath, exist_ok=True)
-                    for y in range(0, 2 ** zlevel):
-                        fpath = os.path.join(dpath, '{}.png'.format(y))
-                        img = zimgs[(zooms-1)]
-                        img = img.crop((x * width, y * width, (x + 1) * width, (y + 1) * width))
-                        img = img.resize((tile_size, tile_size), Image.NEAREST)
-                        img.save(fpath)
-
     def make_web_map(self, wdir, copy_support_files):
         force_topo_tiles = False
 
@@ -405,53 +355,12 @@ class ToolMakeWebMap:
         # BUILD topo map
         topo_dst_path = wdir + 'map/z0/tile_t'
         if not os.path.isdir(topo_dst_path) or force_topo_tiles:  # this is slow so only do it once
-            # extract full res image
-            ai = []
-            for i in range(16):
-                ai.append([None] * 16)
-            for i in range(256):
-                x = i % 16
-                y = i // 16
-                fn = 'textures/ui/map_reserve_0/zoom3/{}.ddsc'.format(i)
-                fn = fn.encode('ascii')
-                
-                vnode = self.vfs.nodes_where_match(v_path=fn)[0]
-                img = Ddsc()
-                with self.vfs.file_obj_from(vnode) as f:
-                    img.load_ddsc(f)
-                ai[y][x] = img.mips[0].data
-
-            for i in range(16):
-                ai[i] = np.hstack(ai[i])
-            ai = np.vstack(ai)
-            img = Image.fromarray(ai)
-
-            self.tileset_make(img, topo_dst_path)
+            export_map(self.vfs, 'textures/ui/map_reserve_0/zoom', topo_dst_path, True, True)
 
         # BUILD warboard map
         topo_dst_path = wdir + 'map/z0/tile_wb'
         if not os.path.isdir(topo_dst_path) or force_topo_tiles:  # this is slow so only do it once
-            # extract full res image
-            ai = []
-            for i in range(16):
-                ai.append([None] * 16)
-            for i in range(256):
-                x = i % 16
-                y = i // 16
-                fn = 'textures/ui/warboard_map/zoom3/{}.ddsc'.format(i)
-                fn = fn.encode('ascii')
-                vnode = self.vfs.nodes_where_match(v_path=fn)[0]
-                img = Ddsc()
-                with self.vfs.file_obj_from(vnode) as f:
-                    img.load_ddsc(f)
-                ai[y][x] = img.mips[0].data
-
-            for i in range(16):
-                ai[i] = np.hstack(ai[i])
-            ai = np.vstack(ai)
-            img = Image.fromarray(ai)
-
-            self.tileset_make(img, topo_dst_path)
+            export_map(self.vfs, 'textures/ui/warboard_map/zoom', topo_dst_path, True, True)
 
         # BUILD height map
         # extract full res image
@@ -470,7 +379,7 @@ class ToolMakeWebMap:
         cimg = cm(aimg)
         img = Image.fromarray((cimg[:, :, :3] * 255).astype(np.uint8))
 
-        self.tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_h'))
+        tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_h'), True, True)
 
         # BUILD water nvwaveworks map
         # extract full res image
@@ -489,7 +398,7 @@ class ToolMakeWebMap:
         cimg = cm(aimg)
         img = Image.fromarray((cimg[:, :, :3] * 255).astype(np.uint8))
 
-        self.tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wn'))
+        tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wn'), True, True)
 
         # BUILD water gerstner map
         # extract full res image
@@ -508,7 +417,7 @@ class ToolMakeWebMap:
         cimg = cm(aimg)
         img = Image.fromarray((cimg[:, :, :3] * 255).astype(np.uint8))
 
-        self.tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wg'))
+        tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wg'), True, True)
 
         # TODO parse terrain/nv_water_cull_mask.rawc ? 1 bit per pixel 512x512 pixels
         fn = b'terrain/nv_water_cull_mask.rawc'
@@ -531,7 +440,7 @@ class ToolMakeWebMap:
         cimg = np.flip(cimg, 0)
         img = Image.fromarray(cimg)
 
-        self.tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wnm'))
+        tileset_make(img, os.path.join(wdir, 'map', 'z0', 'tile_wnm'), True, True)
 
         tile_overlays = []
 
@@ -585,7 +494,7 @@ class ToolMakeWebMap:
             # cimg = np.flip(cimg, 0)
             img = Image.fromarray(cimg)
 
-            self.tileset_make(img, os.path.join(wdir, 'map', 'z0', '{}'.format(tileo[1])))
+            tileset_make(img, os.path.join(wdir, 'map', 'z0', '{}'.format(tileo[1])), True, True)
 
         # load translation
         vnode = self.vfs.nodes_where_match(v_path=b'text/master_eng.stringlookup')[0]

@@ -744,7 +744,7 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     #  GLTF2 cannot
                     if sattr_out.usage[1] == b'AmfUsage_BoneWeight':
                         msk = np.all(data_out_mem_field == 0.0, 1)
-                        data_out_mem_field[msk] = np.zeros((4,)) + 0.25
+                        data_out_mem_field[msk] = np.asarray([1.0, 0.0, 0.0, 0.0])
 
                     preconvert_scale(data_out_field, data_out_mem_field, sattr_out, True, finfo_out.converter)
 

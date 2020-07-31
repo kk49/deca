@@ -42,12 +42,6 @@ build_script:
 
     pip install requests
 
-
-    cd C:\prj\deca
-
-    python ./appveyor/on_success.py success url
-
-
     echo BUILD IMAGE DLL
 
     cd C:\prj\deca
@@ -106,5 +100,4 @@ deploy:
 
 on_success:
   - ps: cd C:\prj\deca
-  - ps: python ./appveyor/on_success.py
-  - ps: ./appveyor/send.ps1 success $env:BUILD_WEBHOOK_URL
+  - ps: python ./appveyor/on_success.py success CHANGELOG.md $env:BUILD_WEBHOOK_URL

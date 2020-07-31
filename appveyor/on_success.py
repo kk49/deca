@@ -1,19 +1,21 @@
 import sys
 import os
 import subprocess
+import datetime
 import json
 import requests
 
 # based on script from Sankarsan Kampa (a.k.a. k3rn31p4nic)
 
-if len(sys.argv) < 3:
-    print('WARNING NEED AT LEAST TWO PARAMETERS: <STATUS> <WEBHOOK_URL>.'
+if len(sys.argv) < 4:
+    print('WARNING NEED AT LEAST TWO PARAMETERS: <STATUS> <CHANGELOG> <WEBHOOK_URL>.'
           'See: https://github.com/DiscordHooks/appveyor-discord-webhook')
 
 status = sys.argv[1]
-webhook_url = sys.argv[2]
+changelog_fn = sys.argv[2]
+webhook_url = sys.argv[3]
 
-print('Generating webhook body...', file=sys.stderr)
+print('Webhook setup...', file=sys.stderr)
 
 if status == 'success':
     embed_color = 3066993
@@ -27,100 +29,129 @@ else:
 
 avatar_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Appveyor_logo.svg/256px-Appveyor_logo.svg.png'
 
-repo_commit = os.environ["APPVEYOR_REPO_COMMIT"]
-result = subprocess.run(['git', 'log', '-1', '--pretty=%H'], stdout=subprocess.PIPE)
-if not repo_commit:
-    repo_commit = result.stdout.decode('utf-8')
-
-result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%aN'], stdout=subprocess.PIPE)
-AUTHOR_NAME = result.stdout.decode('utf-8')
-
-result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%cN'], stdout=subprocess.PIPE)
-COMMITTER_NAME = result.stdout.decode('utf-8')
-
-result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%s'], stdout=subprocess.PIPE)
-COMMIT_SUBJECT = result.stdout.decode('utf-8')
-
-result = subprocess.run(['git', 'log', '-1', repo_commit, '--pretty=%b'], stdout=subprocess.PIPE)
-COMMIT_MESSAGE = result.stdout.decode('utf-8')
+APPVEYOR_REPO_COMMIT = os.environ.get("APPVEYOR_REPO_COMMIT", None)
+APPVEYOR_BUILD_VERSION = os.environ.get("APPVEYOR_BUILD_VERSION", None)
+APPVEYOR_BUILD_NUMBER = os.environ.get("APPVEYOR_BUILD_NUMBER", None)
+APPVEYOR_REPO_NAME = os.environ.get("APPVEYOR_REPO_NAME", None)
+APPVEYOR_REPO_BRANCH = os.environ.get("APPVEYOR_REPO_BRANCH", None)
+APPVEYOR_JOB_ID = os.environ.get("APPVEYOR_JOB_ID", None)
 
 
-print(f'APPVEYOR_REPO_COMMIT -> {os.environ["APPVEYOR_REPO_COMMIT"]}')
-print(f'REPO_COMMIT -> {repo_commit}')
-print(f'AUTHOR_NAME -> {AUTHOR_NAME}')
-print(f'COMMITTER_NAME -> {COMMITTER_NAME}')
-print(f'COMMIT_SUBJECT -> {COMMIT_SUBJECT}')
-print(f'COMMIT_MESSAGE -> {COMMIT_MESSAGE}')
+if not APPVEYOR_REPO_COMMIT:
+    result = subprocess.run(['git', 'log', '-1', '--pretty=%H'], stdout=subprocess.PIPE)
+    APPVEYOR_REPO_COMMIT = result.stdout.decode('utf-8').rstrip()
 
-'''
-$AVATAR="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Appveyor_logo.svg/256px-Appveyor_logo.svg.png"
+result = subprocess.run(['git', 'log', '-1', APPVEYOR_REPO_COMMIT, '--pretty=%aN'], stdout=subprocess.PIPE)
+AUTHOR_NAME = result.stdout.decode('utf-8').rstrip()
 
-if (!$env:APPVEYOR_REPO_COMMIT) {
-  $env:APPVEYOR_REPO_COMMIT="$(git log -1 --pretty="%H")"
-}
+result = subprocess.run(['git', 'log', '-1', APPVEYOR_REPO_COMMIT, '--pretty=%cN'], stdout=subprocess.PIPE)
+COMMITTER_NAME = result.stdout.decode('utf-8').rstrip()
 
-$AUTHOR_NAME="$(git log -1 "$env:APPVEYOR_REPO_COMMIT" --pretty="%aN")"
-$COMMITTER_NAME="$(git log -1 "$env:APPVEYOR_REPO_COMMIT" --pretty="%cN")"
-$COMMIT_SUBJECT="$(git log -1 "$env:APPVEYOR_REPO_COMMIT" --pretty="%s")" -replace "`"", "'"
-$COMMIT_MESSAGE="$(git log -1 "$env:APPVEYOR_REPO_COMMIT" --pretty="%b")" -replace "`"", "'"
+result = subprocess.run(['git', 'log', '-1', APPVEYOR_REPO_COMMIT, '--pretty=%s'], stdout=subprocess.PIPE)
+COMMIT_SUBJECT = result.stdout.decode('utf-8').rstrip()
 
-if ($AUTHOR_NAME -eq $COMMITTER_NAME) {
-  $CREDITS="$AUTHOR_NAME authored & committed"
-}
-else {
-  $CREDITS="$AUTHOR_NAME authored & $COMMITTER_NAME committed"
-}
+result = subprocess.run(['git', 'log', '-1', APPVEYOR_REPO_COMMIT, '--pretty=%b'], stdout=subprocess.PIPE)
+COMMIT_MESSAGE = result.stdout.decode('utf-8').rstrip()
 
-if ($env:APPVEYOR_PULL_REQUEST_NUMBER) {
-  $COMMIT_SUBJECT="PR #$env:APPVEYOR_PULL_REQUEST_NUMBER - $env:APPVEYOR_PULL_REQUEST_TITLE"
-  $URL="https://github.com/$env:APPVEYOR_REPO_NAME/pull/$env:APPVEYOR_PULL_REQUEST_NUMBER"
-}
-else {
-  $URL=""
-}
+# print(f'APPVEYOR_REPO_COMMIT -> {APPVEYOR_REPO_COMMIT}')
+# print(f'AUTHOR_NAME -> {AUTHOR_NAME}')
+# print(f'COMMITTER_NAME -> {COMMITTER_NAME}')
+# print(f'COMMIT_SUBJECT -> {COMMIT_SUBJECT}')
+# print(f'COMMIT_MESSAGE -> {COMMIT_MESSAGE}')
 
-$CHANGE_LOG_LINES=(python ./appveyor/get_dev_changelog.py CHANGELOG.md) -join "\n" -replace "`"", "'"
-Write-Output $CHANGE_LOG_LINES
+if AUTHOR_NAME == COMMITTER_NAME:
+    CREDITS = f'{AUTHOR_NAME} authored & committed'
+else:
+    CREDITS = f'{AUTHOR_NAME} authored & {COMMITTER_NAME} committed'
 
-$BUILD_VERSION = [uri]::EscapeDataString($env:APPVEYOR_BUILD_VERSION)
-$TIMESTAMP="$(Get-Date -format s)Z"
-$WEBHOOK_DATA="
-{
-  ""username"": """",
-  ""avatar_url"": ""$AVATAR"",
-  ""embeds"":
-  [
-    {
-      ""color"": $EMBED_COLOR,
-      ""author"": {
-        ""name"": ""$env:APPVEYOR_REPO_NAME/deca_gui-b$env:APPVEYOR_BUILD_NUMBER.zip"",
-        ""url"": ""https://ci.appveyor.com/api/buildjobs/$env:APPVEYOR_JOB_ID/artifacts/deca_gui-b$env:APPVEYOR_BUILD_NUMBER.zip"",
-        ""icon_url"": ""$AVATAR""
-      },
-      ""title"": ""$COMMIT_SUBJECT"",
-      ""url"": ""$URL"",
-      ""description"": ""$COMMIT_MESSAGE $CREDITS\n\n$CHANGE_LOG_LINES"",
-      ""fields"": [
+if os.environ.get("APPVEYOR_PULL_REQUEST_NUMBER"):
+    COMMIT_SUBJECT = \
+        f'PR {os.environ["APPVEYOR_PULL_REQUEST_NUMBER"]} - {os.environ["APPVEYOR_PULL_REQUEST_TITLE"]}'
+    URL = f'https://github.com/{os.environ["APPVEYOR_REPO_NAME"]}/pull/{os.environ["APPVEYOR_PULL_REQUEST_NUMBER"]}'
+else:
+    URL = ''
+
+# CHANGE LOG EXTRACT
+with open(changelog_fn, 'r') as f:
+    lines = f.readlines()
+
+block_count = 0
+second_block = -1
+for i, line in enumerate(lines):
+    if line.startswith('####'):
+        block_count += 1
+
+    if block_count >= 2:
+        second_block = i - 1
+        break
+
+lines = lines[:second_block]
+lines = [line.replace('\n', '') for line in lines]
+
+while len(lines[-1]) == 0:
+    lines = lines[:-1]
+
+CHANGELOG = '\n'.join(lines)
+
+result = subprocess.run(['git', 'log', '-1', APPVEYOR_REPO_COMMIT, '--pretty=%aN'], stdout=subprocess.PIPE)
+AUTHOR_NAME = result.stdout.decode('utf-8').rstrip()
+
+TIMESTAMP = datetime.datetime.now().isoformat() + 'Z'
+
+WEBHOOK_DATA = {
+    'username': '',
+    'avatar_url': avatar_url,
+    'embeds': [
         {
-          ""name"": ""Commit"",
-          ""value"": ""[``$($env:APPVEYOR_REPO_COMMIT.substring(0, 7))``](https://github.com/$env:APPVEYOR_REPO_NAME/commit/$env:APPVEYOR_REPO_COMMIT)"",
-          ""inline"": true
-        },
-        {
-          ""name"": ""Branch"",
-          ""value"": ""[``$env:APPVEYOR_REPO_BRANCH``](https://github.com/$env:APPVEYOR_REPO_NAME/tree/$env:APPVEYOR_REPO_BRANCH)"",
-          ""inline"": true
+            'color': embed_color,
+            'author': {
+                'name': f'{APPVEYOR_REPO_NAME}/deca_gui-b{APPVEYOR_BUILD_NUMBER}.zip',
+                'url': f'https://ci.appveyor.com/api/buildjobs/{APPVEYOR_JOB_ID}/artifacts/deca_gui-b{APPVEYOR_BUILD_NUMBER}.zip',
+                'icon_url': avatar_url,
+            },
+            'title': COMMIT_SUBJECT,
+            'url': URL,
+            'description': f'{COMMIT_MESSAGE} {CREDITS}\n\n{CHANGELOG}',
+            'fields': [
+                {
+                    'name': 'Commit',
+                    'value': f'[{APPVEYOR_REPO_COMMIT[0:8]}](https://github.com/{APPVEYOR_REPO_NAME}/commit/{APPVEYOR_REPO_COMMIT})',
+                    'inline': True,
+                },
+                {
+                    'name': 'Branch',
+                    'value': f'[{APPVEYOR_REPO_BRANCH}](https://github.com/{APPVEYOR_REPO_NAME}/tree/{APPVEYOR_REPO_BRANCH})',
+                    'inline': True
+
+                }
+            ],
+            'timestamp': TIMESTAMP
         }
-      ],
-      ""timestamp"": ""$TIMESTAMP""
+    ]
+}
+
+print('---- WEBHOOK_DATA ----', file=sys.stderr)
+print(json.dumps(WEBHOOK_DATA, indent=2), file=sys.stderr)
+print('---- --------- ----', file=sys.stderr)
+
+
+print('Webhook Sending ...', file=sys.stderr)
+
+response = requests.post(
+    webhook_url,
+    data=json.dumps(WEBHOOK_DATA),
+    headers={
+        'Content-Type': 'application/json',
+        'UserAgent': 'AppVeyor-Webhook',
+        'X-Author': 'Queerthulhu#1312',
     }
-  ]
-}"
+)
 
-Invoke-RestMethod -Uri "$WEBHOOK_URL" -Method "POST" -UserAgent "AppVeyor-Webhook" `
-  -ContentType "application/json" -Header @{"X-Author"="k3rn31p4nic#8383"} `
-  -Body $WEBHOOK_DATA `
-  -Verbose
-
-Write-Output "[Webhook]: Successfully sent the webhook."
-'''
+if response.status_code == 200:
+    print(
+        'Webhook Complete',
+        file=sys.stderr)
+else:
+    print(
+        f'Webhook Error: Request returned an error {response.status_code}, the response is:\n{response.text}',
+        file=sys.stderr)

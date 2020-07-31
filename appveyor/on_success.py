@@ -92,7 +92,10 @@ while len(lines[-1]) == 0:
     lines = lines[:-1]
 
 CHANGELOG = '\n'.join(lines)
-CHANGELOG = CHANGELOG[:1024]
+CHANGELOG = CHANGELOG
+
+description = f'{COMMIT_MESSAGE} {CREDITS}\n\n{CHANGELOG}'
+description = description[:2048]
 
 result = subprocess.run(['git', 'log', '-1', APPVEYOR_REPO_COMMIT, '--pretty=%aN'], stdout=subprocess.PIPE)
 AUTHOR_NAME = result.stdout.decode('utf-8').rstrip()
@@ -112,7 +115,7 @@ WEBHOOK_DATA = {
             },
             'title': COMMIT_SUBJECT,
             'url': URL,
-            'description': f'{COMMIT_MESSAGE} {CREDITS}\n\n{CHANGELOG}',
+            'description': description,
             'fields': [
                 {
                     'name': 'Commit',

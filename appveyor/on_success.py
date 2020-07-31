@@ -7,7 +7,7 @@ import requests
 # based on script from Sankarsan Kampa (a.k.a. k3rn31p4nic)
 
 if len(sys.argv) < 3:
-    print('WARNING NEED AT LEAST TWO PARAMTERS: <STATUS> <WEBHOOK_URL>.'
+    print('WARNING NEED AT LEAST TWO PARAMETERS: <STATUS> <WEBHOOK_URL>.'
           'See: https://github.com/DiscordHooks/appveyor-discord-webhook')
 
 status = sys.argv[1]

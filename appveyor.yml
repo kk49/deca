@@ -45,7 +45,7 @@ build_script:
 
     cd C:\prj\deca
 
-    python ./appveyor/on_success.py
+    python ./appveyor/on_success.py success url
 
 
     echo BUILD IMAGE DLL

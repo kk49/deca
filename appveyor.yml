@@ -40,6 +40,11 @@ build_script:
 
     pip install pyinstaller
 
+    pip install requests
+
+
+    python ./appveyor/on_success.py
+
 
     echo BUILD IMAGE DLL
 
@@ -99,4 +104,5 @@ deploy:
 
 on_success:
   - ps: cd C:\prj\deca
+  - ps: python ./appveyor/on_success.py
   - ps: ./appveyor/send.ps1 success $env:BUILD_WEBHOOK_URL

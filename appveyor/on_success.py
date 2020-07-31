@@ -15,7 +15,7 @@ status = sys.argv[1]
 changelog_fn = sys.argv[2]
 webhook_url = sys.argv[3]
 
-print('Webhook setup...', file=sys.stderr)
+print('Webhook setup...')
 
 if status == 'success':
     embed_color = 3066993
@@ -130,12 +130,12 @@ WEBHOOK_DATA = {
     ]
 }
 
-print('---- WEBHOOK_DATA ----', file=sys.stderr)
-print(json.dumps(WEBHOOK_DATA, indent=2), file=sys.stderr)
-print('---- --------- ----', file=sys.stderr)
+print('---- WEBHOOK_DATA ----')
+print(json.dumps(WEBHOOK_DATA, indent=2))
+print('---- --------- ----')
 
 
-print('Webhook Sending ...', file=sys.stderr)
+print('Webhook Sending ...')
 
 response = requests.post(
     webhook_url,
@@ -147,11 +147,7 @@ response = requests.post(
     }
 )
 
-if response.status_code == 200:
-    print(
-        'Webhook Complete',
-        file=sys.stderr)
+if response.status_code in {200, 204}:
+    print('Webhook Complete')
 else:
-    print(
-        f'Webhook Error: Request returned an error {response.status_code}, the response is:\n{response.text}',
-        file=sys.stderr)
+    print(f'Webhook Error: Request returned an error {response.status_code}, the response is:\n{response.text}')

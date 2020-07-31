@@ -43,6 +43,8 @@ build_script:
     pip install requests
 
 
+    cd C:\prj\deca
+
     python ./appveyor/on_success.py
 
 

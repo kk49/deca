@@ -92,6 +92,7 @@ while len(lines[-1]) == 0:
     lines = lines[:-1]
 
 CHANGELOG = '\n'.join(lines)
+CHANGELOG = CHANGELOG[:1024]
 
 result = subprocess.run(['git', 'log', '-1', APPVEYOR_REPO_COMMIT, '--pretty=%aN'], stdout=subprocess.PIPE)
 AUTHOR_NAME = result.stdout.decode('utf-8').rstrip()

@@ -143,7 +143,6 @@ response = requests.post(
     headers={
         'Content-Type': 'application/json',
         'UserAgent': 'AppVeyor-Webhook',
-        'X-Author': 'Queerthulhu#1312',
     }
 )
 

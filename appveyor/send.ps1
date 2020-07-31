@@ -61,33 +61,37 @@ Write-Output $CHANGE_LOG_LINES
 
 $BUILD_VERSION = [uri]::EscapeDataString($env:APPVEYOR_BUILD_VERSION)
 $TIMESTAMP="$(Get-Date -format s)Z"
-$WEBHOOK_DATA="{
+$WEBHOOK_DATA="
+{
   ""username"": """",
   ""avatar_url"": ""$AVATAR"",
-  ""embeds"": [ {
-    ""color"": $EMBED_COLOR,
-    ""author"": {
-      ""name"": ""$env:APPVEYOR_REPO_NAME/deca_gui-b$env:APPVEYOR_BUILD_NUMBER.zip"",
-      ""url"": ""https://ci.appveyor.com/api/buildjobs/$env:APPVEYOR_JOB_ID/artifacts/deca_gui-b$env:APPVEYOR_BUILD_NUMBER.zip"",
-      ""icon_url"": ""$AVATAR""
-    },
-    ""title"": ""$COMMIT_SUBJECT"",
-    ""url"": ""$URL"",
-    ""description"": ""$COMMIT_MESSAGE $CREDITS\n\n$CHANGE_LOG_LINES"",
-    ""fields"": [
-      {
-        ""name"": ""Commit"",
-        ""value"": ""[``$($env:APPVEYOR_REPO_COMMIT.substring(0, 7))``](https://github.com/$env:APPVEYOR_REPO_NAME/commit/$env:APPVEYOR_REPO_COMMIT)"",
-        ""inline"": true
+  ""embeds"":
+  [
+    {
+      ""color"": $EMBED_COLOR,
+      ""author"": {
+        ""name"": ""$env:APPVEYOR_REPO_NAME/deca_gui-b$env:APPVEYOR_BUILD_NUMBER.zip"",
+        ""url"": ""https://ci.appveyor.com/api/buildjobs/$env:APPVEYOR_JOB_ID/artifacts/deca_gui-b$env:APPVEYOR_BUILD_NUMBER.zip"",
+        ""icon_url"": ""$AVATAR""
       },
-      {
-        ""name"": ""Branch"",
-        ""value"": ""[``$env:APPVEYOR_REPO_BRANCH``](https://github.com/$env:APPVEYOR_REPO_NAME/tree/$env:APPVEYOR_REPO_BRANCH)"",
-        ""inline"": true
-      }
-    ],
-    ""timestamp"": ""$TIMESTAMP""
-  } ]
+      ""title"": ""$COMMIT_SUBJECT"",
+      ""url"": ""$URL"",
+      ""description"": ""$COMMIT_MESSAGE $CREDITS\n\n$CHANGE_LOG_LINES"",
+      ""fields"": [
+        {
+          ""name"": ""Commit"",
+          ""value"": ""[``$($env:APPVEYOR_REPO_COMMIT.substring(0, 7))``](https://github.com/$env:APPVEYOR_REPO_NAME/commit/$env:APPVEYOR_REPO_COMMIT)"",
+          ""inline"": true
+        },
+        {
+          ""name"": ""Branch"",
+          ""value"": ""[``$env:APPVEYOR_REPO_BRANCH``](https://github.com/$env:APPVEYOR_REPO_NAME/tree/$env:APPVEYOR_REPO_BRANCH)"",
+          ""inline"": true
+        }
+      ],
+      ""timestamp"": ""$TIMESTAMP""
+    }
+  ]
 }"
 
 Invoke-RestMethod -Uri "$WEBHOOK_URL" -Method "POST" -UserAgent "AppVeyor-Webhook" `

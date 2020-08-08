@@ -15,32 +15,25 @@
     "hp_trophyworld_",
     "hp_yukon_",
     "hp_trophyworld_2_",
-    "hp_iberia_"
+    "hp_iberia_",
+    "hp_rockies_"
   ],
   "world_indexes": [0,1,2,3],
   "world_patches": [
-    "terrain/hp/patches/",
-    "terrain/jc3/patches/",
     "worlds/base/terrain/hp/patches/",
     "worlds/world${WORLD_INDEX}/terrain/world${WORLD_INDEX}/patches/"
   ],
   "world_occluders": [
-    "terrain/hp/occluder/",
-    "terrain/jc3/occluder/",
     "worlds/base/terrain/hp/occluder/",
-    "worlds/world0/terrain/world${WORLD_INDEX}/occluder/"
+    "worlds/world${WORLD_INDEX}/terrain/world${WORLD_INDEX}/occluder/"
   ],
   "world_navheightfields": [
-    "terrain/hp/navheightfield/globalhires/",
-    "terrain/jc3/navheightfield/globalhires/",
     "worlds/base/terrain/hp/navheightfield/globalhires/",
-    "worlds/world0/terrain/world${WORLD_INDEX}/navheightfield/globalhires/"
+    "worlds/world${WORLD_INDEX}/terrain/world${WORLD_INDEX}/navheightfield/globalhires/"
   ],
   "world_hm": [
-    "terrain/hp/horizonmap/horizon_",
-    "terrain/jc3/horizonmap/horizon_",
-    "worlds/base/terrain/hp/horizonmap/horizon_hp_${AREA_PREFIX}",
-    "worlds/world${WORLD_INDEX}/terrain/world${WORLD_INDEX}/horizonmap/horizon_hp_${AREA_PREFIX}"
+    "worlds/base/terrain/hp/horizonmap/horizon_${AREA_PREFIX}",
+    "worlds/world${WORLD_INDEX}/terrain/world${WORLD_INDEX}/horizonmap/horizon_${AREA_PREFIX}"
   ],
   "world_ai": [
     "ai/tiles/",
@@ -104,6 +97,11 @@
       ".swf": "gfx",
       ".cfx": "gfx",
       ".gfx": "gfx"
+    },
+    {
+      ".gdc": "adf",
+      ".gsc": "adf",
+      ".stringlookup": "adf"
     }
   ]
 }

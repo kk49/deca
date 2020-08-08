@@ -694,6 +694,10 @@ class Processor:
                 db.propose_string(fn + b'.xml', node)
                 db.propose_string(fn + b'.xmlc', node)
                 db.propose_string(fn + b'.modelc', node)
+            elif ext == b'.gsr':
+                db.propose_string(fn + b'.gsc', node, possible_file_types=[FTYPE_ADF])
+                db.propose_string(fn + b'.gdc', node, possible_file_types=[FTYPE_ADF])
+                db.propose_string(fn + b'.stringlookup', node, possible_file_types=[FTYPE_ADF])
             elif ext == b'.bik':
                 db.propose_string(s + b'c', node, possible_file_types=[FTYPE_BINK_BIK, FTYPE_BINK_KB2])
             elif len(ext) > 0:

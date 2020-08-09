@@ -1038,7 +1038,12 @@ class AdfDatabase:
         with ArchiveFile(io.BytesIO(buffer)) as fp:
             obj = Adf()
             try:
+                # import time
+                # t0 = time.time()
                 obj.deserialize(fp, self.type_map_def)
+                # t1 = time.time()
+                # print(f'Time ADF = {t1 - t0}')
+
                 # get typedefs from regular load, to handle the case where types are in ADF, and ADFB but not EXE
                 self.typedefs_add(obj.map_typedef)
                 return obj

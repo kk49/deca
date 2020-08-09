@@ -61,7 +61,6 @@ def tileset_make(img, tile_path, export_full, export_tiles, tile_size=256, max_z
 
 def export_map(vfs: VfsDatabase, map_vpath, export_path, export_full, export_tiles):
     # find highest resolution
-
     max_zoom = 0
     while True:
         fn = '{}{}/{}.ddsc'.format(map_vpath, max_zoom + 1, 0)
@@ -87,26 +86,27 @@ def export_map(vfs: VfsDatabase, map_vpath, export_path, export_full, export_til
     tile_count_x = radius
     tile_count_y = radius
 
-    # extract full res image
-    ai = []
-    for i in range(tile_count_y):
-        ai.append([None] * tile_count_x)
+    if max_zoom > 0:
+        # extract full res image
+        ai = []
+        for i in range(tile_count_y):
+            ai.append([None] * tile_count_x)
 
-    for i in range(tile_count):
-        x = i % tile_count_x
-        y = i // tile_count_x
-        fn = '{}{}/{}.ddsc'.format(map_vpath, max_zoom, i)
-        fn = fn.encode('ascii')
+        for i in range(tile_count):
+            x = i % tile_count_x
+            y = i // tile_count_x
+            fn = '{}{}/{}.ddsc'.format(map_vpath, max_zoom, i)
+            fn = fn.encode('ascii')
 
-        vnode = vfs.nodes_where_match(v_path=fn)[0]
-        img = Ddsc()
-        with vfs.file_obj_from(vnode) as f:
-            img.load_ddsc(f)
-        ai[y][x] = img.mips[0].data
+            vnode = vfs.nodes_where_match(v_path=fn)[0]
+            img = Ddsc()
+            with vfs.file_obj_from(vnode) as f:
+                img.load_ddsc(f)
+            ai[y][x] = img.mips[0].data
 
-    for i in range(tile_count_x):
-        ai[i] = np.hstack(ai[i])
-    ai = np.vstack(ai)
-    img = Image.fromarray(ai)
+        for i in range(tile_count_x):
+            ai[i] = np.hstack(ai[i])
+        ai = np.vstack(ai)
+        img = Image.fromarray(ai)
 
-    tileset_make(img, export_path, export_full, export_tiles)
+        tileset_make(img, export_path, export_full, export_tiles)

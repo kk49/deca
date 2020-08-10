@@ -73,6 +73,8 @@ h_prop_spline = hash32_func('spline')
 h_prop_spawn_tags = hash32_func('spawn_tags')
 h_prop_model_skeleton = hash32_func('model_skeleton')
 h_prop_skeleton = hash32_func('skeleton')
+h_prop_need_type = hash32_func('need_type')
+h_prop_start_time = hash32_func('start_time')
 
 h_prop_item_item_id = hash32_func('[Item]  Item ID')
 h_prop_ref_apex_identifier = hash32_func('[ref] apex identifier')

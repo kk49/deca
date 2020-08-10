@@ -1,4 +1,4 @@
-#### v0.2.11 ???
+#### v0.2.11 Damn it's hot (applicable only in the norther hemisphere)
 * Added option to extract maps both full resolution png and tiles for webmaps
 * Added hack to handle bone weights being all zero when vertex is not connected to any bones, APEX is fine with this GLTF2/Blender is not
 * Added guessing of textures/hp_ai_textures/{\*,\*_user}.ddsc from settings/hp_settings/hp_ai_textures/\*.bmp_datac    
@@ -22,7 +22,7 @@
     * Reset to previously accepted value if **Esc** is key'ed or **CLEAR** is pressed
     * Has a yellow text background when valid but not yet accepted expression is entered
     * Has a red text background when not valid
-
+ 
 #### v0.2.10 Half Way There
 * GLTF2: Added option to export skeletons with models (Using [HavokLib!](https://github.com/PredatorCZ/HavokLib))
 * GUI: will now create a new tab with the contents of a SARC (nl/fl/...) when the open button in the SARC tab is pressed

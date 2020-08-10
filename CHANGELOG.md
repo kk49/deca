@@ -1,3 +1,5 @@
+#### v0.2.12 ???
+
 #### v0.2.11 Damn it's hot (applicable only in the norther hemisphere)
 * Added option to extract maps both full resolution png and tiles for webmaps
 * Added hack to handle bone weights being all zero when vertex is not connected to any bones, APEX is fine with this GLTF2/Blender is not

@@ -20,6 +20,15 @@ Also has a channel for development releases of **deca**
 
 https://discord.gg/x5AuPj7
 
+## Maps and data mining created with DECA
+### Generation Zero
+* Main page - http://www.mathartbang.com/deca/gz/
+* Map - http://www.mathartbang.com/deca/gz/map.html
+
+### theHunter:COTW
+* Main page - http://www.mathartbang.com/deca/hp/
+* Map - http://www.mathartbang.com/deca/hp/map.html
+
 ## Key Features
 * Export (modelc, meshc, hrmeshc) to GLTF 2.0 (material models not complete/missing, no bones)
 * Export ADF encoded spreadsheets

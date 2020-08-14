@@ -1,4 +1,6 @@
 #### v0.2.12 ???
+* Made XLSX extractor more flexible to handle mystery entry
+* Added extrapolation for file names from model_xml to modelc for COTW
 
 #### v0.2.11 Damn it's hot (applicable only in the norther hemisphere)
 * Added option to extract maps both full resolution png and tiles for webmaps

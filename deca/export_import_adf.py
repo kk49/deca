@@ -81,7 +81,8 @@ def adf_export_xlsx_0x0b73315d(
                         # worksheet.write_string(r, c, 'Missing ValueData {}'.format(didx), cell_format=cell_format)
                         pass
                 else:
-                    raise NotImplemented('Unhandled Cell Type {}'.format(ctype))
+                    worksheet.write_string(r, c, f'DECA: ERROR: cell_type = {ctype}, data_index = {didx}, attr_index = {aidx}')
+                    # raise NotImplementedError('Unhandled Cell Type {}'.format(ctype))
 
     book.close()
 

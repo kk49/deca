@@ -82,6 +82,7 @@
       ".meshc": "adf",
       ".hrmeshc": "adf",
       ".modelc": "adf",
+      ".model_xml": "txt",
       ".model_deps": "txt",
       ".pfxc": "pfx"
     },

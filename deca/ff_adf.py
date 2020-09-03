@@ -23,6 +23,7 @@ adf_hash_fields = {
     'LocationId',
 }
 
+
 class AdfTypeMissing(Exception):
     def __init__(self, type_id, *args, **kwargs):
         Exception.__init__(self, *args)
@@ -130,6 +131,7 @@ class MetaType(enum.IntEnum):
 
 class TypeDef:
     def __init__(self):
+        self.META_position = None
         self.metatype = None
         self.size = None
         self.alignment = None
@@ -141,6 +143,7 @@ class TypeDef:
         self.members = None
 
     def deserialize(self, f, nt):
+        self.META_position = f.tell()
         self.metatype = f.read_u32()
         self.size = f.read_u32()
         self.alignment = f.read_u32()
@@ -190,6 +193,7 @@ class TypeDef:
 
 class InstanceEntry:
     def __init__(self):
+        self.META_position = None
         self.name_hash = None
         self.type_hash = None
         self.offset = None
@@ -197,7 +201,7 @@ class InstanceEntry:
         self.name = None
 
     def deserialize(self, f, nt):
-        # print('FP Begin:', f.tell())
+        self.META_position = f.tell()
         self.name_hash = f.read_u32()
         self.type_hash = f.read_u32()
         self.offset = f.read_u32()
@@ -852,14 +856,17 @@ class Adf:
 
         sbuf = sbuf + '\n--------string_hash\n'
         # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
-        for v in self.map_stringhash.items():
-            sbuf = sbuf + 'string_hash\t{:016x}\t{}\n'.format(v[0], v[1].value)
+        v: StringHash
+        for k, v in self.map_stringhash.items():
+            sbuf = sbuf + 'string_hash\t{:016x}\t{}\n'.format(k, v.value)
 
         sbuf = sbuf + '\n--------typedefs\n'
         # sbuf = sbuf + '  NOT CURRENTLY SHOWN\n'
-        for v in self.map_typedef.items():
-            sbuf = sbuf + 'typedefs\t{:08x}\t{}\n'.format(v[0], v[1].name.decode('utf-8'))
-            sbuf = sbuf + dump_type(v[0], self.extended_map_typedef, 2)
+        vt: TypeDef
+        for k, vt in self.map_typedef.items():
+            sbuf = sbuf + 'typedefs\t{:08x}\t{} @ {} (0x{:08x})\n'.format(
+                k, vt.name.decode('utf-8'), vt.META_position, vt.META_position)
+            sbuf = sbuf + dump_type(k, self.extended_map_typedef, 2)
 
         sbuf = sbuf + '\n--------instances\n'
         for info, v, fv in zip(self.table_instance, self.table_instance_values, self.table_instance_full_values):

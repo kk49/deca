@@ -353,6 +353,8 @@ class MainWindow(QMainWindow):
             export_contents=self.ui.chkbx_export_contents_mods.isChecked(),
             save_to_processed=self.ui.chkbx_export_processed_mods.isChecked(),
             save_to_text=False,
+            export_map_full=False,
+            export_map_tiles=False,
         )
 
     def slot_mod_build_clicked(self, checked):

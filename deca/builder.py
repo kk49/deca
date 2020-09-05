@@ -96,14 +96,14 @@ class Builder:
                 buf = None
                 src_file = src_files[i]
                 if entry.is_symlink:
-                    # print('  SYMLINK {}'.format(entry.v_path))
+                    print('  SYMLINK {}'.format(entry.v_path))
                     pass
                 elif src_file is not None:
-                    # print('  INSERTING {} src file to new file'.format(entry.v_path))
+                    print('  INSERTING {} src file to new file'.format(entry.v_path))
                     with open(src_file, 'rb') as f:
                         buf = f.read(entry.length)
                 else:
-                    # print('  COPYING {} from old file to new file'.format(entry.v_path))
+                    print('  COPYING {} from old file to new file'.format(entry.v_path))
                     vn = vfs.nodes_where_match(v_path=entry.v_path)[0]
                     with vfs.file_obj_from(vn) as fsi:
                         buf = fsi.read(entry.length)
@@ -120,17 +120,22 @@ class Builder:
 
         v_path = vnode.v_path
 
+        if src_path is None:
+            src_file = None
+        else:
+            _, src_file = os.path.split(src_path)
+
         if vnode.file_type == FTYPE_SARC:
             self.build_node_sarc(dst_path, src_path, vnode, vfs, vpath_complete_map)
         elif src_path is None:
             pass  # no source path,
-        elif src_path.find('DECA') >= 0:
+        elif src_file.find('DECA') >= 0:
             pass  # BUILD file(s) do not copy
         # elif re.match(r'^.*\.ddsc$', src_path) or \
         #         re.match(r'^.*\.hmddsc$', src_path) or \
         #         re.match(r'^.*\.atx?$', src_path):
         #     pass  # DO NOT USE THESE FILES image builder should use .ddsc.dds
-        elif src_path.endswith('.ddsc.dds'):
+        elif src_file.endswith('.ddsc.dds'):
             # Build texture
             vnode = vfs.nodes_where_match(v_path=v_path)[0]
 
@@ -168,20 +173,21 @@ class Builder:
                 for entry in cdir:
                     wl.append(os.path.join(cpath, entry))
             elif os.path.isfile(cpath):
-                file, ext = os.path.splitext(cpath)
+                _, file = os.path.split(cpath)
+                _, ext = os.path.splitext(file)
                 if ext == '.deca_sha1sum':
                     pass
-                elif cpath.endswith('.DECA.FILE_LIST.txt'):
+                elif file.endswith('.DECA.FILE_LIST.txt'):
                     v_path = cpath[len(src_path):-len('.DECA.FILE_LIST.txt')].encode('ascii')
                     v_path = v_path.replace(b'\\', b'/')
                     src_files[v_path] = cpath
                     print('DEPEND: DECA.FILE_LIST.txt: {} = {}'.format(v_path, cpath))
-                elif cpath.endswith('.ddsc.dds'):
+                elif file.endswith('.ddsc.dds'):
                     v_path = cpath[len(src_path):-len('.dds')].encode('ascii')
                     v_path = v_path.replace(b'\\', b'/')
                     src_files[v_path] = cpath
                     print('DEPEND: ddsc.dds: {} = {}'.format(v_path, cpath))
-                elif cpath.find('DECA') >= 0:  # ignore other deca files
+                elif file.find('DECA') >= 0:  # ignore other deca files
                     pass
                 else:
                     v_path = cpath[len(src_path):].encode('ascii')

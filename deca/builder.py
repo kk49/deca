@@ -96,13 +96,14 @@ class Builder:
                 buf = None
                 src_file = src_files[i]
                 if entry.is_symlink:
-                    print('  SYMLINK {}'.format(entry.v_path))
+                    # print('  SYMLINK {}'.format(entry.v_path))
+                    pass
                 elif src_file is not None:
-                    print('  INSERTING {} src file to new file'.format(entry.v_path))
+                    # print('  INSERTING {} src file to new file'.format(entry.v_path))
                     with open(src_file, 'rb') as f:
                         buf = f.read(entry.length)
                 else:
-                    print('  COPYING {} from old file to new file'.format(entry.v_path))
+                    # print('  COPYING {} from old file to new file'.format(entry.v_path))
                     vn = vfs.nodes_where_match(v_path=entry.v_path)[0]
                     with vfs.file_obj_from(vn) as fsi:
                         buf = fsi.read(entry.length)
@@ -115,6 +116,8 @@ class Builder:
 
     def build_node(
             self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
+        print(f'build_node: {dst_path} | {src_path} | {vnode.file_type} | {vnode.v_path}')
+
         v_path = vnode.v_path
 
         if vnode.file_type == FTYPE_SARC:
@@ -146,6 +149,8 @@ class Builder:
             vpath_complete_map[v_path] = dst
 
     def build_dir(self, vfs: VfsDatabase, src_path: str, dst_path: str, subset=None):
+        print(f'build_node: {dst_path} | {src_path}')
+
         # find all changed src files
         src_files = {}
 
@@ -190,7 +195,11 @@ class Builder:
         completed = set()
         while len(pack_list) > 0:
             v_path = pack_list.pop(0)
+            print(f'PACKING: {v_path}')
+
             if v_path not in completed:
+                print(f'COMPLETING: {v_path}')
+
                 completed.add(v_path)
                 depends[v_path] = depends.get(v_path, set())
 
@@ -222,6 +231,7 @@ class Builder:
         # pprint(depends, width=128)
 
         if subset is not None:
+            print('CALCULATING SUBSET')
             subset_vpaths = set()
             for uid in subset:
                 vnode: VfsNode = vfs.node_where_uid(uid)
@@ -238,7 +248,8 @@ class Builder:
 
             for k in depends_remove:
                 depends.pop(k, None)
-
+        else:
+            print('SKIPPING SUBSET')
 
         # copy src modified files to build directory
         vpaths_completed = {}
@@ -246,6 +257,7 @@ class Builder:
             any_change = False
             depends_keys = list(depends.keys())
             for v_path in depends_keys:
+                print(f'check depends: {v_path} | {depends[v_path]}')
                 if len(depends[v_path]) == 0:  # all sources ready?
                     any_change = True
                     depends.pop(v_path)

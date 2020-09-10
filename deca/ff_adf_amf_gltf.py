@@ -180,8 +180,8 @@ class Deca3dMeshc:
             vfs.logger.log('Setup Meshc: {}'.format(self.v_path))
             mesh_adf = adf_db.read_node(vfs, vfs.nodes_where_match(v_path=self.v_path)[0])
             assert len(mesh_adf.table_instance) == 2
-            # 0xea60065d - gz/hp, 0x7A2C9B73 - rg2
-            assert mesh_adf.table_instance[0].type_hash in {0xea60065d, 0x7A2C9B73}
+            # 0xea60065d - gz/hp, 0x7A2C9B73 - rg2, 0x6f841426 - hp (also)
+            assert mesh_adf.table_instance[0].type_hash in {0xea60065d, 0x7A2C9B73, 0x6f841426}
             # 0x67b3a453 - gz, 0xe6834477 - hp, 0x0E1C0800 - rg2
             assert mesh_adf.table_instance[1].type_hash in {0x67b3a453, 0xe6834477, 0x0E1C0800}
             mesh_header = AmfMeshHeader(

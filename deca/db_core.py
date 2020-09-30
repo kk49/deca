@@ -1380,20 +1380,25 @@ class VfsDatabase:
                     for bi, (block_offset, compressed_len, uncompressed_len) in enumerate(blocks):
                         f_in.seek(block_offset)
                         in_buffer = f_in.read(compressed_len)
+
                         if compression_type == compression_v4_03_oo:
                             dc = zstd.ZstdDecompressor()
                             buffer_ret = dc.decompress(in_buffer)
-                            ret = uncompressed_len
-                            good_blocks.append((bi, ret, block_offset, compressed_len, uncompressed_len))
+                            ret = len(buffer_ret)
+                        else:
+                            if compressed_len == uncompressed_len:
+                                buffer_ret, ret = in_buffer, len(in_buffer)
+                            else:
+                                buffer_ret, ret = self.decompress_oodle_lz.decompress(
+                                    in_buffer, compressed_len, uncompressed_len)
+
+                        bb = (bi, ret, block_offset, compressed_len, uncompressed_len)
+                        if ret == uncompressed_len:
+                            good_blocks.append(bb)
                             buffer_out = buffer_out + buffer_ret
                         else:
-                            buffer_ret, ret = self.decompress_oodle_lz.decompress(in_buffer, compressed_len, uncompressed_len)
-                            if ret == uncompressed_len:
-                                good_blocks.append((bi, ret, block_offset, compressed_len, uncompressed_len))
-                                buffer_out = buffer_out + buffer_ret
-                            else:
-                                bad_blocks.append((bi, ret, block_offset, compressed_len, uncompressed_len))
-                                buffer_out = buffer_out + in_buffer
+                            bad_blocks.append(bb)
+                            buffer_out = buffer_out + in_buffer
 
                 with open(file_name, 'wb') as f_out:
                     f_out.write(buffer_out)

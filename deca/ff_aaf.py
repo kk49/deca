@@ -43,7 +43,11 @@ def extract_aaf(src):
         buf_in = f.read(section_compressed_length)
         buf_out = zlib.decompress(buf_in, -15)
         if len(buf_out) != section_uncompressed_length:
-            raise Exception('Uncompress Failed Section {}/{}'.format(i, section_count))
+            raise Exception(
+                'Uncompress Failed Section {}/{}: scs:{}, sus:{}, bl:{}, m:{}'.format(
+                    i, section_count, section_compressed_length, section_uncompressed_length, len(buf_out),
+                    magic_ewam,
+                ))
         buffer_out = buffer_out + buf_out
         f.seek(section_length_with_header + section_start)
         # print(section_compressed_length, section_uncompressed_length, section_length_with_header, magic_ewam)

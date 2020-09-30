@@ -10,4 +10,5 @@ openpyxl==3.0.2
 kaitaistruct==0.8
 llvmlite==0.31.0
 numba==0.48.0
+zstandard==0.14.0
 mmh3

@@ -382,7 +382,6 @@ class Deca3dMeshc:
                             TANGENT=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_Tangent', [])),
                             COLOR_0=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_Color', [])),
                             JOINTS_0=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_BoneIndex', [])),
-                            WEIGHTS_0=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_BoneWeight', [])),
                         )
 
                         # !!!!!! TEMPORARILY SAVE STRING HERE TO BE REPLACE BY MATERIAL FROM MODEL

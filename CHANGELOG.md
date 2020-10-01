@@ -5,6 +5,7 @@
 * Added extrapolation for file names from model_xml to modelc for COTW
 * Added COTW mesh type 0x6f841426 to gltf2 export
 * Fixed bug in preparing for modding and creating mod/ directory
+* dump cache directory to log on first use
 
 #### v0.2.11 Damn it's hot (applicable only in the norther hemisphere)
 * Added option to extract maps both full resolution png and tiles for webmaps

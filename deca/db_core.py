@@ -19,6 +19,7 @@ from deca.hashes import hash32_func, hash48_func, hash64_func, hash_all_func
 from deca.ff_gtoc import GtocArchiveEntry, GtocFileEntry
 from deca.db_types import *
 
+dumped_cache_dir = False
 
 language_codes = [
     'bra',  # Brazil
@@ -1335,6 +1336,12 @@ class VfsDatabase:
                 parent_paths.append(pp)
         cache_dir = os.path.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
         file_name = os.path.join(cache_dir, node.v_hash_to_str() + '.dat')
+
+        global dumped_cache_dir
+        if not dumped_cache_dir:
+            dumped_cache_dir = True
+            self.logger.log(f'CACHE DIRECTORY -> {cache_dir}')
+
         return file_name
 
     def file_obj_from(self, node: VfsNode):

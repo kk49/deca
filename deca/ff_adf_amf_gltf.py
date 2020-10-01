@@ -284,6 +284,7 @@ class Deca3dMeshc:
                         gltf.bufferViews.append(buffer_view)
 
                     # Setup GLTF accessors
+                    possibly_skin = False
                     accessors_streams = []
                     accessors_stream_map = {}
                     stream_attr: AmfStreamAttribute
@@ -333,6 +334,9 @@ class Deca3dMeshc:
                         elif stream_attr.format[1] == b'AmfFormat_R32G32B32_FLOAT':
                             accessor.type = "VEC3"
                             accessor.componentType = pyg.FLOAT
+                        elif stream_attr.format[1] == b'AmfFormat_R32G32B32A32_FLOAT':
+                            accessor.type = "VEC4"
+                            accessor.componentType = pyg.FLOAT
                         elif stream_attr.format[1] == b'DecaFormat_R32G32B32A32_FLOAT_P1':
                             accessor.type = "VEC4"
                             accessor.componentType = pyg.FLOAT
@@ -346,6 +350,9 @@ class Deca3dMeshc:
                             accessor.min = list(stream_attr.min.astype(dtype=np.double))
                             accessor.max = list(stream_attr.max.astype(dtype=np.double))
 
+                        if stream_attr.usage[1] in {b'AmfUsage_BoneIndex', b'AmfUsage_BoneWeight'}:
+                            possibly_skin = True
+
                         # add accessor
                         accessors_stream_idx = len(gltf.accessors)
                         gltf.accessors.append(accessor)
@@ -354,7 +361,12 @@ class Deca3dMeshc:
                         asl.append(accessors_stream_idx)
                         accessors_stream_map[stream_attr.usage[1]] = asl
 
-                    do_skin = mesh.meshProperties is not None and mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and len(mesh.boneIndexLookup) > 0
+                    do_skin = \
+                        mesh.meshProperties is not None and \
+                        mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and \
+                        len(mesh.boneIndexLookup) > 0
+
+                    do_skin = do_skin or possibly_skin
 
                     submeshes = []
                     submesh: AmfSubMesh
@@ -382,6 +394,7 @@ class Deca3dMeshc:
                             TANGENT=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_Tangent', [])),
                             COLOR_0=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_Color', [])),
                             JOINTS_0=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_BoneIndex', [])),
+                            WEIGHTS_0=_get_or_none(0, accessors_stream_map.get(b'AmfUsage_BoneWeight', [])),
                         )
 
                         # !!!!!! TEMPORARILY SAVE STRING HERE TO BE REPLACE BY MATERIAL FROM MODEL

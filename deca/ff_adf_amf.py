@@ -663,6 +663,8 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     elif usage_in == b'AmfUsage_TangentSpace':
                         usages_out = [b'AmfUsage_Normal', b'AmfUsage_Tangent']
                         formats_out = [b'AmfFormat_R32G32B32_FLOAT', b'DecaFormat_R32G32B32A32_FLOAT_P1']
+                    elif usage_in == b'AmfUsage_BoneWeight':
+                        formats_out = [b'AmfFormat_R32G32B32A32_FLOAT']
 
                     fi_in = field_format_info[format_in]
                     attributes_in.append(sattr_in)
@@ -745,13 +747,17 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                     if sattr_out.usage[1] == b'AmfUsage_BoneWeight':
                         msk = np.all(data_out_mem_field == 0.0, 1)
                         data_out_mem_field[msk] = np.asarray([1.0, 0.0, 0.0, 0.0])
+                        s = np.sum(data_out_mem_field, 1)
+                        data_out_mem_field = (data_out_mem_field.T / s).T
 
                     preconvert_scale(data_out_field, data_out_mem_field, sattr_out, True, finfo_out.converter)
 
                     # Normals should be unit length
                     if sattr_out.usage[1] == b'AmfUsage_Normal' or sattr_out.usage[1] == b'AmfUsage_Tangent':
                         norm = np.linalg.norm(data_out_field[:, 0:3], axis=1)
-                        norm[norm == 0] = 1.0
+                        data_out_field[norm == 0, 0:3] = 1.0
+                        norm = np.linalg.norm(data_out_field[:, 0:3], axis=1)
+                        # norm[norm == 0] = 1.0
                         data_out_field[:, 0:3] = data_out_field[:, 0:3] / norm[:, np.newaxis]
                         data_out_field[np.isnan(norm), 0:3] = 0
                         data_out_field[np.isnan(norm), 0] = 1

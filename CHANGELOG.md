@@ -1,5 +1,6 @@
 #### v0.2.12 ???
 * Fixed GLTF2 skeletons for model types without MeshProperties, now assumes if BoneIndex or BoneWeight exits, it is skinned, also always use boneIndexMapping if it exists
+* Made location extraction more flexible and tolerant of missing models
 * Fixed decompression of compression type 3 (it's zstandard records), added bypass for non compressed blocks
 * Made XLSX extractor more flexible to handle mystery entry
 * Added extrapolation for file names from model_xml to modelc for COTW

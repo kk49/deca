@@ -144,7 +144,7 @@ def nodes_export_gltf(
             node = vfs_view.node_where_uid(uid)
             if node.is_valid() and node.offset is not None:
                 try:
-                    if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
+                    if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE, FTYPE_ADF0}:
                         vs_adf.append(node)
                     elif node.file_type in {FTYPE_RTPC}:
                         vs_rtpc.append(node)

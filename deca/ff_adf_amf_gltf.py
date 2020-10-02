@@ -427,7 +427,9 @@ class Deca3dModelc:
 
             nodes = vfs.nodes_where_match(v_path=self.v_path)
             if len(nodes) == 0:
-                raise EDecaFileMissing('Not Mapped: {}'.format(self.v_path))
+                # raise EDecaFileMissing('Not Mapped: {}'.format(self.v_path))
+                vfs.logger.warning(f"{EDecaFileMissing('Not Mapped: {}'.format(self.v_path))}")
+                return None
 
             node = nodes[0]
             model_adf = adf_db.read_node(vfs, node)
@@ -949,17 +951,18 @@ class DecaGltf:
         meshes_all = self.db.gltf_add_modelc(
             self.gltf, v_path, material_properties=material_properties)
 
-        with DecaGltfNode(self, name=os.path.basename(v_path), matrix=transform.col_major_list()):
-            for mesh_info in meshes_all[self.lod]:
-                submeshes = mesh_info[0]
+        if meshes_all is not None:
+            with DecaGltfNode(self, name=os.path.basename(v_path), matrix=transform.col_major_list()):
+                for mesh_info in meshes_all[self.lod]:
+                    submeshes = mesh_info[0]
 
-                skin_idx = None
-                if mesh_info[1] and skeleton is not None:
-                    skin_idx = skeleton[0]
+                    skin_idx = None
+                    if mesh_info[1] and skeleton is not None:
+                        skin_idx = skeleton[0]
 
-                for submesh in submeshes:
-                    with DecaGltfNode(self) as mesh_node:
-                        mesh_node.mesh = submesh
-                        mesh_node.skin = skin_idx
+                    for submesh in submeshes:
+                        with DecaGltfNode(self) as mesh_node:
+                            mesh_node.mesh = submesh
+                            mesh_node.skin = skin_idx
 
         self.vfs.logger.log('export_modelc: Complete')

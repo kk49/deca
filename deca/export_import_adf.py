@@ -157,6 +157,51 @@ def adf_export_mdic_0xb5b062f1(
     vfs.logger.log('Exporting {}: Complete'.format(vnode.v_path.decode('utf-8')))
 
 
+def adf_export_mdic_0x9111dc0(
+        vfs: VfsDatabase,
+        adf_db: AdfDatabase,
+        vnode: VfsNode,
+        export_path,
+        allow_overwrite,
+        save_to_one_dir,
+        include_skeleton,
+        texture_format,
+):
+    vfs.logger.log('Exporting {}: Started'.format(vnode.v_path.decode('utf-8')))
+    gltf = DecaGltf(
+        vfs, export_path, vnode.v_path.decode('utf-8'),
+        save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton, texture_format=texture_format)
+
+    with gltf.scene():
+        adf = adf_db.read_node(vfs, vnode)
+        mdic = adf.table_instance_values[0]
+        models = []
+        for m in mdic['Models']:
+            v_path = None
+            v_paths = vfs.hash_string_match(hash32=m)
+            if len(v_paths) > 0:
+                v_path = v_paths[0][1]
+            models.append(v_path)
+        instances = mdic['Instances']
+        aabb = AABB(all6=mdic['AABB'])
+        mid = aabb.mid()
+        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path)) as mdic_node:
+            mdic_node.translation = list(mid)
+            for instance in instances:
+                transform = Deca3dMatrix(col_major=instance['Transform'])
+                transform.translate(-mid)
+                model_index = instance['ModelIndex']
+                model = models[model_index]
+                if model is None:
+                    vfs.logger.log('Missing model 0x{:08x}'.format(model_index))
+                else:
+                    gltf.export_modelc(model, transform)
+
+    gltf.gltf_save()
+    vfs.logger.log('Exporting {}: Complete'.format(vnode.v_path.decode('utf-8')))
+
+
+
 def node_export_adf_gltf(
         vfs: VfsDatabase,
         adf_db: AdfDatabase,
@@ -176,6 +221,10 @@ def node_export_adf_gltf(
                     save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton, texture_format=texture_format)
             elif adf.table_instance[0].type_hash == 0xb5b062f1:  # mdic
                 adf_export_mdic_0xb5b062f1(
+                    vfs, adf_db, vnode, export_path, allow_overwrite,
+                    save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton, texture_format=texture_format)
+            elif adf.table_instance[0].type_hash == 0x9111DC10:  # mdic
+                adf_export_mdic_0x9111dc0(
                     vfs, adf_db, vnode, export_path, allow_overwrite,
                     save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton, texture_format=texture_format)
 

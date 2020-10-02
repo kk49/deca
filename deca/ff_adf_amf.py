@@ -738,7 +738,7 @@ def amf_meshc_reformat(mesh_header, mesh_buffers):
                         data_out_field = data_out[fidx]
 
                     # update bone indexs
-                    if mesh.meshProperties is not None and mesh.meshProperties.get('IsSkinnedMesh', 0) == 1 and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
+                    if mesh.boneIndexLookup and sattr_out.usage[1] == b'AmfUsage_BoneIndex':
                         arr_map = np.array(mesh.boneIndexLookup)
                         data_out_mem_field[:, :] = arr_map[data_out_mem_field]
 

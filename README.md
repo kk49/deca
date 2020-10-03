@@ -128,5 +128,14 @@ add this to chrome command line
 --allow-file-access-from-files --allow-file-access --allow-cross-origin-auth-prompt
 ```
 
+### Blender
+#### Script to turn off normal smoothing
+```
+for object in bpy.context.scene.objects:
+    if object.type == 'MESH': 
+        object.data.use_auto_smooth = False
+```
+
+
 ## Disclaimer (IANAL)
 All product names, logos, and brands are property of their respective owners. All company, product and service names used in this website are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.

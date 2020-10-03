@@ -136,6 +136,12 @@ for object in bpy.context.scene.objects:
         object.data.use_auto_smooth = False
 ```
 
+### Kaitai Format
+Format files for `.gfx` for string extraction and older (for GZ and COTW) non RTPC `world.bin` files are provide with 
+Kaitai description files. Kaitai links:
+* [IDE](https://ide.kaitai.io/)
+* [docs](http://doc.kaitai.io/user_guide.html)  
+
 
 ## Disclaimer (IANAL)
 All product names, logos, and brands are property of their respective owners. All company, product and service names used in this website are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.

@@ -1,5 +1,5 @@
 #### v0.2.12 ???
-* Added kaitai format files for non-RTPC (GZ and COTW) locations/world.bin files
+* Added [kaitai](https://kaitai.io/) format files for non-RTPC (GZ and COTW) locations/world.bin files
 * Fixed GLTF2 skeletons for model types without MeshProperties, now assumes if BoneIndex or BoneWeight exits, it is skinned, also always use boneIndexMapping if it exists
 * Made location extraction more flexible and tolerant of missing models
 * Fixed decompression of compression type 3 (it's zstandard records), added bypass for non compressed blocks

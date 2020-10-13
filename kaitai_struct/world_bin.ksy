@@ -10,16 +10,72 @@ doc: |
 seq:
   - id: header_ver_0
     type: u1
+
   - id: header_ver_1
     type: u2
-  - id: header_count
+
+  - id: object_count
     type: u2
 
-  - id: elements
-    type: element
-    repeat: eos
+  - id: objects
+    type: object
+    repeat: expr
+    repeat-expr: object_count
 
 types:
+  object:
+    seq:
+      - id: name
+        type: u4
+        
+      - id: unk0
+        type: u1
+        
+      - id: unk1
+        type: u2
+        
+      - id: count
+        type: u2
+        
+      - id: members
+        type: element
+        repeat: expr
+        repeat-expr: count
+        
+  element:
+    seq:
+      - id: name
+        type: u4
+
+      - id: type_id
+        type: u1
+
+      - id: data_u4
+        type: u4
+        if: type_id == 1
+      
+      - id: data_f4
+        type: f4
+        if: type_id == 2
+
+      - id: data_strn
+        type: strn
+        if: type_id == 3
+        
+      - id: data_vec3
+        type: f4
+        repeat: expr
+        repeat-expr: 3
+        if: type_id == 5
+
+      - id: data_mat3x4
+        type: mat3x4
+        if: type_id == 8
+
+      - id: data_events
+        type: events
+        if: type_id == 14
+
   strn:
     seq:
       - id: len
@@ -47,62 +103,13 @@ types:
       - id: z
         type: f4
         
-  mat12:
+  mat3x4:
     seq:
-      - id: mat
+      - id: mat3x3
         type: f4
         repeat: expr
-        repeat-expr: 12
-        
-        
-  element:
-    seq:
-      - id: name
-        type: u4
-
-      - id: type_id
-        type: u1
-
-      - id: data_01
-        type: u4
-        if: type_id == 1
-      
-      - id: data_02
+        repeat-expr: 9
+      - id: vec3
         type: f4
-        if: type_id == 2
-
-      - id: data_03
-        type: strn
-        if: type_id == 3
-        
-      - id: data_05
-        type: vec3
-        if: type_id == 5
-
-      - id: data_08
-        type: mat12
-        if: type_id == 8
-
-      - id: data_0e
-        type: events
-        if: type_id == 14
-      
-      - id: data_f8
-        type: vec3
-        if: type_id == 248
-        
-      
-
-      
-
-  type3:
-    seq:
-      - id: type_id
-        type: u1
-      - id: len
-        type: u2
-      - id: val
-        size: len
-        type: str
-        encoding: ascii
-
+        repeat: expr
+        repeat-expr: 3

@@ -20,15 +20,13 @@ class WorldBin(KaitaiStruct):
     def _read(self):
         self.header_ver_0 = self._io.read_u1()
         self.header_ver_1 = self._io.read_u2le()
-        self.header_count = self._io.read_u2le()
-        self.elements = []
-        i = 0
-        while not self._io.is_eof():
-            self.elements.append(self._root.Element(self._io, self, self._root))
-            i += 1
+        self.object_count = self._io.read_u2le()
+        self.objects = [None] * (self.object_count)
+        for i in range(self.object_count):
+            self.objects[i] = self._root.Object(self._io, self, self._root)
 
 
-    class Mat12(KaitaiStruct):
+    class Object(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
@@ -36,9 +34,13 @@ class WorldBin(KaitaiStruct):
             self._read()
 
         def _read(self):
-            self.mat = [None] * (12)
-            for i in range(12):
-                self.mat[i] = self._io.read_f4le()
+            self.name = self._io.read_u4le()
+            self.unk0 = self._io.read_u1()
+            self.unk1 = self._io.read_u2le()
+            self.count = self._io.read_u2le()
+            self.members = [None] * (self.count)
+            for i in range(self.count):
+                self.members[i] = self._root.Element(self._io, self, self._root)
 
 
 
@@ -53,25 +55,25 @@ class WorldBin(KaitaiStruct):
             self.name = self._io.read_u4le()
             self.type_id = self._io.read_u1()
             if self.type_id == 1:
-                self.data_01 = self._io.read_u4le()
+                self.data_u4 = self._io.read_u4le()
 
             if self.type_id == 2:
-                self.data_02 = self._io.read_f4le()
+                self.data_f4 = self._io.read_f4le()
 
             if self.type_id == 3:
-                self.data_03 = self._root.Strn(self._io, self, self._root)
+                self.data_strn = self._root.Strn(self._io, self, self._root)
 
             if self.type_id == 5:
-                self.data_05 = self._root.Vec3(self._io, self, self._root)
+                self.data_vec3 = [None] * (3)
+                for i in range(3):
+                    self.data_vec3[i] = self._io.read_f4le()
+
 
             if self.type_id == 8:
-                self.data_08 = self._root.Mat12(self._io, self, self._root)
+                self.data_mat3x4 = self._root.Mat3x4(self._io, self, self._root)
 
             if self.type_id == 14:
-                self.data_0e = self._root.Events(self._io, self, self._root)
-
-            if self.type_id == 248:
-                self.data_f8 = self._root.Vec3(self._io, self, self._root)
+                self.data_events = self._root.Events(self._io, self, self._root)
 
 
 
@@ -115,7 +117,7 @@ class WorldBin(KaitaiStruct):
 
 
 
-    class Type3(KaitaiStruct):
+    class Mat3x4(KaitaiStruct):
         def __init__(self, _io, _parent=None, _root=None):
             self._io = _io
             self._parent = _parent
@@ -123,9 +125,14 @@ class WorldBin(KaitaiStruct):
             self._read()
 
         def _read(self):
-            self.type_id = self._io.read_u1()
-            self.len = self._io.read_u2le()
-            self.val = (self._io.read_bytes(self.len)).decode(u"ascii")
+            self.mat3x3 = [None] * (9)
+            for i in range(9):
+                self.mat3x3[i] = self._io.read_f4le()
+
+            self.vec3 = [None] * (3)
+            for i in range(3):
+                self.vec3[i] = self._io.read_f4le()
+
 
 
 

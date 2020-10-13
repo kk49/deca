@@ -1,0 +1,99 @@
+{
+  "game_id": "sb",
+  "exe_match": ".*SecondExtinction.*",
+  "archive_version": 5,
+  "file_hash_size": 8,
+  "oo_decompress_dll": false,
+  "area_prefixes": [
+    "arctic",
+    "dev",
+    "jungle",
+    "lobby",
+    "prototype"
+  ],
+  "world_patches": [
+    "worlds/${AREA_PREFIX}/terrain/veg_streampatches/width_3/",
+    "worlds/${AREA_PREFIX}/terrain/veg_streampatches/width_4/",
+    "worlds/${AREA_PREFIX}/terrain/veg_streampatches/width_8/",
+    "worlds/${AREA_PREFIX}/terrain/patches/width_3/",
+    "worlds/${AREA_PREFIX}/terrain/patches/width_4/",
+    "worlds/${AREA_PREFIX}/terrain/patches/width_8/"
+  ],
+  "world_occluders": [
+    "worlds/${AREA_PREFIX}/terrain/occluder/"
+  ],
+  "world_navheightfields": [
+    "terrain/hp/navheightfield/globalhires/"
+  ],
+  "world_hm": [
+    "worlds/${AREA_PREFIX}/terrain/horizonmap/horizonmap_tessellation_enabled_",
+    "worlds/${AREA_PREFIX}/terrain/horizonmap/horizonmap_tessellation_disabled_",
+    "worlds/${AREA_PREFIX}/terrain/horizonmap/horizonmap_moon_tessellation_enabled_",
+    "worlds/${AREA_PREFIX}/terrain/horizonmap/horizonmap_moon_tessellation_disabled_"
+  ],
+  "world_ai": [
+    "worlds/${AREA_PREFIX}/ai/tiles/"
+  ],
+  "map_zooms": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "map_max_count": 1024,
+  "map_prefixes": [
+    "worlds/${AREA_PREFIX}/world_map/worldmap_"
+  ],
+  "unarchived_files": [
+    "${GAME_DIR}/ShadersVulkan_F.shader_bundle"
+  ],
+  "archive_paths": [
+    "${GAME_DIR}/archives_win64/initial/",
+    "${GAME_DIR}/archives_win64/supplemental/"
+  ],
+  "mdic_ftype": "adf",
+  "navmesh_ftype": "tag0",
+  "obc_ftype": "obc",
+  "pfs_ftype": "tag0",
+  "has_garcs": true,
+  "file_assoc": [
+    {
+      ".ee": "META-ANY-TYPE",
+      ".epe": "rtpc"
+    },
+    {
+      ".bl": "META-ANY-TYPE",
+      ".nl": "META-ANY-TYPE",
+      ".fl": "META-ANY-TYPE",
+      ".blo": "rtpc",
+      ".nl.mdic": "adf",
+      ".fl.mdic": "adf",
+      ".pfs": "tag0",
+      ".obc": "obc"
+    },
+    {
+      ".meshc": "adf",
+      ".hrmeshc": "adf",
+      ".modelc": "adf",
+      ".model_deps": "txt",
+      ".pfxc": "tag0"
+    },
+    {
+      ".ddsc": "avtx,dds",
+      ".atx1": "atx,META-NO-TYPE",
+      ".atx2": "atx,META-NO-TYPE",
+      ".atx3": "atx,META-NO-TYPE"
+    },
+    {
+      ".fmod_sbankc": "txt",
+      ".fmod_bankc": "riff"
+    },
+    {
+      ".swf": "gfx",
+      ".cfx": "gfx",
+      ".gfx": "gfx"
+    }
+  ]
+}

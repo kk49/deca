@@ -1,4 +1,5 @@
-#### v0.2.12 ???
+#### v0.2.12 "THis implies the existence of a one themed game"
+* Support for Second Extinction 
 * Added [kaitai](https://kaitai.io/) format files for non-RTPC (GZ and COTW) locations/world.bin files
 * Fixed GLTF2 skeletons for model types without MeshProperties, now assumes if BoneIndex or BoneWeight exits, it is skinned, also always use boneIndexMapping if it exists
 * Made location extraction more flexible and tolerant of missing models

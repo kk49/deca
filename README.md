@@ -40,14 +40,14 @@ https://discord.gg/x5AuPj7
 ## "Supported" Games
 Support varies among the games, people are activily using **deca** for GenZero and theHunter:COTW
 
-|GAME|
-|---|
-|Avalanche Studios' Generation Zero®|
-|Avalanche Studios' theHunter™: Call of the Wild|
-|Avalanche Studios' Just Cause 3|
-|Avalanche Studios' Just Cause 4|
-|Avalanche Studios' RAGE 2|
-|Avalanche Studios' Second Extinction|
+|Studio|GAME|
+|---|---|
+|Avalanche Studios / Systemic Reaction|Generation Zero®|
+|Avalanche Studios / Expansive Worlds|theHunter™: Call of the Wild|
+|Avalanche Studios|Just Cause 3|
+|Avalanche Studios|Just Cause 4|
+|Avalanche Studios|RAGE 2|
+|Avalanche Studios / Systemic Reaction|Second Extinction|
 
 
 ## Quick Start

@@ -47,6 +47,8 @@ Support varies among the games, people are activily using **deca** for GenZero a
 |Avalanche Studios' Just Cause 3|
 |Avalanche Studios' Just Cause 4|
 |Avalanche Studios' RAGE 2|
+|Avalanche Studios' Second Extinction|
+
 
 ## Quick Start
 No installer, just unzip the [release file](https://github.com/kk49/deca/releases) in some directory and start deca_gui.exe. (not signed so windows will complain)

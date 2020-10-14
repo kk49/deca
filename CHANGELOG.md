@@ -1,3 +1,5 @@
+#### v0.2.13 ...
+
 #### v0.2.12 "THis implies the existence of a one themed game"
 * Support for Second Extinction 
 * Added [kaitai](https://kaitai.io/) format files for non-RTPC (GZ and COTW) locations/world.bin files

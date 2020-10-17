@@ -249,16 +249,25 @@ def nodes_export_processed(
 
     adf_db = AdfDatabase(vfs)
     for node in vs_adf:
-        try:
-            if save_to_processed:
+        if save_to_processed:
+            try:
                 node_export_adf_processed(vfs, adf_db, node, extract_dir, allow_overwrite=allow_overwrite)
+            except EDecaFileExists as e:
+                vfs.logger.log(
+                    'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+            except AdfTypeMissing as e:
+                vfs.logger.log(
+                    'WARNING: Extracting {} Failed: Missing ADF Type 0x{:08x}  '.format(node.v_path, e.type_id))
 
-            if save_to_text:
+        if save_to_text:
+            try:
                 node_export_adf_text(vfs, adf_db, node, extract_dir, allow_overwrite=allow_overwrite)
-
-        except EDecaFileExists as e:
-            vfs.logger.log(
-                'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+            except EDecaFileExists as e:
+                vfs.logger.log(
+                    'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(e.args[0]))
+            except AdfTypeMissing as e:
+                vfs.logger.log(
+                    'WARNING: Extracting {} Failed: Missing ADF Type 0x{:08x}  '.format(node.v_path, e.type_id))
 
     for node in vs_rtpc:
         try:

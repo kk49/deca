@@ -15,6 +15,9 @@ from .util import Logger, make_dir_for_file
 from .digest import process_translation_adf
 
 
+STATUS_UPDATE_TIME_S = 5.0
+
+
 def vfs_structure_new(filename):
     exe_path = filename[0]
     game_dir, exe_name = os.path.split(exe_path)
@@ -73,6 +76,8 @@ class VfsProcessor(VfsDatabase):
     def __init__(self, project_file, working_dir, logger):
         VfsDatabase.__init__(self, project_file, working_dir, logger, init_display=True)
         self.last_status_update = None
+        self.process_time_start = None
+        self.process_time_last = None
 
     def log(self, msg):
         self.logger.log(msg)
@@ -220,7 +225,16 @@ class VfsProcessor(VfsDatabase):
             else:
                 self.logger.warning('Equipment.bin Missing')
 
+    def idle_call(self):
+        t_curr = time.time()
+        if (self.process_time_last + STATUS_UPDATE_TIME_S) < t_curr:
+            self.process_time_last = t_curr
+            self.logger.log(f"ELAPSED TIME: {t_curr - self.process_time_start:.0f} seconds")
+
     def process(self, debug=False):
+        self.process_time_start = time.time()
+        self.process_time_last = 0.0
+
         inner_loop = []
 
         inner_loop += [
@@ -456,7 +470,7 @@ class VfsProcessor(VfsDatabase):
         indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            results = commander.do_map(cmd, indexes, step_id='Determine file type')
+            results = commander.do_map(cmd, indexes, step_id='Determine file type', idle_call=self.idle_call)
 
             indexes_processed = [k for k, v in results]
             indexes_success = [k for k, v in results if v]
@@ -485,7 +499,7 @@ class VfsProcessor(VfsDatabase):
         indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            results = commander.do_map(cmd, indexes, step_id='Determine file type with name')
+            results = commander.do_map(cmd, indexes, step_id='Determine file type with name', idle_call=self.idle_call)
 
             indexes_processed = [k for k, v in results]
             indexes_success = [k for k, v in results if v]
@@ -510,7 +524,7 @@ class VfsProcessor(VfsDatabase):
         indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            results = commander.do_map(cmd, indexes, step_id=f_type)
+            results = commander.do_map(cmd, indexes, step_id=f_type, idle_call=self.idle_call)
 
             indexes_processed = [k for k, v in results]
             indexes_success = [k for k, v in results if v]
@@ -535,7 +549,7 @@ class VfsProcessor(VfsDatabase):
         indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            results = commander.do_map(cmd, indexes, step_id=f'v_hash = {v_hash}')
+            results = commander.do_map(cmd, indexes, step_id=f'v_hash = {v_hash}', idle_call=self.idle_call)
 
             indexes_processed = [k for k, v in results]
             indexes_success = [k for k, v in results if v]
@@ -560,7 +574,7 @@ class VfsProcessor(VfsDatabase):
         indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            results = commander.do_map(cmd, indexes, step_id=f'ext_hash = {ext_hash}')
+            results = commander.do_map(cmd, indexes, step_id=f'ext_hash = {ext_hash}', idle_call=self.idle_call)
 
             indexes_processed = [k for k, v in results]
             indexes_success = [k for k, v in results if v]
@@ -581,7 +595,7 @@ class VfsProcessor(VfsDatabase):
         indexes_failed = []
         if indexes:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            results = commander.do_map(cmd, indexes, step_id=f'endswith = {suffix}')
+            results = commander.do_map(cmd, indexes, step_id=f'endswith = {suffix}', idle_call=self.idle_call)
 
             indexes_processed = [k for k, v in results]
             indexes_success = [k for k, v in results if v]
@@ -597,7 +611,7 @@ class VfsProcessor(VfsDatabase):
         vhashes = self.nodes_select_distinct_vhash()
         if len(vhashes) > 0:
             commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
-            commander.do_map(cmd, vhashes, step_id='v_hash')
+            commander.do_map(cmd, vhashes, step_id='v_hash', idle_call=self.idle_call)
         self.logger.log('PROCESS: VHASHes: End: Total VHASHes {}'.format(len(vhashes)))
 
     def find_vpath_procmon_dir(self):

@@ -5,7 +5,7 @@ import time
 import sys
 import traceback
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Callable
 
 from .file import ArchiveFile
 from .db_core import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
@@ -122,7 +122,7 @@ class MultiProcessControl:
         # self.mp_n_processes = max(1, 2 * multiprocessing.cpu_count() // 4)
         self.mp_n_processes = max(1, 3 * multiprocessing.cpu_count() // 4)
 
-    def do_map(self, cmd, params, step_id=None):
+    def do_map(self, cmd, params, step_id=None, idle_call: Optional[Callable] = None):
         self.logger.log(f'Manager: "{cmd}" with {len(params)} parameters using {self.mp_n_processes} processes')
 
         indexes = [params[v::self.mp_n_processes] for v in range(0, self.mp_n_processes)]
@@ -131,7 +131,7 @@ class MultiProcessControl:
         for ii in indexes:
             command_list.append([cmd, [ii]])
 
-        results = self.mp_issue_commands(command_list, step_id=step_id)
+        results = self.mp_issue_commands(command_list, step_id=step_id, idle_call=idle_call)
 
         all_results = []
         for r in results:
@@ -139,7 +139,7 @@ class MultiProcessControl:
 
         return all_results
 
-    def mp_issue_commands(self, command_list: list, step_id=None):
+    def mp_issue_commands(self, command_list: list, step_id=None, idle_call: Optional[Callable] = None):
         command_todo = [(i, cmd) for i, cmd in enumerate(command_list)]
         command_active = {}
         command_complete = []
@@ -186,6 +186,9 @@ class MultiProcessControl:
             processes_available = set(mp_processes.keys())
 
             while len(processes_available) > 0 and (len(command_todo) + len(command_active)) > 0:
+                if idle_call is not None:
+                    idle_call()
+
                 ctime = time.time()
                 if last_update is None or (last_update + self.progress_update_time_sec) < ctime:
                     n_done = 0

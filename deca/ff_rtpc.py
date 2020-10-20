@@ -406,7 +406,7 @@ def rtpc_prop_to_string(prop0, hash_lookup: FieldNameMap):
 
     name = hash_lookup.lookup(hash32=prop_name_hash)
     if name:
-        name = '"{}"'.format(name)
+        name = f'0x{prop_name_hash:08x} "{name}"'
     else:
         name = f'0x{prop_name_hash:08x}'
 

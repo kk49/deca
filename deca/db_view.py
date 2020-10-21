@@ -115,6 +115,8 @@ class VfsView:
             if v_path is None:
                 nodes_uids_no_vpath.add(uid)
             else:
+                v_path = to_unicode(v_path)
+
                 lst0 = nodes_map.get(v_path, None)
 
                 if lst0 is None:

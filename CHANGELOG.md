@@ -2,6 +2,7 @@
 * Fixed crash when doing text export of entire editor directory in GenZero
 * Added elapsed time log message for when ARCHIVE is being processed
 * Added various possible field names, updated rtpc to always show property hash id, and optionally the matching string if it exits
+* Fixed bug in extracting item from Raw list tab
 
 #### v0.2.12 "THis implies the existence of a one themed game"
 * Support for Second Extinction 

@@ -3,6 +3,7 @@
 * Added elapsed time log message for when ARCHIVE is being processed
 * Added various possible field names, updated rtpc to always show property hash id, and optionally the matching string if it exits
 * Fixed bug in extracting item from Raw list tab
+* Improved error for report which type in an ADF object is missing, this gives details for 0xDEFE88ED types
 
 #### v0.2.12 "THis implies the existence of a one themed game"
 * Support for Second Extinction 

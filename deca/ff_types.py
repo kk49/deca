@@ -77,3 +77,5 @@ ftype_list = {
     FTYPE_EXE: 1 << 63,
     FTYPE_ANY_TYPE: 0xFFffFFffFFffFFff,
 }
+
+ftype_adf_family = {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE}

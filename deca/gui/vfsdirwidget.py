@@ -217,7 +217,7 @@ class VfsDirModel(QAbstractItemModel):
                         return QColor(Qt.yellow)
                 elif column == 3:
                     if vnode.file_sub_type is not None and \
-                            vnode.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE} and \
+                            vnode.file_type in ftype_adf_family and \
                             vnode.file_sub_type not in self.vfs_view.adf_db().type_map_def:
                         return QColor(Qt.red)
         return None

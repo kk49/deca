@@ -1,9 +1,10 @@
 #### v0.2.13 ...
+* Made parsing more forgiving of missing 0xDEFE88ED types, 0xDEFE88ED may contain length in second field? But length does not matter anyway for skiping data
+* Improved error when reporting which type in an ADF object is missing, this gives details for 0xDEFE88ED types
 * Fixed crash when doing text export of entire editor directory in GenZero
 * Added elapsed time log message for when ARCHIVE is being processed
 * Added various possible field names, updated rtpc to always show property hash id, and optionally the matching string if it exits
 * Fixed bug in extracting item from Raw list tab
-* Improved error for report which type in an ADF object is missing, this gives details for 0xDEFE88ED types
 
 #### v0.2.12 "THis implies the existence of a one themed game"
 * Support for Second Extinction 

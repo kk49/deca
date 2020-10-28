@@ -137,6 +137,8 @@ def node_export_rtpc_text(
 
     fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
 
+    vfs.logger.log('Exporting as Text: {}'.format(fn))
+
     if not allow_overwrite and os.path.exists(fn):
         raise EDecaFileExists(fn)
 

@@ -28,7 +28,7 @@ def extract_node_raw(
                 else:
                     out_file = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
 
-                vfs.logger.log('Exporting {}'.format(out_file))
+                vfs.logger.log('Exporting Raw: {}'.format(out_file))
 
                 make_dir_for_file(out_file)
 

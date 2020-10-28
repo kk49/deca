@@ -27,6 +27,8 @@ def adf_export_xlsx_0x0b73315d(
     ofile = generate_export_file_path(vfs, export_path, vnode)
     fn = ofile + '.xlsx'
 
+    vfs.logger.log('Exporting as XLSX: {}'.format(fn))
+
     adf = adf_db.read_node(vfs, vnode)
 
     if not allow_overwrite and os.path.exists(fn):
@@ -201,7 +203,6 @@ def adf_export_mdic_0x9111dc0(
     vfs.logger.log('Exporting {}: Complete'.format(vnode.v_path.decode('utf-8')))
 
 
-
 def node_export_adf_gltf(
         vfs: VfsDatabase,
         adf_db: AdfDatabase,
@@ -253,6 +254,8 @@ def node_export_adf_text(
     adf = adf_db.read_node(vfs, vnode)
 
     fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
+
+    vfs.logger.log('Exporting as Text: {}'.format(fn))
 
     if not allow_overwrite and os.path.exists(fn):
         raise EDecaFileExists(fn)

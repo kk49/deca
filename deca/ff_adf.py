@@ -572,9 +572,12 @@ def read_instance(
         else:
             opos = buffer_pos
             buffer_pos = v0[0]
-            v, buffer_pos = read_instance(
-                buffer, n_buffer, buffer_pos, v0[2], map_typedef, map_string_hash, abs_offset,
-                found_strings=found_strings)
+            try:
+                v, buffer_pos = read_instance(
+                    buffer, n_buffer, buffer_pos, v0[2], map_typedef, map_string_hash, abs_offset,
+                    found_strings=found_strings)
+            except AdfTypeMissing as e:
+                v = f"!!!MISSING TYPE:  0x{e.type_id:08x} in 0x{v0[2]:08x}[{v0[1]}]"
             buffer_pos = opos
             v = AdfValue(v, type_id, dpos + abs_offset, v0[0] + abs_offset)
 

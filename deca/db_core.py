@@ -13,11 +13,11 @@ from deca.file import ArchiveFile, SubsetFile
 from deca.ff_types import *
 from deca.ff_aaf import extract_aaf
 from deca.decompress import DecompressorOodleLZ
-from deca.util import make_dir_for_file, to_unicode, DecaSignal
 from deca.game_info import game_info_load
 from deca.hashes import hash32_func, hash48_func, hash64_func, hash_all_func
 from deca.ff_gtoc import GtocArchiveEntry, GtocFileEntry
 from deca.db_types import *
+from deca.db_cross_game import DbCrossGame
 
 dumped_cache_dir = False
 
@@ -36,17 +36,6 @@ language_codes = [
     'spa',  # Spanish
     'swe',  # Swedish
 ]
-
-
-def regexp(expr, item):
-    if item is None or expr is None:
-        return False
-    if isinstance(expr, str):
-        expr = expr.encode('ascii')
-    if isinstance(item, str):
-        item = item.encode('ascii')
-    reg = re.compile(expr)
-    return reg.search(item) is not None
 
 
 def format_hash32(v_hash):
@@ -330,15 +319,18 @@ ref_flag_is_file_name = 1 << 2
 ref_flag_is_field_name = 1 << 3
 
 
-class VfsDatabase:
+class VfsDatabase(DbBase):
     def __init__(
             self, project_file, working_dir, logger,
             init_display=False,
             max_uncompressed_cache_size=(2 * 1024**3)
     ):
+        super().__init__(os.path.join(working_dir, 'db', 'core.db'), logger)
+
+        self.db_cg = DbCrossGame(os.path.abspath(os.path.join(working_dir, "..")), logger)
+
         self.project_file = project_file
         self.working_dir = working_dir
-        self.logger = logger
         self.game_info = game_info_load(project_file)
         self.decompress_oodle_lz = DecompressorOodleLZ(self.game_info.oo_decompress_dll)
         if 4 == self.game_info.file_hash_size:
@@ -366,17 +358,6 @@ class VfsDatabase:
         self._lookup_translation_from_name = None
         self._lookup_note_from_file_path = None
 
-        self.db_changed_signal = DecaSignal()
-
-        # setup data base
-        self.db_filename = os.path.join(self.working_dir, 'db', 'core.db')
-        make_dir_for_file(self.db_filename)
-
-        self.db_conn = sqlite3.connect(self.db_filename)
-        # self.db_conn.text_factory = bytes
-        self.db_conn.create_function("REGEXP", 2, regexp)
-        self.db_cur = self.db_conn.cursor()
-
         self.db_setup()
 
         # setup in memory uncompressed cache
@@ -386,70 +367,6 @@ class VfsDatabase:
 
     def shutdown(self):
         self.decompress_oodle_lz.shutdown()
-
-    def logger_set(self, logger):
-        self.logger = logger
-
-    def handle_exception(self, dbg, exc: sqlite3.OperationalError):
-        if len(exc.args) == 1 and exc.args[0] == 'database is locked':
-            self.logger.log(f'{dbg}: Waiting on database...')
-        else:
-            print(dbg, exc, exc.args)
-            raise
-
-    def db_execute_one(self, stmt, params=None, dbg='db_execute_one'):
-        if params is None:
-            params = []
-
-        while True:
-            try:
-                result = self.db_cur.execute(stmt, params)
-                break
-            except sqlite3.OperationalError as exc:
-                self.handle_exception(dbg, exc)
-
-        return result
-
-    def db_execute_many(self, stmt, params=None, dbg='db_execute_many'):
-        if params is None:
-            params = []
-
-        while True:
-            try:
-                result = self.db_cur.executemany(stmt, params)
-                break
-            except sqlite3.OperationalError as exc:
-                self.handle_exception(dbg, exc)
-
-        return result
-
-    def db_query_one(self, stmt, params=None, dbg='db_query_one'):
-        if params is None:
-            params = []
-
-        while True:
-            try:
-                result = self.db_cur.execute(stmt, params)
-                result = result.fetchone()
-                break
-            except sqlite3.OperationalError as exc:
-                self.handle_exception(dbg, exc)
-
-        return result
-
-    def db_query_all(self, stmt, params=None, dbg='db_query_all'):
-        if params is None:
-            params = []
-
-        while True:
-            try:
-                result = self.db_cur.execute(stmt, params)
-                result = result.fetchall()
-                break
-            except sqlite3.OperationalError as exc:
-                self.handle_exception(dbg, exc)
-
-        return result
 
     def db_reset(self):
         self.db_execute_one('DROP INDEX IF EXISTS index_core_node_blocks_node_id;')

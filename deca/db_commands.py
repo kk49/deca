@@ -13,7 +13,7 @@ from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
 from .db_types import *
 from .ff_types import *
 from .ff_txt import load_json
-from .ff_adf import AdfTypeMissing, GdcArchiveEntry
+from .ff_adf import AdfTypeMissing, GdcArchiveEntry, TypeDef, MemberDef
 from .ff_rtpc import RtpcVisitorGatherStrings, k_type_event, k_type_objid, k_type_str, parse_prop_data
 from .ff_arc_tab import tab_file_load, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
@@ -583,8 +583,20 @@ class Processor:
                 if rp is not None:
                     db.propose_string(rp, node)
 
+            fields_string_set = set()
+            adf_type: TypeDef
+            for adf_type in adf.table_typedef:
+                if adf_type.metatype == 1:  # Structure
+                    member: MemberDef
+                    for member in adf_type.members:
+                        fields_string_set.add(member.name_utf8)
+
+            for fs in fields_string_set:
+                db.propose_string(fs, node, is_field_name=True)
+
+            # field names and enums
             for sh in adf.table_name:
-                db.propose_string(sh[1], node, is_field_name=True)
+                db.propose_string(sh[1], node)
 
             # self naming
             if len(adf.table_instance_values) > 0 and \

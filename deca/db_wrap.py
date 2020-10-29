@@ -1,5 +1,6 @@
 import os
 from .db_core import VfsDatabase, VfsNode, GtocArchiveEntry
+from .db_cross_game import DbCrossGame
 from .ff_adf import AdfDatabase
 from .ff_types import *
 from .db_types import *
@@ -147,6 +148,11 @@ class DbWrap:
                 self.log('DATABASE: Inserting {} hash strings'.format(len(hash_strings_to_add)))
                 self._db.hash_string_add_many(hash_strings_to_add)
 
+            hash_field_strings_to_add = [hs for hs in hash_strings_to_add if hs[-3]]
+            if len(hash_field_strings_to_add) > 0:
+                self.log('DATABASE: Inserting {} hash field strings'.format(len(hash_field_strings_to_add)))
+                self._db.db_cg.hash_string_add_many(hash_field_strings_to_add)
+
             if len(self._gtoc_archive_defs) > 0:
                 self.log('DATABASE: Inserting {} gt0c archive definitions'.format(len(self._gtoc_archive_defs)))
                 self._db.gtoc_archive_add_many(self._gtoc_archive_defs)
@@ -223,7 +229,7 @@ class DbWrap:
                 substrings_new += substring.split(sep)
             substrings = substrings_new
 
-        is_field_name = True  # for substrings to be possible field names
+        is_field_name = False  # for substrings to be possible field names
         for substring in substrings:
             if substring != string:
                 self.propose_string(substring.strip(), parent_node, is_field_name, possible_file_types, used_at_runtime, fix_paths)

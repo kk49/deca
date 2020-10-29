@@ -1,4 +1,5 @@
 #### v0.2.13 ...
+* Added cross game field strings, and a second cross game database in work/
 * Added messages to indicate which file is being exported and in what format (at least for raw and text)
 * Made parsing more forgiving of missing 0xDEFE88ED types, 0xDEFE88ED may contain length in second field? But length does not matter anyway for skiping data
 * Improved error when reporting which type in an ADF object is missing, this gives details for 0xDEFE88ED types

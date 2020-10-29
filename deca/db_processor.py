@@ -4,8 +4,8 @@ import csv
 import time
 
 from .file import ArchiveFile
-from .db_core import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
 from .db_types import *
+from .db_core import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
 from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
 from .db_commands import MultiProcessControl
 from .game_info import determine_game

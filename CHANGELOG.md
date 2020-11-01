@@ -1,4 +1,5 @@
 #### v0.2.13 ...
+* Added option to "Save Changed Files As Symlinks" at mod build time, this will mark changed files as symlink instead of copying the changed file in SARC files
 * Added cross game field strings, and a second cross game database in work/
 * Added messages to indicate which file is being exported and in what format (at least for raw and text)
 * Made parsing more forgiving of missing 0xDEFE88ED types, 0xDEFE88ED may contain length in second field? But length does not matter anyway for skiping data

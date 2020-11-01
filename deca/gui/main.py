@@ -364,7 +364,12 @@ class MainWindow(QMainWindow):
                 subset = self.vfs_view_current().nodes_selected_uids_get()
 
             self.builder.build_dir(
-                self.vfs, self.vfs.working_dir + 'mod/', self.vfs.working_dir + 'build/', subset=subset)
+                self.vfs,
+                self.vfs.working_dir + 'mod/',
+                self.vfs.working_dir + 'build/',
+                subset=subset,
+                symlink_changed_file=self.ui.chkbx_mod_symlink_new_files.isChecked(),
+            )
             self.dialog_good('BUILD SUCCESS')
         except EDecaFileExists as ex:
             self.error_dialog('Build Failed: File Exists: {}'.format(ex.args))

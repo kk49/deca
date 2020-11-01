@@ -16,7 +16,14 @@ class Builder:
         pass
 
     def build_node_sarc(
-            self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
+            self,
+            dst_path: str,
+            src_path: Union[None, str],
+            vnode: VfsNode,
+            vfs: VfsDatabase,
+            vpath_complete_map,
+            symlink_changed_file,
+    ):
         assert(vnode.file_type == FTYPE_SARC)
 
         v_path = vnode.v_path
@@ -83,6 +90,9 @@ class Builder:
                 src_file = vpath_complete_map[entry.v_path]
                 src_files[i] = src_file
                 entry.length = os.stat(src_file).st_size
+                if symlink_changed_file:
+                    entry.offset = 0
+                    entry.is_symlink = True
 
         # extract existing file
         fn_dst = os.path.join(dst_path, vnode.v_path.decode('utf-8'))
@@ -115,7 +125,14 @@ class Builder:
         vpath_complete_map[v_path] = fn_dst
 
     def build_node(
-            self, dst_path: str, src_path: Union[None, str], vnode: VfsNode, vfs: VfsDatabase, vpath_complete_map):
+            self,
+            dst_path: str,
+            src_path: Union[None, str],
+            vnode: VfsNode,
+            vfs: VfsDatabase,
+            vpath_complete_map,
+            symlink_changed_file,
+    ):
         print(f'build_node: {dst_path} | {src_path} | {vnode.file_type} | {vnode.v_path}')
 
         v_path = vnode.v_path
@@ -126,7 +143,7 @@ class Builder:
             _, src_file = os.path.split(src_path)
 
         if vnode.file_type == FTYPE_SARC:
-            self.build_node_sarc(dst_path, src_path, vnode, vfs, vpath_complete_map)
+            self.build_node_sarc(dst_path, src_path, vnode, vfs, vpath_complete_map, symlink_changed_file)
         elif src_path is None:
             pass  # no source path,
         elif src_file.find('DECA') >= 0:
@@ -153,7 +170,14 @@ class Builder:
             shutil.copy2(src_path, dst)
             vpath_complete_map[v_path] = dst
 
-    def build_dir(self, vfs: VfsDatabase, src_path: str, dst_path: str, subset=None):
+    def build_dir(
+            self,
+            vfs: VfsDatabase,
+            src_path: str,
+            dst_path: str,
+            subset=None,
+            symlink_changed_file=False,
+    ):
         print(f'build_node: {dst_path} | {src_path}')
 
         # find all changed src files
@@ -283,7 +307,9 @@ class Builder:
                             src_path=fpath,
                             vnode=vnodes[0],
                             vfs=vfs,
-                            vpath_complete_map=vpaths_completed)
+                            vpath_complete_map=vpaths_completed,
+                            symlink_changed_file=symlink_changed_file,
+                        )
 
             if not any_change and len(depends) > 0:
                 print('BUILD FAILED: Infinite loop:')

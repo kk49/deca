@@ -60,9 +60,10 @@ class Builder:
                         # Check to make sure entry does not exist
                         for entry in sarc_file.entries:
                             if entry.v_path == v_path:
-                                raise EDecaBuildError(
-                                    'BUILD ERROR: {}: Tried to re-add v_path: {}'.format(
-                                        src_context, v_path.decode('UTF-8')))
+                                # raise EDecaBuildError(
+                                #     'BUILD ERROR: {}: Tried to re-add v_path: {}'.format(
+                                #         src_context, v_path.decode('UTF-8')))
+                                print('BUILD WARNING: Do not do this unless you are Ciprianno: {}: Tried to re-add v_path: {}'.format(src_context, v_path.decode('UTF-8')))
 
                         # Add to end
                         entry = EntrySarc(v_path=v_path)

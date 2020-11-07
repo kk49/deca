@@ -6,6 +6,7 @@ from .file import ArchiveFile
 from .db_core import VfsDatabase, VfsNode
 from .ff_adf import AdfDatabase
 from .export_import_adf import adf_export_xlsx_0x0b73315d
+from .util import make_dir_for_file
 
 
 def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode):
@@ -24,10 +25,11 @@ def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode
             name = tf.read_strz().decode('utf-8')
             tr[name] = text
 
-    if os.path.exists(os.path.join('scratch', 'gz')):
-        with open(os.path.join('scratch', 'gz', 'text_debug.txt'), 'w') as dt:
-            for k, v in tr.items():
-                dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>')))
+    debug_file = os.path.join(vfs.working_dir, 'text_debug.txt')
+    make_dir_for_file(debug_file)
+    with open(debug_file, 'w') as dt:
+        for k, v in tr.items():
+            dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>').replace('"', '&quot;')))
 
     return tr
 

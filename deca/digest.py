@@ -1,4 +1,5 @@
 import os
+import sys
 import io
 import openpyxl
 
@@ -25,13 +26,13 @@ def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode
             name = tf.read_strz().decode('utf-8')
             tr[name] = text
 
-    debug_file = os.path.join(vfs.working_dir, 'text_debug.txt')
-    make_dir_for_file(debug_file)
-    with open(debug_file, 'wb') as dt:
-        for k, v in tr.items():
-            buf = '{}\t{}\n'.format(k, v.replace('\n', '<br>').replace('"', '&quot;'))
-            dt.write(buf.encode('ascii'))
-            # dt.write(buf)
+    if sys.platform == 'linux':
+        debug_file = os.path.join(vfs.working_dir, 'text_debug.txt')
+        make_dir_for_file(debug_file)
+        with open(debug_file, 'w') as dt:
+            for k, v in tr.items():
+                buf = '{}\t{}\n'.format(k, v.replace('\n', '<br>').replace('"', '&quot;'))
+                dt.write(buf)
 
     return tr
 

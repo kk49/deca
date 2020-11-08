@@ -211,12 +211,25 @@ def nodes_export_processed(
     node_map = vfs_view.nodes_selected_get()
     for k, (nodes_real, nodes_sym) in node_map.items():
         if nodes_real and nodes_real[0] is not None:
-            uid = nodes_real[0]
-            node = vfs_view.node_where_uid(uid)
+            nodes = [vfs_view.node_where_uid(uid) for uid in nodes_real]
+            node = nodes[0]
             if node.is_valid() and node.offset is not None:
                 try:
-                    if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE}:
-                        vs_adf.append(node)
+                    if node.file_type in {FTYPE_ADF, FTYPE_ADF0, FTYPE_ADF_BARE}:
+                        # handle the case for GenZero where ADF files can be in the
+                        nodes_adf = []
+                        nodes_adfb = []
+
+                        for vnode in nodes:
+                            if vnode.file_type == FTYPE_ADF_BARE:
+                                nodes_adfb.append(vnode)
+                            else:
+                                nodes_adf.append(vnode)
+
+                        if len(nodes_adf) > 0:
+                            vs_adf.append(nodes_adf[0])
+                        if len(nodes_adfb) > 0:
+                            vs_adf.append(nodes_adfb[0])
                     elif node.file_type in {FTYPE_RTPC}:
                         vs_rtpc.append(node)
                     elif node.file_type in {FTYPE_BMP, FTYPE_DDS, FTYPE_AVTX, FTYPE_ATX, FTYPE_HMDDSC}:

@@ -5,12 +5,16 @@ from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 from .db_core import VfsDatabase, VfsNode
 
 
-def generate_export_file_path(vfs: VfsDatabase, export_path, vnode: VfsNode):
+def generate_export_file_path(vfs: VfsDatabase, export_path, vnode: VfsNode, note):
     if vnode.v_path is None:
         ofile = os.path.join(export_path, '{:08X}.dat'.format(vnode.v_hash))
     else:
         ofile = os.path.join(export_path, '{}'.format(vnode.v_path.decode('utf-8')))
-    vfs.logger.log('Exporting {}'.format(ofile))
+
+    if vnode.file_type == FTYPE_ADF_BARE:
+        ofile = ofile + '.gdcc'
+
+    vfs.logger.log('Exporting{}: {}'.format(note, ofile))
     ofiledir = os.path.dirname(ofile)
     os.makedirs(ofiledir, exist_ok=True)
 
@@ -24,10 +28,8 @@ def adf_export_xlsx_0x0b73315d(
         export_path,
         allow_overwrite
 ):
-    ofile = generate_export_file_path(vfs, export_path, vnode)
+    ofile = generate_export_file_path(vfs, export_path, vnode, ' as XLSX')
     fn = ofile + '.xlsx'
-
-    vfs.logger.log('Exporting as XLSX: {}'.format(fn))
 
     adf = adf_db.read_node(vfs, vnode)
 
@@ -253,9 +255,7 @@ def node_export_adf_text(
 ):
     adf = adf_db.read_node(vfs, vnode)
 
-    fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
-
-    vfs.logger.log('Exporting as Text: {}'.format(fn))
+    fn = generate_export_file_path(vfs, export_path, vnode, ' as Text') + '.txt'
 
     if not allow_overwrite and os.path.exists(fn):
         raise EDecaFileExists(fn)

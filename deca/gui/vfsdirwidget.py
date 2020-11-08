@@ -274,6 +274,4 @@ class VfsDirWidget(QWidget):
         if index.isValid():
             tnode = index.internalPointer()
             if isinstance(tnode, VfsDirLeaf) and self.vnode_2click_selected is not None:
-                uid = tnode.uids[0]
-                item = self.source_model.vfs_view.node_where_uid(uid)
-                self.vnode_2click_selected(item)
+                self.vnode_2click_selected(tnode.uids_hard)

@@ -1,7 +1,7 @@
 import re
 import sys
 import os
-from typing import Optional
+from typing import Optional, List
 from deca.errors import *
 from deca.db_processor import VfsProcessor, vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
 from deca.db_view import VfsView
@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         self.logger = Logger('./')
 
         self.builder = Builder()
-        self.current_vnode = None
+        self.current_uids = None
         self.vfs_view_root: Optional[VfsView] = None
 
         self.tab_nodes_deletable = set()
@@ -251,9 +251,9 @@ class MainWindow(QMainWindow):
             else:
                 self.ui.bt_mod_build.setText('Build Mod All')
 
-    def vnode_2click_selected(self, vnode: VfsNode):
-        self.current_vnode = vnode
-        self.ui.data_view.vnode_2click_selected(vnode)
+    def vnode_2click_selected(self, uids: List[int]):
+        self.current_uids = uids
+        self.ui.data_view.vnode_2click_selected(uids)
 
     def extract(
             self, eid, extract_dir, export_raw, export_contents, save_to_processed, save_to_text,

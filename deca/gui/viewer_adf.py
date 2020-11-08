@@ -27,7 +27,7 @@ class DataViewerAdf(DataViewer):
             obj = adf_db.read_node(vfs, vnode)
             sbuf = obj.dump_to_string(vfs)
         except AdfTypeMissing as e:
-            sbuf = 'ADF_BARE: Missing ADF_TYPE {:08x} in parsing of type {:08x}'.format(e.type_id, vnode.file_sub_type)
+            sbuf = 'Missing ADF_TYPE {:08x} in parsing of type {:08x}'.format(e.type_id, vnode.file_sub_type)
 
         self.text_box.setText(sbuf)
 

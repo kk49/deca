@@ -1,4 +1,5 @@
 #### v0.2.13 ...
+* For ADF files that exist inside the GDC/GDCC file (currently only GenZero) allow the display of the version inside the GDC and one example of the one outside of the GDC
 * LINUX ONLY: Added dumping of translation file during startup to `<working dir>/text_debug.txt`
 * TEST HACK: allow same file to be added twice to SARC file
 * Added option to "Save Changed Files As Symlinks" at mod build time, this will mark changed files as symlink instead of copying the changed file in SARC files

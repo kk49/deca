@@ -591,14 +591,14 @@ class VfsDatabase(DbBase):
         r1 = db_to_vfs_node(r1)
         return r1
 
-    def nodes_where_uid(self, uids):
-        nodes = self.db_query_one(
-            "select * from core_nodes where node_id in (?)",
-            [uids],
-            dbg='nodes_where_uid')
-
-        nodes = [db_to_vfs_node(node) for node in nodes]
-        return nodes
+    # def nodes_where_uid(self, uids):
+    #     nodes = self.db_query_one(
+    #         "select * from core_nodes where node_id in (?)",
+    #         [uids],
+    #         dbg='nodes_where_uid')
+    #
+    #     nodes = [db_to_vfs_node(node) for node in nodes]
+    #     return nodes
 
     def nodes_where_match(
             self,

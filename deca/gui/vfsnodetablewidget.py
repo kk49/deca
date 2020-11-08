@@ -228,6 +228,5 @@ class VfsNodeTableWidget(QWidget):
     def double_clicked(self, index):
         if index.isValid():
             if self.vnode_2click_selected is not None:
-                item = self.model.uid_table[index.row()]
-                item = self.model.vfs_view.node_where_uid(item)
-                self.vnode_2click_selected(item)
+                uids = [self.model.uid_table[index.row()]]
+                self.vnode_2click_selected(uids)

@@ -27,9 +27,11 @@ def process_translation_adf(vfs: VfsDatabase, adf_db: AdfDatabase, node: VfsNode
 
     debug_file = os.path.join(vfs.working_dir, 'text_debug.txt')
     make_dir_for_file(debug_file)
-    with open(debug_file, 'w') as dt:
+    with open(debug_file, 'wb') as dt:
         for k, v in tr.items():
-            dt.write('{}\t{}\n'.format(k, v.replace('\n', '<br>').replace('"', '&quot;')))
+            buf = '{}\t{}\n'.format(k, v.replace('\n', '<br>').replace('"', '&quot;'))
+            dt.write(buf.encode('ascii'))
+            # dt.write(buf)
 
     return tr
 

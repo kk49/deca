@@ -4,6 +4,7 @@ import queue
 import time
 import sys
 import traceback
+import hashlib
 import numpy as np
 from typing import List, Optional, Callable
 
@@ -275,6 +276,7 @@ class Processor:
         self._comm = comm
 
         self.commands = {
+            'process_hash_file_contents': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_hash_file_contents),
             'process_file_type_find_no_name': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find_no_name),
             'process_file_type_find_with_name': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find_with_name),
             'process_symlink': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_symlink),
@@ -349,6 +351,25 @@ class Processor:
             self._comm.status(n_indexes, n_indexes)
 
         return results
+
+    def process_hash_file_contents(self, node: VfsNode, db: DbWrap):
+        if node.offset is not None and (node.size_u is not None or node.size_c is not None):
+            h = hashlib.sha1()
+            with db.db().file_obj_from(node) as f:
+                while True:
+                    buf = f.read(1024*10124)
+                    if buf is None or len(buf) == 0:
+                        break
+
+                    h.update(buf)
+            v = h.hexdigest()
+
+            node.content_hash = v
+            db.node_update(node)
+
+            return True
+        else:
+            return False
 
     def process_file_type_find_no_name(self, node: VfsNode, db: DbWrap):
         # self._comm.trace(f'process_file_type_find_no_name: {node.uid} {node.v_hash_to_str()} {node.v_path}')

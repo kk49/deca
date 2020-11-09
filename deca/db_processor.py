@@ -18,6 +18,13 @@ from .digest import process_translation_adf
 STATUS_UPDATE_TIME_S = 5.0
 
 
+def none_to_str(v):
+    if v is None:
+        return ''
+    else:
+        return v
+
+
 def vfs_structure_new(filename):
     exe_path = filename[0]
     game_dir, exe_name = os.path.split(exe_path)
@@ -238,6 +245,7 @@ class VfsProcessor(VfsDatabase):
         inner_loop = []
 
         inner_loop += [
+            [self.process_no_content_hash, (None, 'process_hash_file_contents')],
             [self.process_no_ftype, (None, 'process_file_type_find_no_name')],
             [self.process_no_ftype_with_name, (None, 'process_file_type_find_with_name')],
 
@@ -337,14 +345,15 @@ class VfsProcessor(VfsDatabase):
 
     def dump_vpaths(self):
         vpath_file = os.path.join(self.working_dir, 'vpaths.txt')
-        vpaths = self.nodes_select_distinct_vpath()
-        vpaths = list(set([to_str(v) for v in vpaths if v is not None]))
-        vpaths.sort()
+        vpaths = self.nodes_select_distinct_vpath_content_hash()
+        vpaths = [(none_to_str(v[0]), none_to_str(v[1])) for v in vpaths]
+        vpaths = list(set(vpaths))
+        vpaths = sorted(vpaths)
         if not os.path.isfile(vpath_file):
             self.logger.log('CREATING: vpaths.txt')
             with open(vpath_file, 'w') as f:
-                for v_path in vpaths:
-                    f.write('{}\n'.format(v_path))
+                for v_path, content_hash in vpaths:
+                    f.write('{}\t{}\n'.format(v_path, content_hash))
 
     def dump_status(self):
         # possible different vpaths with same hash, uncommon
@@ -455,6 +464,34 @@ class VfsProcessor(VfsDatabase):
                 indexes.append(uid)
 
         return indexes, done_set
+
+    def process_no_content_hash(self, f_type, cmd):
+        self.logger.log('PROCESS: Determine content hash: Begin'.format())
+
+        indexes = self.nodes_where_match(
+            content_hash_empty=True,
+            uid_only=True
+        )
+        done_set = set()
+
+        indexes_processed = []
+        indexes_success = []
+        indexes_failed = []
+        if indexes:
+            commander = MultiProcessControl(self.project_file, self.working_dir, self.logger)
+            results = commander.do_map(cmd, indexes, step_id='Determine content hash', idle_call=self.idle_call)
+
+            indexes_processed = [k for k, v in results]
+            indexes_success = [k for k, v in results if v]
+            indexes_failed = [k for k, v in results if not v]
+
+        self.logger.log(
+            'PROCESS: Determine content hash: End: Already Processed: {}, Additional: {}, Success: {}, Failed: {}'.format(
+                len(done_set), len(indexes_processed), len(indexes_success), len(indexes_failed)
+            )
+        )
+
+        return indexes_processed, indexes_success, indexes_failed
 
     def process_no_ftype(self, f_type, cmd):
         self.logger.log('PROCESS: Determine file type: Begin'.format())

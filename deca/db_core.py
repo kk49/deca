@@ -65,6 +65,7 @@ class VfsNode:
         'file_type',
         'file_sub_type',
         'ext_hash',
+        'content_hash',
         'magic',
         'pid',
         'index',
@@ -81,7 +82,9 @@ class VfsNode:
             v_hash=None, p_path=None, v_path=None,
             pid=None, index=None,
             offset=None, size_c=None, size_u=None,
-            file_sub_type=None, ext_hash=None, magic=None,
+            file_sub_type=None, ext_hash=None,
+            content_hash=None,
+            magic=None,
             is_processed_file_raw_no_name=False,
             is_processed_file_raw_with_name=False,
             is_processed_file_type=False,
@@ -101,6 +104,7 @@ class VfsNode:
         self.file_type = file_type
         self.file_sub_type = file_sub_type
         self.ext_hash = ext_hash
+        self.content_hash = content_hash
         self.magic = magic
 
         self.pid = pid
@@ -234,6 +238,7 @@ core_nodes_definition = \
         "v_hash" INTEGER,
         "v_path" TEXT,
         "p_path" TEXT,
+        "content_hash" TEXT,
         "magic" INTEGER,
         "file_type" TEXT,
         "ext_hash" INTEGER,
@@ -255,6 +260,7 @@ core_nodes_update_all_where_node_id = \
     v_hash=(?),
     v_path=(?),
     p_path=(?),
+    content_hash=(?),
     magic=(?),
     file_type=(?),
     ext_hash=(?),
@@ -265,7 +271,7 @@ core_nodes_update_all_where_node_id = \
     WHERE node_id=(?)
     """
 
-core_nodes_field_count = 15
+core_nodes_field_count = 16
 
 core_nodes_all_fields = '(' + ','.join(['?'] * core_nodes_field_count) + ')'
 
@@ -280,13 +286,14 @@ def db_to_vfs_node(v):
         v_hash=v[5],
         v_path=to_bytes(v[6]),
         p_path=to_str(v[7]),
-        magic=v[8],
-        file_type=to_str(v[9]),
-        ext_hash=v[10],
-        size_c=v[11],
-        size_u=v[12],
-        file_sub_type=v[13],
-        used_at_runtime_depth=v[14],
+        content_hash=to_str(v[8]),
+        magic=v[9],
+        file_type=to_str(v[10]),
+        ext_hash=v[11],
+        size_c=v[12],
+        size_u=v[13],
+        file_sub_type=v[14],
+        used_at_runtime_depth=v[15],
     )
     return node
 
@@ -301,6 +308,7 @@ def db_from_vfs_node(node: VfsNode):
         node.v_hash,
         to_str(node.v_path),
         to_str(node.p_path),
+        to_str(node.content_hash),
         node.magic,
         to_str(node.file_type),
         node.ext_hash,
@@ -415,6 +423,11 @@ class VfsDatabase(DbBase):
         self.db_execute_one(
             '''
             CREATE INDEX IF NOT EXISTS "index_core_nodes_v_hash_to_vnode" ON "core_nodes" ("v_hash"	ASC);
+            '''
+        )
+        self.db_execute_one(
+            '''
+            CREATE INDEX IF NOT EXISTS "index_core_nodes_content_hash_to_vnode" ON "core_nodes" ("content_hash" ASC);
             '''
         )
 
@@ -607,6 +620,7 @@ class VfsDatabase(DbBase):
             v_path_like=None,
             v_path_regexp=None,
             file_type=None,
+            content_hash_empty=None,
             pid_in=None,
             uid_only=False,
             output=None):
@@ -641,6 +655,12 @@ class VfsDatabase(DbBase):
             params.append(file_type)
             wheres.append('(file_type == (?))')
 
+        if content_hash_empty is not None:
+            if content_hash_empty:
+                wheres.append('(content_hash IS NULL)')
+            else:
+                wheres.append('(content_hash IS NOT NULL)')
+
         if pid_in is not None:
             params.append(pid_in)
             wheres.append('(parent_id == (?))')
@@ -659,7 +679,7 @@ class VfsDatabase(DbBase):
         else:
             result_str = '*'
 
-        if params:
+        if len(where_str) > 0:
             nodes = self.db_query_all(
                 "SELECT " + result_str + " FROM core_nodes " + where_str, params, dbg='nodes_where_match')
         else:
@@ -774,6 +794,12 @@ class VfsDatabase(DbBase):
         result = self.db_query_all(
             "SELECT DISTINCT v_path FROM core_nodes", dbg='nodes_select_distinct_vpath')
         result = [to_bytes(r[0]) for r in result if r[0] is not None]
+        return result
+
+    def nodes_select_distinct_vpath_content_hash(self):
+        result = self.db_query_all(
+            "SELECT DISTINCT v_path, content_hash FROM core_nodes", dbg='nodes_select_distinct_vpath_content_hash')
+        result = [(to_str(r[0]), to_str(r[1])) for r in result if r[0] is not None]
         return result
 
     def nodes_select_distinct_vpath_where_vhash(self, v_hash):

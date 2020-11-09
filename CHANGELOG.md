@@ -1,4 +1,5 @@
 #### v0.2.13 ...
+* REBUILD DB: added sha1sum hash for every node, this is written to vpaths to let people see what files changed between releases
 * For ADF files that exist inside GDC/GDCC files (currently only GenZero) extract a gdcc.txt version to seperate it from the normal ADF files
 * For ADF files that exist inside GDC/GDCC files (currently only GenZero) allow the display of the version inside the GDC and one example of the one outside of the GDC
 * LINUX ONLY: Added dumping of translation file during startup to `<working dir>/text_debug.txt`

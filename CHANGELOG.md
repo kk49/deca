@@ -1,10 +1,11 @@
 #### v0.2.13 ...
 * REBUILD DB: added sha1sum hash for every node, this is written to vpaths to let people see what files changed between releases
+* Added option to not build archives when building mods
+* (REMOVED) Added option to "Save Changed Files As Symlinks" at mod build time, this will mark changed files as symlink instead of copying the changed file in SARC files
 * For ADF files that exist inside GDC/GDCC files (currently only GenZero) extract a gdcc.txt version to seperate it from the normal ADF files
 * For ADF files that exist inside GDC/GDCC files (currently only GenZero) allow the display of the version inside the GDC and one example of the one outside of the GDC
 * LINUX ONLY: Added dumping of translation file during startup to `<working dir>/text_debug.txt`
 * TEST HACK: allow same file to be added twice to SARC file
-* Added option to "Save Changed Files As Symlinks" at mod build time, this will mark changed files as symlink instead of copying the changed file in SARC files
 * Added cross game field strings, and a second cross game database in work/
 * Added messages to indicate which file is being exported and in what format (at least for raw and text)
 * Made parsing more forgiving of missing 0xDEFE88ED types, 0xDEFE88ED may contain length in second field? But length does not matter anyway for skiping data

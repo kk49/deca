@@ -3,7 +3,7 @@
 # Form implementation generated from reading ui file 'main_window.ui',
 # licensing of 'main_window.ui' applies.
 #
-# Created: Sat Oct 31 22:28:41 2020
+# Created: Sun Nov 15 11:38:18 2020
 #      by: pyside2-uic  running on PySide2 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
@@ -123,9 +123,9 @@ class Ui_MainWindow(object):
         self.gridLayout_3.addWidget(self.chkbx_mod_build_subset, 3, 0, 1, 1)
         spacerItem3 = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.gridLayout_3.addItem(spacerItem3, 5, 0, 1, 1)
-        self.chkbx_mod_symlink_new_files = QtWidgets.QCheckBox(self.tab_modding)
-        self.chkbx_mod_symlink_new_files.setObjectName("chkbx_mod_symlink_new_files")
-        self.gridLayout_3.addWidget(self.chkbx_mod_symlink_new_files, 4, 0, 1, 3)
+        self.chkbx_mod_do_not_build_archives = QtWidgets.QCheckBox(self.tab_modding)
+        self.chkbx_mod_do_not_build_archives.setObjectName("chkbx_mod_do_not_build_archives")
+        self.gridLayout_3.addWidget(self.chkbx_mod_do_not_build_archives, 4, 0, 1, 3)
         self.tabs_control.addTab(self.tab_modding, "")
         self.tab_3d_gltf2 = QtWidgets.QWidget()
         self.tab_3d_gltf2.setObjectName("tab_3d_gltf2")
@@ -251,7 +251,7 @@ class Ui_MainWindow(object):
         self.chkbx_export_raw_mods.setText(QtWidgets.QApplication.translate("MainWindow", "Export Raw Files", None, -1))
         self.chkbx_export_processed_mods.setText(QtWidgets.QApplication.translate("MainWindow", "Export As Processed", None, -1))
         self.chkbx_mod_build_subset.setText(QtWidgets.QApplication.translate("MainWindow", "Build Subset", None, -1))
-        self.chkbx_mod_symlink_new_files.setText(QtWidgets.QApplication.translate("MainWindow", "Save Changed Files As Symlinks", None, -1))
+        self.chkbx_mod_do_not_build_archives.setText(QtWidgets.QApplication.translate("MainWindow", "Do Not Build Archives", None, -1))
         self.tabs_control.setTabText(self.tabs_control.indexOf(self.tab_modding), QtWidgets.QApplication.translate("MainWindow", "Modding", None, -1))
         self.bt_extract_gltf_3d.setText(QtWidgets.QApplication.translate("MainWindow", "EXPORT 3D/GLTF2", None, -1))
         self.chkbx_export_3d_include_skeleton.setText(QtWidgets.QApplication.translate("MainWindow", "Include Skeleton", None, -1))

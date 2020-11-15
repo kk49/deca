@@ -276,9 +276,9 @@
              </spacer>
             </item>
             <item row="4" column="0" colspan="3">
-             <widget class="QCheckBox" name="chkbx_mod_symlink_new_files">
+             <widget class="QCheckBox" name="chkbx_mod_do_not_build_archives">
               <property name="text">
-               <string>Save Changed Files As Symlinks</string>
+               <string>Do Not Build Archives</string>
               </property>
              </widget>
             </item>

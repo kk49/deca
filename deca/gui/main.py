@@ -368,7 +368,8 @@ class MainWindow(QMainWindow):
                 self.vfs.working_dir + 'mod/',
                 self.vfs.working_dir + 'build/',
                 subset=subset,
-                symlink_changed_file=self.ui.chkbx_mod_symlink_new_files.isChecked(),
+                symlink_changed_file=False,
+                do_not_build_archive=self.ui.chkbx_mod_do_not_build_archives.isChecked()
             )
             self.dialog_good('BUILD SUCCESS')
         except EDecaFileExists as ex:

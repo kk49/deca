@@ -1,5 +1,6 @@
 #### v0.2.13 ...
 * REBUILD DB: added sha1sum hash for every node, this is written to vpaths to let people see what files changed between releases
+* Added support for reserve10 in COTW
 * Added option to not build archives when building mods
 * (REMOVED) Added option to "Save Changed Files As Symlinks" at mod build time, this will mark changed files as symlink instead of copying the changed file in SARC files
 * For ADF files that exist inside GDC/GDCC files (currently only GenZero) extract a gdcc.txt version to seperate it from the normal ADF files

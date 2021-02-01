@@ -485,9 +485,10 @@ class Deca3dModelc:
                         if tid is not None:
                             mat_mr.baseColorTexture = pyg.MaterialTexture(index=tid)
 
-                        tid = textures[2]
-                        if tid is not None:
-                            mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
+                        if len(textures) >= 3:
+                            tid = textures[2]
+                            if tid is not None:
+                                mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
 
                         mat_mr.roughnessFactor = 1.0
                         mat_mr.metallicFactor = 1.0

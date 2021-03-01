@@ -7,6 +7,7 @@ import ctypes
 import sys
 from .fast_file import *
 from .dxgi_97 import process_image_97
+from .dxgi_94_95_96 import process_image_94_95_96
 from .dxgi_types import *
 from numba import njit
 
@@ -488,6 +489,7 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         79: process_image_79,  # DXGI_FORMAT_BC4_TYPELESS
         82: process_image_82,  # DXGI_FORMAT_BC5_TYPELESS
         87: process_image_87,  # DXGI_FORMAT_B8G8R8A8_UNORM
+        94: process_image_94_95_96,  # DXGI_FORMAT_BC6H_TYPELESS
         97: process_image_97,  # DXGI_FORMAT_BC7_TYPELESS
     }
 
@@ -499,7 +501,7 @@ def process_image_python(image, raw, nx, ny, pixel_format):
 
 def process_image_c(image, raw, nx, ny, pixel_format):
 
-    if pixel_format in {2, 10, 26, 41}:  # do floating point loads in python
+    if pixel_format in {2, 10, 26, 41, 94, 95, 96}:  # do floating point loads in python
         process_image_python(image, raw, nx, ny, pixel_format)
     else:
         global c_process_image_func

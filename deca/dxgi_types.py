@@ -504,6 +504,7 @@ dxgi_format_db = {
     76: [False, 16],    # DXGI_FORMAT_BC3_TYPELESS
     79: [False, 8],     # DXGI_FORMAT_BC4_TYPELESS
     82: [False, 16],    # DXGI_FORMAT_BC5_TYPELESS
+    94: [False, 16],    # DXGI_FORMAT_BC6H_TYPELESS
     97: [False, 16],    # DXGI_FORMAT_BC7_TYPELESS
 }
 
@@ -527,6 +528,8 @@ dxgi_base_format_db = {
     79: 79, 80: 79, 81: 79,
     # DXGI_FORMAT_BC5_*
     82: 82, 83: 82, 84: 82,
+    # DXGI_FORMAT_BC6H_
+    94: 94, 95: 94, 96: 94,
     # DXGI_FORMAT_BC7_*
     97: 97, 98: 97, 99: 97,
 }

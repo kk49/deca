@@ -1,5 +1,6 @@
 #### v0.2.13 ...
 * REBUILD DB: added sha1sum hash for every node, this is written to vpaths to let people see what files changed between releases
+* Added placeholder to BC6H DXGI loader, for now it fills in a 0,0,0,0 color for all pixels
 * Fixed Eye model extraction for COTW  
 * Added support for reserve10 in COTW
 * Added option to not build archives when building mods

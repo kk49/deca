@@ -17,9 +17,10 @@
     "hp_trophyworld_2_",
     "hp_iberia_",
     "hp_rockies_",
-    "hp_nz_"
+    "hp_nz_",
+    "hp_mexico_"
   ],
-  "world_indexes": [0,1,2,3],
+  "world_indexes": [0,1,2,3,4],
   "world_patches": [
     "worlds/base/terrain/hp/patches/",
     "worlds/world${WORLD_INDEX}/terrain/world${WORLD_INDEX}/patches/"
@@ -54,7 +55,8 @@
     "textures/ui/map_reserve_7/",
     "textures/ui/map_reserve_8/",
     "textures/ui/map_reserve_9/",
-    "textures/ui/map_reserve_10/"
+    "textures/ui/map_reserve_10/",
+    "textures/ui/map_reserve_11/"
   ],
   "unarchived_files": [],
   "archive_paths": [

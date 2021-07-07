@@ -319,6 +319,9 @@ class Deca3dMeshc:
                         elif stream_attr.format[1] == b'AmfFormat_R8G8B8A8_UINT':
                             accessor.type = "VEC4"
                             accessor.componentType = pyg.UNSIGNED_BYTE
+                        elif stream_attr.format[1] == b'AmfFormat_R16G16B16A16_SINT':
+                            accessor.type = "VEC4"
+                            accessor.componentType = pyg.SHORT
                         elif stream_attr.format[1] == b'AmfFormat_R32_UNIT_VEC_AS_FLOAT':
                             accessor.type = "SCALAR"
                             accessor.componentType = pyg.FLOAT
@@ -438,7 +441,7 @@ class Deca3dModelc:
             material_map = {}
             material: AmfMaterial
             for material in model.materials:
-                if material.renderBlockId in {b'GeneralR2', b'Character'}:
+                if material.renderBlockId in {b'GeneralR2', b'Character', b'CarPaint'}:
                     # add textures
                     textures = []
                     for texture_vpath in material.textures:

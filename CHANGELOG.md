@@ -1,8 +1,9 @@
-#### v0.2.13 ...
+#### v0.2.13 meh
 * REBUILD DB: added sha1sum hash for every node, this is written to vpaths to let people see what files changed between releases
 * Added placeholder to BC6H DXGI loader, for now it fills in a 0,0,0,0 color for all pixels
 * Fixed Eye model extraction for COTW  
-* Added support for reserve10 in COTW
+* Added support for reserve 10 and 11 in COTW
+* Fixed some issues with JC4 model extraction
 * Added option to not build archives when building mods
 * (REMOVED) Added option to "Save Changed Files As Symlinks" at mod build time, this will mark changed files as symlink instead of copying the changed file in SARC files
 * For ADF files that exist inside GDC/GDCC files (currently only GenZero) extract a gdcc.txt version to seperate it from the normal ADF files

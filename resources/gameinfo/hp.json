@@ -18,7 +18,8 @@
     "hp_iberia_",
     "hp_rockies_",
     "hp_nz_",
-    "hp_mexico_"
+    "hp_mexico_",
+    "hp_delta_"
   ],
   "world_indexes": [0,1,2,3,4],
   "world_patches": [
@@ -56,7 +57,8 @@
     "textures/ui/map_reserve_8/",
     "textures/ui/map_reserve_9/",
     "textures/ui/map_reserve_10/",
-    "textures/ui/map_reserve_11/"
+    "textures/ui/map_reserve_11/",
+    "textures/ui/map_reserve_12/"
   ],
   "unarchived_files": [],
   "archive_paths": [

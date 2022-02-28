@@ -1,3 +1,6 @@
+#### v0.2.14 ???
+* added Mississippi (delta) update for COTW
+
 #### v0.2.13 meh
 * REBUILD DB: added sha1sum hash for every node, this is written to vpaths to let people see what files changed between releases
 * Added placeholder to BC6H DXGI loader, for now it fills in a 0,0,0,0 color for all pixels

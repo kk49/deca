@@ -1,5 +1,7 @@
-#### v0.2.14 ???
+#### v0.2.14 5 by 5
 * added Mississippi (delta) update for COTW
+* added more strings from the community
+* added vpath file names for COTW
 
 #### v0.2.13 meh
 * REBUILD DB: added sha1sum hash for every node, this is written to vpaths to let people see what files changed between releases

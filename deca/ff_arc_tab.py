@@ -14,7 +14,7 @@ def tab_file_load(filename, ver):
         if 3 == ver:
             assert ver_0 == 2
             assert ver_1 == 1
-            assert ver_2 == 2048
+            assert ver_2 in {2048, 4096}
             tab_file = TabFileV3()
         elif 4 == ver:
             assert ver_0 == 2

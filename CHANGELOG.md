@@ -1,3 +1,7 @@
+#### v0.2.15 RELEASE-CANDIDATE
+* Updated to support COTW 2022-06-28
+* Added Finland update for COTW
+
 #### v0.2.14 5 by 5
 * added Mississippi (delta) update for COTW
 * added more strings from the community

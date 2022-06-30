@@ -1,4 +1,4 @@
-#### v0.2.15 RELEASE-CANDIDATE
+#### v0.2.15 free abortions on demand
 * Updated to support COTW 2022-06-28
 * Added Finland update for COTW
 

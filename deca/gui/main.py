@@ -19,7 +19,7 @@ from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialo
 from PySide2.QtGui import QDesktopServices, QKeyEvent
 
 
-window_title = 'decaGUI: v0.2.14'
+window_title = 'decaGUI: v0.2.15'
 
 
 class MainWindowDataSource(IVfsViewSrc):

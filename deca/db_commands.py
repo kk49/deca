@@ -13,8 +13,9 @@ from .db_core import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type
 from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
 from .db_types import *
 from .ff_types import *
+from .errors import *
 from .ff_txt import load_json
-from .ff_adf import AdfTypeMissing, GdcArchiveEntry, TypeDef, MemberDef
+from .ff_adf import GdcArchiveEntry, TypeDef, MemberDef
 from .ff_rtpc import RtpcVisitorGatherStrings, k_type_event, k_type_objid, k_type_str, parse_prop_data
 from .ff_arc_tab import tab_file_load, TabEntryFileBase
 from .ff_sarc import FileSarc, EntrySarc
@@ -353,40 +354,55 @@ class Processor:
         return results
 
     def process_hash_file_contents(self, node: VfsNode, db: DbWrap):
-        if node.offset is not None and (node.size_u is not None or node.size_c is not None):
-            h = hashlib.sha1()
-            with db.db().file_obj_from(node) as f:
-                while True:
-                    buf = f.read(1024*10124)
-                    if buf is None or len(buf) == 0:
-                        break
+        try:
+            if node.offset is not None and (node.size_u is not None or node.size_c is not None):
+                h = hashlib.sha1()
+                with db.db().file_obj_from(node) as f:
+                    while True:
+                        buf = f.read(1024*10124)
+                        if buf is None or len(buf) == 0:
+                            break
 
-                    h.update(buf)
-            v = h.hexdigest()
+                        h.update(buf)
+                v = h.hexdigest()
 
-            node.content_hash = v
-            db.node_update(node)
+                node.content_hash = v
+                db.node_update(node)
 
-            return True
-        else:
-            return False
+                return True
+            else:
+                return False
+        except EDecaUnknownCompressionType as ae:
+            self._comm.log('DBCmd: Unknown Compression Type {} in {} {} {}'.format(
+                ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+        return False
 
     def process_file_type_find_no_name(self, node: VfsNode, db: DbWrap):
         # self._comm.trace(f'process_file_type_find_no_name: {node.uid} {node.v_hash_to_str()} {node.v_path}')
-        determine_file_type(db.db(), node)
-        node.flags_set(node_flag_processed_file_raw_no_name)
-        db.node_update(node)
-        return True
+        try:
+            determine_file_type(db.db(), node)
+            node.flags_set(node_flag_processed_file_raw_no_name)
+            db.node_update(node)
+            return True
+        except EDecaUnknownCompressionType as ae:
+            self._comm.log('DBCmd: Unknown Compression Type {} in {} {} {}'.format(
+                ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+        return False
 
     def process_file_type_find_with_name(self, node: VfsNode, db: DbWrap):
         # self._comm.trace(g'process_file_type_find_with_name: {node.uid} {node.v_hash_to_str()} {node.v_path}')
-        determine_file_type_by_name(db.db(), node)
-        if node.file_type is not None:
-            node.flags_set(node_flag_processed_file_raw_with_name)
-            db.node_update(node)
-            return True
-        else:
-            return False
+        try:
+            determine_file_type_by_name(db.db(), node)
+            if node.file_type is not None:
+                node.flags_set(node_flag_processed_file_raw_with_name)
+                db.node_update(node)
+                return True
+            else:
+                return False
+        except EDecaUnknownCompressionType as ae:
+            self._comm.log('DBCmd: Unknown Compression Type {} in {} {} {}'.format(
+                ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+        return False
 
     def process_symlink(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing SYMLINK: {} {} {}'.format(node.uid, node.v_hash_to_str(), node.v_path))
@@ -505,23 +521,33 @@ class Processor:
         self._comm.trace('Processing global gdcc": gdc/global.gdcc')
 
         # special case starting point for runtime
-        adf = db.node_read_adf(node)
+        try:
+            adf = db.node_read_adf(node)
 
-        cnode_name = b'gdc/global.gdc.DECA'
-        cnode = VfsNode(
-            v_hash=db.file_hash(cnode_name),
-            v_hash_type=db.file_hash_type,
-            v_path=cnode_name,
-            file_type=FTYPE_GDCBODY, pid=node.uid,
-            offset=adf.table_instance[0].offset,
-            size_c=adf.table_instance[0].size,
-            size_u=adf.table_instance[0].size,
-        )
-        db.node_add(cnode)
+            cnode_name = b'gdc/global.gdc.DECA'
+            cnode = VfsNode(
+                v_hash=db.file_hash(cnode_name),
+                v_hash_type=db.file_hash_type,
+                v_path=cnode_name,
+                file_type=FTYPE_GDCBODY, pid=node.uid,
+                offset=adf.table_instance[0].offset,
+                size_c=adf.table_instance[0].size,
+                size_u=adf.table_instance[0].size,
+            )
+            db.node_add(cnode)
 
-        node.flags_set(node_flag_processed_file_type)
-        db.node_update(node)
-        return True
+            node.flags_set(node_flag_processed_file_type)
+            db.node_update(node)
+            return True
+
+        except EDecaUnknownCompressionType as ae:
+            self._comm.log('DBCmd: Unknown Compression Type {} in {} {} {}'.format(
+                ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+        except EDecaMissingAdfType as ae:
+            self._comm.log('DBCmd: Missing ADF Type {:08x} in {} {} {}'.format(
+                ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+
+        return False
 
     def process_global_gdcc_body(self, node: VfsNode, db: DbWrap):
         self._comm.trace('Processing global gdcc body": gdc/global.gdcc.DECA')
@@ -689,13 +715,16 @@ class Processor:
                                 f'sound/dialogue/{lang}/{dia_id}.wavc',
                                 parent_node=node, possible_file_types=[FTYPE_FSB5C])
 
-            # only mark as processed if AdfTypeMissing exception did not happen
+            # only mark as processed if EDecaMissingAdfType exception did not happen
             node.flags_set(node_flag_processed_file_type)
             db.node_update(node)
             return True
 
-        except AdfTypeMissing as ae:
-            self._comm.log('DBCmd: Missing Type {:08x} in {} {} {}'.format(
+        except EDecaUnknownCompressionType as ae:
+            self._comm.log('DBCmd: Unknown Compression Type {} in {} {} {}'.format(
+                ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+        except EDecaMissingAdfType as ae:
+            self._comm.log('DBCmd: Missing ADF Type {:08x} in {} {} {}'.format(
                 ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
         return False
 

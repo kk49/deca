@@ -1,0 +1,115 @@
+{
+  "game_id": "an",
+  "exe_match": ".*CotWTheAngler_Steam\\..*",
+  "archive_version": 5,
+  "file_hash_size": 8,
+  "oo_decompress_dll": false,
+  "area_prefixes": [
+    "",
+    "globalhires_",
+    "empty_",
+    "achelous_"
+  ],
+  "world_indexes": [0,1,2,3,4,5],
+  "world_patches": [
+    "worlds/empty/terrain/patches/width_3/",
+    "worlds/empty/terrain/patches/width_4/",
+    "worlds/empty/terrain/patches/width_8/",
+    "worlds/empty/terrain/veg_streampatches/width_3/",
+    "worlds/empty/terrain/veg_streampatches/width_4/",
+    "worlds/empty/terrain/veg_streampatches/width_8/",
+    "worlds/achelous/terrain/patches/width_3/",
+    "worlds/achelous/terrain/patches/width_4/",
+    "worlds/achelous/terrain/patches/width_8/",
+    "worlds/achelous/terrain/veg_streampatches/width_3/",
+    "worlds/achelous/terrain/veg_streampatches/width_4/",
+    "worlds/achelous/terrain/veg_streampatches/width_8/"
+  ],
+  "world_occluders": [
+    "worlds/empty/terrain/occluder/",
+    "worlds/achelous/terrain/occluder/"
+  ],
+  "world_navheightfields": [
+    "worlds/empty/terrain/hp/navheightfield/globalhires/",
+    "worlds/achelous/terrain/hp/navheightfield/globalhires/"
+  ],
+  "world_hm": [
+    "worlds/empty/terrain/hp/horizonmap/horizon_${AREA_PREFIX}",
+    "worlds/achelous/terrain/hp/horizonmap/horizon_${AREA_PREFIX}"
+  ],
+  "world_ai": [
+    "ai/tiles/",
+    "worlds/empty/ai/tiles/",
+    "worlds/achelous/ai/tiles/",
+    "worlds/world${WORLD_INDEX}/ai/tiles/"
+  ],
+  "map_zooms": [0,1,2,3],
+  "map_max_count": 500,
+  "map_prefixes": [
+    "textures/ui/map_reserve_0/",
+    "textures/ui/map_reserve_1/",
+    "textures/ui/map_reserve_2/",
+    "textures/ui/map_reserve_3/",
+    "textures/ui/map_reserve_4/",
+    "textures/ui/map_reserve_5/",
+    "textures/ui/map_reserve_6/",
+    "textures/ui/map_reserve_7/",
+    "textures/ui/map_reserve_8/",
+    "textures/ui/map_reserve_9/",
+    "textures/ui/map_reserve_10/",
+    "textures/ui/map_reserve_11/",
+    "textures/ui/map_reserve_12/",
+    "textures/ui/map_reserve_13/"
+  ],
+  "unarchived_files": [],
+  "archive_paths": [
+    "${GAME_DIR}/archives_win64/"
+  ],
+  "mdic_ftype": "mdi",
+  "navmesh_ftype": "h2014",
+  "obc_ftype": "",
+  "pfs_ftype": "pfx",
+  "has_garcs": true,
+  "file_assoc": [
+    {
+      ".ee": "sarc",
+      ".epe": "rtpc"
+    },
+    {
+      ".bl": "sarc",
+      ".nl": "sarc",
+      ".fl": "sarc",
+      ".blo": "rtpc",
+      ".nl.mdic": "mdi",
+      ".fl.mdic": "mdi",
+      ".pfs": "pfx",
+      ".obc": "obc"
+    },
+    {
+      ".meshc": "adf",
+      ".hrmeshc": "adf",
+      ".modelc": "adf",
+      ".model_xml": "txt",
+      ".model_deps": "txt",
+      ".pfxc": "pfx"
+    },
+    {
+      ".ddsc": "avtx,dds",
+      ".hmddsc": "atx,META-NO-TYPE"
+    },
+    {
+      ".fmod_sbankc": "txt",
+      ".fmod_bankc": "riff"
+    },
+    {
+      ".swf": "gfx",
+      ".cfx": "gfx",
+      ".gfx": "gfx"
+    },
+    {
+      ".gdc": "adf",
+      ".gsc": "adf",
+      ".stringlookup": "adf"
+    }
+  ]
+}

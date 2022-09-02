@@ -58,15 +58,19 @@ def determine_file_type(vfs: VfsDatabase, node: VfsNode):
         if node.offset is None:
             node.file_type = FTYPE_SYMLINK
         else:
-            if node.compression_type_get() in {compression_v4_03_oo, compression_v4_04_oo}:
+            if node.compression_type_get() in {compression_v4_01_zlib, compression_v4_03_zstd, compression_v4_04_oo}:
                 # todo special case for jc4 /rage2 compression needs to be cleaned up
                 with vfs.file_obj_from(node) as f:
                     node.file_type, _, node.magic, node.file_sub_type = \
                         determine_file_type_and_size(f, node.size_u)
             else:
-                with vfs.file_obj_from(node) as f:
-                    node.file_type, node.size_u, node.magic, node.file_sub_type = \
-                        determine_file_type_and_size(f, node.size_c)
+                fin = vfs.file_obj_from(node)
+                if fin is None:
+                    node.file_type = FTYPE_NOT_HANDLED
+                else:
+                    with fin as f:
+                        node.file_type, node.size_u, node.magic, node.file_sub_type = \
+                            determine_file_type_and_size(f, node.size_c)
 
     if node.file_type == FTYPE_AAF:
         node.compression_type_set(compression_v3_zlib)

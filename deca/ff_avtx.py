@@ -313,7 +313,7 @@ def load_mip(mip, f, filename, save_raw_data, is_atx=False):
         inp = np.zeros((nym, nxm, 4), dtype=np.uint8)
         inp[:, :, 0:3] = ((inp_f32[:, :, 0:3] - mn) * s * 255).astype(dtype=np.uint8)
         inp[:, :, 3] = 255
-    elif pixel_format in {41}:  # floating point 1 components
+    elif pixel_format in {41,  53, 55, 56, 57,  54,  58, 59,  63, 64}:  # floating point 1 components
         inp_f32 = np.zeros((nym, nxm, 4), dtype=np.float32)
         deca.dxgi.process_image(inp_f32, raw_data, nx, ny, pixel_format)
         mn = np.nanmin(inp_f32[:, :, 0:1])

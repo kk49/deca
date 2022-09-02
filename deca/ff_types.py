@@ -1,10 +1,11 @@
 compression_00_none = 0
-compression_v4_01_unknown = 0x01
+compression_v4_01_zlib = 0x01
 compression_v4_02_unknown = 0x02
-compression_v4_03_oo = 0x03
+compression_v4_03_zstd = 0x03
 compression_v4_04_oo = 0x04
 compression_v3_zlib = 0xff
 
+FTYPE_NOT_HANDLED = 'NOT'
 FTYPE_ARC = 'arc'
 FTYPE_TAB = 'tab'
 FTYPE_AAF = 'aaf'

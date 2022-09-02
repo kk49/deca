@@ -137,12 +137,63 @@ def process_image_41(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R32_FLOAT
 
 
 @njit
-def process_image_60(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R8_TYPELESS
+def process_image_53(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R16_ u16
+    pos = 0
+    chans = [0] * 1
+    for yi in range(ny):
+        for xi in range(nx):
+            chans[0], pos = ff_read_u16(buffer, n_buffer, pos)
+            image[yi, xi, 0] = chans[0]
+            image[yi, xi, 1] = 0
+            image[yi, xi, 2] = 0
+            image[yi, xi, 3] = 0
+
+
+@njit
+def process_image_54(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R16_FLOAT
+    pos = 0
+    chans = [0] * 1
+    for yi in range(ny):
+        for xi in range(nx):
+            chans[0], pos = ff_read_u16(buffer, n_buffer, pos)
+            image[yi, xi, 0] = u16_to_f16_in_f32(chans[0])
+            image[yi, xi, 1] = 0
+            image[yi, xi, 2] = 0
+            image[yi, xi, 3] = 0
+
+@njit
+def process_image_58(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R16_ s16
+    pos = 0
+    chans = [0] * 1
+    for yi in range(ny):
+        for xi in range(nx):
+            chans[0], pos = ff_read_s16(buffer, n_buffer, pos)
+            image[yi, xi, 0] = chans[0]
+            image[yi, xi, 1] = 0
+            image[yi, xi, 2] = 0
+            image[yi, xi, 3] = 0
+
+
+@njit
+def process_image_60(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R8_ u8
     pos = 0
     chans = [0] * 1
     for yi in range(ny):
         for xi in range(nx):
             chans[0], pos = ff_read_u8(buffer, n_buffer, pos)
+            image[yi, xi, 0] = chans[0]
+            image[yi, xi, 1] = 0
+            image[yi, xi, 2] = 0
+            image[yi, xi, 3] = 0
+
+
+@njit
+def process_image_63(image, buffer, n_buffer, nx, ny):  # DXGI_FORMAT_R8_ s8
+    pos = 0
+    chans = [0] * 1
+    for yi in range(ny):
+        for xi in range(nx):
+            chans[0], pos = ff_read_s8(buffer, n_buffer, pos)
             image[yi, xi, 0] = chans[0]
             image[yi, xi, 1] = 0
             image[yi, xi, 2] = 0
@@ -482,7 +533,11 @@ def process_image_python(image, raw, nx, ny, pixel_format):
         26: process_image_26,  # DXGI_FORMAT_R11G11B10_FLOAT
         28: process_image_28,  # DXGI_FORMAT_R8G8B8A8_UNORM
         41: process_image_41,  # DXGI_FORMAT_R32_FLOAT
-        60: process_image_60,  # DXGI_FORMAT_R8_TYPELESS
+        53: process_image_53,  # DXGI_FORMAT_R16_TYPELESS u16
+        54: process_image_54,  # DXGI_FORMAT_R16_FLOAT f16
+        58: process_image_58,  # DXGI_FORMAT_R16_SNORM s16
+        60: process_image_60,  # DXGI_FORMAT_R8_TYPELESS u8
+        63: process_image_63,  # DXGI_FORMAT_R8_TYPELESS s8
         70: process_image_70,  # DXGI_FORMAT_BC1_TYPELESS
         73: process_image_73,  # DXGI_FORMAT_BC2_TYPELESS
         76: process_image_76,  # DXGI_FORMAT_BC3_TYPELESS

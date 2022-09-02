@@ -12,19 +12,19 @@ def tab_file_load(filename, ver):
 
         assert magic == b'TAB\x00'
         if 3 == ver:
-            assert ver_0 == 2
-            assert ver_1 == 1
-            assert ver_2 in {2048, 4096}
+            assert ver_0 == 2, f"ver_0 = {ver_0}"
+            assert ver_1 == 1, f"ver_1 = {ver_1}"
+            assert ver_2 in {2048, 4096}, f"ver_2 = {ver_2}"
             tab_file = TabFileV3()
         elif 4 == ver:
-            assert ver_0 == 2
-            assert ver_1 == 1
-            assert ver_2 == 4096
+            assert ver_0 == 2, f"ver_0 = {ver_0}"
+            assert ver_1 == 1, f"ver_1 = {ver_1}"
+            assert ver_2 == 4096, f"ver_2 = {ver_2}"
             tab_file = TabFileV4()
         elif 5 == ver:
-            assert ver_0 == 3
-            assert ver_1 == 1
-            assert ver_2 == 4096
+            assert ver_0 == 3, f"ver_0 = {ver_0}"
+            assert ver_1 == 1, f"ver_1 = {ver_1}"
+            assert ver_2 == 4096, f"ver_2 = {ver_2}"
             tab_file = TabFileV5()
         else:
             raise NotImplementedError('Unknown TAB file version {}'.format(ver))

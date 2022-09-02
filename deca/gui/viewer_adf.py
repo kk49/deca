@@ -1,5 +1,5 @@
 from .viewer import *
-from ..ff_adf import AdfTypeMissing, AdfDatabase
+from ..ff_adf import EDecaMissingAdfType, AdfDatabase
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
@@ -26,7 +26,7 @@ class DataViewerAdf(DataViewer):
         try:
             obj = adf_db.read_node(vfs, vnode)
             sbuf = obj.dump_to_string(vfs)
-        except AdfTypeMissing as e:
+        except EDecaMissingAdfType as e:
             sbuf = 'Missing ADF_TYPE {:08x} in parsing of type {:08x}'.format(e.type_id, vnode.file_sub_type)
 
         self.text_box.setText(sbuf)

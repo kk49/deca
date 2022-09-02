@@ -682,6 +682,7 @@ class VfsProcessor(VfsDatabase):
     def find_vpath_resources(self):
         fns = [
             (False, './resources/{}/strings.txt'.format(self.game_info.game_id)),
+            (False, './resources/{}/filenames.txt'.format(self.game_info.game_id)),
             (True, './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)),
             (False, './resources/strings.txt'),  # backwords compatibility
 

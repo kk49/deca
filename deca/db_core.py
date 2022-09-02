@@ -4,6 +4,7 @@ import sqlite3
 import pickle
 import re
 import zstandard as zstd
+import zlib
 import numpy as np
 from typing import List
 
@@ -1294,7 +1295,7 @@ class VfsDatabase(DbBase):
             return open(node.p_path, 'rb')
         elif node.file_type == FTYPE_TAB:
             return self.file_obj_from(self.node_where_uid(node.pid))
-        elif compression_v3_zlib == node.compression_type_get():
+        elif compression_type in {compression_v3_zlib}:
             file_name = self.generate_cache_file_name(node)
             if not os.path.isfile(file_name):
                 parent_node = self.node_where_uid(node.pid)
@@ -1314,7 +1315,7 @@ class VfsDatabase(DbBase):
             else:
                 return open(file_name, 'rb')
 
-        elif compression_type in {compression_v4_03_oo, compression_v4_04_oo}:
+        elif compression_type in {compression_v4_01_zlib, compression_v4_03_zstd, compression_v4_04_oo}:
             file_name = self.generate_cache_file_name(node)
 
             if not os.path.isfile(file_name):
@@ -1331,7 +1332,12 @@ class VfsDatabase(DbBase):
                         f_in.seek(block_offset)
                         in_buffer = f_in.read(compressed_len)
 
-                        if compression_type == compression_v4_03_oo:
+                        if compression_type in {compression_v4_01_zlib}:
+                            buffer_ret = zlib.decompress(in_buffer)
+                            ret = len(buffer_ret)
+                            # buffer_ret = in_buffer
+                            # ret = compressed_len
+                        elif compression_type in {compression_v4_03_zstd}:
                             dc = zstd.ZstdDecompressor()
                             buffer_ret = dc.decompress(in_buffer)
                             ret = len(buffer_ret)
@@ -1371,7 +1377,8 @@ class VfsDatabase(DbBase):
                 return open(file_name, 'rb')
 
         elif compression_type != compression_00_none:
-            raise Exception(f'NOT IMPLEMENTED: COMPRESSION TYPE {compression_type}')
+            self.logger.log(f'NOT IMPLEMENTED: COMPRESSION TYPE {compression_type}: B: id:{node.uid}, pid:{node.pid}, v:{node.v_path}, p:{node.p_path}, cs:{node.size_c}, us:{node.size_u}')
+            raise EDecaUnknownCompressionType(compression_type)
         elif node.file_type == FTYPE_ADF_BARE:
             parent_node = self.node_where_uid(node.pid)
             return self.file_obj_from(parent_node)

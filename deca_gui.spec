@@ -4,12 +4,16 @@ block_cipher = None
 
 added_files = [
     ('resources/*.txt', 'resources/'),
+    ('resources/adf', 'resources/adf'),
+    ('resources/an', 'resources/an'),
+    ('resources/field_strings', 'resources/field_strings'),
+    ('resources/gameinfo', 'resources/gameinfo'),
+    ('resources/ghidra_strings', 'resources/ghidra_strings'),
     ('resources/gz', 'resources/gz'),
     ('resources/gzb', 'resources/gzb'),
     ('resources/hp', 'resources/hp'),
-    ('resources/ghidra_strings', 'resources/ghidra_strings'),
-    ('resources/gameinfo', 'resources/gameinfo'),
-    ('resources/adf', 'resources/adf'),
+    ('resources/jc4', 'resources/jc4'),
+    ('resources/rg2', 'resources/rg2'),
     ('tool_resources/make_web_map', 'tool_resources/make_web_map'),
     ('extern/HavokLib/build/_bin2xml/bin2xml*', 'extern/HavokLib/build/_bin2xml/'),
 ]

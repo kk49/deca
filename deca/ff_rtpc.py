@@ -23,6 +23,8 @@ class PropType(IntEnum):
     type_depreciated_12 = 12
     type_objid = 13
     type_event = 14
+    type_unk_15 = 15
+    type_unk_16 = 16
 
 
 k_type_none = PropType.type_none.value
@@ -40,6 +42,8 @@ k_type_array_u8 = PropType.type_array_u8.value
 k_type_depreciated_12 = PropType.type_depreciated_12.value
 k_type_objid = PropType.type_objid.value
 k_type_event = PropType.type_event.value
+k_type_unk_15 = PropType.type_unk_15.value
+k_type_unk_16 = PropType.type_unk_16.value
 
 
 PropType_names = [
@@ -58,6 +62,8 @@ PropType_names = [
     'd12',
     'objid',
     'event',
+    'unk_15',
+    'unk_16',
 ]
 
 h_prop_class = hash32_func('_class')
@@ -294,6 +300,10 @@ def rtpc_prop_from_binary(f, prop):
         for i in range(n):
             prop.data.append(f.read_u64())
         f.seek(opos)
+    elif prop.type == k_type_unk_15:
+        pass
+    elif prop.type == k_type_unk_16:
+        pass
     else:
         raise Exception('NOT HANDLED {}'.format(prop.type))
 
@@ -386,7 +396,7 @@ def rtpc_prop_to_string(prop0, hash_lookup: FieldNameMap):
             data_new.append(name)
         data = data_new
 
-    elif prop_type == k_type_u32:
+    elif prop_type in {k_type_u32, k_type_unk_15, k_type_unk_16}:
         d = data
         name = '{} (0x{:08X})'.format(d, d)
         name4 = hash_lookup.lookup(hash32=d)
@@ -523,6 +533,10 @@ def parse_prop_data(bufn, prop_info):
         pos = prop_data_pos
         n, pos = ff_read_u32(bufn, pos)
         prop_data, pos = ff_read_s64s(bufn, pos, n)
+    elif prop_type == k_type_unk_15:
+        prop_data = prop_data_raw
+    elif prop_type == k_type_unk_16:
+        prop_data = prop_data_raw
     else:
         prop_data = None
         parse_prop_data_raise_error(prop_type)

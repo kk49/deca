@@ -236,6 +236,8 @@ def nodes_export_processed(
                         vs_images.append(node)
                     elif node.file_type in {FTYPE_FSB5C}:
                         vs_fsb5cs.append(node)
+                    elif isinstance(node.v_path, bytes) and (node.v_path.endswith(b'.csvc') or node.v_path.endswith(b'.bmpc')):
+                        vs_rename.append(node)
                     else:
                         vs_other.append(node)
 

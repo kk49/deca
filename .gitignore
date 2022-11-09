@@ -12,6 +12,6 @@ venv*/
 dist/
 build/
 scratch/
-procmon_csv/
+scratch/procmon_csv/
 scripts/digest/
 process_image.*

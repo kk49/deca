@@ -1,0 +1,16 @@
+setuptools
+matplotlib
+numpy
+scipy
+Pillow
+PySide2
+XlsxWriter
+pygltflib
+openpyxl
+kaitaistruct
+llvmlite
+numba
+zstandard
+mmh3
+
+zugbruecke

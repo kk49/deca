@@ -653,19 +653,19 @@ class ToolMakeWebMap:
             if os.path.exists(dst):
                 print('WARNING: {} already exists will not over-write'.format(dst))
             else:
-                shutil.copyfile(os.path.join('.', 'tool_resources', 'make_web_map', 'index.html'), dst)
+                shutil.copyfile(os.path.join('.', 'resources', 'make_web_map', 'index.html'), dst)
 
             dst = os.path.join(dpath, 'full.html')
             if os.path.exists(dst):
                 print('WARNING: {} already exists will not over-write'.format(dst))
             else:
-                shutil.copyfile(os.path.join('.', 'tool_resources', 'make_web_map', 'full.html'), dst)
+                shutil.copyfile(os.path.join('.', 'resources', 'make_web_map', 'full.html'), dst)
 
             dst = os.path.join(dpath, 'lib')
             if os.path.exists(dst):
                 print('WARNING: {} already exists will not over-write'.format(dst))
             else:
-                shutil.copytree(os.path.join('.', 'tool_resources', 'make_web_map', 'lib'), dst)
+                shutil.copytree(os.path.join('.', 'resources', 'make_web_map', 'lib'), dst)
 
 
 def main():

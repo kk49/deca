@@ -1,5 +1,5 @@
 from typing import Optional
-from deca.gui.vfs_widgets import used_color_calc
+from .vfs_widgets import used_color_calc
 from deca.db_processor import VfsNode
 from deca.db_view import VfsView
 from deca.ff_types import *

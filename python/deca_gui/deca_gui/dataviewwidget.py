@@ -3,15 +3,15 @@ from deca.db_processor import VfsNode
 from deca.db_view import VfsView
 from deca.db_processor import VfsNode, VfsProcessor
 from deca.ff_types import *
-from deca.gui.viewer_adf import DataViewerAdf
-from deca.gui.viewer_rtpc import DataViewerRtpc
-from deca.gui.viewer_image import DataViewerImage
-from deca.gui.viewer_raw import DataViewerRaw
-from deca.gui.viewer_info import DataViewerInfo
-from deca.gui.viewer_text import DataViewerText
-from deca.gui.viewer_sarc import DataViewerSarc
-from deca.gui.viewer_obc import DataViewerObc
-from deca.gui.deca_interfaces import IVfsViewSrc
+from .viewer_adf import DataViewerAdf
+from .viewer_rtpc import DataViewerRtpc
+from .viewer_image import DataViewerImage
+from .viewer_raw import DataViewerRaw
+from .viewer_info import DataViewerInfo
+from .viewer_text import DataViewerText
+from .viewer_sarc import DataViewerSarc
+from .viewer_obc import DataViewerObc
+from .deca_interfaces import IVfsViewSrc
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QSizePolicy, QWidget, QVBoxLayout, QTabWidget
 

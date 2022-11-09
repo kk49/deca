@@ -1,10 +1,10 @@
 from .viewer import *
-from ..ff_rtpc import RtpcVisitorDumpToString
+from deca.ff_obc import Obc
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
 
-class DataViewerRtpc(DataViewer):
+class DataViewerObc(DataViewer):
     def __init__(self):
         DataViewer.__init__(self)
 
@@ -21,9 +21,8 @@ class DataViewerRtpc(DataViewer):
         self.setLayout(self.main_layout)
 
     def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
+        obc = Obc()
         with vfs.file_obj_from(vnode) as f:
-            buffer = f.read(vnode.size_u)
-        dump = RtpcVisitorDumpToString(vfs)
-        dump.visit(buffer)
-        sbuf = dump.result()
+            obc.deserialize(f)
+        sbuf = obc.dump_to_string(vfs)
         self.text_box.setText(sbuf)

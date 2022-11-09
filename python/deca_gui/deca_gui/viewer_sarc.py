@@ -1,5 +1,5 @@
 from .viewer import *
-from ..ff_sarc import FileSarc
+from deca.ff_sarc import FileSarc
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
 from PySide2.QtGui import QFont

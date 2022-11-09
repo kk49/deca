@@ -1,5 +1,5 @@
 from .viewer import *
-from ..ff_avtx import Ddsc
+from deca.ff_avtx import Ddsc
 import deca.ff_avtx
 import os
 from PySide2.QtCore import Qt, QPoint, QRectF, Signal

@@ -1,10 +1,10 @@
 from .viewer import *
-from ..ff_adf import EDecaMissingAdfType, AdfDatabase
+from deca.ff_rtpc import RtpcVisitorDumpToString
 from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
 
-class DataViewerAdf(DataViewer):
+class DataViewerRtpc(DataViewer):
     def __init__(self):
         DataViewer.__init__(self)
 
@@ -21,14 +21,9 @@ class DataViewerAdf(DataViewer):
         self.setLayout(self.main_layout)
 
     def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
-        adf_db = AdfDatabase(vfs)
-
-        try:
-            obj = adf_db.read_node(vfs, vnode)
-            sbuf = obj.dump_to_string(vfs)
-        except EDecaMissingAdfType as e:
-            sbuf = 'Missing ADF_TYPE {:08x} in parsing of type {:08x}'.format(e.type_id, vnode.file_sub_type)
-
+        with vfs.file_obj_from(vnode) as f:
+            buffer = f.read(vnode.size_u)
+        dump = RtpcVisitorDumpToString(vfs)
+        dump.visit(buffer)
+        sbuf = dump.result()
         self.text_box.setText(sbuf)
-
-

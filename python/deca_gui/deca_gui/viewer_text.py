@@ -1,10 +1,10 @@
 from .viewer import *
-from ..ff_obc import Obc
-from PySide2.QtWidgets import QSizePolicy,  QVBoxLayout, QTextEdit
+from deca.file import ArchiveFile
+from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QTextEdit
 from PySide2.QtGui import QFont
 
 
-class DataViewerObc(DataViewer):
+class DataViewerText(DataViewer):
     def __init__(self):
         DataViewer.__init__(self)
 
@@ -21,8 +21,6 @@ class DataViewerObc(DataViewer):
         self.setLayout(self.main_layout)
 
     def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
-        obc = Obc()
-        with vfs.file_obj_from(vnode) as f:
-            obc.deserialize(f)
-        sbuf = obc.dump_to_string(vfs)
-        self.text_box.setText(sbuf)
+        with ArchiveFile(vfs.file_obj_from(vnode)) as f:
+            buf = f.read(vnode.size_u)
+            self.text_box.setText(buf.decode('utf-8'))

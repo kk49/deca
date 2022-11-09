@@ -1,4 +1,5 @@
 *.pyc
+*.so
 *#
 log.txt
 deca_gui.pex
@@ -14,4 +15,4 @@ build/
 scratch/
 scratch/procmon_csv/
 scripts/digest/
-process_image.*
+

@@ -6,7 +6,7 @@ build_script:
 - cmd: >-
     SET
 
-    SET PATH=C:\Python37-x64;C:\Python37-x64\Scripts;%path%
+    SET PATH=C:\Python38-x64;C:\Python38-x64\Scripts;%path%
 
 
     echo GET SUBMODULES
@@ -18,6 +18,19 @@ build_script:
     echo XXX git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
 
     git submodule update --init --recursive
+
+
+    echo BUILD C++
+
+    call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+
+    mkdir C:\prj\deca\build
+    
+    cd C:\prj\deca\build
+
+    cmake --config Release -G "NMake Makefiles" ..
+
+    nmake
 
 
     echo SETUP PYTHON
@@ -42,17 +55,6 @@ build_script:
 
     pip install requests
 
-    echo BUILD IMAGE DLL
-
-    call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-
-    mkdir C:\prj\deca\build
-    
-    cd C:\prj\deca\build
-
-    cmake --config Release -G "NMake Makefiles" ..
-
-    nmake
 
     echo PACKAGE
 

@@ -28,7 +28,7 @@ build_script:
     
     cd C:\prj\deca\build
 
-    cmake --config Release -G "NMake Makefiles" ..
+    cmake -DCMAKE_BUILD_TYPE=Release -G "NMake Makefiles" ..
 
     nmake
 

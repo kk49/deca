@@ -1,6 +1,6 @@
 version: build-{build}
 max_jobs: 1
-image: Visual Studio 2017
+image: Visual Studio 2022
 clone_folder: C:\prj\deca
 build_script:
 - cmd: >-
@@ -15,7 +15,7 @@ build_script:
 
     echo git submodule init
 
-    git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
+    echo XXX git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
 
     git submodule update --init --recursive
 
@@ -24,19 +24,19 @@ build_script:
 
     cd C:\prj
 
-    c:\Python37-x64\python --version
+    c:\Python38-x64\python --version
 
-    c:\Python37-x64\python -m pip list
+    c:\Python38-x64\python -m pip list
 
-    c:\Python37-x64\python -m virtualenv venv
+    c:\Python38-x64\python -m venv venv
 
     venv\Scripts\activate
 
-    python -m pip install "pip<19.0"
-
     pip list
 
-    pip install -r deca/requirements.txt
+    pip install wheel 
+    
+    pip install -r python/requirements.txt
 
     pip install pyinstaller
 
@@ -44,33 +44,15 @@ build_script:
 
     echo BUILD IMAGE DLL
 
-    cd C:\prj\deca
+    call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 
-    "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+    mkdir C:\prj\deca\build
+    
+    cd C:\prj\deca\build
 
-    cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll
-
-
-    echo BUILD HAVOK LIB
-
-    cd C:\prj\deca\extern\HavokLib
-
-    mkdir build
-
-    cd build
-
-    cmake --config Release -G "NMake Makefiles" ..\
+    cmake --config Release -G "NMake Makefiles" ..
 
     nmake
-
-    mkdir _bin2xml
-
-    cd _bin2xml
-
-    cmake --config Release -G "NMake Makefiles" ..\..\_bin2xml\
-
-    nmake
-
 
     echo PACKAGE
 

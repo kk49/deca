@@ -21,8 +21,11 @@ build_script:
 
 
     echo PATCH external libs
+    
     cd c:\prj\deca\extern\HavokLib\3rd_part\PreCore
+    
     git apply c:\prj\deca\path\pre_core.patch
+
 
     echo BUILD C++
 

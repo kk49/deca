@@ -20,6 +20,10 @@ build_script:
     git submodule update --init --recursive
 
 
+    echo PATCH external libs
+    cd c:\prj\deca\extern\HavokLib\3rd_part\PreCore
+    git apply c:\prj\deca\path\pre_core.patch
+
     echo BUILD C++
 
     call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"

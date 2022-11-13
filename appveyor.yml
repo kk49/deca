@@ -39,6 +39,14 @@ build_script:
 
     nmake
 
+    mkdir C:\prj\root\bin
+    
+    mkdir C:\prj\root\lib
+    
+    copy C:\prj\deca\build\cpp\bin2xml\bin2xml* C:\prj\root\bin\ 
+    
+    copy C:\prj\deca\build\cpp\process_image\process_image* C:\prj\root\lib\ 
+
 
     echo SETUP PYTHON
 
@@ -65,7 +73,7 @@ build_script:
 
     echo PACKAGE
 
-    cd C:\prj\deca
+    cd C:\prj\deca\python
 
     pyinstaller deca_gui.spec --clean --noconfirm
 

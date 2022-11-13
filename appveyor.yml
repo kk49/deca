@@ -15,7 +15,7 @@ build_script:
 
     echo git submodule init
 
-    echo XXX git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
+    git config submodule.extern/HavokLib.url https://github.com/kk49/HavokLib.git
 
     git submodule update --init --recursive
 

@@ -19,7 +19,7 @@ added_files = [
 ]
 
 a = Analysis(
-    ['python/deca_gui/entry_point.py'],
+    ['python/deca_gui/deca_gui/entry_point.py'],
     pathex=['/home/krys/prj/deca'],
     binaries=[],
     datas=added_files,

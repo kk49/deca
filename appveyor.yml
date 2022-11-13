@@ -75,7 +75,9 @@ build_script:
 
     cd C:\prj\deca
 
-    pyinstaller deca_gui.spec --clean --noconfirm
+    pyinstaller deca_gui.spec --clean --noconfirm --distpath dist --workpath build_py 
+    
+
 
 
 after_build:

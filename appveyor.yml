@@ -39,13 +39,13 @@ build_script:
 
     nmake
 
-    mkdir C:\prj\root\bin
+    mkdir C:\prj\deca\root\bin
     
-    mkdir C:\prj\root\lib
+    mkdir C:\prj\deca\root\lib
     
-    copy C:\prj\deca\build\cpp\bin2xml\bin2xml* C:\prj\root\bin\ 
+    copy C:\prj\deca\build\cpp\bin2xml\bin2xml* C:\prj\deca\root\bin\ 
     
-    copy C:\prj\deca\build\cpp\process_image\process_image* C:\prj\root\lib\ 
+    copy C:\prj\deca\build\cpp\process_image\process_image* C:\prj\deca\root\lib\ 
 
 
     echo SETUP PYTHON

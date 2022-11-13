@@ -4,7 +4,7 @@
 log.txt
 deca_gui.pex
 __PYCACHE__/
-deca.egg-info/
+**.egg-info/
 test/
 tools/
 work/
@@ -12,7 +12,7 @@ venv*/
 .idea/
 dist/
 build/
+root/
 scratch/
-scratch/procmon_csv/
-scripts/digest/
+python/bin/digest/
 

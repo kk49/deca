@@ -18,12 +18,26 @@ Original copyright notice:
 '''
 
 
-@njit(inline='always')
+class CostModel(object):
+    def __init__(self, max_inlines):
+        self._count = 0
+        self._max_inlines = max_inlines
+
+    def __call__(self, *args, **kwargs):
+        ret = self._count < self._max_inlines
+        self._count += 1
+        return ret
+
+
+cost_model_params = 0
+
+
+@njit(inline=CostModel(cost_model_params))
 def rot(x, k):
     return (x << k) | (x >> (32 - k))
 
 
-@njit(inline='always')
+@njit(inline=CostModel(cost_model_params))
 def mix(a, b, c):
     a &= 0xffffffff; b &= 0xffffffff; c &= 0xffffffff
     a -= c; a &= 0xffffffff; a ^= rot(c,4);  a &= 0xffffffff; c += b; c &= 0xffffffff
@@ -35,7 +49,7 @@ def mix(a, b, c):
     return a, b, c
 
 
-@njit(inline='always')
+@njit(inline=CostModel(cost_model_params))
 def final(a, b, c):
     a &= 0xffffffff; b &= 0xffffffff; c &= 0xffffffff
     c ^= b; c &= 0xffffffff; c -= rot(b,14); c &= 0xffffffff
@@ -48,7 +62,7 @@ def final(a, b, c):
     return a, b, c
 
 
-@njit(inline='always')
+@njit(inline=CostModel(cost_model_params))
 def hashlittle2(data, initval=0, initval2=0):
     length = lenpos = len(data)
 
@@ -86,7 +100,7 @@ def hashlittle2(data, initval=0, initval2=0):
     return c, b
 
 
-@njit(inline='always')
+@njit(inline=CostModel(cost_model_params))
 def hash32_func_bytes(data, init_val=0):
     c, b = hashlittle2(data, init_val, 0)
     return c

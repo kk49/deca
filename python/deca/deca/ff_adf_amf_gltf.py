@@ -8,7 +8,7 @@ import pygltflib as pyg
 import scipy.spatial.transform as sst
 import copy
 import subprocess
-
+import sys
 
 def _get_or_none(index, list_data):
     if index < len(list_data):
@@ -460,13 +460,13 @@ class Deca3dModelc:
                     # normal bump map
                     tid = textures[1]
                     if tid is not None:
-                        gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
+                        gltf_material.normalTexture = pyg.NormalMaterialTexture(index=tid)
 
                     if material.attributes.get('UseEmissive', False):
                         gltf_material.emissiveFactor = [1.0, 1.0, 1.0]
                         tid = textures[4]
                         if tid is not None:
-                            gltf_material.emissiveTexture = pyg.MaterialTexture(index=tid)
+                            gltf_material.emissiveTexture = pyg.TextureInfo(index=tid)
                     else:
                         gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
 
@@ -475,7 +475,7 @@ class Deca3dModelc:
                         mat_sg = {}
                         tid = textures[0]
                         if tid is not None:
-                            mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                            mat_sg['diffuseTexture'] = pyg.TextureInfo(index=tid)
                         tid = textures[2]
                         if tid is not None:
                             mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
@@ -486,12 +486,12 @@ class Deca3dModelc:
 
                         tid = textures[0]
                         if tid is not None:
-                            mat_mr.baseColorTexture = pyg.MaterialTexture(index=tid)
+                            mat_mr.baseColorTexture = pyg.TextureInfo(index=tid)
 
                         if len(textures) >= 3:
                             tid = textures[2]
                             if tid is not None:
-                                mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
+                                mat_mr.metallicRoughnessTexture = pyg.TextureInfo(index=tid)
 
                         mat_mr.roughnessFactor = 1.0
                         mat_mr.metallicFactor = 1.0
@@ -502,7 +502,7 @@ class Deca3dModelc:
                     # if material.attributes['UseColorMask']:
                     #     tid = textures[17]
                     #     if tid is not None:
-                    #         mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                    #         mat_sg['diffuseTexture'] = pyg.TextureInfo(index=tid)
 
                     material_idx = len(gltf.materials)
                     gltf.materials.append(gltf_material)
@@ -526,7 +526,7 @@ class Deca3dModelc:
                     # normal bump map
                     tid = textures[1]
                     if tid is not None:
-                        gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
+                        gltf_material.normalTexture = pyg.NormalMaterialTexture(index=tid)
 
                     gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
 
@@ -535,10 +535,10 @@ class Deca3dModelc:
                         mat_sg = {}
                         tid = textures[0]
                         if tid is not None:
-                            mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                            mat_sg['diffuseTexture'] = pyg.TextureInfo(index=tid)
                         tid = textures[3]
                         if tid is not None:
-                            mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+                            mat_sg['specularGlossinessTexture'] = pyg.TextureInfo(index=tid)
 
                         gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
                     else:
@@ -546,11 +546,11 @@ class Deca3dModelc:
 
                         tid = textures[0]
                         if tid is not None:
-                            mat_mr.baseColorTexture = pyg.MaterialTexture(index=tid)
+                            mat_mr.baseColorTexture = pyg.TextureInfo(index=tid)
 
                         tid = textures[3]
                         if tid is not None:
-                            mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
+                            mat_mr.metallicRoughnessTexture = pyg.TextureInfo(index=tid)
 
                         mat_mr.roughnessFactor = 1.0
                         mat_mr.metallicFactor = 1.0
@@ -580,7 +580,7 @@ class Deca3dModelc:
                     # normal bump map
                     tid = textures[1]
                     if tid is not None:
-                        gltf_material.normalTexture = pyg.MaterialTexture(index=tid)
+                        gltf_material.normalTexture = pyg.NormalMaterialTexture(index=tid)
 
                     gltf_material.emissiveFactor = [0.0, 0.0, 0.0]
 
@@ -589,10 +589,10 @@ class Deca3dModelc:
                         mat_sg = {}
                         tid = textures[0]
                         if tid is not None:
-                            mat_sg['diffuseTexture'] = pyg.MaterialTexture(index=tid)
+                            mat_sg['diffuseTexture'] = pyg.TextureInfo(index=tid)
                         tid = textures[2]
                         if tid is not None:
-                            mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+                            mat_sg['specularGlossinessTexture'] = pyg.TextureInfo(index=tid)
 
                         gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
                     else:
@@ -600,11 +600,11 @@ class Deca3dModelc:
 
                         tid = textures[0]
                         if tid is not None:
-                            mat_mr.baseColorTexture = pyg.MaterialTexture(index=tid)
+                            mat_mr.baseColorTexture = pyg.TextureInfo(index=tid)
 
                         tid = textures[2]
                         if tid is not None:
-                            mat_mr.metallicRoughnessTexture = pyg.MaterialTexture(index=tid)
+                            mat_mr.metallicRoughnessTexture = pyg.TextureInfo(index=tid)
 
                         mat_mr.roughnessFactor = 1.0
                         mat_mr.metallicFactor = 1.0
@@ -672,8 +672,11 @@ class Deca3dHkSkeleton:
                 with open(ppath_skel_raw, 'wb') as f:
                     f.write(buffer)
 
+            exe_path, exe_name = os.path.split(sys.argv[0])
+            bin_path = os.path.join("./", exe_path, "..", "..", "..", "root", "bin")
+
             cmd = '{} {} {}'.format(
-                os.path.join('.', 'extern', 'HavokLib', 'build', '_bin2xml', 'bin2xml'),
+                os.path.join(bin_path, 'bin2xml'),
                 ppath_skel_raw,
                 ppath_skel_xml,
             )
@@ -756,7 +759,7 @@ class Deca3dHkSkeleton:
                 m_scale = np.eye(4)
 
                 m_translate[0:3, 3] = translate
-                m_rotate[0:3, 0:3] = sst.Rotation(rotate).as_dcm()
+                m_rotate[0:3, 0:3] = sst.Rotation(rotate).as_matrix()
                 m_scale[0, 0] = scale[0]
                 m_scale[1, 1] = scale[1]
                 m_scale[2, 2] = scale[2]

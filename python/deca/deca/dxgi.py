@@ -584,25 +584,32 @@ def process_image(*args, **kwargs):
     if process_image_func is None:
         c_process_image_lib = None
         exe_path, exe_name = os.path.split(sys.argv[0])
-        if len(exe_path) == 0:
-            exe_path = '.'
+        lib_path = os.path.join("./", exe_path, "..", "..", "..", "root", "lib")
 
         # process_image_func = setup_image_wasm
 
         if process_image_func is None:
-            if os.path.isfile('process_image.dll'):
-                # "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
-                # "cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll"
-                c_process_image_lib = ctypes.WinDLL('process_image.dll')
-            elif os.path.isfile(os.path.join(exe_path, 'process_image.so')):
-                # gcc -fPIC -shared -O3 deca/process_image.c -o process_image.so
-                c_process_image_lib = ctypes.CDLL(os.path.join(exe_path, 'process_image.so'))
-            elif os.path.isfile('process_image.so'):
-                # gcc -fPIC -shared -O3 deca/process_image.c -o process_image.so
-                c_process_image_lib = ctypes.CDLL('process_image.so')
+            # "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+            # "cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll"
+
+            # gcc -fPIC -shared -O3 deca/process_image.c -o process_image.so
+            paths = [
+                "process_image.dll",
+                os.path.join(lib_path, "process_image.dll"),
+                "process_image.so",
+                os.path.join(lib_path, "process_image.so"),
+            ]
+
+            for path in paths:
+                if os.path.isfile(path):
+                    print(f"Using C version of process_image from {path}")
+                    if os.path.splitext(path)[1].lower() == ".dll":
+                        c_process_image_lib = ctypes.WinDLL(path)
+                    else:
+                        c_process_image_lib = ctypes.CDLL(path)
+                    break
 
             if c_process_image_lib is not None:
-                print('Using C version of process_image')
                 prototype = ctypes.CFUNCTYPE(
                     ctypes.c_int,
                     ctypes.POINTER(ctypes.c_uint8),
@@ -624,6 +631,7 @@ def process_image(*args, **kwargs):
                 c_process_image_func = prototype(("process_image", c_process_image_lib), paramflags)
                 process_image_func = process_image_c
             else:
+                print('Using Python version of process_image')
                 process_image_func = process_image_python
 
     process_image_func(*args, **kwargs)

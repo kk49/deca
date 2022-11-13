@@ -7,8 +7,8 @@ import re
 
 
 game_info_prefixes = [
-    '../work/gameinfo',
-    './resources/gameinfo',
+    '../../../work/gameinfo',
+    '../../resources/deca/gameinfo',
 ]
 
 

@@ -42,7 +42,7 @@ build_script:
 
     echo SETUP PYTHON
 
-    cd C:\prj
+    cd C:\prj\deca
 
     c:\Python38-x64\python --version
 

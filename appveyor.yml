@@ -22,7 +22,7 @@ build_script:
 
     echo PATCH external libs
     
-    cd c:\prj\deca\extern\HavokLib\3rd_part\PreCore
+    cd c:\prj\deca\extern\HavokLib\3rd_party\PreCore
     
     git apply c:\prj\deca\path\pre_core.patch
 

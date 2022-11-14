@@ -69,6 +69,10 @@ build_script:
     pip install pyinstaller
 
     pip install requests
+    
+    pip install -e python/deca/
+    
+    pip install -e python/deca_gui/
 
 
     echo PACKAGE

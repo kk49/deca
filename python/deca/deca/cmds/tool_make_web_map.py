@@ -4,7 +4,7 @@ from deca.ff_adf import AdfDatabase
 from deca.ff_adf_amf import AABB
 from deca.ff_adf_amf_gltf import Deca3dMatrix
 from deca.digest import process_translation_adf, process_codex_adf
-from deca.util import make_dir_for_file
+from deca.util import make_dir_for_file, deca_root
 from deca.export_map import export_map, tileset_make
 import deca.ff_rtpc as rtpc
 from deca.ff_rtpc import parse_prop_data
@@ -669,8 +669,7 @@ class ToolMakeWebMap:
 
 
 def main():
-    tool = ToolMakeWebMap('../../../work/gz/project.json')
-    # tool = ToolMakeWebMap('../work/gz/project.json')
+    tool = ToolMakeWebMap(os.path.join(deca_root(), '..', 'work', 'gz', 'project.json'))
     tool.make_web_map(tool.vfs.working_dir, False)
 
 

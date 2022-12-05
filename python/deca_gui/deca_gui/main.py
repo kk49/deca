@@ -6,7 +6,7 @@ from deca.errors import *
 from deca.db_processor import VfsProcessor, vfs_structure_new, vfs_structure_open, vfs_structure_empty, VfsNode
 from deca.db_view import VfsView
 from deca.builder import Builder
-from deca.util import Logger, to_unicode
+from deca.util import Logger, to_unicode, deca_root
 from deca.cmds.tool_make_web_map import ToolMakeWebMap
 from deca.export_import import \
     nodes_export_raw, nodes_export_contents, nodes_export_processed, nodes_export_gltf, nodes_export_map
@@ -469,7 +469,8 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def project_open(self, checked):
-        filename = QFileDialog.getOpenFileName(self, 'Open Project ...', '../work', 'Project File (project.json)')
+
+        filename = QFileDialog.getOpenFileName(self, 'Open Project ...', os.path.join(deca_root(), '..', 'work'), 'Project File (project.json)')
         if filename is not None and len(filename[0]) > 0:
             project_file = filename[0]
             vfs = vfs_structure_open(project_file)
@@ -489,7 +490,7 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def file_gz_open(self, checked):
-        filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open GZ File ...', '../work', 'Any File (*)')
+        filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open GZ File ...', os.path.join(deca_root(), '..', 'work'), 'Any File (*)')
 
         if filenames and len(filenames[0]) > 0:
             path, _ = os.path.split(filenames[0])

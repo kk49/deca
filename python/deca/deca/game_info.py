@@ -1,5 +1,6 @@
 import deca
 from deca.ff_types import *
+from deca.util import deca_root
 from typing import List
 import os
 import json
@@ -7,8 +8,8 @@ import re
 
 
 game_info_prefixes = [
-    '../../../work/gameinfo',
-    '../../resources/deca/gameinfo',
+    '../work/gameinfo',
+    'resources/deca/gameinfo',
 ]
 
 
@@ -653,10 +654,9 @@ class GameInfoFactory:
 
 
 def determine_game_info(game_dir, exe_name, game_id=None):
-    deca_path = os.path.abspath(os.path.join(os.path.dirname(deca.__file__), '..'))
     json_files = []
     for prefix0 in game_info_prefixes:
-        prefix = os.path.abspath(os.path.join(deca_path, prefix0))
+        prefix = os.path.abspath(os.path.join(deca_root(), prefix0))
         if os.path.isdir(prefix):
             json_files += [os.path.join(prefix, fn) for fn in os.listdir(prefix) if fn.endswith('json')]
 

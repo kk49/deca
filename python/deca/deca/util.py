@@ -118,3 +118,11 @@ def to_unicode(s):
         s = s.decode('utf-8')
 
     return s
+
+
+def deca_root():
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        return sys._MEIPASS
+    except Exception:
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))

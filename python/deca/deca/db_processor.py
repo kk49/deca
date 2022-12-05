@@ -2,6 +2,7 @@ import os
 import re
 import csv
 import time
+import sys
 
 from .file import ArchiveFile
 from .db_types import *
@@ -11,7 +12,7 @@ from .db_commands import MultiProcessControl
 from .game_info import determine_game
 from .ff_types import *
 from .ff_adf import AdfDatabase
-from .util import Logger, make_dir_for_file
+from .util import Logger, make_dir_for_file, deca_root
 from .digest import process_translation_adf
 
 
@@ -34,7 +35,7 @@ def vfs_structure_new(filename):
     vfs = None
 
     if game_info is not None:
-        working_dir = '../work/{}/'.format(game_info.game_id)
+        working_dir = os.path.join(deca_root(), '..', 'work', game_info.game_id)
         project_file = os.path.join(working_dir, 'project.json')
         make_dir_for_file(project_file)
         game_info.save(project_file)
@@ -52,7 +53,7 @@ def vfs_structure_empty(game_dir, exe_name):
     game_info = determine_game(game_dir, exe_name)
     vfs = None
     if game_info is not None:
-        working_dir = '../work/{}_tmp/'.format(game_info.game_id)
+        working_dir = os.path.join(deca_root(), '..', 'work', '{}_tmp/'.format(game_info.game_id))
         project_file = os.path.join(working_dir, 'project.json')
         make_dir_for_file(project_file)
         game_info.save(project_file)
@@ -652,7 +653,8 @@ class VfsProcessor(VfsDatabase):
         self.logger.log('PROCESS: VHASHes: End: Total VHASHes {}'.format(len(vhashes)))
 
     def find_vpath_procmon_dir(self):
-        path_name = './procmon_csv/{}'.format(self.game_info.game_id)
+        path_name = os.path.join(deca_root(), 'procmon_csv', '{}'.format(self.game_info.game_id))
+
         custom_strings = set()
 
         if os.path.isdir(path_name):
@@ -681,14 +683,14 @@ class VfsProcessor(VfsDatabase):
 
     def find_vpath_resources(self):
         fns = [
-            (False, './resources/{}/strings.txt'.format(self.game_info.game_id)),
-            (False, './resources/{}/filenames.txt'.format(self.game_info.game_id)),
-            (True, './resources/{}/strings_procmon.txt'.format(self.game_info.game_id)),
-            (False, './resources/strings.txt'),  # backwords compatibility
+            (False, 'resources/deca/{}/strings.txt'.format(self.game_info.game_id)),
+            (False, 'resources/deca/{}/filenames.txt'.format(self.game_info.game_id)),
+            (True, 'resources/deca/{}/strings_procmon.txt'.format(self.game_info.game_id)),
+            (False, 'resources/deca/strings.txt'),  # backwords compatibility
 
-            (False, './resources/common/fields.txt'),  # deca common field names
-            (False, './resources/common/filenames.txt'),  # deca common file names
-            (False, './resources/common/strings.txt'),  # deca common strings
+            (False, 'resources/deca/common/fields.txt'),  # deca common field names
+            (False, 'resources/deca/common/filenames.txt'),  # deca common file names
+            (False, 'resources/deca/common/strings.txt'),  # deca common strings
 
             (False, '../work/fields.txt'),  # user common field names
             (False, '../work/filenames.txt'),  # user common file names
@@ -698,19 +700,20 @@ class VfsProcessor(VfsDatabase):
 
         ]
 
-        search_dir = './resources/ghidra_strings'
+        search_dir = 'resources/deca/ghidra_strings'
         if os.path.isdir(search_dir):
             for file in os.listdir(search_dir):
                 fns.append((False, os.path.join(search_dir, file)))
 
-        search_dir = './resources/field_strings'
+        search_dir = 'resources/deca/field_strings'
         if os.path.isdir(search_dir):
             for file in os.listdir(search_dir):
                 fns.append((False, os.path.join(search_dir, file)))
 
         string_count = 0
         with DbWrap(self, logger=self) as db:
-            for used_at_runtime, fn in fns:
+            for used_at_runtime, fn_org in fns:
+                fn = os.path.join(deca_root(), fn_org)
                 if os.path.isfile(fn):
                     self.logger.log('STRINGS FROM RESOURCES: {}: Loading possible strings'.format(fn))
 

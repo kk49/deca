@@ -12,6 +12,7 @@ venv*/
 .idea/
 dist/
 build/
+build_py/
 root/
 scratch/
 python/bin/digest/

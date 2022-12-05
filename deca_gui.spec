@@ -18,9 +18,11 @@ added_files = [
     ('root', 'root'),
 ]
 
+spec_root = os.path.abspath("./")
+
 a = Analysis(
     ['python/deca_gui/deca_gui/entry_point.py'],
-    pathex=['/home/krys/prj/deca'],
+    pathex=[os.path.join(spec_root, "root", "bin"), os.path.join(spec_root, "root", "lib")],
     binaries=[],
     datas=added_files,
     hiddenimports=[],

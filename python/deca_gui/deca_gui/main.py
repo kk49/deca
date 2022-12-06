@@ -517,6 +517,8 @@ def main():
     # options.add_argument("-f", "--file", type=str, required=True)
     # args = options.parse_args()
 
+    deca_root()
+
     # Qt Application
     app = QApplication(sys.argv)
     window = MainWindow()

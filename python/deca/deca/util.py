@@ -2,6 +2,7 @@ import datetime
 import os
 import struct
 import weakref
+import sys
 
 
 class Logger:
@@ -121,8 +122,20 @@ def to_unicode(s):
 
 
 def deca_root():
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        return sys._MEIPASS
-    except Exception:
-        return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    frozen = getattr(sys, 'frozen', False)
+    if frozen and hasattr(sys, '_MEIPASS'):
+        print('running in a PyInstaller bundle')
+        bundle_dir = sys._MEIPASS
+    else:
+        print('running in a normal Python process')
+        bundle_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+
+    print(f"{__file__=}")
+    print(f"{bundle_dir=}")
+    print(f"{sys.argv[0]=}")
+    print(f"{sys.executable=}")
+    print(f"{os.getcwd()=}")
+    print(f"{frozen=}")
+
+    return bundle_dir
+

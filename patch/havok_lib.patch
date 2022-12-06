@@ -1,0 +1,19 @@
+diff --git a/3rd_party/PreCore b/3rd_party/PreCore
+--- a/3rd_party/PreCore
++++ b/3rd_party/PreCore
+@@ -1 +1 @@
+-Subproject commit 8e98bdd6970f5eda44176fc5edd9cd2ba67af771
++Subproject commit 8e98bdd6970f5eda44176fc5edd9cd2ba67af771-dirty
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 66bb538..fb77bd9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -21,7 +21,7 @@ option(OBJECTS_PID "Imply PID for all objects." ${PYTHON_MODULE})
+ option(HK_STATIC_LIB "Builds havok-static target." OFF)
+ 
+ set(CMAKE_CXX_STANDARD 20)
+-add_compile_options(-Wall -Wextra)
++# add_compile_options(-Wall -Wextra)
+ find_package(Python3 COMPONENTS Development Interpreter)
+ 
+ if(TOOLSET)

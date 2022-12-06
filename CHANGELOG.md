@@ -1,9 +1,11 @@
 #### v0.2.16-wip ???
 * Updated to support COTW the Angler (WIP)
+* Added COTW reserve 14 NH support
+* New packaging
 
 #### v0.2.15 free abortions on demand
 * Updated to support COTW 2022-06-28
-* Added Finland update for COTW
+* Added COTW reserve 13 Finland support
 
 #### v0.2.14 5 by 5
 * added Mississippi (delta) update for COTW

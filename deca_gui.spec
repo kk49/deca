@@ -3,24 +3,26 @@
 block_cipher = None
 
 added_files = [
-    ('resources/*.txt', 'resources/'),
-    ('resources/adf', 'resources/adf'),
-    ('resources/an', 'resources/an'),
-    ('resources/field_strings', 'resources/field_strings'),
-    ('resources/gameinfo', 'resources/gameinfo'),
-    ('resources/ghidra_strings', 'resources/ghidra_strings'),
-    ('resources/gz', 'resources/gz'),
-    ('resources/gzb', 'resources/gzb'),
-    ('resources/hp', 'resources/hp'),
-    ('resources/jc4', 'resources/jc4'),
-    ('resources/rg2', 'resources/rg2'),
-    ('tool_resources/make_web_map', 'tool_resources/make_web_map'),
-    ('extern/HavokLib/build/_bin2xml/bin2xml*', 'extern/HavokLib/build/_bin2xml/'),
+    ('resources/deca/*.txt', 'resources/deca/'),
+    ('resources/deca/adf', 'resources/deca/adf'),
+    ('resources/deca/an', 'resources/deca/an'),
+    ('resources/deca/field_strings', 'resources/deca/field_strings'),
+    ('resources/deca/gameinfo', 'resources/deca/gameinfo'),
+    ('resources/deca/ghidra_strings', 'resources/deca/ghidra_strings'),
+    ('resources/deca/gz', 'resources/deca/gz'),
+    ('resources/deca/gzb', 'resources/deca/gzb'),
+    ('resources/deca/hp', 'resources/deca/hp'),
+    ('resources/deca/jc4', 'resources/deca/jc4'),
+    ('resources/deca/rg2', 'resources/deca/rg2'),
+    ('resources/make_web_map', 'resources/make_web_map'),
+    ('root', 'root'),
 ]
 
+spec_root = os.path.abspath("./")
+
 a = Analysis(
-    ['entry_point.py'],
-    pathex=['/home/krys/prj/deca'],
+    ['python/deca_gui/deca_gui/entry_point.py'],
+    pathex=[os.path.join(spec_root, "root", "bin"), os.path.join(spec_root, "root", "lib")],
     binaries=[],
     datas=added_files,
     hiddenimports=[],

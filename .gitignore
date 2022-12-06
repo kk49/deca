@@ -1,9 +1,10 @@
 *.pyc
+*.so
 *#
 log.txt
 deca_gui.pex
 __PYCACHE__/
-deca.egg-info/
+**.egg-info/
 test/
 tools/
 work/
@@ -11,7 +12,8 @@ venv*/
 .idea/
 dist/
 build/
+build_py/
+root/
 scratch/
-scratch/procmon_csv/
-scripts/digest/
-process_image.*
+python/bin/digest/
+

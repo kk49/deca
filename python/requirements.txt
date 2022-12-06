@@ -1,0 +1,14 @@
+kaitaistruct==0.10
+llvmlite==0.39.1
+matplotlib==3.6.2
+mmh3==3.0.0
+numba==0.56.4
+numpy==1.23.4
+openpyxl==3.0.10
+Pillow==9.3.0
+pygltflib==1.15.3
+PySide2==5.15.2.1
+scipy==1.9.3
+XlsxWriter==3.0.3
+zstandard==0.19.0
+zugbruecke==0.1.0

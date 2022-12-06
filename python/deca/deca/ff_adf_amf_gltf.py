@@ -478,7 +478,7 @@ class Deca3dModelc:
                             mat_sg['diffuseTexture'] = pyg.TextureInfo(index=tid)
                         tid = textures[2]
                         if tid is not None:
-                            mat_sg['specularGlossinessTexture'] = pyg.MaterialTexture(index=tid)
+                            mat_sg['specularGlossinessTexture'] = pyg.TextureInfo(index=tid)
 
                         gltf_material.extensions['KHR_materials_pbrSpecularGlossiness'] = mat_sg
                     else:

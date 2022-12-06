@@ -20,7 +20,8 @@
     "hp_nz_",
     "hp_mexico_",
     "hp_delta_",
-    "hp_finland_"
+    "hp_finland_",
+    "hp_nh_"
   ],
   "world_indexes": [0,1,2,3,4,5],
   "world_patches": [
@@ -60,7 +61,8 @@
     "textures/ui/map_reserve_10/",
     "textures/ui/map_reserve_11/",
     "textures/ui/map_reserve_12/",
-    "textures/ui/map_reserve_13/"
+    "textures/ui/map_reserve_13/",
+    "textures/ui/map_reserve_14/"
   ],
   "unarchived_files": [],
   "archive_paths": [

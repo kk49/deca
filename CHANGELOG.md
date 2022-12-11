@@ -1,8 +1,9 @@
 #### v0.2.16-wip ???
-* Sped up display of large files that display text
+* Sped up display of large files that display text 
 * Updated to support COTW the Angler (WIP)
 * Added COTW reserve 14 NH support
 * New packaging
+* Update to support zugbruecke 0.1.0,  `import zugbruecke as ctypes` -> `import zugbruecke.ctypes as ctypes`
 
 #### v0.2.15 free abortions on demand
 * Updated to support COTW 2022-06-28

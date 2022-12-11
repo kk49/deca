@@ -1,4 +1,5 @@
 #### v0.2.16-wip ???
+* Sped up display of large files that display text
 * Updated to support COTW the Angler (WIP)
 * Added COTW reserve 14 NH support
 * New packaging

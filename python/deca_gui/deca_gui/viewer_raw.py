@@ -1,24 +1,12 @@
 from .viewer import *
-from PySide2.QtWidgets import QSizePolicy, QVBoxLayout, QTextEdit
-from PySide2.QtGui import QFont
+from .viewer_text import DataViewerText
+
+MAX_DISPLAY_LINES = 1024 * 1024
 
 
-class DataViewerRaw(DataViewer):
+class DataViewerRaw(DataViewerText):
     def __init__(self):
-        DataViewer.__init__(self)
-
-        self.text_box = QTextEdit()
-        self.text_box.setReadOnly(True)
-        font = QFont("Courier", 8)
-        self.text_box.setFont(font)
-        self.text_box.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.text_box.setSizePolicy(size)
-
-        self.main_layout = QVBoxLayout()
-        self.main_layout.addWidget(self.text_box)
-        self.setLayout(self.main_layout)
+        super().__init__()
 
     def vnode_process(self, vfs: VfsProcessor, vnode: VfsNode):
         with vfs.file_obj_from(vnode) as f:
@@ -35,12 +23,16 @@ class DataViewerRaw(DataViewer):
             else:
                 return '░'
 
-        ss = ''
-        ss += header0 + '\n'
-        ss += header1 + '\n'
+        ss = [
+            header0,
+            header1
+        ]
+
         n = len(buf)
-        max_pos = min(n, 1024 * line_len)
-        for i in range(0, max_pos, line_len):
+        for i in range(0, n, line_len):
+            if i >= MAX_DISPLAY_LINES:
+                break
+
             ep = min(n, i + line_len)
             lb = buf[i:ep]
 
@@ -52,6 +44,6 @@ class DataViewerRaw(DataViewer):
             ls += ' | '
             ls += ''.join(lbc)
 
-            ss += ls + '\n'
+            ss.append(ls)
 
-        self.text_box.setText(ss)
+        self.content_set(ss)

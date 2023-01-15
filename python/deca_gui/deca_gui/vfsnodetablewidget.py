@@ -126,7 +126,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                 elif column == 3:
                     if node.file_sub_type is None:
                         return ''
-                    elif node.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE}:
+                    elif node.file_type in ftype_adf_family:
                         return '{:08x}'.format(node.file_sub_type)
                     else:
                         return '{}'.format(node.file_sub_type)
@@ -158,7 +158,7 @@ class VfsNodeTableModel(QAbstractTableModel):
                         return used_color_calc(node.used_at_runtime_depth)
                     elif column == 3:
                         if node.file_sub_type is not None and \
-                                node.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE} and \
+                                node.file_type in ftype_adf_family and \
                                 node.file_sub_type not in self.adf_db.type_map_def:
                             return QColor(Qt.red)
 

@@ -186,7 +186,7 @@ class VfsDirModel(QAbstractItemModel):
                 elif column == 3:
                     if vnode.file_sub_type is None:
                         return ''
-                    elif vnode.file_type in {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE}:
+                    elif vnode.file_type in ftype_adf_family:
                         return '{:08x}'.format(vnode.file_sub_type)
                     else:
                         return '{} ({})'.format(dxgi_name_db.get(vnode.file_sub_type, 'UNKNOWN'), vnode.file_sub_type)

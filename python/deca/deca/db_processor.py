@@ -275,6 +275,7 @@ class VfsProcessor(VfsDatabase):
             [self.process_by_ftype_match, (FTYPE_ADF, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_ADF_BARE, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_ADF0, 'process_adf_initial')],
+            [self.process_by_ftype_match, (FTYPE_ADF5, 'process_adf_initial')],
             [self.process_by_ftype_match, (FTYPE_RTPC, 'process_rtpc_initial')],
             [self.process_by_ftype_match, (FTYPE_GFX, 'process_gfx_initial')],
             [self.process_by_ftype_match, (FTYPE_TXT, 'process_txt_initial')],

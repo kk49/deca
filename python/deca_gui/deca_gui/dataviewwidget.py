@@ -95,7 +95,7 @@ class DataViewWidget(QWidget):
             self.tab_widget.setTabEnabled(self.tab_image_index, True)
             self.tab_image.vnode_process(vfs, vnode)
             self.tab_widget.setCurrentIndex(self.tab_image_index)
-        elif vnode.file_type in {FTYPE_ADF, FTYPE_ADF_BARE, FTYPE_ADF0}:
+        elif vnode.file_type in ftype_adf_family:
             # handle the case for GenZero where ADF files can be in the
             vnodes_adf = []
             vnodes_adfb = []

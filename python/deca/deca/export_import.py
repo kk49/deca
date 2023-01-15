@@ -144,7 +144,7 @@ def nodes_export_gltf(
             node = vfs_view.node_where_uid(uid)
             if node.is_valid() and node.offset is not None:
                 try:
-                    if node.file_type in {FTYPE_ADF, FTYPE_ADF_BARE, FTYPE_ADF0}:
+                    if node.file_type in ftype_adf_family:
                         vs_adf.append(node)
                     elif node.file_type in {FTYPE_RTPC}:
                         vs_rtpc.append(node)
@@ -215,7 +215,7 @@ def nodes_export_processed(
             node = nodes[0]
             if node.is_valid() and node.offset is not None:
                 try:
-                    if node.file_type in {FTYPE_ADF, FTYPE_ADF0, FTYPE_ADF_BARE}:
+                    if node.file_type in ftype_adf_family:
                         # handle the case for GenZero where ADF files can be in the
                         nodes_adf = []
                         nodes_adfb = []

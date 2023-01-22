@@ -8,7 +8,7 @@ from deca.errors import *
 from deca.file import ArchiveFile
 from deca.fast_file import *
 from deca.hashes import hash32_func
-from deca.ff_types import FTYPE_ADF_BARE, FTYPE_ADF0
+from deca.ff_types import FTYPE_ADF_BARE, FTYPE_ADF0, FTYPE_ADF5
 from deca.db_core import VfsDatabase, VfsNode
 
 # https://github.com/tim42/gibbed-justcause3-tools-fork/blob/master/Gibbed.JustCause3.FileFormats/AdfFile.cs
@@ -1108,6 +1108,9 @@ class AdfDatabase:
                     adf_type = node.file_sub_type
                 skip = 8  # skip magic and type id
                 adf = self._load_adf_bare(buffer[skip:], adf_type, 0, node.size_u - skip)
+            elif node.file_type == FTYPE_ADF5:
+                skip = 5
+                adf = self._load_adf(buffer[skip:])
             else:
                 adf = self._load_adf(buffer)
         except EDecaMissingAdfType as ae:

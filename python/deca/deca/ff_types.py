@@ -35,6 +35,7 @@ FTYPE_BINK_BIK = 'bik'
 FTYPE_GT0C = 'gt0c'
 FTYPE_GARC = 'garc'
 FTYPE_ADF0 = 'adf0'
+FTYPE_ADF5 = 'adf5'
 
 FTYPE_SYMLINK = 'symlink'
 
@@ -75,8 +76,9 @@ ftype_list = {
     FTYPE_GT0C: 1 << 28,
     FTYPE_GARC: 1 << 29,
     FTYPE_ADF0: 1 << 30,
+    FTYPE_ADF5: 1 << 31,
     FTYPE_EXE: 1 << 63,
     FTYPE_ANY_TYPE: 0xFFffFFffFFffFFff,
 }
 
-ftype_adf_family = {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE}
+ftype_adf_family = {FTYPE_ADF0, FTYPE_ADF, FTYPE_ADF_BARE, FTYPE_ADF5}

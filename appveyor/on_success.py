@@ -103,7 +103,7 @@ AUTHOR_NAME = result.stdout.decode('utf-8').rstrip()
 TIMESTAMP = datetime.datetime.now().isoformat() + 'Z'
 
 WEBHOOK_DATA = {
-    'username': '',
+    'username': 'DecaBot3000',
     'avatar_url': avatar_url,
     'embeds': [
         {

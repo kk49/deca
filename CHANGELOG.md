@@ -1,4 +1,4 @@
-#### v0.2.16-wip ???
+#### v0.2.16 what would it be like to be a raven? 
 * Support for processing of uncompressed COTW ADF save files
 * Sped up display of large files that display text
 * Updated to support COTW the Angler (WIP)

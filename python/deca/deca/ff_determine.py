@@ -50,7 +50,7 @@ def determine_file_type_and_size(f, file_size0):
             file_type = FTYPE_ADF
         elif b'\x00FDA' == magic[0:4]:
             file_type = FTYPE_ADF0
-        elif b'\x01\x01\x00\x00\x00 FDA':
+        elif b'\x01\x01\x00\x00\x00 FDA' == magic[0:19]:
             file_type = FTYPE_ADF5
         elif b'AVTX' == magic[0:4]:
             file_type = FTYPE_AVTX

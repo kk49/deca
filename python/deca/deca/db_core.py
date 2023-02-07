@@ -1338,9 +1338,12 @@ class VfsDatabase(DbBase):
                             # buffer_ret = in_buffer
                             # ret = compressed_len
                         elif compression_type in {compression_v4_03_zstd}:
-                            dc = zstd.ZstdDecompressor()
-                            buffer_ret = dc.decompress(in_buffer)
-                            ret = len(buffer_ret)
+                            if compressed_len == uncompressed_len:
+                                buffer_ret, ret = in_buffer, len(in_buffer)
+                            else:
+                                dc = zstd.ZstdDecompressor()
+                                buffer_ret = dc.decompress(in_buffer)
+                                ret = len(buffer_ret)
                         else:
                             if compressed_len == uncompressed_len:
                                 buffer_ret, ret = in_buffer, len(in_buffer)

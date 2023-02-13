@@ -18,7 +18,6 @@ from PySide2.QtCore import Slot, QUrl, Signal, QEvent
 from PySide2.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QStyle
 from PySide2.QtGui import QDesktopServices, QKeyEvent
 
-
 window_title = 'decaGUI: v0.2.18rc'
 
 
@@ -297,13 +296,13 @@ class MainWindow(QMainWindow):
             path = self.vfs_view_current().common_prefix()
 
             if self.sender() == self.ui.bt_extract_folder_show:
-                root = self.vfs.working_dir + 'extracted/'
+                root = os.path.join(self.vfs.working_dir, 'extracted')
             elif self.sender() == self.ui.bt_extract_gltf_3d_folder_show:
-                root = self.vfs.working_dir + 'gltf2_3d/'
+                root = os.path.join(self.vfs.working_dir, 'gltf2_3d')
             elif self.sender() == self.ui.bt_mod_folder_show:
-                root = self.vfs.working_dir + 'mod/'
+                root = os.path.join(self.vfs.working_dir, 'mod')
             elif self.sender() == self.ui.bt_mod_build_folder_show:
-                root = self.vfs.working_dir + 'build/'
+                root = os.path.join(self.vfs.working_dir, 'build')
                 path = None
             else:
                 root = None
@@ -326,7 +325,7 @@ class MainWindow(QMainWindow):
 
     def slot_extract_clicked(self, checked):
         self.extract(
-            'Extraction', self.vfs.working_dir + 'extracted/',
+            'Extraction', os.path.join(self.vfs.working_dir, 'extracted'),
             export_raw=self.ui.chkbx_export_raw_extract.isChecked(),
             export_contents=self.ui.chkbx_export_contents_extract.isChecked(),
             save_to_processed=self.ui.chkbx_export_processed_extract.isChecked(),
@@ -337,7 +336,7 @@ class MainWindow(QMainWindow):
 
     def slot_extract_gltf_clicked(self, checked):
         self.extract_gltf(
-            'GLTF2 / 3D', self.vfs.working_dir + 'gltf2_3d/',
+            'GLTF2 / 3D', os.path.join(self.vfs.working_dir, 'gltf2_3d'),
             save_to_one_dir=self.ui.chkbx_export_save_to_one_dir.isChecked(),
             include_skeleton=self.ui.chkbx_export_3d_include_skeleton.isChecked(),
             texture_format=self.ui.cmbbx_texture_format.currentText(),
@@ -348,7 +347,7 @@ class MainWindow(QMainWindow):
 
     def slot_mod_prep_clicked(self, checked):
         self.extract(
-            'Mod Prep', self.vfs.working_dir + 'mod/',
+            'Mod Prep', os.path.join(self.vfs.working_dir, 'mod'),
             export_raw=self.ui.chkbx_export_raw_mods.isChecked(),
             export_contents=self.ui.chkbx_export_contents_mods.isChecked(),
             save_to_processed=self.ui.chkbx_export_processed_mods.isChecked(),
@@ -365,8 +364,8 @@ class MainWindow(QMainWindow):
 
             self.builder.build_dir(
                 self.vfs,
-                self.vfs.working_dir + 'mod/',
-                self.vfs.working_dir + 'build/',
+                os.path.join(self.vfs.working_dir, 'mod'),
+                os.path.join(self.vfs.working_dir, 'build'),
                 subset=subset,
                 symlink_changed_file=False,
                 do_not_build_archive=self.ui.chkbx_mod_do_not_build_archives.isChecked()
@@ -470,7 +469,8 @@ class MainWindow(QMainWindow):
     @Slot()
     def project_open(self, checked):
 
-        filename = QFileDialog.getOpenFileName(self, 'Open Project ...', os.path.join(deca_root(), '..', 'work'), 'Project File (project.json)')
+        filename = QFileDialog.getOpenFileName(self, 'Open Project ...', os.path.join(deca_root(), '..', 'work'),
+                                               'Project File (project.json)')
         if filename is not None and len(filename[0]) > 0:
             project_file = filename[0]
             vfs = vfs_structure_open(project_file)
@@ -490,7 +490,9 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def file_gz_open(self, checked):
-        filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open GZ File ...', os.path.join(deca_root(), '..', 'work'), 'Any File (*)')
+        filenames, selected_filter = QFileDialog.getOpenFileNames(self, 'Open GZ File ...',
+                                                                  os.path.join(deca_root(), '..', 'work'),
+                                                                  'Any File (*)')
 
         if filenames and len(filenames[0]) > 0:
             path, _ = os.path.split(filenames[0])

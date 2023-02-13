@@ -1,8 +1,9 @@
 #### v0.2.18 ???
-* Support for Ravenbound Demo
+* add: support for Ravenbound Demo
+* fix: bug with skeleton extraction on Windows and path setup
 
 #### v0.2.17 can't sleep, hotfix time
-* Fixed bug with loading because of ADF5 type discovery (https://github.com/kk49/deca/issues/144)
+* fix: bug with loading because of ADF5 type discovery (https://github.com/kk49/deca/issues/144)
 
 #### v0.2.16 what would it be like to be a raven? 
 * Support for processing of uncompressed COTW ADF save files

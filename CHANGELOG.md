@@ -1,6 +1,7 @@
 #### v0.2.18 ???
 * add: support for Ravenbound Demo
 * fix: bug with skeleton extraction on Windows and path setup
+* fix: extracted raw files used directory name without slash
 
 #### v0.2.17 can't sleep, hotfix time
 * fix: bug with loading because of ADF5 type discovery (https://github.com/kk49/deca/issues/144)

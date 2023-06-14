@@ -1,4 +1,4 @@
-#### v0.2.18 ???
+#### v0.2.18 Lucid Knows
 * add: support for Ravenbound Demo
 * fix: bug with skeleton extraction on Windows and path setup
 * fix: extracted raw files used directory name without slash

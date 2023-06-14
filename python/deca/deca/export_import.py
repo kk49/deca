@@ -24,9 +24,9 @@ def extract_node_raw(
         if node.offset is not None:
             with ArchiveFile(vfs.file_obj_from(node)) as f:
                 if node.v_path is None:
-                    out_file = extract_dir + node.v_hash_to_str() + '.dat'
+                    out_file = os.path.join(extract_dir, node.v_hash_to_str() + '.dat')
                 else:
-                    out_file = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
+                    out_file = os.path.join(extract_dir, '{}'.format(node.v_path.decode('utf-8')))
 
                 vfs.logger.log('Exporting Raw: {}'.format(out_file))
 
@@ -172,7 +172,8 @@ def nodes_export_gltf(
 
         except EDecaFileExists as e:
             vfs.logger.log(
-                'WARNING: Extracting {} Failed: overwrite disabled and {} exists, skipping'.format(node.v_path, e.args[0]))
+                'WARNING: Extracting {} Failed: overwrite disabled and {} exists, skipping'.format(node.v_path,
+                                                                                                   e.args[0]))
         except EDecaMissingAdfType as e:
             vfs.logger.log(
                 'ERROR: Extracting {} Failed: Missing ADF Type 0x{:08x}  '.format(node.v_path, e.type_id))
@@ -207,6 +208,7 @@ def nodes_export_processed(
     vs_rtpc = []
     vs_images = []
     vs_fsb5cs = []
+    vs_rename = []
     vs_other = []
     node_map = vfs_view.nodes_selected_get()
     for k, (nodes_real, nodes_sym) in node_map.items():
@@ -236,7 +238,8 @@ def nodes_export_processed(
                         vs_images.append(node)
                     elif node.file_type in {FTYPE_FSB5C}:
                         vs_fsb5cs.append(node)
-                    elif isinstance(node.v_path, bytes) and (node.v_path.endswith(b'.csvc') or node.v_path.endswith(b'.bmpc')):
+                    elif isinstance(node.v_path, bytes) and (
+                            node.v_path.endswith(b'.csvc') or node.v_path.endswith(b'.bmpc')):
                         vs_rename.append(node)
                     else:
                         vs_other.append(node)

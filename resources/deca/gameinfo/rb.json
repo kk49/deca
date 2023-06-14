@@ -1,0 +1,104 @@
+{
+  "game_id": "rb",
+  "exe_match": ".*Ravenbound.*",
+  "archive_version": 5,
+  "file_hash_size": 8,
+  "oo_decompress_dll": "${GAME_DIR}/oo2core_7_win64.dll",
+  "area_prefixes": [
+    "",
+    "testbed",
+    "prototype"
+  ],
+  "world_indexes": [0,1,2,3,4,5],
+  "world_patches": [
+    "worlds/prototype/terrain/patches/width_3/",
+    "worlds/prototype/terrain/patches/width_4/",
+    "worlds/prototype/terrain/patches/width_8/",
+    "worlds/prototype/terrain/veg_streampatches/width_3/",
+    "worlds/prototype/terrain/veg_streampatches/width_4/",
+    "worlds/prototype/terrain/veg_streampatches/width_8/",
+    "worlds/testbed/terrain/patches/width_3/",
+    "worlds/testbed/terrain/patches/width_4/",
+    "worlds/testbed/terrain/patches/width_8/",
+    "worlds/testbed/terrain/veg_streampatches/width_3/",
+    "worlds/testbed/terrain/veg_streampatches/width_4/",
+    "worlds/testbed/terrain/veg_streampatches/width_8/"
+  ],
+  "world_occluders": [
+    "worlds/prototype/terrain/occluder/",
+    "worlds/testbed/terrain/occluder/"
+  ],
+  "world_navheightfields": [
+    "worlds/prototype/terrain/hp/navheightfield/globalhires/",
+    "worlds/testbed/terrain/hp/navheightfield/globalhires/"
+  ],
+  "world_hm": [
+    "worlds/prototype/terrain/hp/horizonmap/horizon_${AREA_PREFIX}",
+    "worlds/testbed/terrain/hp/horizonmap/horizon_${AREA_PREFIX}"
+  ],
+  "world_ai": [
+    "ai/tiles/",
+    "worlds/prototype/ai/tiles/",
+    "worlds/testbed/ai/tiles/",
+    "worlds/world${WORLD_INDEX}/ai/tiles/"
+  ],
+  "map_zooms": [0,1,2,3],
+  "map_max_count": 500,
+  "map_prefixes": [
+    "worlds/${AREA_PREFIX}/world_map/worldmap_"
+  ],
+  "unarchived_files": [],
+  "archive_paths": [
+    "${GAME_DIR}/archives_win64/"
+  ],
+  "mdic_ftype": "mdi",
+  "navmesh_ftype": "h2014",
+  "obc_ftype": "",
+  "pfs_ftype": "pfx",
+  "has_garcs": true,
+  "file_assoc": [
+    {
+      ".ee": "sarc",
+      ".epe": "rtpc"
+    },
+    {
+      ".bl": "META-ANY-TYPE",
+      ".nl": "META-ANY-TYPE",
+      ".fl": "META-ANY-TYPE",
+      ".blo": "rtpc",
+      ".nl.mdic": "adf",
+      ".fl.mdic": "adf",
+      ".pfs": "tag0",
+      ".obc": "obc"
+    },
+    {
+      ".meshc": "adf",
+      ".hrmeshc": "adf",
+      ".modelc": "adf",
+      ".model_xml": "txt",
+      ".model_deps": "txt",
+      ".pfxc": "pfx"
+    },
+    {
+      ".ddsc": "avtx,dds",
+      ".hmddsc": "atx,META-NO-TYPE",
+      ".atx0": "atx,META-NO-TYPE",
+      ".atx1": "atx,META-NO-TYPE",
+      ".atx2": "atx,META-NO-TYPE"
+    },
+    {
+      ".fmod_sbankc": "txt",
+      ".fmod_bankc": "riff"
+    },
+    {
+      ".swf": "gfx",
+      ".cfx": "gfx",
+      ".gfx": "gfx"
+    },
+    {
+      ".gdc": "adf",
+      ".gsc": "adf",
+      ".stringlookup": "adf"
+    }
+  ]
+}

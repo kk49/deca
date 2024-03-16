@@ -2,6 +2,7 @@
 * add: Support for COTW hp_australia
 * fix: ADF5 file determination for COTW save files
 * fix: hack? empty `gdc/global.gdcc` in COTW now?
+
 #### v0.2.18 Lucid Knows
 * add: support for Ravenbound Demo
 * fix: bug with skeleton extraction on Windows and path setup

@@ -5,7 +5,6 @@ from deca.ff_aaf import load_aaf_header
 from deca.ff_avtx import DdImageHeader
 from deca.ff_types import *
 
-
 # guess type
 raw_image_size = {
     0x1000000: '',
@@ -26,7 +25,7 @@ def file_stats(f, file_size):
     # TODO huge files will take a WHILE
     counts = np.zeros((256,), dtype=np.uint32)
     while True:
-        buf = f.read(1024*1024)
+        buf = f.read(1024 * 1024)
         if len(buf) == 0:
             break
         buf = bytearray(buf)
@@ -41,49 +40,49 @@ def determine_file_type_and_size(f, file_size0):
     file_size = file_size0
 
     start_pos = f.tell()
-    magic = f.read(256)
+    magic: bytes = f.read(256)
     magic_int = None
     if len(magic) >= 20:
         magic_int = struct.unpack('I', magic[0:4])[0]
 
-        if b' FDA' == magic[0:4]:
+        if magic.startswith(b' FDA'):
             file_type = FTYPE_ADF
-        elif b'\x00FDA' == magic[0:4]:
+        elif magic.startswith(b'\x00FDA'):
             file_type = FTYPE_ADF0
-        elif b'\x01\x01\x00\x00\x00 FDA' == magic[0:19]:
+        elif magic.startswith(b'\x01\x01\x00\x00\x00 FDA'):
             file_type = FTYPE_ADF5
-        elif b'AVTX' == magic[0:4]:
+        elif magic.startswith(b'AVTX'):
             file_type = FTYPE_AVTX
             header = DdImageHeader()
             header.deserialize_ddsc(magic)
             file_sub_type = header.dds_header_dxt10.dxgiFormat
-        elif b'DDS ' == magic[0:4]:
+        elif magic.startswith(b'DDS '):
             file_type = FTYPE_DDS
             header = DdImageHeader()
             header.deserialize_dds(magic)
             file_sub_type = header.dds_header_dxt10.dxgiFormat
-        elif b'AAF' == magic[0:3].upper():
+        elif magic.upper().startswith(b'AAF'):
             file_type = FTYPE_AAF
             f.seek(start_pos)
             aafh = load_aaf_header(f)
             file_size = aafh.size_u
-        elif b'RTPC' == magic[0:4]:
+        elif magic.startswith(b'RTPC'):
             file_type = FTYPE_RTPC
-        elif b'CFX' == magic[0:3]:
+        elif magic.startswith(b'CFX'):
             file_type = FTYPE_GFX
-        elif b'GFX' == magic[0:3]:
+        elif magic.startswith(b'GFX'):
             file_type = FTYPE_GFX
-        elif b'RIFF' == magic[0:4]:
+        elif magic.startswith(b'RIFF'):
             file_type = FTYPE_RIFF
-        elif b'OggS' == magic[0:4]:
+        elif magic.startswith(b'OggS'):
             file_type = FTYPE_OGG
-        elif b'BM6' == magic[0:3]:
+        elif magic.startswith(b'BM6'):
             file_type = FTYPE_BMP
-        elif b'BM8' == magic[0:3]:
+        elif magic.startswith(b'BM8'):
             file_type = FTYPE_BMP
-        elif b'MDI\x00' == magic[0:4]:
+        elif magic.startswith(b'MDI\x00'):
             file_type = FTYPE_MDI
-        elif b'PFX\x00' == magic[0:4]:
+        elif magic.startswith(b'PFX\x00'):
             file_type = FTYPE_PFX
         elif b'SARC' == magic[4:8]:
             file_type = FTYPE_SARC
@@ -91,15 +90,15 @@ def determine_file_type_and_size(f, file_size0):
             file_type = FTYPE_TAG0
         elif b'FSB5' == magic[16:20]:
             file_type = FTYPE_FSB5C
-        elif b'\x57\xE0\xE0\x57\x10\xC0\xC0\x10' == magic[0:8]:
+        elif magic.startswith(b'\x57\xE0\xE0\x57\x10\xC0\xC0\x10'):
             file_type = FTYPE_H2014
-        elif b'\x05\x00\x00\x00RBMDL' == magic[0:9]:
+        elif magic.startswith(b'\x05\x00\x00\x00RBMDL'):
             file_type = FTYPE_RBMDL
-        elif b'KB2' == magic[0:3]:
+        elif magic.startswith(b'KB2'):
             file_type = FTYPE_BINK_KB2
-        elif b'BIK' == magic[0:3]:
+        elif magic.startswith(b'BIK'):
             file_type = FTYPE_BINK_BIK
-        elif b'GT0C' == magic[0:4]:
+        elif magic.startswith(b'GT0C'):
             file_type = FTYPE_GT0C
 
     # need to inspect file structure

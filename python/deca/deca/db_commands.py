@@ -24,6 +24,7 @@ from .util import remove_prefix_if_present, remove_suffix_if_present
 from .kaitai.gfx import Gfx
 
 print_node_info = False
+debug_local_process = False
 
 hash32_object_id = hash32_func('_object_id')
 hash32_class = hash32_func('_class')
@@ -159,8 +160,7 @@ class MultiProcessControl:
         last_update = None
         start_time = time.time()
 
-        local = False
-        if local:
+        if debug_local_process:
             vfs = VfsDatabase(self.project_file, self.working_dir, self.logger)
             processor = Processor(vfs, LogWrapper(self.logger))
             for i, command in command_todo:
@@ -242,7 +242,8 @@ class MultiProcessControl:
                             command = command_active.pop(proc_name)
                             command_complete.append([proc_name, proc_params[0]])
                             command_results[command[0]] = proc_params[1]
-                            self.logger.debug('Manager: {} completed {} {}'.format(proc_name, proc_params[0], len(proc_params[1])))
+                            self.logger.debug(
+                                'Manager: {} completed {} {}'.format(proc_name, proc_params[0], len(proc_params[1])))
                         elif proc_cmd == 'process_done':
                             self.logger.debug('Manager: {} DONE'.format(proc_name))
                             command_active.pop(proc_name)
@@ -277,9 +278,12 @@ class Processor:
         self._comm = comm
 
         self.commands = {
-            'process_hash_file_contents': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_hash_file_contents),
-            'process_file_type_find_no_name': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find_no_name),
-            'process_file_type_find_with_name': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_file_type_find_with_name),
+            'process_hash_file_contents': lambda idxs: self.loop_over_uid_wrapper(idxs,
+                                                                                  self.process_hash_file_contents),
+            'process_file_type_find_no_name': lambda idxs: self.loop_over_uid_wrapper(idxs,
+                                                                                      self.process_file_type_find_no_name),
+            'process_file_type_find_with_name': lambda idxs: self.loop_over_uid_wrapper(idxs,
+                                                                                        self.process_file_type_find_with_name),
             'process_symlink': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_symlink),
             'process_exe': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_exe),
             'process_arc': lambda idxs: self.loop_over_uid_wrapper(idxs, self.process_arc),
@@ -359,7 +363,7 @@ class Processor:
                 h = hashlib.sha1()
                 with db.db().file_obj_from(node) as f:
                     while True:
-                        buf = f.read(1024*10124)
+                        buf = f.read(1024 * 10124)
                         if buf is None or len(buf) == 0:
                             break
 
@@ -985,7 +989,7 @@ class MultiProcessVfsBase:
         self.q_out = q_out
 
     def send(self, cmd, *params):
-        self.q_out.put((self.name, cmd, params, ))
+        self.q_out.put((self.name, cmd, params,))
 
     def log(self, msg):
         self.send('log', msg)
@@ -1028,6 +1032,6 @@ def run_mp_vfs_base(name, project_file, working_dir, q_in, q_out):
         vfs.shutdown()
     except:
         ei = sys.exc_info()
-        q_out.put((name, 'exception', [ei[0], ei[1], traceback.format_tb(ei[2])], ))
+        q_out.put((name, 'exception', [ei[0], ei[1], traceback.format_tb(ei[2])],))
 
     q_out.put((name, 'process_done', [],))

@@ -39,6 +39,8 @@ build_script:
 
     nmake
 
+    mkdir C:\prj\deca\root
+
     mkdir C:\prj\deca\root\bin
     
     mkdir C:\prj\deca\root\lib
@@ -46,6 +48,21 @@ build_script:
     copy C:\prj\deca\build\cpp\bin2xml\bin2xml* C:\prj\deca\root\bin\ 
     
     copy C:\prj\deca\build\cpp\process_image\process_image* C:\prj\deca\root\lib\ 
+
+    copy C:\prj\deca\build\extern\HavokLib\source\havok.dll C:\prj\deca\root\bin\
+
+    copy C:\prj\deca\build\extern\HavokLib\3rd_party\PreCore\precore6.dll C:\prj\deca\root\bin\
+
+    copy C:\prj\deca\build\extern\HavokLib\3rd_party\PreCore\3rd_party\3rd_party\glm\glm\glm_shared.dll
+
+    copy C:\prj\deca\build\extern\HavokLib\3rd_party\PreCore\3rd_party\pugixml\pugixml1.dll C:\prj\deca\root\bin\
+
+
+    echo UN-PATCH external libs
+    
+    cd c:\prj\deca\extern\HavokLib\3rd_party\PreCore
+    
+    git apply -R c:\prj\deca\patch\pre_core.patch
 
 
     echo SETUP PYTHON

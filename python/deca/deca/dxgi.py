@@ -590,9 +590,9 @@ def process_image(*args, **kwargs):
 
         if process_image_func is None:
             # "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
-            # "cl.exe /D_USRDLL /D_WINDLL deca/process_image.c /link /DLL /OUT:process_image.dll"
+            # "cl.exe /D_USRDLL /D_WINDLL cpp/process_image/src/process_image.c /link /DLL /OUT:process_image.dll"
 
-            # gcc -fPIC -shared -O3 deca/process_image.c -o process_image.so
+            # gcc -fPIC -shared -O3 cpp/process_image/src/process_image.c -o process_image.so
             paths = [
                 "process_image.dll",
                 os.path.join(lib_path, "process_image.dll"),

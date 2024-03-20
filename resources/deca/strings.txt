@@ -19943,6 +19943,8 @@ Missions|
 missions/achievements.group.hpmissions
 .missionsc
 missions/metaprogression/meta.group.hpmissions
+missions/missions.hpmissionsc
+missions/missions.stringlookup
 mission.start_campaign
 MissionsUpdated
 m_IsSpecialization
@@ -23985,8 +23987,7 @@ settings/hp_settings/player_initial_loadout.bin
 settings/hp_settings/player_rewards.bin
 settings/hp_settings/player_skills.bin
 settings/hp_settings/player_skill_trees.bin
-settings/hp_settings/reserve_%d.bin
-settings/hp_settings/reserve_%d.bl
+settings/hp_settings/reserves.bin
 settings/hp_settings/string_ids.stringlookup
 settings/hp_settings/tooltip_icon_data.bin
 settings/hp_settings/world_object_types.bin

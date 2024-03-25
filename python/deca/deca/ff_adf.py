@@ -213,6 +213,20 @@ class InstanceEntry:
     #     return v
 
 
+# Type-hashes and their coresponding type-names
+# The last 3 digits represent a metatype, size in bytes and byte-alignment
+# 0x580D0A62 == hashlittle2("int8011")
+# 0x0CA2821D == hashlittle2("uint8011")
+# 0xD13FCF93 == hashlittle2("int16022")
+# 0x86D152BD == hashlittle2("uint16022")
+# 0x192FE633 == hashlittle2("int32044")
+# 0x075E4E4F == hashlittle2("uint32044")
+# 0xAF41354F == hashlittle2("int64088")
+# 0xA139E01F == hashlittle2("uint64088")
+# 0x7515A207 == hashlittle2("float044")
+# 0xC609F663 == hashlittle2("double088")
+# 0x8955583E == hashlittle2("String588")
+        
 typedef_s8 = 0x580D0A62
 typedef_u8 = 0x0ca2821d
 typedef_s16 = 0xD13FCF93
@@ -579,21 +593,57 @@ def read_instance(
             v = AdfValue(v, type_id, dpos + abs_offset, v0[0] + abs_offset)
 
     elif type_id == 0x178842fe:  # gdc/global.gdcc
+        # TypeID 0x178842fe is the GameDataCollection structure (metatype = 1).
+        # This structure consist of two arrays A[GDCFileEntry] (metatype 3) and A[StringHash] (metatype 3)
+        # Usualy these additional types can be found in ADF parts of EXE file.
+        #
+        # For exemple "theHunterCotW_F.exe" contains the file "gamedatacollection.adf"
+        # with the folowing types:
+        #
+        #     GameDataCollection (Struct, 0x178842fe,  metatype = 1)
+        #         Files: A[GDCFileEntry] (ArrayEntry, 0xe3524ceb, metatype = 3)
+        #         Names: A[StringHash] (ArrayEntry, 0xb68e5583, metatype = 3)
+        #
+        #     GDCFileEntry (Struct, 0x0a0c56ee, metatype = 1)
+        #         Data: (Deferred, 0xdefe88ed, metatype = 6)
+        #         FileName: (String, 0x8955583e, metatype = 5)
+        #         Version: (UInt32, 0x075e4e4f, metatype = 0)
+        #
+        #     StringHash (StringHash, 0x48c5294d, metatype = 5)
+        #
+        #     etc...
+        #
+        # TODO: We need to get rid of the hacks below. This part should be completely reworked.
+        # The file "gdc/global.gdcc" doesn't contain GameDataCollection types. We need to retrieve these
+        # types from ADF-part of the EXE file and then continue parsing "gdc/global.gdcc".
+
         try:
-            # TODO this should probably be it's own file type and the adf should be considered a wrapper
             gdf_buffer = buffer[buffer_pos:]
             gdf_n_buffer = len(gdf_buffer)
             gdf_buffer_pos = 0
 
             count, gdf_buffer_pos = ff_read_u32s(gdf_buffer, gdf_n_buffer, gdf_buffer_pos, 8)
-            assert count[0] == 32, f"{count[0]=}"
-            assert count[1] == 16, f"{count[1]=}"
+
+            # A[GDCFileEntry] (metatype = 3, typehash = 0xe3524ceb)
+            # Array-Offset :: 2 x ArrayEntries [2 * 16 = 32] or zero [0] on empty data
+            assert count[0] == 32 or count[0] == 0, f"{count[0]=}"
+            # Chain-Offset :: Offset to the next entry [16] or zero [0] on empty data
+            assert count[1] == 16 or count[1] == 0, f"{count[1]=}"
+            # Array-Length :: Files count (this entry) == Names count (next entry)
             assert count[2] == count[6], f"{count[2]=} {count[6]=}"
+            # Zero-Fill :: 16 bytes alignment
             assert count[3] == 0, f"{count[3]=}"
+
+            # A[StringHash] (metatype = 3, typehash = 0xb68e5583)
+            # Array-Offset :: Unpredictable due to multiple byte-alignments, or zero [0] on empty data
             # assert(count[4] == filesize +- k)
-            assert count[5] == 16, f"{count[5]=}"
+            # Chain-Offset :: Offset to the next entry [16] or zero [0] on empty data
+            assert count[5] == 16 or count[5] == 0, f"{count[5]=}"
+            # Array-Length :: Names count (this entry) == Files count (prev entry)
             assert count[6] == count[2], f"{count[2]=} {count[6]=}"
+            # Zero-Fill :: 16 bytes alignment
             assert count[7] == 0, f"{count[7]=}"
+
             dir_list = []
             for i in range(count[2]):
                 d00_offset, gdf_buffer_pos = ff_read_u32(gdf_buffer, gdf_n_buffer, gdf_buffer_pos)

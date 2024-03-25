@@ -4,6 +4,7 @@ import struct
 import weakref
 import sys
 
+from deca.path import UniPath
 
 class Logger:
     def __init__(self, working_dir):
@@ -128,7 +129,7 @@ def deca_root():
         bundle_dir = sys._MEIPASS
     else:
         # print('running in a normal Python process')
-        bundle_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+        bundle_dir = UniPath.abspath(UniPath.join(UniPath.dirname(__file__), '..', '..', '..'))
 
     # print(f"{__file__=}")
     # print(f"{bundle_dir=}")

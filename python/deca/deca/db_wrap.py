@@ -1,10 +1,12 @@
 import os
+
 from .db_core import VfsDatabase, VfsNode, GtocArchiveEntry
 from .db_cross_game import DbCrossGame
 from .ff_adf import AdfDatabase
 from .ff_types import *
 from .db_types import *
 from .ff_determine import determine_file_type_and_size
+from .path import UniPath
 from .file import ArchiveFile
 
 
@@ -20,7 +22,7 @@ def determine_file_type_by_name(vfs: VfsDatabase, node: VfsNode):
                 filename = node.p_path
 
             if filename is not None:
-                file, ext = os.path.splitext(filename)
+                file, ext = UniPath.splitext(filename)
                 if ext.startswith(b'.atx'):
                     node.file_type = FTYPE_ATX
                 elif ext == b'.hmddsc':

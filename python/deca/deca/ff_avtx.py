@@ -3,6 +3,7 @@ import io
 import pprint
 import numpy as np
 from PIL import Image
+from .path import UniPath
 from .file import ArchiveFile
 from .errors import *
 from .ff_types import *
@@ -490,7 +491,7 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
         if vnode.v_path is None:
             filename = None
         else:
-            filename = os.path.splitext(vnode.v_path)
+            filename = UniPath.splitext(vnode.v_path)
         f_ddsc = vfs.file_obj_from(vnode)
         ddsc = Ddsc()
         ddsc.load_dds(ArchiveFile(f_ddsc), filename=filename, save_raw_data=save_raw_data)
@@ -501,7 +502,7 @@ def image_load(vfs: VfsDatabase, vnode: VfsNode, save_raw_data=False):
             ddsc = Ddsc()
             ddsc.load_ddsc(f_ddsc, save_raw_data=save_raw_data)
         else:
-            filename = os.path.splitext(vnode.v_path)
+            filename = UniPath.splitext(vnode.v_path)
             if len(filename[1]) == 0 and vnode.file_type == FTYPE_AVTX:
                 filename_ddsc = vnode.v_path
             else:
@@ -681,13 +682,13 @@ def image_export(vfs: VfsDatabase, node: VfsNode, extract_dir, export_raw, expor
 
             for cnode in cnodes:
                 if cnode.v_path is None:
-                    ofile = extract_dir + '{:08X}.dat'.format(cnode.v_hash)
+                    ofile = UniPath.join(extract_dir, '{:08X}.dat'.format(cnode.v_hash))
                 else:
-                    ofile = extract_dir + '{}'.format(cnode.v_path.decode('utf-8'))
+                    ofile = UniPath.join(extract_dir, '{}'.format(cnode.v_path.decode('utf-8')))
 
                 make_dir_for_file(ofile)
 
-                if not allow_overwrite and os.path.isfile(ofile):
+                if not allow_overwrite and UniPath.isfile(ofile):
                     existing_files.append(ofile)
                 else:
                     with open(ofile, 'wb') as fo:
@@ -697,25 +698,25 @@ def image_export(vfs: VfsDatabase, node: VfsNode, extract_dir, export_raw, expor
 
         if export_processed and multifile:
             if node.v_path is None:
-                ofile = extract_dir + '{:08X}.dat'.format(node.v_hash)
+                ofile = UniPath.join(extract_dir, '{:08X}.dat'.format(node.v_hash))
             else:
-                ofile = extract_dir + '{}'.format(node.v_path.decode('utf-8'))
+                ofile = UniPath.join(extract_dir, '{}'.format(node.v_path.decode('utf-8')))
 
             make_dir_for_file(ofile)
 
-            ofile = os.path.splitext(ofile)[0]
+            ofile = UniPath.splitext(ofile)[0]
             ofile = ofile + '.ddsc'
 
             # export to reference png file
             ofile_img = ofile + '.DECA.REFERENCE.png'
-            if not allow_overwrite and os.path.isfile(ofile_img):
+            if not allow_overwrite and UniPath.isfile(ofile_img):
                 existing_files.append(ofile_img)
             else:
                 ddsc_write_to_png(ddsc, ofile_img)
 
             # export dds with all mip levels
             ofile_img = ofile + '.dds'
-            if not allow_overwrite and os.path.isfile(ofile_img):
+            if not allow_overwrite and UniPath.isfile(ofile_img):
                 existing_files.append(ofile_img)
             else:
                 ddsc_write_to_dds(ddsc, ofile_img)
@@ -753,7 +754,7 @@ def image_import(vfs: VfsDatabase, node: VfsNode, ifile: str, opath: str):
         out_vpaths = set(out_vpaths)
 
         for vpath_out in out_vpaths:
-            fout_name = os.path.join(opath, vpath_out.decode('utf-8'))
+            fout_name = UniPath.join(opath, vpath_out.decode('utf-8'))
 
             make_dir_for_file(fout_name)
 

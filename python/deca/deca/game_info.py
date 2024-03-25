@@ -1,6 +1,6 @@
-import deca
 from deca.ff_types import *
 from deca.util import deca_root
+from deca.path import UniPath
 from typing import List
 import os
 import json
@@ -208,13 +208,13 @@ class GameInfoGZ(GameInfo):
         ]
 
     def unarchived_files(self):
-        files = [os.path.join(self.game_dir, 'Shaders_F.shader_bundle')]
+        files = [UniPath.join(self.game_dir, 'Shaders_F.shader_bundle')]
         return files
 
     def archive_paths(self):
         archive_paths = []
         for cat in ['initial', 'supplemental', 'optional']:
-            archive_paths.append(os.path.join(self.game_dir, 'archives_win64', cat))
+            archive_paths.append(UniPath.join(self.game_dir, 'archives_win64', cat))
         return archive_paths
 
     def mdic_ftype(self):
@@ -330,7 +330,7 @@ class GameInfoTHCOTW(GameInfo):
 
     def archive_paths(self):
         archive_paths = []
-        archive_paths.append(os.path.join(self.game_dir, 'archives_win64'))
+        archive_paths.append(UniPath.join(self.game_dir, 'archives_win64'))
         return archive_paths
 
     def mdic_ftype(self):
@@ -399,9 +399,9 @@ class GameInfoJC3(GameInfo):
 
     def archive_paths(self):
         archive_paths = []
-        archive_paths.append(os.path.join(self.game_dir, 'patch_win64'))
-        archive_paths.append(os.path.join(self.game_dir, 'archives_win64'))
-        archive_paths.append(os.path.join(self.game_dir, 'dlc_win64'))
+        archive_paths.append(UniPath.join(self.game_dir, 'patch_win64'))
+        archive_paths.append(UniPath.join(self.game_dir, 'archives_win64'))
+        archive_paths.append(UniPath.join(self.game_dir, 'dlc_win64'))
         return archive_paths
 
     def mdic_ftype(self):
@@ -460,7 +460,7 @@ class GameInfoJC4(GameInfo):
     def __init__(self, game_dir, exe_name):
         GameInfo.__init__(self, game_dir, exe_name, 'jc4')
         self.archive_version = 4
-        self.oo_decompress_dll = os.path.join(game_dir, 'oo2core_7_win64.dll')
+        self.oo_decompress_dll = UniPath.join(game_dir, 'oo2core_7_win64.dll')
         self.map_prefixes += [
             'dlc/agency/textures/ui/map0/',
             'dlc/agency/textures/ui/map1/',
@@ -472,7 +472,7 @@ class GameInfoJC4(GameInfo):
 
     def archive_paths(self):
         archive_paths = []
-        archive_paths.append(os.path.join(self.game_dir, 'archives_win64'))
+        archive_paths.append(UniPath.join(self.game_dir, 'archives_win64'))
         return archive_paths
 
     def mdic_ftype(self):
@@ -535,7 +535,7 @@ class GameInfoRage2(GameInfo):
         GameInfo.__init__(self, game_dir, exe_name, 'rg2')
         self.archive_version = 5
         self.file_hash_size = 8
-        self.oo_decompress_dll = os.path.join(game_dir, 'oo2core_7_win64.dll')
+        self.oo_decompress_dll = UniPath.join(game_dir, 'oo2core_7_win64.dll')
         self.map_prefixes += [
         ]
 
@@ -567,7 +567,7 @@ class GameInfoRage2(GameInfo):
 
     def archive_paths(self):
         archive_paths = [
-            os.path.join(self.game_dir, 'archives_win64'),
+            UniPath.join(self.game_dir, 'archives_win64'),
         ]
         return archive_paths
 
@@ -639,7 +639,7 @@ class GameInfoFactory:
         exe_match = self.json.get('exe_match', None)
         exe_not_match = self.json.get('exe_not_match', None)
 
-        full_path = os.path.join(game_dir, exe_name)
+        full_path = UniPath.join(game_dir, exe_name)
 
         if game_id is not None and game_id != self.json['game_id']:
             return None
@@ -656,9 +656,9 @@ class GameInfoFactory:
 def determine_game_info(game_dir, exe_name, game_id=None):
     json_files = []
     for prefix0 in game_info_prefixes:
-        prefix = os.path.abspath(os.path.join(deca_root(), prefix0))
+        prefix = os.path.abspath(UniPath.join(deca_root(), prefix0))
         if os.path.isdir(prefix):
-            json_files += [os.path.join(prefix, fn) for fn in os.listdir(prefix) if fn.endswith('json')]
+            json_files += [UniPath.join(prefix, fn) for fn in os.listdir(prefix) if fn.endswith('json')]
 
     for fn in json_files:
         factory = GameInfoFactory(fn)

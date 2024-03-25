@@ -4,6 +4,7 @@ import csv
 import time
 import sys
 
+from .path import UniPath
 from .file import ArchiveFile
 from .db_types import *
 from .db_core import VfsDatabase, VfsNode, db_to_vfs_node, language_codes
@@ -27,16 +28,16 @@ def none_to_str(v):
 
 
 def vfs_structure_new(filename):
-    exe_path = filename[0]
-    game_dir, exe_name = os.path.split(exe_path)
-    game_dir = os.path.join(game_dir, '')
+    exe_path = UniPath.normpath(filename[0])
+    game_dir, exe_name = UniPath.split(exe_path)
+    game_dir = UniPath.join(game_dir, '')
 
     game_info = determine_game(game_dir, exe_name)
     vfs = None
 
     if game_info is not None:
-        working_dir = os.path.join(deca_root(), '..', 'work', game_info.game_id)
-        project_file = os.path.join(working_dir, 'project.json')
+        working_dir = UniPath.normpath(UniPath.join(deca_root(), '..', 'work', game_info.game_id))
+        project_file = UniPath.join(working_dir, 'project.json')
         make_dir_for_file(project_file)
         game_info.save(project_file)
         vfs = vfs_structure_prep(project_file, working_dir)  # , logger=self.logger)
@@ -45,7 +46,7 @@ def vfs_structure_new(filename):
 
 
 def vfs_structure_open(project_file, logger=None, debug=False):
-    working_dir = os.path.join(os.path.split(project_file)[0], '')
+    working_dir = UniPath.join(UniPath.split(project_file)[0], '')
     return vfs_structure_prep(project_file, working_dir, logger=logger, debug=debug)
 
 
@@ -53,8 +54,8 @@ def vfs_structure_empty(game_dir, exe_name):
     game_info = determine_game(game_dir, exe_name)
     vfs = None
     if game_info is not None:
-        working_dir = os.path.join(deca_root(), '..', 'work', '{}_tmp/'.format(game_info.game_id))
-        project_file = os.path.join(working_dir, 'project.json')
+        working_dir = UniPath.normpath(UniPath.join(deca_root(), '..', 'work', '{}_tmp/'.format(game_info.game_id)))
+        project_file = UniPath.join(working_dir, 'project.json')
         make_dir_for_file(project_file)
         game_info.save(project_file)
         logger = Logger(working_dir)
@@ -104,7 +105,7 @@ class VfsProcessor(VfsDatabase):
 
         initial_nodes = []
 
-        exe_path = os.path.join(self.game_info.game_dir, self.game_info.exe_name)
+        exe_path = UniPath.join(self.game_info.game_dir, self.game_info.exe_name)
         f_size = os.stat(exe_path).st_size
         node = VfsNode(
             v_hash_type=self.file_hash_type,
@@ -114,7 +115,7 @@ class VfsProcessor(VfsDatabase):
         self.logger.log('Add unarchived files')
         for ua_file in self.game_info.unarchived_files():
             f_size = os.stat(ua_file).st_size
-            v_path = os.path.basename(ua_file).encode('utf-8')
+            v_path = UniPath.basename(ua_file).encode('utf-8')
             v_hash = self.file_hash(v_path)
             node = VfsNode(
                 v_hash_type=self.file_hash_type,
@@ -128,17 +129,17 @@ class VfsProcessor(VfsDatabase):
 
         while len(dir_in) > 0:
             d = dir_in.pop(0)
-            if os.path.isdir(d):
+            if UniPath.isdir(d):
                 dir_found.append(d)
                 files = os.listdir(d)
                 for file in files:
-                    ff = os.path.join(d, file)
-                    if os.path.isdir(ff):
+                    ff = UniPath.join(d, file)
+                    if UniPath.isdir(ff):
                         dir_in.append(ff)
 
         for fcat in dir_found:
             self.logger.log('Processing Directory: {}'.format(fcat))
-            if os.path.isdir(fcat):
+            if UniPath.isdir(fcat):
                 files = os.listdir(fcat)
                 ifns = []
                 for file in files:
@@ -146,10 +147,10 @@ class VfsProcessor(VfsDatabase):
                         ifns.append(file[0:-4])
                 ifns.sort(key=game_file_to_sortable_string)
                 for ifn in ifns:
-                    input_files.append(os.path.join(fcat, ifn))
+                    input_files.append(UniPath.join(fcat, ifn))
 
         for ta_file in input_files:
-            inpath = os.path.join(ta_file)
+            inpath = UniPath.join(ta_file)
             file_arc = inpath + '.arc'
             f_size = os.stat(file_arc).st_size
             node = VfsNode(
@@ -346,12 +347,12 @@ class VfsProcessor(VfsDatabase):
         self.logger.log('PROCESSING: COMPLETE')
 
     def dump_vpaths(self):
-        vpath_file = os.path.join(self.working_dir, 'vpaths.txt')
+        vpath_file = UniPath.join(self.working_dir, 'vpaths.txt')
         vpaths = self.nodes_select_distinct_vpath_content_hash()
         vpaths = [(none_to_str(v[0]), none_to_str(v[1])) for v in vpaths]
         vpaths = list(set(vpaths))
         vpaths = sorted(vpaths)
-        if not os.path.isfile(vpath_file):
+        if not UniPath.isfile(vpath_file):
             self.logger.log('CREATING: vpaths.txt')
             with open(vpath_file, 'w') as f:
                 for v_path, content_hash in vpaths:
@@ -654,15 +655,15 @@ class VfsProcessor(VfsDatabase):
         self.logger.log('PROCESS: VHASHes: End: Total VHASHes {}'.format(len(vhashes)))
 
     def find_vpath_procmon_dir(self):
-        path_name = os.path.join(deca_root(), 'procmon_csv', '{}'.format(self.game_info.game_id))
+        path_name = UniPath.join(deca_root(), 'procmon_csv', '{}'.format(self.game_info.game_id))
 
         custom_strings = set()
 
-        if os.path.isdir(path_name):
+        if UniPath.isdir(path_name):
             fns = os.listdir(path_name)
-            fns = [os.path.join(path_name, fn) for fn in fns]
+            fns = [UniPath.join(path_name, fn) for fn in fns]
             for fn in fns:
-                if os.path.isfile(fn):
+                if UniPath.isfile(fn):
                     self.logger.log('STRINGS FROM PROCMON DIR: look for hashable strings in {}'.format(fn))
                     with open(fn, 'r') as f:
                         db = csv.reader(f, delimiter=',', quotechar='"')
@@ -702,20 +703,20 @@ class VfsProcessor(VfsDatabase):
         ]
 
         search_dir = 'resources/deca/ghidra_strings'
-        if os.path.isdir(search_dir):
+        if UniPath.isdir(search_dir):
             for file in os.listdir(search_dir):
-                fns.append((False, os.path.join(search_dir, file)))
+                fns.append((False, UniPath.join(search_dir, file)))
 
         search_dir = 'resources/deca/field_strings'
-        if os.path.isdir(search_dir):
+        if UniPath.isdir(search_dir):
             for file in os.listdir(search_dir):
-                fns.append((False, os.path.join(search_dir, file)))
+                fns.append((False, UniPath.join(search_dir, file)))
 
         string_count = 0
         with DbWrap(self, logger=self) as db:
             for used_at_runtime, fn_org in fns:
-                fn = os.path.join(deca_root(), fn_org)
-                if os.path.isfile(fn):
+                fn = UniPath.join(deca_root(), fn_org)
+                if UniPath.isfile(fn):
                     self.logger.log('STRINGS FROM RESOURCES: {}: Loading possible strings'.format(fn))
 
                     custom_strings = []
@@ -823,7 +824,7 @@ class VfsProcessor(VfsDatabase):
         assoc_strings = {}
 
         for k in all_hash4:
-            file_ext = os.path.splitext(k)
+            file_ext = UniPath.splitext(k)
             if len(file_ext[0]) > 0 and len(file_ext[1]) > 0:
                 file = file_ext[0]
                 ext = file_ext[1]
@@ -895,7 +896,7 @@ class VfsProcessor(VfsDatabase):
             self.nodes_delete_where_uid(uids)
 
     def external_file_add(self, filename, is_temporary_file=True):
-        if os.path.isfile(filename):
+        if UniPath.isfile(filename):
             f_size = os.stat(filename).st_size
 
             v_path = filename.replace(':', '/')

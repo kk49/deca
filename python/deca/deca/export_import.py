@@ -13,6 +13,7 @@ from .export_import_adf import node_export_adf_processed, node_export_adf_gltf, 
 from .export_import_rtpc import node_export_rtpc_gltf, node_export_rtpc_text
 from .export_import_audio import node_export_fsb5c_processed
 from .export_map import export_map
+from .path import UniPath
 
 
 def extract_node_raw(
@@ -24,9 +25,9 @@ def extract_node_raw(
         if node.offset is not None:
             with ArchiveFile(vfs.file_obj_from(node)) as f:
                 if node.v_path is None:
-                    out_file = os.path.join(extract_dir, node.v_hash_to_str() + '.dat')
+                    out_file = UniPath.join(extract_dir, node.v_hash_to_str() + '.dat')
                 else:
-                    out_file = os.path.join(extract_dir, '{}'.format(node.v_path.decode('utf-8')))
+                    out_file = UniPath.join(extract_dir, '{}'.format(node.v_path.decode('utf-8')))
 
                 vfs.logger.log('Exporting Raw: {}'.format(out_file))
 
@@ -37,7 +38,7 @@ def extract_node_raw(
                         'WARNING: Extracting raw ADFB file {} not supported, extract gdc/global.gdcc instead.'.format(
                             out_file))
 
-                if not allow_overwrite and os.path.isfile(out_file):
+                if not allow_overwrite and UniPath.isfile(out_file):
                     vfs.logger.log(
                         'WARNING: Extraction failed overwrite disabled and {} exists, skipping'.format(out_file))
                     # raise DecaFileExists(out_file)
@@ -84,8 +85,8 @@ def nodes_export_map(
             prefixes.add(mr.group(1))
 
     for prefix in prefixes:
-        d, f = os.path.split(prefix)
-        export_path = os.path.join(extract_dir, d, 'deca.map')
+        d, f = UniPath.split(prefix)
+        export_path = UniPath.join(extract_dir, d, 'deca.map')
         export_map(vfs, prefix, export_path, export_map_full, export_map_tiles)
 
 
@@ -110,7 +111,7 @@ def nodes_export_contents(
 
                     nodes_export_raw(vfs, vfs_view, extract_dir, allow_overwrite)
 
-                    file_list_name = os.path.join(extract_dir, node.v_path.decode('utf-8') + '.DECA.FILE_LIST.txt')
+                    file_list_name = UniPath.join(extract_dir, node.v_path.decode('utf-8') + '.DECA.FILE_LIST.txt')
 
                     with open(file_list_name, 'w') as f:
                         f.write('sarc.clear();\n')

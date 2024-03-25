@@ -1,6 +1,7 @@
 import os
 from .db_core import VfsDatabase, VfsNode
 from .util import make_dir_for_file
+from .path import UniPath
 
 
 def node_export_fsb5c_processed(
@@ -16,14 +17,14 @@ def node_export_fsb5c_processed(
     buffer = buffer[16:]
 
     if node.v_path is None:
-        ofile = extract_dir + '{:08X}.dat.DECA.fsb'.format(node.v_hash)
+        ofile = UniPath.join(extract_dir, '{:08X}.dat.DECA.fsb'.format(node.v_hash))
     else:
-        ofile = extract_dir + '{}.DECA.fsb'.format(node.v_path.decode('utf-8'))
+        ofile = UniPath.join(extract_dir, '{}.DECA.fsb'.format(node.v_path.decode('utf-8')))
 
     vfs.logger.log('Exporting {}'.format(ofile))
 
     make_dir_for_file(ofile)
 
-    if allow_overwrite or not os.path.isfile(ofile):
+    if allow_overwrite or not UniPath.isfile(ofile):
         with open(ofile, 'wb') as fo:
             fo.write(buffer)

@@ -8,6 +8,7 @@ import hashlib
 import numpy as np
 from typing import List, Optional, Callable
 
+from .path import UniPath
 from .file import ArchiveFile
 from .db_core import VfsDatabase, VfsNode, language_codes, node_flag_v_hash_type_4, node_flag_v_hash_type_8
 from .db_wrap import DbWrap, determine_file_type, determine_file_type_by_name
@@ -420,7 +421,7 @@ class Processor:
         self._comm.trace('Processing EXE: {} {}'.format(node.uid, node.p_path))
 
         adf_sub_file_offsets = db.process_adf_in_exe(node.p_path, node.uid)
-        _, exe_file = os.path.split(node.p_path)
+        _, exe_file = UniPath.split(node.p_path)
 
         for idx, (adf_offset, adf_size) in enumerate(adf_sub_file_offsets):
             fn = f'{exe_file}/{adf_offset:09d}.adf'
@@ -448,7 +449,7 @@ class Processor:
         self._comm.trace('Processing ARC: {} {}'.format(node.uid, node.p_path))
 
         # here we add the tab file as a child of the ARC, a trick to make it work with our data model
-        tab_path = os.path.splitext(node.p_path)
+        tab_path = UniPath.splitext(node.p_path)
         tab_path = tab_path[0] + '.tab'
         cnode = VfsNode(file_type=FTYPE_TAB, p_path=tab_path, pid=node.uid, v_hash_type=db.file_hash_type)
         db.node_add(cnode)
@@ -745,7 +746,7 @@ class Processor:
         for s in rtpc_gather.strings:
             db.propose_string(s, node)
 
-            fn, ext = os.path.splitext(s)
+            fn, ext = UniPath.splitext(s)
             if ext in {b'.tga', b'.dds'}:
                 db.propose_string(fn + b'.ddsc', node, possible_file_types=[FTYPE_AVTX, FTYPE_DDS])
             elif ext == b'.skeleton':
@@ -794,15 +795,15 @@ class Processor:
 
             elif tag.record_header.tag_type in image_tags:
                 fn = tag.tag_body.file_name
-                fn = os.path.basename(fn)
-                fn, ext = os.path.splitext(fn)
+                fn = UniPath.basename(fn)
+                fn, ext = UniPath.splitext(fn)
                 fn = f'ui/{fn}.ddsc'
                 db.propose_string(fn, node, possible_file_types=[FTYPE_AVTX, FTYPE_DDS])
 
             elif Gfx.TagType.import_assets2 == tag.record_header.tag_type:
                 fn = tag.tag_body.url
-                fn = os.path.basename(fn)
-                fn, ext = os.path.splitext(fn)
+                fn = UniPath.basename(fn)
+                fn, ext = UniPath.splitext(fn)
                 db.propose_string(f'ui/{tag.tag_body.url}', node, possible_file_types=[FTYPE_GFX])
                 db.propose_string(f'ui/{fn}.gfx', node, possible_file_types=[FTYPE_GFX])
 
@@ -957,7 +958,7 @@ class Processor:
                                     break
 
                     if node.file_type is None and node.v_path is not None:
-                        file, ext = os.path.splitext(node.v_path)
+                        file, ext = UniPath.splitext(node.v_path)
                         if ext[0:4] == b'.atx':
                             node.file_type = FTYPE_ATX
                             updated = True
@@ -968,7 +969,7 @@ class Processor:
                     missed_vpaths.discard(node.v_path)
 
                     if node.ext_hash is None and node.v_path is not None:
-                        file, ext = os.path.splitext(node.v_path)
+                        file, ext = UniPath.splitext(node.v_path)
                         node.ext_hash = self._vfs.ext_hash(ext)
                         updated = True
 

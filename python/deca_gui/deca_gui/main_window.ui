@@ -450,11 +450,6 @@
     <addaction name="action_external_add"/>
     <addaction name="action_exit"/>
    </widget>
-   <widget class="QMenu" name="menu_Edit">
-    <property name="title">
-     <string>&amp;Edit</string>
-    </property>
-   </widget>
    <widget class="QMenu" name="menu_Tools">
     <property name="title">
      <string>&amp;Tools</string>
@@ -462,7 +457,6 @@
     <addaction name="action_make_web_map"/>
    </widget>
    <addaction name="menu_File"/>
-   <addaction name="menu_Edit"/>
    <addaction name="menu_Tools"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>

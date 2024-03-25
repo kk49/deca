@@ -747,9 +747,12 @@ class VfsProcessor(VfsDatabase):
         guess_strings = {}
         guess_strings['gdc/global.gdcc'] = FTYPE_ADF
 
-        for res_i in range(10):
+        # Usually, the number of 'reserve_*' and 'missions_*' files does not exceed the number of maps
+        for res_i in range(len(self.game_info.map_prefixes)):
             guess_strings['settings/hp_settings/reserve_{}.bin'.format(res_i)] = FTYPE_RTPC
             guess_strings['settings/hp_settings/reserve_{}.bl'.format(res_i)] = FTYPE_SARC
+            guess_strings['missions/missions_{}.hpmissionsc'.format(res_i)] = FTYPE_SARC
+            guess_strings['missions/missions_{}.stringlookup'.format(res_i)] = FTYPE_SARC
 
         # maps
         for map_prefix in self.game_info.map_prefixes:

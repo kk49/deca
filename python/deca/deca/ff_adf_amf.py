@@ -1,5 +1,6 @@
 import struct
 import numpy as np
+from typing import no_type_check, get_type_hints
 from deca.ff_adf import Adf, AdfValue, adf_value_extract
 
 
@@ -7,6 +8,7 @@ from deca.ff_adf import Adf, AdfValue, adf_value_extract
 
 
 class AABB:
+    @no_type_check
     def __init__(self, all6: [np.ndarray, list] = None, min3: [np.ndarray, list] = None, max3: [np.ndarray, list] = None):
         if all6 is not None and min3 is None and max3 is None:
             self.min = np.array(all6[0:3])

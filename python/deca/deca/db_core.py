@@ -8,6 +8,7 @@ import zlib
 import numpy as np
 from typing import List
 
+from deca.path import UniPath
 from deca.util import common_prefix
 from deca.errors import *
 from deca.file import ArchiveFile, SubsetFile
@@ -334,9 +335,9 @@ class VfsDatabase(DbBase):
             init_display=False,
             max_uncompressed_cache_size=(2 * 1024**3)
     ):
-        super().__init__(os.path.join(working_dir, 'db', 'core.db'), logger)
+        super().__init__(UniPath.join(working_dir, 'db', 'core.db'), logger)
 
-        self.db_cg = DbCrossGame(os.path.abspath(os.path.join(working_dir, "..")), logger)
+        self.db_cg = DbCrossGame(UniPath.abspath(UniPath.join(working_dir, "..")), logger)
 
         self.project_file = project_file
         self.working_dir = working_dir
@@ -1271,15 +1272,15 @@ class VfsDatabase(DbBase):
             pp = None
             if parent_node.p_path is not None:
                 prefix, end0, end1 = common_prefix(parent_node.p_path, self.game_info.game_dir)
-                f, e = os.path.splitext(end0)
+                f, e = UniPath.splitext(end0)
                 if e != '.tab':
                     pp = end0
             else:
                 pp = parent_node.v_hash_to_str() + '.dat'
             if pp is not None:
                 parent_paths.append(pp)
-        cache_dir = os.path.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
-        file_name = os.path.join(cache_dir, node.v_hash_to_str() + '.dat')
+        cache_dir = UniPath.join(self.working_dir, '__CACHE__/', *parent_paths[::-1])
+        file_name = UniPath.join(cache_dir, node.v_hash_to_str() + '.dat')
 
         global dumped_cache_dir
         if not dumped_cache_dir:
@@ -1297,7 +1298,7 @@ class VfsDatabase(DbBase):
             return self.file_obj_from(self.node_where_uid(node.pid))
         elif compression_type in {compression_v3_zlib}:
             file_name = self.generate_cache_file_name(node)
-            if not os.path.isfile(file_name):
+            if not UniPath.isfile(file_name):
                 parent_node = self.node_where_uid(node.pid)
                 with ArchiveFile(self.file_obj_from(parent_node)) as pf:
                     pf.seek(node.offset)
@@ -1318,7 +1319,7 @@ class VfsDatabase(DbBase):
         elif compression_type in {compression_v4_01_zlib, compression_v4_03_zstd, compression_v4_04_oo}:
             file_name = self.generate_cache_file_name(node)
 
-            if not os.path.isfile(file_name):
+            if not UniPath.isfile(file_name):
                 parent_node = self.node_where_uid(node.pid)
                 make_dir_for_file(file_name)
                 good_blocks = []

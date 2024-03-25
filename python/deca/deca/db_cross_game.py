@@ -7,6 +7,7 @@ import zstandard as zstd
 import numpy as np
 from typing import List
 
+from deca.path import UniPath
 from deca.util import common_prefix
 from deca.errors import *
 from deca.file import ArchiveFile, SubsetFile
@@ -22,7 +23,7 @@ from deca.db_types import *
 
 class DbCrossGame(DbBase):
     def __init__(self,  working_dir, logger):
-        super().__init__(os.path.join(working_dir, 'cross_game.db'), logger)
+        super().__init__(UniPath.join(working_dir, 'cross_game.db'), logger)
 
         self.db_execute_one(
             '''

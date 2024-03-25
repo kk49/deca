@@ -1,5 +1,6 @@
 from typing import Optional
 import xml.etree.ElementTree as ElementTree
+from .path import UniPath
 from .util import remove_prefix_if_present
 from .ff_avtx import image_load, ddsc_write_to_dds, ddsc_write_to_png, ddsc_clean
 from .ff_adf import *
@@ -123,17 +124,17 @@ class Deca3dTexture:
 
                     if db.flat_file_layout:
                         texture_fn = texture_fn.replace('/', '_')
-                    texture_fn_uri = os.path.join(db.resource_prefix_uri, texture_fn)
-                    texture_fn_absolute = os.path.join(db.resource_prefix_abs, texture_fn)
+                    texture_fn_uri = UniPath.join(db.resource_prefix_uri, texture_fn)
+                    texture_fn_absolute = UniPath.join(db.resource_prefix_abs, texture_fn)
 
-                    if not os.path.isfile(texture_fn_absolute):
+                    if not UniPath.isfile(texture_fn_absolute):
                         texture_node = texture_nodes[0]
                         ddsc = image_load(vfs, texture_node, save_raw_data=True)
 
                         if ddsc_clean(ddsc):
                             vfs.logger.warning('WARNING: {}: missing high resolution data'.format(self.v_path))
 
-                        os.makedirs(os.path.dirname(texture_fn_absolute), exist_ok=True)
+                        os.makedirs(UniPath.dirname(texture_fn_absolute), exist_ok=True)
 
                         if texture_fn_absolute.endswith('png'):
                             ddsc_write_to_png(ddsc, texture_fn_absolute)
@@ -229,10 +230,10 @@ class Deca3dMeshc:
                 fn = self.v_path.decode('utf-8') + '.buffer_index_{:03}.bin'.format(index)
                 if db.flat_file_layout:
                     fn = fn.replace('/', '_')
-                fn_uri = os.path.join(db.resource_prefix_uri, fn)
-                fn_abs = os.path.join(db.resource_prefix_abs, fn)
-                if not os.path.isfile(fn_abs):
-                    os.makedirs(os.path.dirname(fn_abs), exist_ok=True)
+                fn_uri = UniPath.join(db.resource_prefix_uri, fn)
+                fn_abs = UniPath.join(db.resource_prefix_abs, fn)
+                if not UniPath.isfile(fn_abs):
+                    os.makedirs(UniPath.dirname(fn_abs), exist_ok=True)
                     with open(fn_abs, 'wb') as f:
                         f.write(buffer.data)
                 index_buffer_fns.append(fn_abs)
@@ -243,10 +244,10 @@ class Deca3dMeshc:
                 fn = self.v_path.decode('utf-8') + '.buffer_vertex_{:03}.bin'.format(index)
                 if db.flat_file_layout:
                     fn = fn.replace('/', '_')
-                fn_uri = os.path.join(db.resource_prefix_uri, fn)
-                fn_abs = os.path.join(db.resource_prefix_abs, fn)
-                if not os.path.isfile(fn_abs):
-                    os.makedirs(os.path.dirname(fn_abs), exist_ok=True)
+                fn_uri = UniPath.join(db.resource_prefix_uri, fn)
+                fn_abs = UniPath.join(db.resource_prefix_abs, fn)
+                if not UniPath.isfile(fn_abs):
+                    os.makedirs(UniPath.dirname(fn_abs), exist_ok=True)
                     with open(fn_abs, 'wb') as f:
                         f.write(buffer.data)
                 vertex_buffer_fns.append(fn_abs)
@@ -648,16 +649,16 @@ class Deca3dHkSkeleton:
 
             # get baked skeleton filename
             v_path = self.v_path
-            v_path = os.path.splitext(v_path)
+            v_path = UniPath.splitext(v_path)
             v_path = v_path[0] + b'.bsk'
             fn = v_path.decode('utf-8')
             if db.flat_file_layout:
                 fn = fn.replace('/', '_')
-            ppath_skel_uri = os.path.join(db.resource_prefix_uri, fn)
-            ppath_skel_raw = os.path.join(db.resource_prefix_abs, fn)
+            ppath_skel_uri = UniPath.join(db.resource_prefix_uri, fn)
+            ppath_skel_raw = UniPath.join(db.resource_prefix_abs, fn)
             ppath_skel_xml = ppath_skel_raw + '.xml'
 
-            if not os.path.isfile(ppath_skel_raw):
+            if not UniPath.isfile(ppath_skel_raw):
                 vnodes = vfs.nodes_where_match(v_path=v_path)
 
                 if len(vnodes) == 0:
@@ -667,26 +668,26 @@ class Deca3dHkSkeleton:
                 with vfs.file_obj_from(vnode) as f:
                     buffer = f.read()
 
-                dir_path = os.path.dirname(ppath_skel_raw)
+                dir_path = UniPath.dirname(ppath_skel_raw)
                 os.makedirs(dir_path, exist_ok=True)
                 with open(ppath_skel_raw, 'wb') as f:
                     f.write(buffer)
 
-            exe_path, exe_name = os.path.split(sys.argv[0])
-            bin_path = os.path.join("./", exe_path, "..", "..", "..", "root", "bin")
+            exe_path, exe_name = UniPath.split(sys.argv[0])
+            bin_path = UniPath.normpath(UniPath.join("./", exe_path, "..", "..", "..", "root", "bin"))
 
             cmd = '{} {} {}'.format(
-                os.path.join(bin_path, 'bin2xml'),
+                UniPath.join(bin_path, 'bin2xml'),
                 ppath_skel_raw,
                 ppath_skel_xml,
             )
 
             run_out = None
 
-            if not os.path.isfile(ppath_skel_xml):
+            if not UniPath.isfile(ppath_skel_xml):
                 run_out = subprocess.run(cmd, shell=True, capture_output=True)
 
-            if not os.path.isfile(ppath_skel_xml):
+            if not UniPath.isfile(ppath_skel_xml):
                 if run_out is None:
                     stdout = 'stdout MISSING'
                     stderr = 'stderr MISSING'
@@ -810,7 +811,7 @@ class Deca3dHkSkeleton:
             # create skin
             skin = pyg.Skin()
             skin_joints = [bone_info[0] for bone_info in bone_nodes]
-            skin.name = os.path.basename(self.v_path.decode('utf-8')) + ".armature"
+            skin.name = UniPath.basename(self.v_path.decode('utf-8')) + ".armature"
             skin.skeleton = skin_joints[0]
             skin.joints = skin_joints
             skin.inverseBindMatrices = accessor_idx
@@ -879,18 +880,18 @@ class DecaGltf:
         self.d_scene = DecaGltfScene(self, name='Scene0')
 
         if self.save_to_one_dir:
-            self.export_path = os.path.join(export_path, filename + '.dir', 'model-lod_{}.gltf'.format(self.lod))
-            self.resource_prefix_abs = os.path.join(export_path, filename + '.dir')
+            self.export_path = UniPath.join(export_path, filename + '.dir', 'model-lod_{}.gltf'.format(self.lod))
+            self.resource_prefix_abs = UniPath.join(export_path, filename + '.dir')
             self.resource_prefix_uri = ''
         else:
-            self.export_path = os.path.join(export_path, filename + '-lod_{}.gltf'.format(self.lod))
+            self.export_path = UniPath.join(export_path, filename + '-lod_{}.gltf'.format(self.lod))
             self.resource_prefix_abs = export_path
             self.resource_prefix_uri = ''
-            dirs = os.path.dirname(filename)
+            dirs = UniPath.dirname(filename)
             while len(dirs) > 0:
                 self.resource_prefix_uri += '../'
-                dirs = os.path.dirname(dirs)
-        os.makedirs(os.path.dirname(self.export_path), exist_ok=True)
+                dirs = UniPath.dirname(dirs)
+        os.makedirs(UniPath.dirname(self.export_path), exist_ok=True)
 
         self.db = Deca3dDatabase(
             self.vfs,
@@ -959,7 +960,7 @@ class DecaGltf:
             self.gltf, v_path, material_properties=material_properties)
 
         if meshes_all is not None:
-            with DecaGltfNode(self, name=os.path.basename(v_path), matrix=transform.col_major_list()):
+            with DecaGltfNode(self, name=UniPath.basename(v_path), matrix=transform.col_major_list()):
                 for mesh_info in meshes_all[self.lod]:
                     submeshes = mesh_info[0]
 

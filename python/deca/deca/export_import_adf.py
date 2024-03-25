@@ -3,19 +3,20 @@ from .xlsxwriter_hack import DecaWorkBook
 from .ff_adf_amf import AABB
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
 from .db_core import VfsDatabase, VfsNode
+from .path import UniPath
 
 
 def generate_export_file_path(vfs: VfsDatabase, export_path, vnode: VfsNode, note):
     if vnode.v_path is None:
-        ofile = os.path.join(export_path, '{:08X}.dat'.format(vnode.v_hash))
+        ofile = UniPath.join(export_path, '{:08X}.dat'.format(vnode.v_hash))
     else:
-        ofile = os.path.join(export_path, '{}'.format(vnode.v_path.decode('utf-8')))
+        ofile = UniPath.join(export_path, '{}'.format(vnode.v_path.decode('utf-8')))
 
     if vnode.file_type == FTYPE_ADF_BARE:
         ofile = ofile + '.gdcc'
 
     vfs.logger.log('Exporting{}: {}'.format(note, ofile))
-    ofiledir = os.path.dirname(ofile)
+    ofiledir = UniPath.dirname(ofile)
     os.makedirs(ofiledir, exist_ok=True)
 
     return ofile
@@ -33,7 +34,7 @@ def adf_export_xlsx_0x0b73315d(
 
     adf = adf_db.read_node(vfs, vnode)
 
-    if not allow_overwrite and os.path.exists(fn):
+    if not allow_overwrite and UniPath.exists(fn):
         raise EDecaFileExists(fn)
 
     src = adf.table_instance_values[0]
@@ -109,7 +110,7 @@ def adf_export_amf_model_0xf7c20a69(
         save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton, texture_format=texture_format)
 
     with gltf.scene():
-        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path)):
+        with DecaGltfNode(gltf, name=UniPath.basename(vnode.v_path)):
             gltf.export_modelc(vnode.v_path, None)
 
     gltf.gltf_save()
@@ -145,7 +146,7 @@ def adf_export_mdic_0xb5b062f1(
         instances = mdic['Instances']
         aabb = AABB(all6=mdic['AABB'])
         mid = aabb.mid()
-        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path)) as mdic_node:
+        with DecaGltfNode(gltf, name=UniPath.basename(vnode.v_path)) as mdic_node:
             mdic_node.translation = list(mid)
             for instance in instances:
                 transform = Deca3dMatrix(col_major=instance['Transform'])
@@ -189,7 +190,7 @@ def adf_export_mdic_0x9111dc0(
         instances = mdic['Instances']
         aabb = AABB(all6=mdic['AABB'])
         mid = aabb.mid()
-        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path)) as mdic_node:
+        with DecaGltfNode(gltf, name=UniPath.basename(vnode.v_path)) as mdic_node:
             mdic_node.translation = list(mid)
             for instance in instances:
                 transform = Deca3dMatrix(col_major=instance['Transform'])
@@ -257,12 +258,12 @@ def node_export_adf_text(
 
     fn = generate_export_file_path(vfs, export_path, vnode, ' as Text') + '.txt'
 
-    if not allow_overwrite and os.path.exists(fn):
+    if not allow_overwrite and UniPath.exists(fn):
         raise EDecaFileExists(fn)
 
     s = adf.dump_to_string(vfs)
 
-    fn_dir = os.path.dirname(fn)
+    fn_dir = UniPath.dirname(fn)
     os.makedirs(fn_dir, exist_ok=True)
 
     with open(fn, 'wt', encoding='utf-8') as f:

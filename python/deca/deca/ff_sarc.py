@@ -1,3 +1,4 @@
+from deca.path import UniPath
 from deca.file import ArchiveFile
 from deca.hashes import hash32_func
 from deca.util import align_to
@@ -54,12 +55,12 @@ class EntrySarc:
         self.is_symlink = self.offset == 0
 
         assert(self.v_hash == hash32_func(self.v_path))
-        assert(self.file_ext_hash == hash32_func(os.path.splitext(self.v_path)[1]))
+        assert(self.file_ext_hash == hash32_func(UniPath.splitext(self.v_path)[1]))
 
     def serialize_v3(self, f):
         # update entry based on v_path
         self.v_hash = hash32_func(self.v_path)
-        self.file_ext_hash = hash32_func(os.path.splitext(self.v_path)[1])
+        self.file_ext_hash = hash32_func(UniPath.splitext(self.v_path)[1])
 
         f.write_u32(self.string_offset)
         f.write_u32(self.offset)

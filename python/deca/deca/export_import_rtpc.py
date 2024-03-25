@@ -4,6 +4,7 @@ from .errors import EDecaFileExists
 from .ff_rtpc import Rtpc, RtpcNode, RtpcVisitorDumpToString, rtpc_from_binary, \
     h_prop_skeleton, h_prop_model_skeleton, h_prop_class, h_prop_class_hash
 from .ff_adf_amf_gltf import DecaGltf, DecaGltfNode, Deca3dMatrix
+from .path import UniPath
 
 '''
 0xd31ab684 part name
@@ -118,7 +119,7 @@ def node_export_rtpc_gltf(
         save_to_one_dir=save_to_one_dir, include_skeleton=include_skeleton, texture_format=texture_format)
 
     with gltf.scene():
-        with DecaGltfNode(gltf, name=os.path.basename(vnode.v_path.decode('utf-8'))):
+        with DecaGltfNode(gltf, name=UniPath.basename(vnode.v_path.decode('utf-8'))):
             rtpc_export_node_recurse(rtpc.root_node, gltf, vfs)
 
     gltf.gltf_save()
@@ -135,18 +136,18 @@ def node_export_rtpc_text(
     with vfs.file_obj_from(vnode) as f:
         buffer = f.read(vnode.size_u)
 
-    fn = os.path.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
+    fn = UniPath.join(export_path, vnode.v_path.decode('utf-8')) + '.txt'
 
     vfs.logger.log('Exporting as Text: {}'.format(fn))
 
-    if not allow_overwrite and os.path.exists(fn):
+    if not allow_overwrite and UniPath.exists(fn):
         raise EDecaFileExists(fn)
 
     dump = RtpcVisitorDumpToString(vfs)
     dump.visit(buffer)
     s = dump.result()
 
-    ofiledir = os.path.dirname(fn)
+    ofiledir = UniPath.dirname(fn)
     os.makedirs(ofiledir, exist_ok=True)
 
     with open(fn, 'wt') as f:

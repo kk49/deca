@@ -3,6 +3,7 @@ from .db_core import VfsDatabase
 import os
 import numpy as np
 from PIL import Image
+from .path import UniPath
 
 
 def tileset_make(img, tile_path, export_full, export_tiles, tile_size=256, max_zoom=-1):
@@ -10,7 +11,7 @@ def tileset_make(img, tile_path, export_full, export_tiles, tile_size=256, max_z
     os.makedirs(tile_path, exist_ok=True)
 
     if export_full:
-        img.save(os.path.join(tile_path, 'full.png'))
+        img.save(UniPath.join(tile_path, 'full.png'))
 
     if export_tiles:
         # determine zoom levels
@@ -34,25 +35,25 @@ def tileset_make(img, tile_path, export_full, export_tiles, tile_size=256, max_z
             if zimgs[zlevel] is None:
                 zimgs[zlevel] = zimgs[zlevel + 1].resize((sz[0] >> z, sz[1] >> z), Image.LANCZOS)
 
-            if not os.path.isdir(zpath):
+            if not UniPath.isdir(zpath):
                 for x in range(0, 2 ** zlevel):
-                    dpath = os.path.join(zpath, '{}'.format(x))
+                    dpath = UniPath.join(zpath, '{}'.format(x))
                     os.makedirs(dpath, exist_ok=True)
                     for y in range(0, 2 ** zlevel):
-                        fpath = os.path.join(dpath, '{}.png'.format(y))
+                        fpath = UniPath.join(dpath, '{}.png'.format(y))
                         zimgs[zlevel].crop((x * tile_size, y * tile_size, (x + 1) * tile_size, (y + 1) * tile_size)).save(
                             fpath)
 
         for zlevel in range(zooms, max_zoom + 1):
             width = tile_size >> (zlevel - (zooms - 1))
-            zpath = os.path.join(tile_path, '{}'.format(zlevel))
+            zpath = UniPath.join(tile_path, '{}'.format(zlevel))
             print('Generate Zoom: {}'.format(zpath))
-            if not os.path.isdir(zpath):
+            if not UniPath.isdir(zpath):
                 for x in range(0, 2 ** zlevel):
-                    dpath = os.path.join(zpath, '{}'.format(x))
+                    dpath = UniPath.join(zpath, '{}'.format(x))
                     os.makedirs(dpath, exist_ok=True)
                     for y in range(0, 2 ** zlevel):
-                        fpath = os.path.join(dpath, '{}.png'.format(y))
+                        fpath = UniPath.join(dpath, '{}.png'.format(y))
                         img = zimgs[(zooms - 1)]
                         img = img.crop((x * width, y * width, (x + 1) * width, (y + 1) * width))
                         img = img.resize((tile_size, tile_size), Image.NEAREST)

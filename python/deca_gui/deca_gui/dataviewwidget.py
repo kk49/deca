@@ -44,6 +44,17 @@ class DataViewWidget(QWidget):
         self.tab_rtpc_index = self.tab_widget.addTab(self.tab_rtpc, 'RTPC')
         self.tab_obc_index = self.tab_widget.addTab(self.tab_obc, 'OBC')
 
+        self.tab_widget.setEnabled(False)
+        self.tab_widget.setTabEnabled(self.tab_info_index, True)
+        self.tab_widget.setTabEnabled(self.tab_raw_index, False)
+        self.tab_widget.setTabEnabled(self.tab_text_index, False)
+        self.tab_widget.setTabEnabled(self.tab_sarc_index, False)
+        self.tab_widget.setTabEnabled(self.tab_image_index, False)
+        self.tab_widget.setTabEnabled(self.tab_adf_index, False)
+        self.tab_widget.setTabEnabled(self.tab_adf_gdc_index, False)
+        self.tab_widget.setTabEnabled(self.tab_rtpc_index, False)
+        self.tab_widget.setTabEnabled(self.tab_obc_index, False)
+
         size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         size.setVerticalStretch(1)
         self.tab_widget.setSizePolicy(size)
@@ -69,6 +80,8 @@ class DataViewWidget(QWidget):
 
         vnode = vnodes[0]
 
+        self.tab_widget.setEnabled(True)
+        
         self.tab_widget.setTabEnabled(self.tab_info_index, True)
         self.tab_info.vnode_process(vfs, vnode)
 

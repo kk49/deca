@@ -5,6 +5,8 @@ import struct
 import os
 import ctypes
 import sys
+
+from .path import UniPath
 from .fast_file import *
 from .dxgi_97 import process_image_97
 from .dxgi_94_95_96 import process_image_94_95_96
@@ -583,8 +585,8 @@ def process_image(*args, **kwargs):
 
     if process_image_func is None:
         c_process_image_lib = None
-        exe_path, exe_name = os.path.split(sys.argv[0])
-        lib_path = os.path.join("./", exe_path, "..", "..", "..", "root", "lib")
+        exe_path, exe_name = UniPath.split(sys.argv[0])
+        lib_path = UniPath.normpath(UniPath.join("./", exe_path, "..", "..", "..", "root", "lib"))
 
         # process_image_func = setup_image_wasm
 
@@ -595,15 +597,15 @@ def process_image(*args, **kwargs):
             # gcc -fPIC -shared -O3 cpp/process_image/src/process_image.c -o process_image.so
             paths = [
                 "process_image.dll",
-                os.path.join(lib_path, "process_image.dll"),
+                UniPath.join(lib_path, "process_image.dll"),
                 "process_image.so",
-                os.path.join(lib_path, "process_image.so"),
+                UniPath.join(lib_path, "process_image.so"),
             ]
 
             for path in paths:
-                if os.path.isfile(path):
+                if UniPath.isfile(path):
                     print(f"Using C version of process_image from {path}")
-                    if os.path.splitext(path)[1].lower() == ".dll":
+                    if UniPath.splitext(path)[1].lower() == ".dll":
                         c_process_image_lib = ctypes.WinDLL(path)
                     else:
                         c_process_image_lib = ctypes.CDLL(path)

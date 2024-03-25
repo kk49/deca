@@ -3,6 +3,7 @@ from deca.ff_types import *
 from deca.ff_sarc import FileSarc, EntrySarc
 from deca.ff_avtx import image_import
 from deca.errors import *
+from deca.path import UniPath
 from deca.file import ArchiveFile
 import os
 import shutil
@@ -96,8 +97,8 @@ class Builder:
                     entry.is_symlink = True
 
         # extract existing file
-        fn_dst = os.path.join(dst_path, vnode.v_path.decode('utf-8'))
-        pt, fn = os.path.split(fn_dst)
+        fn_dst = UniPath.join(dst_path, vnode.v_path.decode('utf-8'))
+        pt, fn = UniPath.split(fn_dst)
         os.makedirs(pt, exist_ok=True)
 
         with ArchiveFile(open(fn_dst, 'wb')) as fso:
@@ -142,7 +143,7 @@ class Builder:
         if src_path is None:
             src_file = None
         else:
-            _, src_file = os.path.split(src_path)
+            _, src_file = UniPath.split(src_path)
 
         if vnode.file_type == FTYPE_SARC:
             if not do_not_build_archive:
@@ -167,8 +168,8 @@ class Builder:
                 vpath_complete_map[v_path] = dst
         else:
             # copy from source
-            dst = os.path.join(dst_path, v_path.decode('utf-8'))
-            dst_dir = os.path.dirname(dst)
+            dst = UniPath.join(dst_path, v_path.decode('utf-8'))
+            dst_dir = UniPath.dirname(dst)
             os.makedirs(dst_dir, exist_ok=True)
             shutil.copy2(src_path, dst)
             vpath_complete_map[v_path] = dst
@@ -193,33 +194,31 @@ class Builder:
             dst_path = dst_path.decode('utf-8')
 
         wl = [src_path]
+        src_path_cut_len = len(UniPath.join(src_path, ''))
         while len(wl) > 0:
             cpath = wl.pop(0)
             print('Process: {}'.format(cpath))
-            if os.path.isdir(cpath):
+            if UniPath.isdir(cpath):
                 cdir = os.listdir(cpath)
                 for entry in cdir:
-                    wl.append(os.path.join(cpath, entry))
-            elif os.path.isfile(cpath):
-                _, file = os.path.split(cpath)
-                _, ext = os.path.splitext(file)
+                    wl.append(UniPath.join(cpath, entry))
+            elif UniPath.isfile(cpath):
+                _, file = UniPath.split(cpath)
+                _, ext = UniPath.splitext(file)
                 if ext == '.deca_sha1sum':
                     pass
                 elif file.endswith('.DECA.FILE_LIST.txt'):
-                    v_path = cpath[len(src_path):-len('.DECA.FILE_LIST.txt')].encode('ascii')
-                    v_path = v_path.replace(b'\\', b'/')
+                    v_path = cpath[src_path_cut_len:-len('.DECA.FILE_LIST.txt')].encode('ascii')
                     src_files[v_path] = cpath
                     print('DEPEND: DECA.FILE_LIST.txt: {} = {}'.format(v_path, cpath))
                 elif file.endswith('.ddsc.dds'):
-                    v_path = cpath[len(src_path):-len('.dds')].encode('ascii')
-                    v_path = v_path.replace(b'\\', b'/')
+                    v_path = cpath[src_path_cut_len:-len('.dds')].encode('ascii')
                     src_files[v_path] = cpath
                     print('DEPEND: ddsc.dds: {} = {}'.format(v_path, cpath))
                 elif file.find('DECA') >= 0:  # ignore other deca files
                     pass
                 else:
-                    v_path = cpath[len(src_path):].encode('ascii')
-                    v_path = v_path.replace(b'\\', b'/')
+                    v_path = cpath[src_path_cut_len:].encode('ascii')
                     src_files[v_path] = cpath
                     print('DEPEND: default: {} = {}'.format(v_path, cpath))
 

@@ -25,7 +25,8 @@
     "hp_trophyworld_3_",
     "hp_australia_",
     "hp_nepal_",
-    "hp_sh_"
+    "hp_sh_",
+    "hp_alberta_"
   ],
   "world_indexes": [0,1,2,3,4,5,6],
   "world_patches": [
@@ -70,7 +71,8 @@
     "textures/ui/map_reserve_15/",
     "textures/ui/map_reserve_16/",
     "textures/ui/map_reserve_17/",
-    "textures/ui/map_reserve_18/"
+    "textures/ui/map_reserve_18/",
+    "textures/ui/map_reserve_19/"
   ],
   "unarchived_files": [],
   "archive_paths": [

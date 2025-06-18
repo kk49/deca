@@ -3,6 +3,7 @@
 * add: kk49: Support for COTW hp_australia
 * add: kk49: Support for COTW hp_nepal
 * add: kk49: Support for COTW hp_sh
+* add: kk49: Support for COTW hp_alberta
 * add: verrasse: Support for COTW the Angler (EGS version)
 * add: verrasse: Update for latest COTW the Angler (alpheus, belisama, ceto, doris)
 * add: verrasse / r-one: Added more filenames for COTW the Angler

@@ -182,9 +182,12 @@ class VfsView:
                 for capture in self.capture:
 
                     if isinstance(capture, str):
-                        if len(capture) > 0 and capture[-1] == '/':
-                            capture = capture + r'%'
-                        capture = capture.encode('ascii')
+                        if len(capture) > 0:
+                            if capture[-1] == '/':
+                                capture = capture + r'%'
+                            capture = capture.encode('ascii')
+                        else:
+                            capture = None
 
                     self.node_accumulate(
                         self._nodes_selected, self._nodes_selected_uids, self._nodes_selected_uids_no_vpaths,

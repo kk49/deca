@@ -226,7 +226,7 @@ class InstanceEntry:
 # 0x7515A207 == hashlittle2("float044")
 # 0xC609F663 == hashlittle2("double088")
 # 0x8955583E == hashlittle2("String588")
-        
+
 typedef_s8 = 0x580D0A62
 typedef_u8 = 0x0ca2821d
 typedef_s16 = 0xD13FCF93
@@ -865,6 +865,7 @@ class Adf:
         self.nametable_count = None
         self.nametable_offset = None
         self.total_size = None
+        self.max_file_position = 0
 
         self.unknown = []
 
@@ -946,6 +947,8 @@ class Adf:
 
         header = fp.read(0x40)
 
+        self.max_file_position = max(self.max_file_position, fp.tell())
+
         fh = ArchiveFile(io.BytesIO(header))
 
         if len(header) < 0x40:
@@ -976,6 +979,8 @@ class Adf:
 
         self.comment = fp.read_strz()
 
+        self.max_file_position = max(self.max_file_position, fp.tell())
+
         # name table
         self.table_name = [[0, b''] for i in range(self.nametable_count)]
         fp.seek(self.nametable_offset)
@@ -984,6 +989,8 @@ class Adf:
         for i in range(self.nametable_count):
             self.table_name[i][1] = fp.read(self.table_name[i][0] + 1)[0:-1]
 
+        self.max_file_position = max(self.max_file_position, fp.tell())
+
         # string hash
         self.table_stringhash = [StringHash() for i in range(self.stringhash_count)]
         self.map_stringhash = {}
@@ -991,6 +998,8 @@ class Adf:
         for i in range(self.stringhash_count):
             self.table_stringhash[i].deserialize(fp, self.table_name)
             self.map_stringhash[self.table_stringhash[i].value_hash] = self.table_stringhash[i]
+
+        self.max_file_position = max(self.max_file_position, fp.tell())
 
         # typedef
         self.table_typedef = [TypeDef() for i in range(self.typedef_count)]
@@ -1036,6 +1045,8 @@ class Adf:
                 #     print('Missing HASHID {:08x}'.format(ae.hashid))
                 # except Exception as exp:
                 #     print(exp)
+
+                self.max_file_position = max(self.max_file_position, fp.tell())
 
 
 class AdfDatabase:

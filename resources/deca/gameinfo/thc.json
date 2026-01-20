@@ -1,0 +1,70 @@
+{
+  "game_id": "thc",
+  "exe_match": ".*theHunter.exe",
+  "archive_version": 10,
+  "file_hash_size": 4,
+  "oo_decompress_dll": false,
+  "area_prefixes": [
+    ""
+  ],
+  "world_indexes": [0,1],
+  "world_patches": [],
+  "world_occluders": [],
+  "world_navheightfields": [],
+  "world_hm": [],
+  "world_ai": [],
+  "map_zooms": [0,1,2,3],
+  "map_max_count": 500,
+  "map_prefixes": [],
+  "unarchived_files": [],
+  "archive_paths": [
+    "${GAME_DIR}/archives/"
+  ],
+  "mdic_ftype": "mdi",
+  "navmesh_ftype": "h2014",
+  "obc_ftype": "",
+  "pfs_ftype": "pfx",
+  "has_garcs": false,
+  "file_assoc": [
+    {
+      ".ee": "sarc",
+      ".epe": "rtpc"
+    },
+    {
+      ".bl": "sarc",
+      ".nl": "sarc",
+      ".fl": "sarc",
+      ".blo": "rtpc",
+      ".nl.mdic": "mdi",
+      ".fl.mdic": "mdi",
+      ".pfs": "pfx",
+      ".obc": "obc"
+    },
+    {
+      ".meshc": "adf",
+      ".hrmeshc": "adf",
+      ".modelc": "adf",
+      ".model_xml": "txt",
+      ".model_deps": "txt",
+      ".pfxc": "pfx"
+    },
+    {
+      ".ddsc": "avtx,dds",
+      ".hmddsc": "atx,META-NO-TYPE"
+    },
+    {
+      ".fmod_sbankc": "txt",
+      ".fmod_bankc": "riff"
+    },
+    {
+      ".swf": "gfx",
+      ".cfx": "gfx",
+      ".gfx": "gfx"
+    },
+    {
+      ".gdc": "adf",
+      ".gsc": "adf",
+      ".stringlookup": "adf"
+    }
+  ]
+}

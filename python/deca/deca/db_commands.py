@@ -730,6 +730,9 @@ class Processor:
         except EDecaMissingAdfType as ae:
             self._comm.log('DBCmd: Missing ADF Type {:08x} in {} {} {}'.format(
                 ae.type_id, node.v_hash_to_str(), node.v_path, node.p_path))
+        except Exception as e:
+            self._comm.log('DBCmd: Error parsing ADF [{}] in {} {} {}'.format(
+                repr(e), node.v_hash_to_str(), node.v_path, node.p_path))
         return False
 
     def process_rtpc_initial(self, node: VfsNode, db: DbWrap):

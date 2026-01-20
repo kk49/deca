@@ -239,11 +239,19 @@ class MainWindow(QMainWindow):
             self.ui.bt_mod_build.setEnabled(False)
             self.ui.action_external_add.setEnabled(False)
             self.ui.action_make_web_map.setEnabled(False)
+            self.ui.tab_extract.setEnabled(False)
+            self.ui.tab_modding.setEnabled(False)
+            self.ui.tab_3d_gltf2.setEnabled(False)
+            self.ui.tab_utils.setEnabled(False)
         else:
             self.ui.bt_mod_build_folder_show.setEnabled(True)
             self.ui.bt_mod_build.setEnabled(True)
             self.ui.action_external_add.setEnabled(True)
             self.ui.action_make_web_map.setEnabled(True)
+            self.ui.tab_extract.setEnabled(True)
+            self.ui.tab_modding.setEnabled(True)
+            self.ui.tab_3d_gltf2.setEnabled(True)
+            self.ui.tab_utils.setEnabled(True)
         self.filter_text_changed()
 
     def update_select_state(self, vfs_view):
@@ -266,10 +274,10 @@ class MainWindow(QMainWindow):
             self.ui.bt_mod_prep.setText('PREP MOD: {}'.format(str_vpaths))
 
             if self.ui.chkbx_mod_build_subset.isChecked():
-                self.ui.bt_mod_build.setText('Build Mod Subset: {}'.format(str_vpaths))
+                self.ui.bt_mod_build.setText('BUILD MOD SUBSET: {}'.format(str_vpaths))
                 self.ui.bt_mod_build.setEnabled(any_selected)
             else:
-                self.ui.bt_mod_build.setText('Build Mod All')
+                self.ui.bt_mod_build.setText('BUILD MOD ALL')
 
     def vnode_2click_selected(self, uids: List[int]):
         self.current_uids = uids
@@ -371,7 +379,8 @@ class MainWindow(QMainWindow):
                 texture_format=self.ui.cmbbx_texture_format.currentText())
 
     def slot_mod_build_subset_clicked(self, checked):
-        self.update_select_state(self.vfs_view_current())
+        if self.vfs_view_current():
+            self.update_select_state(self.vfs_view_current())
 
     def slot_mod_prep_clicked(self, checked):
         if self.vfs_view_current():

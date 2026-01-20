@@ -6,9 +6,11 @@
 * add: kk49: Support for COTW hp_alberta
 * add: kk49: Support for COTW hp_scotland
 * add: verrasse: Support for COTW the Angler (EGS version)
+* add: verrasse: Support for Mad Max (v1.0.3.0 + All DLCs)
+* add: verrasse: Support for theHunter Classic (ARC/TAB)
+* add: verrasse: Support for theHunter Primal (ARC/TAB)
 * add: verrasse: Update for latest COTW the Angler (alpheus, belisama, ceto, doris)
 * add: verrasse / r-one: Added more filenames for COTW the Angler
-* add: verrasse: Support for Mad Max (v1.0.3.0 + All DLCs)
 * add: ash: Added rtpc_v3_flat.ksy
 * fix: kk49: ADF5 file determination for COTW save files
 * fix: kk49: hack? empty `gdc/global.gdcc` in COTW now?

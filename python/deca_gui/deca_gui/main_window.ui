@@ -7,30 +7,18 @@
     <x>0</x>
     <y>0</y>
     <width>960</width>
-    <height>603</height>
+    <height>600</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>DECA Main Window</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2">
-    <property name="spacing">
-     <number>7</number>
-    </property>
-    <property name="topMargin">
-     <number>11</number>
-    </property>
-    <property name="rightMargin">
-     <number>11</number>
-    </property>
-    <property name="bottomMargin">
-     <number>0</number>
-    </property>
+   <layout class="QVBoxLayout" name="centralwidget_layout">
     <item>
      <widget class="QSplitter" name="splitter">
       <property name="orientation">
-       <enum>Qt::Horizontal</enum>
+       <enum>Qt::Orientation::Horizontal</enum>
       </property>
       <property name="handleWidth">
        <number>7</number>
@@ -39,7 +27,7 @@
        <bool>false</bool>
       </property>
       <widget class="QWidget" name="layoutWidget">
-       <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,0">
+       <layout class="QVBoxLayout" name="vertical_layout" stretch="1,0,0">
         <item>
          <widget class="QTabWidget" name="tabs_nodes">
           <property name="currentIndex">
@@ -51,7 +39,7 @@
          </widget>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout">
+         <layout class="QHBoxLayout" name="horizontal_layout" stretch="0,1,0,0">
           <property name="leftMargin">
            <number>1</number>
           </property>
@@ -73,6 +61,12 @@
           </item>
           <item>
            <widget class="QLineEdit" name="filter_edit">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Ignored">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="text">
              <string/>
             </property>
@@ -103,7 +97,7 @@
            <attribute name="title">
             <string>Extract</string>
            </attribute>
-           <layout class="QGridLayout" name="gridLayout" rowminimumheight="28,28,28,28,28">
+           <layout class="QGridLayout" name="grid_layout_1" rowminimumheight="24,24,24,24,24">
             <item row="4" column="1" colspan="2">
              <widget class="QComboBox" name="cmbbx_map_format">
               <property name="sizePolicy">
@@ -111,6 +105,12 @@
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>96</width>
+                <height>0</height>
+               </size>
               </property>
               <item>
                <property name="text">
@@ -169,12 +169,6 @@
               <property name="text">
                <string>EXTRACT</string>
               </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="0" column="1">
@@ -185,18 +179,12 @@
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="0" column="4">
              <spacer name="tab_extract_hspacer">
               <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+               <enum>Qt::Orientation::Horizontal</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
@@ -212,7 +200,7 @@
            <attribute name="title">
             <string>Modding</string>
            </attribute>
-           <layout class="QGridLayout" name="gridLayout_3" rowminimumheight="28,28,28,28,28">
+           <layout class="QGridLayout" name="grid_layout_2" rowminimumheight="24,24,24,24,24">
             <item row="1" column="0">
              <widget class="QCheckBox" name="chkbx_export_processed_mods">
               <property name="text">
@@ -235,12 +223,6 @@
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="0" column="0">
@@ -253,26 +235,14 @@
             <item row="0" column="2">
              <widget class="QPushButton" name="bt_mod_prep">
               <property name="text">
-               <string>Extract For Modding</string>
-              </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
+               <string>PREP MOD</string>
               </property>
              </widget>
             </item>
             <item row="1" column="2">
              <widget class="QPushButton" name="bt_mod_build">
               <property name="text">
-               <string>Build Modded Files</string>
-              </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
+               <string>BUILD MOD</string>
               </property>
              </widget>
             </item>
@@ -291,12 +261,6 @@
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="4" column="0" colspan="3">
@@ -309,7 +273,7 @@
             <item row="0" column="3">
              <spacer name="tab_modding_hspacer">
               <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+               <enum>Qt::Orientation::Horizontal</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
@@ -323,9 +287,47 @@
           </widget>
           <widget class="QWidget" name="tab_3d_gltf2">
            <attribute name="title">
-            <string>3d/GLTF2</string>
+            <string>3D/GLTF2</string>
            </attribute>
-           <layout class="QGridLayout" name="gridLayout_2" rowminimumheight="28,28,28,28">
+           <layout class="QGridLayout" name="grid_layout_3" rowstretch="0,0,0,0,0" rowminimumheight="24,24,24,24,24" columnminimumwidth="0,0,0,0">
+            <item row="0" column="0">
+             <widget class="QCheckBox" name="chkbx_export_save_to_one_dir">
+              <property name="text">
+               <string>Save To One Directory</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1" colspan="2">
+             <widget class="QComboBox" name="cmbbx_texture_format">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>64</width>
+                <height>0</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>DDS</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>DDSC</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>PNG</string>
+               </property>
+              </item>
+             </widget>
+            </item>
             <item row="0" column="1">
              <widget class="QPushButton" name="bt_extract_gltf_3d_folder_show">
               <property name="sizePolicy">
@@ -334,18 +336,31 @@
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
-              </property>
              </widget>
             </item>
-            <item row="0" column="0">
-             <widget class="QCheckBox" name="chkbx_export_save_to_one_dir">
+            <item row="0" column="3">
+             <spacer name="tab_3d_hspacer">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="lbl_texture_format">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
               <property name="text">
-               <string>Save To One Directory</string>
+               <string>Texture Format</string>
               </property>
              </widget>
             </item>
@@ -356,76 +371,38 @@
               </property>
              </widget>
             </item>
-            <item row="3" column="0">
-             <widget class="QLabel" name="lbl_texture_format">
-              <property name="text">
-               <string>Texture Format</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="2" colspan="2">
+            <item row="0" column="2">
              <widget class="QPushButton" name="bt_extract_gltf_3d">
               <property name="text">
-               <string>EXPORT 3D/GLTF2</string>
-              </property>
-              <property name="iconSize">
-               <size>
-                <width>18</width>
-                <height>18</height>
-               </size>
+               <string>EXTRACT 3D/GLTF2</string>
               </property>
              </widget>
             </item>
-            <item row="3" column="1" colspan="2">
-             <widget class="QComboBox" name="cmbbx_texture_format">
+            <item row="2" column="0">
+             <widget class="QLabel" name="tab_32_label_1">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-              <item>
-               <property name="text">
-                <string>dds</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>ddsc</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>png</string>
-               </property>
-              </item>
+              <property name="text">
+               <string/>
+              </property>
              </widget>
             </item>
-            <item row="0" column="4">
-             <spacer name="tab_3d_hspacer">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+            <item row="3" column="0">
+             <widget class="QLabel" name="tab_32_label_2">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
               </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>20</height>
-               </size>
+              <property name="text">
+               <string/>
               </property>
-             </spacer>
-            </item>
-            <item row="2" column="4">
-             <spacer name="tab_3d_vspacer">
-              <property name="orientation">
-               <enum>Qt::Vertical</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>20</width>
-                <height>40</height>
-               </size>
-              </property>
-             </spacer>
+             </widget>
             </item>
            </layout>
           </widget>
@@ -433,7 +410,14 @@
            <attribute name="title">
             <string>Utils</string>
            </attribute>
-           <layout class="QGridLayout" name="gridLayout_4" columnstretch="0,0,1" rowminimumheight="28,28">
+           <layout class="QGridLayout" name="grid_layout_4" columnstretch="0,0,1" rowminimumheight="24,0">
+            <item row="0" column="2">
+             <widget class="QLineEdit" name="vhash_to_vpath_out_edit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
             <item row="0" column="0">
              <widget class="QLabel" name="vhash_to_vpath_label">
               <property name="text">
@@ -448,17 +432,10 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="2">
-             <widget class="QLineEdit" name="vhash_to_vpath_out_edit">
-              <property name="readOnly">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="2">
+            <item row="1" column="0">
              <spacer name="tab_utils_vspacer">
               <property name="orientation">
-               <enum>Qt::Vertical</enum>
+               <enum>Qt::Orientation::Vertical</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
@@ -485,7 +462,7 @@
      <x>0</x>
      <y>0</y>
      <width>960</width>
-     <height>26</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu_File">

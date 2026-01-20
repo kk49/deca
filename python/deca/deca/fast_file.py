@@ -83,7 +83,7 @@ ff_read_f32s = make_read_many(np.float32)
 ff_read_f64s = make_read_many(np.float64)
 
 
-@njit(**params)
+@njit(**params, boundscheck=True)
 def ff_read_strz(buffer, n_buffer, pos):
     pos0 = pos
     while buffer[pos] != 0 and pos < n_buffer:

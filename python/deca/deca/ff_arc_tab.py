@@ -12,7 +12,11 @@ def tab_file_load(filename, ver):
 
         if magic == b'\x00\x08\x00\x00':
             
-            if 2 == ver:
+            if 10 == ver:
+                tab_file = TabFileV10()
+            elif 11 == ver:
+                tab_file = TabFileV11()
+            elif 2 == ver:
                 tab_file = TabFileV2()
             else:
                 unknown_version = True
@@ -64,6 +68,48 @@ class TabFileBase:
 
     def deserialize(self, f):
         raise NotImplementedError('Interface Class')
+
+    def serialize(self, f):
+        raise NotImplementedError('Interface Class')
+
+
+class TabFileV10(TabFileBase):
+    def __init__(self):
+        TabFileBase.__init__(self)
+
+    def deserialize(self, f):
+        self.magic = f.read(4)
+       
+        self.file_table = []
+        self.file_hash_map = {}
+        entry = TabEntryFileV10()
+        while entry.deserialize(f):
+            self.file_table.append(entry)
+            self.file_hash_map[entry.hashname] = entry
+            entry = TabEntryFileV10()
+
+        return True
+
+    def serialize(self, f):
+        raise NotImplementedError('Interface Class')
+
+
+class TabFileV11(TabFileBase):
+    def __init__(self):
+        TabFileBase.__init__(self)
+
+    def deserialize(self, f):
+        self.magic = f.read(4)
+       
+        self.file_table = []
+        self.file_hash_map = {}
+        entry = TabEntryFileV11()
+        while entry.deserialize(f):
+            self.file_table.append(entry)
+            self.file_hash_map[entry.hashname] = entry
+            entry = TabEntryFileV11()
+
+        return True
 
     def serialize(self, f):
         raise NotImplementedError('Interface Class')
@@ -260,6 +306,53 @@ class TabEntryFileBase:
             self.compression_flags,
             self.file_block_table
         ]
+
+
+class TabEntryFileV10(TabEntryFileBase):
+    def __init__(self):
+        TabEntryFileBase.__init__(self)
+
+    def deserialize(self, f):
+        try:
+            self.hashname = f.read_u32(raise_on_no_data=True)
+            self.offset = f.read_u32(raise_on_no_data=True)
+            self.size_c = f.read_u32(raise_on_no_data=True)
+            self.size_u = self.size_c
+            self.compression_type = compression_00_none
+            self.compression_flags = f.read_u32(raise_on_no_data=True)
+
+            if f.debug:
+                self.debug()
+        except EDecaOutOfData:
+            return False
+
+        return True
+
+    def serialize(self, f):
+        raise NotImplementedError('TODO')
+
+
+class TabEntryFileV11(TabEntryFileBase):
+    def __init__(self):
+        TabEntryFileBase.__init__(self)
+
+    def deserialize(self, f):
+        try:
+            self.hashname = f.read_u32(raise_on_no_data=True)
+            self.offset = f.read_u32(raise_on_no_data=True)
+            self.size_c = f.read_u32(raise_on_no_data=True)
+            self.size_u = self.size_c
+            self.compression_type = compression_00_none
+
+            if f.debug:
+                self.debug()
+        except EDecaOutOfData:
+            return False
+
+        return True
+
+    def serialize(self, f):
+        raise NotImplementedError('TODO')
 
 
 class TabEntryFileV2(TabEntryFileBase):

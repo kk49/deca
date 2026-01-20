@@ -1088,6 +1088,9 @@ class AdfDatabase:
                     self.type_missing.add((ae.type_id, node_uid))
                     self._type_map_updated = True
 
+                except Exception as e:
+                    print('Error parsing {:08}.adf in EXE-file at position 0x{}: [{}]'.format(poss, hex(poss), repr(e)))  
+
             adf_sub_files.append((poss, adf.total_size))
 
             self.typedefs_add(adf.map_typedef)
